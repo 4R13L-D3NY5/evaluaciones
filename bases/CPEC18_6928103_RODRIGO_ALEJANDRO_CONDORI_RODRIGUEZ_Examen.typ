@@ -4,8 +4,8 @@
   header: none,
   footer: none
 )
-#set text(font: "Times New Roman", size: 10.5pt, lang: "es")
-#set par(leading: 0.62em, justify: true)
+#set text(font: "Times New Roman", size: 11pt, lang: "es")
+#set par(leading: 0.60em, justify: true)
 
 // ============================================================================
 // EXAMEN OFICIAL UNITEPC - RODRIGO ALEJANDRO CONDORI RODRÍGUEZ (ID: 6928103)
@@ -16,52 +16,54 @@
   columns: (78%, 22%),
   column-gutter: 8pt,
   [
-    // Cabecera Oficial
+    // Cabecera Oficial (Times New Roman 11pt)
     #table(
       columns: (28%, 72%),
       stroke: 0.75pt + black,
+      inset: 4pt,
       align: (center + horizon, center + horizon),
       [
         #image("logo_unitepc_clean.png", width: 92%)
       ],
       [
-        #text(size: 11.5pt, weight: "bold")[UNIVERSIDAD TECNICA PRIVADA COSMOS]\
-        #text(size: 10pt, weight: "bold")[GESTION 2-2026]\
+        #text(weight: "bold")[UNIVERSIDAD TECNICA PRIVADA COSMOS]\
+        #text(weight: "bold")[GESTION 2-2026]\
         #v(-4pt)
         #line(length: 100%, stroke: 0.5pt + black)
         #v(-2pt)
-        #text(size: 10.5pt, weight: "bold")[EVALUACION TEORICA 1ER PARCIAL]
+        #text(weight: "bold")[EVALUACION TEORICA 1ER PARCIAL]
       ]
     )
 
     #v(-4pt)
 
-    // Datos del Estudiante con PUNTOS DE FIRMA BAJOS (en la base del renglón)
+    // Datos del Estudiante (Times New Roman 11pt uniforme)
     #table(
-      columns: (65%, 35%),
+      columns: (62%, 38%),
       stroke: 0.5pt + black,
-      [#text(size: 9pt)[*NOMBRE:* RODRIGO ALEJANDRO CONDORI RODRÍGUEZ]],
-      [#text(size: 9pt)[*CODIGO:* 6928103]],
-      [#text(size: 9pt)[*CARRERA:* LICENCIATURA EN AUDITORÍA / CONTADURÍA]],
-      [#text(size: 9pt)[*GRUPO:* TA-01]],
-      [#text(size: 9pt)[*DOCENTE:* MAURICIO QUIROZ LAFUENTE]],
-      [#text(size: 9pt)[*TIPO DE EXAMEN:* 1er Parcial]],
-      [#text(size: 9pt)[*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA]],
-      [#text(size: 9pt)[*FECHA:* 22/08/2026]],
-      [#text(size: 9pt)[*SEMESTRE:* 3]],
-      [#text(size: 9pt)[*HORA:* 08:15:00 - 09:45:00]],
-      [#grid(columns: (auto, 1fr), column-gutter: 4pt, align: (bottom + left, bottom), [#text(size: 8.5pt)[*FIRMA ESTUDIANTE:*]], [#box(width: 1fr, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.75pt)))])],
-      [#text(size: 8.5pt)[*ID ESTUDIANTE:* #text(font: "Courier", weight: "bold")[6928103]]]
+      inset: (x: 4pt, y: 2.8pt),
+      [*NOMBRE:* RODRIGO ALEJANDRO CONDORI RODRÍGUEZ],
+      [*CODIGO:* 6928103],
+      [*CARRERA:* AUDITORÍA / CONTADURÍA],
+      [*GRUPO:* TA-01],
+      [*DOCENTE:* MAURICIO QUIROZ LAFUENTE],
+      [*EXAMEN:* 1er Parcial],
+      [*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA],
+      [*FECHA:* 22/08/2026],
+      [*SEMESTRE:* 3],
+      [*HORA:* 08:15:00 - 09:45:00],
+      [#grid(columns: (auto, 1fr), column-gutter: 4pt, align: (bottom + left, bottom), [*FIRMA ESTUDIANTE:*], [#box(width: 1fr, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.75pt)))])],
+      [*ID:* 6928103]
     )
 
     #v(2.5pt)
-    #text(size: 8.5pt)[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
+    #text[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
     #v(3.5pt)
 
     // SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA (Preguntas 1 a 6 en Hoja 1)
-    #text(size: 10.5pt, weight: "bold")[SELECCION DE LA MEJOR RESPUESTA]
-    #v(-2pt)
-    #text(size: 8.5pt)[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
+    #text(weight: "bold")[SELECCION DE LA MEJOR RESPUESTA]\
+    #v(-4pt)
+    #text[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
     #v(2pt)
 
     #block(spacing: 4.5pt)[
@@ -141,7 +143,7 @@
     // CARTILLA OMR MAXIMIZADA (SIN TEXTO EXTRA, BURBUJAS GRANDES)
     #rect(width: 100%, stroke: 0.85pt + black, fill: rgb("#fafafa"), inset: (x: 2pt, y: 3.5pt), radius: 2pt)[
       #align(center)[
-        #text(size: 10.5pt, weight: "bold")[CARTILLA]
+        #text(weight: "bold")[CARTILLA]
       ]
       #v(-2pt)
 
@@ -523,9 +525,9 @@
 // ============================================================================
 
 #v(4pt)
-#text(size: 10.5pt, weight: "bold")[VERDADERO O FALSO SIMPLE]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* Marque A si el enunciado es verdadero o B si el enunciado es falso.]
+#text(weight: "bold")[VERDADERO O FALSO SIMPLE]\
+#v(-4pt)
+#text[*Instrucciones:* Marque A si el enunciado es verdadero o B si el enunciado es falso.]
 #v(4pt)
 
 #block(spacing: 6pt)[
@@ -553,9 +555,9 @@
 ]
 
 #v(6pt)
-#text(size: 10.5pt, weight: "bold")[VERDADERO O FALSO COMPLEJAS]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* Seleccione la opción correcta de acuerdo con la siguiente clave:\
+#text(weight: "bold")[VERDADERO O FALSO COMPLEJAS]\
+#v(-4pt)
+#text[*Instrucciones:* Seleccione la opción correcta de acuerdo con la siguiente clave:\
 #h(12pt) A: 1, 2 y 3 son verdaderas.\
 #h(12pt) B: 1 y 3 son verdaderas.\
 #h(12pt) C: 2 y 4 son verdaderas.\
@@ -630,9 +632,9 @@
 ]
 
 #v(6pt)
-#text(size: 10.5pt, weight: "bold")[RESPUESTA A / B / AMBAS / NINGUNA]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* Las siguientes preguntas están compuestas por dos premisas. Responda con:\
+#text(weight: "bold")[RESPUESTA A / B / AMBAS / NINGUNA]\
+#v(-4pt)
+#text[*Instrucciones:* Las siguientes preguntas están compuestas por dos premisas. Responda con:\
 #h(12pt) A: si solo la primera premisa es verdadera.\
 #h(12pt) B: si solo la segunda premisa es verdadera.\
 #h(12pt) C: si ambas premisas son verdaderas.\
@@ -668,20 +670,20 @@
 ]
 
 #v(6pt)
-#text(size: 10.5pt, weight: "bold")[ITEMS AGRUPADOS POR CASO CLINICO O PROBLEMA]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* El siguiente caso clinico o problema tendra varias preguntas. Seleccione la respuesta correcta en cada una.]
+#text(weight: "bold")[ITEMS AGRUPADOS POR CASO CLINICO O PROBLEMA]\
+#v(-4pt)
+#text[*Instrucciones:* El siguiente caso clinico o problema tendra varias preguntas. Seleccione la respuesta correcta en cada una.]
 #v(4pt)
 
 #rect(width: 100%, stroke: 0.75pt + black, fill: rgb("#f8fafc"), inset: 8pt, radius: 2pt)[
-  #text(size: 9.5pt, weight: "bold")[CASO N 1:
+  #text(weight: "bold")[CASO N 1:
 La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización externa por la gestión fiscal 2024. El auditor evidenció: (a) compras de mercadería por Bs. 80.000 pagadas en efectivo con factura original, (b) gastos de viaje por Bs. 15.000 sin respaldo de pasajes ni rendición, y (c) omisión de registro de ventas por Bs. 40.000.]
 ]
 #v(4pt)
 
 #block(spacing: 6pt)[
   *23.*  ¿Qué determinación técnica y legal corresponde a la compra de Bs. 80.000 cancelada en efectivo?\
-  #text(size: 8pt, style: "italic", fill: luma(90))[(Seleccione un solo inciso)]
+  #text(style: "italic")[(Seleccione un solo inciso)]
   #v(1.5pt)
   #pad(left: 14pt)[
     A) Depuración del Crédito Fiscal IVA y gasto no deducible en IUE por falta de bancarización \
@@ -694,7 +696,7 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
 
 #block(spacing: 6pt)[
   *24.*  ¿Cuál es el tratamiento tributario de los gastos de viaje de Bs. 15.000 sin respaldo documental?\
-  #text(size: 8pt, style: "italic", fill: luma(90))[(Seleccione un solo inciso)]
+  #text(style: "italic")[(Seleccione un solo inciso)]
   #v(1.5pt)
   #pad(left: 14pt)[
     A) Todas las anteriores \
@@ -707,7 +709,7 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
 
 #block(spacing: 6pt)[
   *25.*  ¿Qué reparos tributarios genera la omisión de registro de ventas por Bs. 40.000?\
-  #text(size: 8pt, style: "italic", fill: luma(90))[(Seleccione un solo inciso)]
+  #text(style: "italic")[(Seleccione un solo inciso)]
   #v(1.5pt)
   #pad(left: 14pt)[
     A) Ninguna de las anteriores \
@@ -720,7 +722,7 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
 
 #block(spacing: 6pt)[
   *26.*  ¿Qué calificación de conducta tributaria preliminar corresponde a las ventas no declaradas?\
-  #text(size: 8pt, style: "italic", fill: luma(90))[(Seleccione un solo inciso)]
+  #text(style: "italic")[(Seleccione un solo inciso)]
   #v(1.5pt)
   #pad(left: 14pt)[
     A) Todas las anteriores \
@@ -732,16 +734,16 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
 ]
 
 #v(6pt)
-#text(size: 10.5pt, weight: "bold")[EMPAREJAMIENTO AMPLIADO]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* De la lista de opciones, seleccione la respuesta correcta para cada enunciado.]
+#text(weight: "bold")[EMPAREJAMIENTO AMPLIADO]\
+#v(-4pt)
+#text[*Instrucciones:* De la lista de opciones, seleccione la respuesta correcta para cada enunciado.]
 #v(4pt)
 
 #rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f1f5f9"), inset: 8pt, radius: 2pt)[
-  #text(size: 9.5pt, weight: "bold")[De la lista de opciones, seleccione la respuesta correcta para cada enunciado:]\
+  #text(weight: "bold")[De la lista de opciones, seleccione la respuesta correcta para cada enunciado:]\
   #v(3pt)
   #pad(left: 10pt)[
-    #text(size: 9pt)[
+    #text[
       A) RESOLUCIÓN DETERMINATIVA (Art. 99 Ley 2492)\
       B) VISTA DE CARGO (Art. 96 Ley 2492)\
       C) ORDEN DE FISCALIZACIÓN EXTERNA (OFE)\

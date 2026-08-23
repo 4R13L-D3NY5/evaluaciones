@@ -383,52 +383,54 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   columns: (78%, 22%),
   column-gutter: 8pt,
   [
-    // Cabecera Oficial
+    // Cabecera Oficial (Times New Roman 11pt)
     #table(
       columns: (28%, 72%),
       stroke: 0.75pt + black,
+      inset: 4pt,
       align: (center + horizon, center + horizon),
       [
         #image("logo_unitepc_clean.png", width: 92%)
       ],
       [
-        #text(size: 11.5pt, weight: "bold")[UNIVERSIDAD TECNICA PRIVADA COSMOS]\\
-        #text(size: 10pt, weight: "bold")[GESTION 2-2026]\\
+        #text(weight: "bold")[UNIVERSIDAD TECNICA PRIVADA COSMOS]\\
+        #text(weight: "bold")[GESTION 2-2026]\\
         #v(-4pt)
         #line(length: 100%, stroke: 0.5pt + black)
         #v(-2pt)
-        #text(size: 10.5pt, weight: "bold")[EVALUACION TEORICA 1ER PARCIAL]
+        #text(weight: "bold")[EVALUACION TEORICA 1ER PARCIAL]
       ]
     )
 
     #v(-4pt)
 
-    // Datos del Estudiante con PUNTOS DE FIRMA BAJOS (en la base del renglón)
+    // Datos del Estudiante (Times New Roman 11pt uniforme)
     #table(
-      columns: (65%, 35%),
+      columns: (62%, 38%),
       stroke: 0.5pt + black,
-      [#text(size: 9pt)[*NOMBRE:* {estudiante_nombre.upper()}]],
-      [#text(size: 9pt)[*CODIGO:* {estudiante_codigo}]],
-      [#text(size: 9pt)[*CARRERA:* LICENCIATURA EN AUDITORÍA / CONTADURÍA]],
-      [#text(size: 9pt)[*GRUPO:* TA-01]],
-      [#text(size: 9pt)[*DOCENTE:* MAURICIO QUIROZ LAFUENTE]],
-      [#text(size: 9pt)[*TIPO DE EXAMEN:* 1er Parcial]],
-      [#text(size: 9pt)[*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA]],
-      [#text(size: 9pt)[*FECHA:* 22/08/2026]],
-      [#text(size: 9pt)[*SEMESTRE:* 3]],
-      [#text(size: 9pt)[*HORA:* 08:15:00 - 09:45:00]],
-      [#grid(columns: (auto, 1fr), column-gutter: 4pt, align: (bottom + left, bottom), [#text(size: 8.5pt)[*FIRMA ESTUDIANTE:*]], [#box(width: 1fr, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.75pt)))])],
-      [#text(size: 8.5pt)[*ID ESTUDIANTE:* #text(font: "Courier", weight: "bold")[{estudiante_codigo}]]]
+      inset: (x: 4pt, y: 2.8pt),
+      [*NOMBRE:* {estudiante_nombre.upper()}],
+      [*CODIGO:* {estudiante_codigo}],
+      [*CARRERA:* AUDITORÍA / CONTADURÍA],
+      [*GRUPO:* TA-01],
+      [*DOCENTE:* MAURICIO QUIROZ LAFUENTE],
+      [*EXAMEN:* 1er Parcial],
+      [*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA],
+      [*FECHA:* 22/08/2026],
+      [*SEMESTRE:* 3],
+      [*HORA:* 08:15:00 - 09:45:00],
+      [#grid(columns: (auto, 1fr), column-gutter: 4pt, align: (bottom + left, bottom), [*FIRMA ESTUDIANTE:*], [#box(width: 1fr, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.75pt)))])],
+      [*ID:* {estudiante_codigo}]
     )
 
     #v(2.5pt)
-    #text(size: 8.5pt)[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
+    #text[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
     #v(3.5pt)
 
     // SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA (Preguntas 1 a 6 en Hoja 1)
-    #text(size: 10.5pt, weight: "bold")[SELECCION DE LA MEJOR RESPUESTA]
-    #v(-2pt)
-    #text(size: 8.5pt)[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
+    #text(weight: "bold")[SELECCION DE LA MEJOR RESPUESTA]\\
+    #v(-4pt)
+    #text[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
     #v(2pt)
 """
 
@@ -452,7 +454,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     // CARTILLA OMR MAXIMIZADA (SIN TEXTO EXTRA, BURBUJAS GRANDES)
     #rect(width: 100%, stroke: 0.85pt + black, fill: rgb("#fafafa"), inset: (x: 2pt, y: 3.5pt), radius: 2pt)[
       #align(center)[
-        #text(size: 10.5pt, weight: "bold")[CARTILLA]
+        #text(weight: "bold")[CARTILLA]
       ]
       #v(-2pt)
 
@@ -487,9 +489,9 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     # SECCIÓN 2: VERDADERO O FALSO SIMPLE (Línea continua en el mismo renglón)
     content += """
 #v(4pt)
-#text(size: 10.5pt, weight: "bold")[VERDADERO O FALSO SIMPLE]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* Marque A si el enunciado es verdadero o B si el enunciado es falso.]
+#text(weight: "bold")[VERDADERO O FALSO SIMPLE]\\
+#v(-4pt)
+#text[*Instrucciones:* Marque A si el enunciado es verdadero o B si el enunciado es falso.]
 #v(4pt)
 """
     for p in p_sec2:
@@ -502,9 +504,9 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     # SECCIÓN 3: VERDADERO O FALSO COMPLEJAS (Con saltos de línea explícitos en las claves)
     content += """
 #v(6pt)
-#text(size: 10.5pt, weight: "bold")[VERDADERO O FALSO COMPLEJAS]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* Seleccione la opción correcta de acuerdo con la siguiente clave:\\
+#text(weight: "bold")[VERDADERO O FALSO COMPLEJAS]\\
+#v(-4pt)
+#text[*Instrucciones:* Seleccione la opción correcta de acuerdo con la siguiente clave:\\
 #h(12pt) A: 1, 2 y 3 son verdaderas.\\
 #h(12pt) B: 1 y 3 son verdaderas.\\
 #h(12pt) C: 2 y 4 son verdaderas.\\
@@ -526,9 +528,9 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     # SECCIÓN 4: RESPUESTA A / B / AMBAS / NINGUNA (Con saltos de línea explícitos en las claves)
     content += """
 #v(6pt)
-#text(size: 10.5pt, weight: "bold")[RESPUESTA A / B / AMBAS / NINGUNA]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* Las siguientes preguntas están compuestas por dos premisas. Responda con:\\
+#text(weight: "bold")[RESPUESTA A / B / AMBAS / NINGUNA]\\
+#v(-4pt)
+#text[*Instrucciones:* Las siguientes preguntas están compuestas por dos premisas. Responda con:\\
 #h(12pt) A: si solo la primera premisa es verdadera.\\
 #h(12pt) B: si solo la segunda premisa es verdadera.\\
 #h(12pt) C: si ambas premisas son verdaderas.\\
@@ -548,13 +550,13 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     # SECCIÓN 5: ÍTEMS AGRUPADOS POR CASO CLÍNICO O PROBLEMA (En card)
     content += f"""
 #v(6pt)
-#text(size: 10.5pt, weight: "bold")[ITEMS AGRUPADOS POR CASO CLINICO O PROBLEMA]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* El siguiente caso clinico o problema tendra varias preguntas. Seleccione la respuesta correcta en cada una.]
+#text(weight: "bold")[ITEMS AGRUPADOS POR CASO CLINICO O PROBLEMA]\\
+#v(-4pt)
+#text[*Instrucciones:* El siguiente caso clinico o problema tendra varias preguntas. Seleccione la respuesta correcta en cada una.]
 #v(4pt)
 
 #rect(width: 100%, stroke: 0.75pt + black, fill: rgb("#f8fafc"), inset: 8pt, radius: 2pt)[
-  #text(size: 9.5pt, weight: "bold")[{CASO_PROBLEMA_TEXTO}]
+  #text(weight: "bold")[{CASO_PROBLEMA_TEXTO}]
 ]
 #v(4pt)
 """
@@ -562,7 +564,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
         content += f"""
 #block(spacing: 6pt)[
   *{p['numero']}.*  {p['enunciado']}\\
-  #text(size: 8pt, style: "italic", fill: luma(90))[(Seleccione un solo inciso)]
+  #text(style: "italic")[(Seleccione un solo inciso)]
   #v(1.5pt)
   #pad(left: 14pt)[
 """
@@ -573,16 +575,16 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     # SECCIÓN 6: EMPAREJAMIENTO AMPLIADO CON SALTOS DE LÍNEA CLAROS
     content += """
 #v(6pt)
-#text(size: 10.5pt, weight: "bold")[EMPAREJAMIENTO AMPLIADO]
-#v(-2pt)
-#text(size: 8.5pt)[*Instrucciones:* De la lista de opciones, seleccione la respuesta correcta para cada enunciado.]
+#text(weight: "bold")[EMPAREJAMIENTO AMPLIADO]\\
+#v(-4pt)
+#text[*Instrucciones:* De la lista de opciones, seleccione la respuesta correcta para cada enunciado.]
 #v(4pt)
 
 #rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f1f5f9"), inset: 8pt, radius: 2pt)[
-  #text(size: 9.5pt, weight: "bold")[De la lista de opciones, seleccione la respuesta correcta para cada enunciado:]\\
+  #text(weight: "bold")[De la lista de opciones, seleccione la respuesta correcta para cada enunciado:]\\
   #v(3pt)
   #pad(left: 10pt)[
-    #text(size: 9pt)[
+    #text[
       A) RESOLUCIÓN DETERMINATIVA (Art. 99 Ley 2492)\\
       B) VISTA DE CARGO (Art. 96 Ley 2492)\\
       C) ORDEN DE FISCALIZACIÓN EXTERNA (OFE)\\
@@ -614,8 +616,8 @@ def generar_documento_typst_completo(estudiantes_lista, output_typ_path):
   header: none,
   footer: none
 )
-#set text(font: "Times New Roman", size: 10.5pt, lang: "es")
-#set par(leading: 0.62em, justify: true)
+#set text(font: "Times New Roman", size: 11pt, lang: "es")
+#set par(leading: 0.60em, justify: true)
 """
     body_content = ""
     patrones_variantes = {}
