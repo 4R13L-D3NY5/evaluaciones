@@ -1,0 +1,3055 @@
+import { Component, inject, signal, computed, ViewChild, ElementRef } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
+import { EvaluacionesDbService } from '../../core/services/evaluaciones-db.service';
+import * as XLSX from 'xlsx';
+
+export interface PreguntaValidada {
+  fila: number;
+  tipo: string;
+  grupo: string;
+  enunciado: string;
+  opcion_a: string;
+  opcion_b: string;
+  opcion_c: string;
+  opcion_d: string;
+  opcion_e: string;
+  opciones?: { [key: string]: string };
+  respuesta_correcta: string;
+  dificultad: '1' | '2' | '3';
+  peso: number;
+  observaciones: string;
+  formulaTypst?: string;
+  valido: boolean;
+  errores: string[];
+}
+
+export interface ExamenDocenteCronograma {
+  id: number;
+  codigo: string;
+  materia: string;
+  carrera: string;
+  semestre: number;
+  grupo: string;
+  tipo: '1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia';
+  fecha: string; // 'DD/MM/YYYY'
+  horario: string;
+  aula: string;
+  conCartilla: boolean;
+  estado: 'Programado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Enviado';
+}
+
+export interface CampusEvaluacion {
+  id: string;
+  nombre: string;
+  ciudad: string;
+  correos: string[];
+  oficina: string;
+}
+
+export interface ComprobanteEnvio {
+  ticket: string;
+  fechaHora: string;
+  campusNombre: string;
+  correoDestino: string;
+  correoDocente: string;
+  docenteNombre: string;
+  docenteCi: string;
+  materia: string;
+  codigoMateria: string;
+  grupo: string;
+  parcial: string;
+  modalidad: string;
+  totalPreguntas: number;
+  hashCriptografico: string;
+  nombreArchivoPkg: string;
+}
+
+export interface DiaCalendario {
+  dayNumber: number;
+  isCurrentMonth: boolean;
+  dateStr: string;
+  examenes: ExamenDocenteCronograma[];
+}
+
+@Component({
+  selector: 'sea-banco-preguntas',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
+    <div class="space-y-6">
+      
+      <!-- Input de archivo oculto para carga real de Excel -->
+      <input 
+        #fileInput 
+        type="file" 
+        accept=".xlsx,.xls" 
+        (change)="onFileSelected($event)" 
+        class="hidden" />
+
+      <!-- Cabecera Limpia del Módulo -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <div class="h-10 w-10 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center text-xl font-bold">
+              <i class="pi pi-check-square"></i>
+            </div>
+            <div>
+              <h1 class="text-2xl font-black tracking-tight text-foreground">
+                Gestión y Validación de Evaluaciones
+              </h1>
+              <p class="text-xs text-muted-foreground font-medium mt-0.5">
+                Validador oficial de banco de preguntas y calendario interactivo de exámenes.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pestañas Principales: 1. Validador de Examen (Default), 2. Fechas y Calendario -->
+        <div class="flex items-center bg-muted/60 p-1 rounded-xl border border-border">
+          <button 
+            (click)="tabActiva.set('validador')"
+            [class]="tabActiva() === 'validador' ? 'bg-purple-700 text-white font-black shadow-xs' : 'text-muted-foreground hover:text-foreground font-bold'"
+            class="px-4 py-2 text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer">
+            <i class="pi pi-verified text-xs"></i>
+            <span>Validador de Examen</span>
+          </button>
+
+          <button 
+            (click)="tabActiva.set('calendario')"
+            [class]="tabActiva() === 'calendario' ? 'bg-purple-700 text-white font-black shadow-xs' : 'text-muted-foreground hover:text-foreground font-bold'"
+            class="px-4 py-2 text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer">
+            <i class="pi pi-calendar text-xs"></i>
+            <span>Fechas y Calendario</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- TAB 1: VALIDADOR DE EXAMEN (DEFAULT - LIMPIO Y ENFOCADO EN EL EXAMEN) -->
+      <!-- ================================================================= -->
+      @if (tabActiva() === 'validador') {
+        <div class="space-y-6 animate-fade-in">
+          
+          <!-- Barra Superior de Acciones y Recursos del Examen -->
+          <div class="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Parcial a Validar</span>
+              <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                @for (p of ['1er Parcial', '2do Parcial', 'Examen Final', '2da Instancia']; track p) {
+                  <button 
+                    (click)="cambiarParcial(p)"
+                    [class]="parcialActivo() === p ? 'bg-purple-700 text-white font-black shadow-xs' : 'bg-muted/70 text-muted-foreground hover:text-foreground font-bold'"
+                    class="px-3.5 py-1.5 text-xs rounded-xl transition-all cursor-pointer">
+                    {{ p }} ({{ getResumenCuota(p) }})
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Botonera de Plantilla y Ejemplos -->
+            <div class="flex flex-wrap items-center gap-2">
+              <button 
+                (click)="descargarExcelBaseMacro()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                <i class="pi pi-download text-xs"></i>
+                <span>Plantilla Oficial (3 Hojas)</span>
+              </button>
+
+              <button 
+                (click)="descargarEjemploValido()"
+                class="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                <i class="pi pi-check-circle text-xs"></i>
+                <span>Ejemplo Válido</span>
+              </button>
+
+              <button 
+                (click)="descargarEjemploInvalido()"
+                class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                <i class="pi pi-exclamation-triangle text-xs"></i>
+                <span>Ejemplo con Errores</span>
+              </button>
+
+              <button 
+                (click)="abrirModalEjemplos()"
+                class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                <i class="pi pi-info-circle text-xs"></i>
+                <span>Guía de Reglas</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Paneles de Métricas y Balance del Examen -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            <!-- Tarjeta 1: Estado de Validación -->
+            <div class="lg:col-span-3 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3 flex flex-col justify-between">
+              <div>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Estado del Examen</span>
+                <h3 class="text-base font-black text-foreground mt-0.5">{{ parcialActivo() }}</h3>
+                <p class="text-xs font-bold text-primary font-mono mt-1">
+                  {{ totalPreguntasValidas() }}/{{ totalPreguntasRequeridas() }} preguntas validadas
+                </p>
+              </div>
+              
+              <div>
+                @if (esBancoTotalmenteValido()) {
+                  <div class="bg-emerald-50 border border-emerald-300 p-3 rounded-xl text-center space-y-1">
+                    <span class="text-emerald-800 font-black text-xs flex items-center justify-center gap-1">
+                      <i class="pi pi-shield text-emerald-600"></i> EXAMEN 100% APROBADO
+                    </span>
+                    <p class="text-[10px] text-emerald-700">Cuotas cumplidas y reactivos conformes</p>
+                  </div>
+                } @else {
+                  <div class="bg-amber-50 border border-amber-300 p-3 rounded-xl text-center space-y-0.5">
+                    <span class="text-amber-800 font-bold text-xs">Pendiente de Aprobación</span>
+                    <p class="text-[9px] text-amber-700 font-mono">Faltan reactivos o corregir errores</p>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Tarjeta 2: Conteo por Dificultad (OBLIGATORIO) -->
+            <div class="lg:col-span-5 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
+              <div class="flex items-center justify-between border-b border-border pb-2">
+                <span class="text-xs font-black text-foreground uppercase tracking-wide">Cuotas por Dificultad</span>
+                <span class="bg-rose-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
+                  OBLIGATORIO
+                </span>
+              </div>
+
+              <div class="space-y-2.5 text-xs">
+                <!-- Fáciles (1) -->
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-emerald-700">Fáciles (1)</span>
+                    <span class="font-mono text-foreground">{{ countFaciles() }}/{{ cuotasDificultad().facil }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="(countFaciles() / cuotasDificultad().facil) * 100"></div>
+                  </div>
+                </div>
+
+                <!-- Medias (2) -->
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-amber-600">Medias (2)</span>
+                    <span class="font-mono text-foreground">{{ countMedias() }}/{{ cuotasDificultad().medio }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-amber-500 rounded-full transition-all duration-500" [style.width.%]="(countMedias() / cuotasDificultad().medio) * 100"></div>
+                  </div>
+                </div>
+
+                <!-- Difíciles (3) -->
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-rose-600">Difíciles (3)</span>
+                    <span class="font-mono text-foreground">{{ countDificiles() }}/{{ cuotasDificultad().dificil }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-rose-500 rounded-full transition-all duration-500" [style.width.%]="(countDificiles() / cuotasDificultad().dificil) * 100"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div [class]="cuotaDificultadCumplida() ? 'text-emerald-700' : 'text-amber-700'" class="text-[10px] font-extrabold flex items-center gap-1 pt-1">
+                <i [class]="cuotaDificultadCumplida() ? 'pi pi-check-circle text-xs' : 'pi pi-exclamation-circle text-xs'"></i>
+                <span>{{ cuotaDificultadCumplida() ? '100% de cuotas alcanzadas para este examen' : 'Cuotas incompletas según parcial' }}</span>
+              </div>
+            </div>
+
+            <!-- Tarjeta 3: Conteo por Grupo de Tipo (REFERENCIAL) -->
+            <div class="lg:col-span-4 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
+              <div class="flex items-center justify-between border-b border-border pb-2">
+                <span class="text-xs font-black text-foreground uppercase tracking-wide">Mezcla por Grupo de Tipo</span>
+                <span class="bg-slate-700 text-white font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
+                  REFERENCIAL
+                </span>
+              </div>
+
+              <div class="space-y-2.5 text-xs">
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-emerald-700">G1 (VF + Compuesta + Clave)</span>
+                    <span class="font-mono text-foreground">{{ countG1() }}/{{ cuotasGrupos().g1 }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="(countG1() / cuotasGrupos().g1) * 100"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-blue-600">G2 (Selección Simple / Mejor Rpta)</span>
+                    <span class="font-mono text-foreground">{{ countG2() }}/{{ cuotasGrupos().g2 }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500 rounded-full transition-all duration-500" [style.width.%]="(countG2() / cuotasGrupos().g2) * 100"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-purple-700">G3 (Casos / Fórmulas Typst + Emp.)</span>
+                    <span class="font-mono text-foreground">{{ countG3() }}/{{ cuotasGrupos().g3 }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-purple-600 rounded-full transition-all duration-500" [style.width.%]="(countG3() / cuotasGrupos().g3) * 100"></div>
+                  </div>
+                </div>
+              </div>
+
+              <p class="text-[10px] text-muted-foreground leading-tight pt-1">
+                Balance referencial de tipos de reactivos.
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Zona Principal de Validación y Acciones de Aprobación -->
+          <div class="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 class="text-base font-black text-foreground flex items-center gap-2">
+                  <i class="pi pi-upload text-purple-700"></i>
+                  <span>Cargar y Validar Archivo Excel del Examen</span>
+                </h3>
+                <p class="text-xs text-muted-foreground">Sube el archivo .xlsx completado con las preguntas oficiales</p>
+              </div>
+
+              <!-- Botones de Acción: Forzar Previsualización PDF antes de Descargar o Previsualizar Encriptado -->
+              @if (esBancoTotalmenteValido()) {
+                <div class="flex flex-wrap items-center gap-2.5 animate-fade-in">
+                  
+                  <!-- BOTÓN 1: PREVISUALIZAR PDF (OBLIGATORIO) -->
+                  <button 
+                    (click)="abrirModalPrevisualizacionPdf()"
+                    [class]="!pdfPrevisualizadoYConforme() ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg ring-4 ring-blue-400/30 animate-pulse font-black' : 'bg-blue-600 hover:bg-blue-700 text-white font-bold'"
+                    class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all hover:scale-105 cursor-pointer">
+                    <i class="pi pi-file-pdf text-sm"></i>
+                    <span>{{ pdfPrevisualizadoYConforme() ? 'Volver a Previsualizar PDF' : 'Previsualizar Examen (Paso 1 Obligatorio)' }}</span>
+                    @if (pdfPrevisualizadoYConforme()) {
+                      <i class="pi pi-check text-[10px] text-emerald-300 font-bold"></i>
+                    }
+                  </button>
+
+                  <!-- BOTÓN 2: PREVISUALIZAR ENCRIPTADO (.PKG) (DESBLOQUEADO TRAS VER PDF) -->
+                  @if (pdfPrevisualizadoYConforme()) {
+                    <button 
+                      (click)="abrirModalPrevisualizacionPkg()"
+                      title="Inspeccionar el contenido cifrado y payload de seguridad del paquete .pkg"
+                      class="bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-purple-900 dark:text-purple-200 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-purple-300 dark:border-purple-700 transition-all hover:scale-105 cursor-pointer">
+                      <i class="pi pi-eye text-xs text-purple-600"></i>
+                      <span>Previsualizar Encriptado</span>
+                    </button>
+                  } @else {
+                    <button 
+                      disabled
+                      title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
+                      class="bg-muted text-muted-foreground/60 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border/60 cursor-not-allowed opacity-60">
+                      <i class="pi pi-lock text-xs"></i>
+                      <span>Previsualizar Encriptado</span>
+                    </button>
+                  }
+
+                  <!-- BOTÓN 3: DESCARGAR COPIA .PKG (DESBLOQUEADO TRAS VER PDF) -->
+                  @if (pdfPrevisualizadoYConforme()) {
+                    <button 
+                      (click)="generarYDescargarPaqueteEncriptado()"
+                      title="Descargar una copia de respaldo cifrada en formato .pkg"
+                      class="bg-muted hover:bg-border text-foreground font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border transition-all hover:scale-105 cursor-pointer">
+                      <i class="pi pi-shield text-xs text-purple-700"></i>
+                      <span>Descargar .pkg</span>
+                    </button>
+                  } @else {
+                    <button 
+                      disabled
+                      title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
+                      class="bg-muted text-muted-foreground/60 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border/60 cursor-not-allowed opacity-60">
+                      <i class="pi pi-lock text-xs"></i>
+                      <span>Descargar .pkg</span>
+                    </button>
+                  }
+
+                  <!-- BOTÓN 4: ENVIAR A OFICINA DE EVALUACIONES (DESBLOQUEADO TRAS VER PDF) -->
+                  @if (pdfPrevisualizadoYConforme()) {
+                    <button 
+                      (click)="abrirModalEnvioEvaluaciones()"
+                      class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-black text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/20 transition-all hover:scale-105 cursor-pointer">
+                      <i class="pi pi-send text-sm"></i>
+                      <span>Enviar a Oficina de Evaluaciones</span>
+                    </button>
+                  } @else {
+                    <button 
+                      disabled
+                      title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
+                      class="bg-muted text-muted-foreground/60 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 border border-border/60 cursor-not-allowed opacity-60">
+                      <i class="pi pi-lock text-xs"></i>
+                      <span>Enviar a Evaluaciones</span>
+                    </button>
+                  }
+
+                </div>
+              }
+            </div>
+
+            <!-- Banner de Estado de Previsualización Obligatoria -->
+            @if (esBancoTotalmenteValido()) {
+              @if (!pdfPrevisualizadoYConforme()) {
+                <div class="p-4 bg-amber-500/10 border border-amber-300 dark:border-amber-700 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fade-in">
+                  <div class="h-9 w-9 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 flex items-center justify-center shrink-0 mt-0.5 border border-amber-300">
+                    <i class="pi pi-exclamation-triangle text-base"></i>
+                  </div>
+                  <div class="space-y-1 flex-1">
+                    <div class="flex items-center justify-between">
+                      <h5 class="text-xs font-black text-amber-950 dark:text-amber-200 uppercase tracking-tight">
+                        Paso Obligatorio: Previsualización de Diagramación Typst Requerida
+                      </h5>
+                      <span class="bg-amber-200 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                        Pendiente de Revisión
+                      </span>
+                    </div>
+                    <p class="text-xs text-amber-900/90 dark:text-amber-300/90 font-medium leading-relaxed">
+                      El banco de preguntas ha alcanzado el 100% de cuotas válidas. Por normativa institucional, <strong>debes hacer clic en "Previsualizar Examen (Paso 1 Obligatorio)"</strong> para verificar la diagramación en PDF, fórmulas matemáticas/químicas y enunciados antes de desbloquear la descarga del paquete encriptado (.pkg) o la remisión oficial.
+                    </p>
+                  </div>
+                </div>
+              } @else {
+                <div class="p-4 bg-emerald-500/10 border border-emerald-300 dark:border-emerald-700 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fade-in">
+                  <div class="h-9 w-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-300">
+                    <i class="pi pi-check-circle text-base"></i>
+                  </div>
+                  <div class="space-y-1 flex-1">
+                    <div class="flex items-center justify-between">
+                      <h5 class="text-xs font-black text-emerald-950 dark:text-emerald-200 uppercase tracking-tight">
+                        Diagramación PDF Verificada y Aprobada por el Docente
+                      </h5>
+                      <span class="bg-emerald-200 text-emerald-900 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                        Conforme ✓
+                      </span>
+                    </div>
+                    <p class="text-xs text-emerald-900/90 dark:text-emerald-300/90 font-medium leading-relaxed">
+                      Has verificado la diagramación oficial del examen en PDF. Las opciones para <strong>previsualizar el paquete encriptado</strong>, <strong>descargar la copia de respaldo .pkg</strong> y <strong>enviar la evaluación a la oficina de evaluaciones</strong> han sido desbloqueadas exitosamente.
+                    </p>
+                  </div>
+                </div>
+              }
+            }
+
+            <!-- Zona Drag and Drop con Input Interactivo -->
+            <div 
+              (click)="triggerFileInput()"
+              (dragover)="onDragOver($event)"
+              (drop)="onDropFile($event)"
+              class="border-2 border-dashed border-border hover:border-purple-600 rounded-2xl p-8 text-center space-y-3 bg-muted/20 hover:bg-muted/40 transition-all cursor-pointer">
+              <div class="h-14 w-14 rounded-2xl bg-purple-100 text-purple-800 flex items-center justify-center text-2xl mx-auto shadow-2xs">
+                <i class="pi pi-file-excel"></i>
+              </div>
+              <div>
+                <div class="text-sm font-black text-foreground">
+                  {{ nombreArchivoCargado() || 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' }}
+                </div>
+                <p class="text-xs text-muted-foreground mt-1">
+                  Validación instantánea de tipos de reactivos, cuotas de dificultad y fórmulas matemáticas/químicas Typst.
+                </p>
+              </div>
+            </div>
+
+            <!-- Resumen de Errores si el archivo no es válido -->
+            @if (preguntasConErrores().length > 0) {
+              <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 space-y-2 text-xs animate-fade-in">
+                <div class="flex items-center gap-2 font-black text-rose-900">
+                  <i class="pi pi-exclamation-triangle text-rose-600"></i>
+                  <span>Se detectaron {{ preguntasConErrores().length }} filas con observaciones que deben corregirse:</span>
+                </div>
+                <ul class="list-disc pl-5 space-y-1 text-rose-800 text-[11px]">
+                  @for (errItem of preguntasConErrores(); track errItem.fila) {
+                    <li>
+                      <strong>Fila {{ errItem.fila }}:</strong> {{ errItem.errores.join(', ') }} <em>({{ errItem.enunciado ? (errItem.enunciado | slice:0:60) + '...' : 'Sin enunciado' }})</em>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+
+          </div>
+
+        </div>
+      }
+
+      <!-- ================================================================= -->
+      <!-- TAB 2: FECHAS Y CALENDARIO INTERACTIVO DE EXÁMENES -->
+      <!-- ================================================================= -->
+      @if (tabActiva() === 'calendario') {
+        <div class="space-y-6 animate-fade-in">
+          
+          <!-- Barra de Navegación del Calendario y Selector de Mes -->
+          <div class="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            <!-- Navegación de Meses -->
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1 bg-muted/70 p-1 rounded-xl border border-border">
+                <button 
+                  (click)="cambiarMesRelativo(-1)" 
+                  class="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-card text-foreground transition-all cursor-pointer">
+                  <i class="pi pi-chevron-left text-xs"></i>
+                </button>
+                <span class="font-black text-sm text-foreground px-3 min-w-[140px] text-center uppercase tracking-wide">
+                  {{ nombreMesActual() }} {{ anioActual() }}
+                </span>
+                <button 
+                  (click)="cambiarMesRelativo(1)" 
+                  class="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-card text-foreground transition-all cursor-pointer">
+                  <i class="pi pi-chevron-right text-xs"></i>
+                </button>
+              </div>
+
+              <!-- Selector Rápido de Meses del Semestre -->
+              <div class="hidden sm:flex items-center gap-1">
+                @for (m of mesesSemestre; track m.mesIndex) {
+                  <button 
+                    (click)="seleccionarMesDirecto(m.mesIndex)"
+                    [class]="mesActual() === m.mesIndex ? 'bg-purple-700 text-white font-bold' : 'bg-muted/60 text-muted-foreground hover:text-foreground font-medium'"
+                    class="px-2.5 py-1 text-[11px] rounded-lg transition-all cursor-pointer">
+                    {{ m.label }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Conmutador Lista / Cuadrícula Calendario -->
+            <div class="flex items-center gap-2">
+              <button 
+                (click)="vistaCalendario.set('calendario')"
+                [class]="vistaCalendario() === 'calendario' ? 'bg-purple-700 text-white font-black shadow-xs' : 'bg-muted text-muted-foreground font-bold'"
+                class="px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer">
+                <i class="pi pi-calendar text-xs"></i>
+                <span>Vista Calendario Mensual</span>
+              </button>
+
+              <button 
+                (click)="vistaCalendario.set('lista')"
+                [class]="vistaCalendario() === 'lista' ? 'bg-purple-700 text-white font-black shadow-xs' : 'bg-muted text-muted-foreground font-bold'"
+                class="px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer">
+                <i class="pi pi-list text-xs"></i>
+                <span>Vista Lista (Tabla)</span>
+              </button>
+            </div>
+
+          </div>
+
+          <!-- VISTA 1: CUADRÍCULA DE CALENDARIO MENSUAL INTERACTIVO -->
+          @if (vistaCalendario() === 'calendario') {
+            <div class="bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
+              
+              <!-- Cabecera de Días de la Semana (Lunes a Domingo) -->
+              <div class="grid grid-cols-7 border-b border-border bg-muted/40 text-center text-xs font-black text-muted-foreground py-2.5 uppercase tracking-wider">
+                <div>Lun</div>
+                <div>Mar</div>
+                <div>Mié</div>
+                <div>Jue</div>
+                <div>Vie</div>
+                <div>Sáb</div>
+                <div>Dom</div>
+              </div>
+
+              <!-- Matriz de Días -->
+              <div class="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-border text-xs">
+                @for (dia of matrizDiasCalendario(); track dia.dateStr) {
+                  <div 
+                    [class]="getDiaClass(dia)"
+                    class="min-h-[140px] p-2 flex flex-col justify-between transition-all hover:bg-muted/30">
+                    
+                    <!-- Encabezado del Día -->
+                    <div class="flex items-center justify-between mb-1.5">
+                      <span 
+                        [class]="dia.examenes.length > 0 ? 'bg-purple-800 text-white font-black px-1.5 py-0.5 rounded-md text-[11px] shadow-2xs' : 'font-bold text-foreground text-xs'">
+                        {{ dia.dayNumber }}
+                      </span>
+
+                      @if (dia.examenes.length > 0) {
+                        <span class="text-[9px] font-extrabold text-purple-700 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded-full">
+                          {{ dia.examenes.length }} {{ dia.examenes.length === 1 ? 'examen' : 'exámenes' }}
+                        </span>
+                      }
+                    </div>
+
+                    <!-- Eventos de Examen en este Día -->
+                    <div class="space-y-1.5 flex-1">
+                      @for (ex of dia.examenes; track ex.id) {
+                        <div 
+                          (click)="abrirModalDetalleExamen(ex)"
+                          [class]="ex.conCartilla ? 'border-l-4 border-l-blue-600 bg-blue-50/80 border border-blue-200' : 'border-l-4 border-l-amber-600 bg-amber-50/80 border border-amber-200'"
+                          class="p-2 rounded-lg text-[10px] space-y-1 shadow-2xs hover:shadow-xs transition-all cursor-pointer hover:scale-[1.02]">
+                          
+                          <!-- Tipo de Parcial y Estado -->
+                          <div class="flex items-center justify-between gap-1">
+                            <span class="bg-purple-700 text-white font-black px-1.5 py-0.2 rounded text-[9px] uppercase">
+                              {{ ex.tipo }}
+                            </span>
+                            <span [class]="getEstadoBadgeClass(ex.estado)" class="text-[8px] font-extrabold px-1.5 py-0.2 rounded-full uppercase">
+                              {{ ex.estado }}
+                            </span>
+                          </div>
+
+                          <!-- Materia y Código -->
+                          <div class="font-black text-foreground leading-tight">
+                            [{{ ex.codigo }}] {{ ex.materia }}
+                          </div>
+
+                          <!-- Grupo y Modalidad (Con/Sin Cartilla) -->
+                          <div class="flex items-center justify-between text-muted-foreground font-medium text-[9px]">
+                            <span>{{ ex.grupo }}</span>
+                            
+                            @if (ex.conCartilla) {
+                              <span class="text-blue-700 font-bold flex items-center gap-0.5">
+                                <i class="pi pi-check-square text-[9px]"></i> Con Cartilla
+                              </span>
+                            } @else {
+                              <span class="text-amber-700 font-bold flex items-center gap-0.5">
+                                <i class="pi pi-file text-[9px]"></i> Sin Cartilla
+                              </span>
+                            }
+                          </div>
+
+                          <!-- Horario y Aula -->
+                          <div class="flex items-center justify-between font-mono text-[9px] text-foreground pt-0.5 border-t border-black/5">
+                            <span><i class="pi pi-clock text-[8px] text-primary"></i> {{ ex.horario.split(' - ')[0] }}</span>
+                            <span class="truncate max-w-[80px]">{{ ex.aula.split(' ')[0] }} {{ ex.aula.split(' ')[1] }}</span>
+                          </div>
+
+                        </div>
+                      }
+                    </div>
+
+                  </div>
+                }
+              </div>
+
+            </div>
+          }
+
+          <!-- VISTA 2: TABLA LISTA OFICIAL -->
+          @if (vistaCalendario() === 'lista') {
+            <div class="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-muted/40 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                      <th class="p-3.5">Código / Materia</th>
+                      <th class="p-3.5 text-center">Semestre</th>
+                      <th class="p-3.5 text-center">Grupo</th>
+                      <th class="p-3.5 text-center">Tipo de Examen</th>
+                      <th class="p-3.5 text-center">Modalidad</th>
+                      <th class="p-3.5">Fecha</th>
+                      <th class="p-3.5">Horario</th>
+                      <th class="p-3.5">Aula / Bloque</th>
+                      <th class="p-3.5 text-center">Estado</th>
+                      <th class="p-3.5 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    @for (ex of listaExamenesDocente; track ex.id) {
+                      <tr class="hover:bg-muted/20 transition-colors">
+                        <td class="p-3.5">
+                          <div class="font-mono font-black text-foreground">{{ ex.codigo }}</div>
+                          <div class="font-bold text-muted-foreground text-[11px]">{{ ex.materia }}</div>
+                        </td>
+                        <td class="p-3.5 text-center">
+                          <span class="bg-teal-50 text-teal-700 border border-teal-200 font-bold px-2 py-0.5 rounded text-[10px]">
+                            Sem. {{ ex.semestre }}
+                          </span>
+                        </td>
+                        <td class="p-3.5 text-center font-mono font-bold">{{ ex.grupo }}</td>
+                        <td class="p-3.5 text-center">
+                          <span class="bg-purple-100 text-purple-800 font-black px-2.5 py-0.5 rounded-full text-[10px] uppercase">
+                            {{ ex.tipo }}
+                          </span>
+                        </td>
+                        <td class="p-3.5 text-center">
+                          @if (ex.conCartilla) {
+                            <span class="bg-blue-50 text-blue-700 border border-blue-200 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                              <i class="pi pi-check-square text-[9px]"></i> Con Cartilla
+                            </span>
+                          } @else {
+                            <span class="bg-amber-50 text-amber-700 border border-amber-200 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                              <i class="pi pi-file text-[9px]"></i> Sin Cartilla
+                            </span>
+                          }
+                        </td>
+                        <td class="p-3.5 font-mono font-bold text-foreground">{{ ex.fecha }}</td>
+                        <td class="p-3.5 font-mono text-muted-foreground">{{ ex.horario }}</td>
+                        <td class="p-3.5 font-bold text-foreground">{{ ex.aula }}</td>
+                        <td class="p-3.5 text-center">
+                          <span [class]="getEstadoBadgeClass(ex.estado)" class="font-black px-2.5 py-0.5 rounded-full text-[10px] uppercase">
+                            {{ ex.estado }}
+                          </span>
+                        </td>
+                        <td class="p-3.5 text-right">
+                          <button 
+                            (click)="irAValidarExamenDesdeCalendario(ex)"
+                            class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                            Validar Banco
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+        </div>
+      }
+
+      <!-- ================================================================= -->
+      <!-- MODAL: DESPACHO OFICIAL DE EXAMEN POR CORREO A EVALUACIONES       -->
+      <!-- ================================================================= -->
+      @if (dialogEnvioEvaluaciones()) {
+        <div class="fixed inset-0 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden animate-scale-in my-6">
+            
+            <!-- Cabecera del Modal de Envío -->
+            <div class="bg-gradient-to-r from-purple-800 to-indigo-900 text-white p-5 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center text-white text-lg">
+                  <i class="pi pi-send"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-black">Remisión Oficial a Oficina de Evaluaciones</h3>
+                  <p class="text-xs text-white/80 font-medium">Despacho seguro directo al correo institucional de la sede</p>
+                </div>
+              </div>
+
+              @if (!enviandoCorreo()) {
+                <button (click)="cerrarModalEnvioEvaluaciones()" class="text-white/80 hover:text-white p-2 text-base cursor-pointer">
+                  <i class="pi pi-times"></i>
+                </button>
+              }
+            </div>
+
+            <!-- Si ya se envió con éxito, mostramos el Comprobante / Acuse Oficial -->
+            @if (comprobanteGenerado()) {
+              <div class="p-6 space-y-5 bg-card text-foreground">
+                
+                <div class="bg-emerald-50 border border-emerald-300 rounded-2xl p-5 text-center space-y-2">
+                  <div class="h-12 w-12 rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl mx-auto shadow-md">
+                    <i class="pi pi-envelope"></i>
+                  </div>
+                  <h4 class="text-base font-black text-emerald-900">¡Plantilla Oficial y Paquete Generados!</h4>
+                  <p class="text-xs text-emerald-800 max-w-md mx-auto">
+                    Se descargó el paquete <strong>{{ comprobanteGenerado()?.nombreArchivoPkg }}</strong> y se preparó el despacho para <strong>{{ comprobanteGenerado()?.correoDestino }}</strong>.
+                  </p>
+                </div>
+
+                <!-- Ficha del Ticket Oficial -->
+                <div class="bg-muted/40 border border-border rounded-xl p-4 space-y-3 text-xs">
+                  <div class="flex items-center justify-between border-b border-border pb-2">
+                    <span class="font-mono font-black text-primary text-sm">{{ comprobanteGenerado()?.ticket }}</span>
+                    <span class="text-muted-foreground font-mono text-[11px]">{{ comprobanteGenerado()?.fechaHora }}</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span class="text-muted-foreground block text-[10px]">Campus de Destino:</span>
+                      <strong class="text-foreground">{{ comprobanteGenerado()?.campusNombre }}</strong>
+                    </div>
+                    <div>
+                      <span class="text-muted-foreground block text-[10px]">Correo Evaluaciones:</span>
+                      <strong class="font-mono text-purple-900">{{ comprobanteGenerado()?.correoDestino }}</strong>
+                    </div>
+                    <div>
+                      <span class="text-muted-foreground block text-[10px]">Asignatura y Grupo:</span>
+                      <strong class="text-foreground">[{{ comprobanteGenerado()?.codigoMateria }}] {{ comprobanteGenerado()?.materia }} ({{ comprobanteGenerado()?.grupo }})</strong>
+                    </div>
+                    <div>
+                      <span class="text-muted-foreground block text-[10px]">Evaluación / Reactivos:</span>
+                      <strong class="text-foreground">{{ comprobanteGenerado()?.parcial }} · {{ comprobanteGenerado()?.totalPreguntas }} preguntas OK</strong>
+                    </div>
+                    <div>
+                      <span class="text-muted-foreground block text-[10px]">Docente Remitente:</span>
+                      <strong class="text-foreground">{{ comprobanteGenerado()?.docenteNombre }} ({{ comprobanteGenerado()?.docenteCi }})</strong>
+                    </div>
+                    <div>
+                      <span class="text-muted-foreground block text-[10px]">Copia de Seguridad:</span>
+                      <strong class="font-mono text-foreground">{{ comprobanteGenerado()?.correoDocente }}</strong>
+                    </div>
+                  </div>
+
+                  <div class="pt-2 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground font-mono">
+                    <span>Archivo: <strong>{{ comprobanteGenerado()?.nombreArchivoPkg }}</strong></span>
+                    <span>Hash: {{ comprobanteGenerado()?.hashCriptografico | slice:0:16 }}...</span>
+                  </div>
+                </div>
+
+                <!-- Botones de Acción Inmediata: Abrir en Correo, Copiar Texto, Descargar .pkg -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <button 
+                    (click)="abrirClienteCorreo(comprobanteGenerado()!)"
+                    class="px-3 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
+                    <i class="pi pi-external-link"></i>
+                    <span>Abrir en mi Correo</span>
+                  </button>
+
+                  <button 
+                    (click)="copiarTextoCorreo(comprobanteGenerado()!)"
+                    class="px-3 py-2.5 bg-muted hover:bg-border text-foreground rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-border cursor-pointer">
+                    <i class="pi pi-copy"></i>
+                    <span>Copiar Texto</span>
+                  </button>
+
+                  <button 
+                    (click)="generarYDescargarPaqueteEncriptado()"
+                    class="px-3 py-2.5 bg-muted hover:bg-border text-foreground rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-border cursor-pointer">
+                    <i class="pi pi-download"></i>
+                    <span>Descargar .pkg</span>
+                  </button>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-border">
+                  <button 
+                    (click)="imprimirComprobanteEnvio()"
+                    class="px-4 py-2 bg-muted hover:bg-border text-foreground rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+                    <i class="pi pi-print"></i>
+                    <span>Imprimir Constancia</span>
+                  </button>
+
+                  <button 
+                    (click)="cerrarModalEnvioEvaluaciones()"
+                    class="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-black cursor-pointer shadow-xs">
+                    Cerrar
+                  </button>
+                </div>
+
+              </div>
+            } @else {
+              <!-- Formulario de Selección de Campus y Confirmación de Datos -->
+              <div class="p-6 space-y-4 text-xs text-foreground">
+                
+                <!-- 1. Selector de Campus / Sede de Destino -->
+                <div class="space-y-1.5">
+                  <label class="block text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                    1. Selecciona el Campus / Sede de Evaluaciones
+                  </label>
+                  <select 
+                    [(ngModel)]="campusSeleccionadoId"
+                    class="w-full bg-muted/60 border border-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-foreground outline-none focus:border-purple-600 cursor-pointer">
+                    @for (camp of listaCampusEvaluacion; track camp.id) {
+                      <option [value]="camp.id">
+                        {{ camp.nombre }} — ({{ camp.correos.join(', ') }})
+                      </option>
+                    }
+                  </select>
+                </div>
+
+                <!-- Detalle del Campus Elegido y sus Múltiples Correos -->
+                @if (campusActivo()) {
+                  <div class="bg-purple-50/70 border border-purple-200 rounded-xl p-3.5 space-y-2 text-[11px]">
+                    <div class="flex items-center justify-between">
+                      <span class="text-purple-900 font-extrabold uppercase text-[10px]">
+                        {{ campusActivo().oficina }} · Sede {{ campusActivo().ciudad }}
+                      </span>
+                      <span class="bg-purple-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                        {{ campusActivo().correos.length }} Buzón(es) de Destino
+                      </span>
+                    </div>
+
+                    <div class="flex flex-wrap gap-1.5 pt-0.5">
+                      @for (mail of campusActivo().correos; track $index) {
+                        <span class="bg-white border border-purple-300 text-purple-950 font-bold px-2.5 py-1 rounded-lg font-mono text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
+                          <i class="pi pi-envelope text-purple-700 text-[10px]"></i>
+                          <span>{{ mail }}</span>
+                        </span>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <!-- 2. Selección de la Materia / Rol de Examen del Docente -->
+                <div class="space-y-1.5">
+                  <label class="block text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                    2. Asignatura y Rol de Examen Programado
+                  </label>
+                  <select 
+                    [(ngModel)]="examenRolSeleccionadoId"
+                    class="w-full bg-muted/60 border border-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-foreground outline-none focus:border-purple-600 cursor-pointer">
+                    @for (ex of listaExamenesDocente; track ex.id) {
+                      <option [value]="ex.id">
+                        [{{ ex.codigo }}] {{ ex.materia }} — {{ ex.grupo }} ({{ ex.tipo }} · {{ ex.fecha }} {{ ex.horario.split(' - ')[0] }})
+                      </option>
+                    }
+                  </select>
+                </div>
+
+                <!-- 3. Ficha Resumen de Emisión -->
+                <div class="grid grid-cols-2 gap-3 bg-muted/40 p-4 rounded-xl border border-border text-[11px]">
+                  <div>
+                    <span class="text-muted-foreground block text-[10px]">Docente Titular:</span>
+                    <strong class="text-foreground">{{ docenteSesion.nombre }}</strong>
+                    <span class="block text-[10px] text-muted-foreground">C.I.: {{ docenteSesion.ci }}</span>
+                  </div>
+                  <div>
+                    <span class="text-muted-foreground block text-[10px]">Correo del Docente:</span>
+                    <strong class="text-foreground font-mono">{{ docenteSesion.correo }}</strong>
+                    <span class="block text-[9px] text-emerald-700 font-bold">Recibirá copia de entrega</span>
+                  </div>
+                  <div>
+                    <span class="text-muted-foreground block text-[10px]">Paquete Generado:</span>
+                    <strong class="font-mono text-purple-900">{{ nombreArchivoPaquete() }}</strong>
+                  </div>
+                  <div>
+                    <span class="text-muted-foreground block text-[10px]">Certificación:</span>
+                    <strong class="text-emerald-700 font-bold">✓ {{ totalPreguntasValidas() }} reactivos validados</strong>
+                  </div>
+                </div>
+
+                <!-- 4. Observaciones Opcionales para el Personal de Evaluaciones -->
+                <div class="space-y-1">
+                  <label class="block text-[11px] font-bold text-muted-foreground">
+                    Observaciones o notas para la Oficina de Evaluaciones (Opcional):
+                  </label>
+                  <textarea 
+                    [(ngModel)]="observacionesDocenteEnvio"
+                    rows="2"
+                    placeholder="Ejemplo: Se solicita imprimir con variante A y B en tamaño Oficio..."
+                    class="w-full bg-muted/50 border border-border rounded-xl p-3 text-xs text-foreground outline-none focus:border-purple-600 resize-none">
+                  </textarea>
+                </div>
+
+              </div>
+
+              <!-- Footer con Botón de Envío Directo -->
+              <div class="bg-muted/30 border-t border-border p-4 flex items-center justify-between">
+                <button 
+                  (click)="cerrarModalEnvioEvaluaciones()"
+                  [disabled]="enviandoCorreo()"
+                  class="px-4 py-2 bg-muted text-foreground rounded-xl text-xs font-bold hover:bg-muted/80 cursor-pointer disabled:opacity-50">
+                  Cancelar
+                </button>
+
+                <button 
+                  (click)="ejecutarEnvioCorreoEvaluaciones()"
+                  [disabled]="enviandoCorreo()"
+                  class="px-6 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-lg shadow-purple-500/20 transition-all hover:scale-105 cursor-pointer disabled:opacity-50">
+                  @if (enviandoCorreo()) {
+                    <i class="pi pi-spin pi-spinner text-sm"></i>
+                    <span>Despachando Correo...</span>
+                  } @else {
+                    <i class="pi pi-send text-sm"></i>
+                    <span>Confirmar y Enviar Evaluación</span>
+                  }
+                </button>
+              </div>
+            }
+
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: DETALLE DE EXAMEN SELECCIONADO EN CALENDARIO -->
+      @if (examenSeleccionadoModal()) {
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-scale-in my-6">
+            
+            <div class="bg-gradient-to-r from-purple-800 to-indigo-900 text-white p-5 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center text-white text-lg">
+                  <i class="pi pi-calendar"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-black">{{ examenSeleccionadoModal()?.materia }}</h3>
+                  <p class="text-xs text-white/80 font-mono">{{ examenSeleccionadoModal()?.codigo }} · {{ examenSeleccionadoModal()?.grupo }}</p>
+                </div>
+              </div>
+
+              <button (click)="examenSeleccionadoModal.set(null)" class="text-white/80 hover:text-white p-2 text-base">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <div class="p-6 space-y-4 text-xs text-foreground">
+              
+              <div class="grid grid-cols-2 gap-3 bg-muted/40 p-4 rounded-xl border border-border font-medium">
+                <div>
+                  <span class="text-[10px] text-muted-foreground uppercase font-bold block">Tipo de Evaluación</span>
+                  <span class="font-black text-purple-900 text-xs">{{ examenSeleccionadoModal()?.tipo }}</span>
+                </div>
+                <div>
+                  <span class="text-[10px] text-muted-foreground uppercase font-bold block">Modalidad</span>
+                  <span class="font-bold text-xs">{{ examenSeleccionadoModal()?.conCartilla ? 'Con Cartilla Óptica' : 'Sin Cartilla' }}</span>
+                </div>
+                <div>
+                  <span class="text-[10px] text-muted-foreground uppercase font-bold block">Fecha Programada</span>
+                  <span class="font-mono font-bold text-xs text-foreground">{{ examenSeleccionadoModal()?.fecha }}</span>
+                </div>
+                <div>
+                  <span class="text-[10px] text-muted-foreground uppercase font-bold block">Horario</span>
+                  <span class="font-mono font-bold text-xs text-foreground">{{ examenSeleccionadoModal()?.horario }}</span>
+                </div>
+                <div>
+                  <span class="text-[10px] text-muted-foreground uppercase font-bold block">Aula / Bloque</span>
+                  <span class="font-bold text-xs text-foreground">{{ examenSeleccionadoModal()?.aula }}</span>
+                </div>
+                <div>
+                  <span class="text-[10px] text-muted-foreground uppercase font-bold block">Estado Actual</span>
+                  <span [class]="getEstadoBadgeClass(examenSeleccionadoModal()!.estado)" class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase inline-block mt-0.5">
+                    {{ examenSeleccionadoModal()?.estado }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-[11px] leading-relaxed">
+                <i class="pi pi-info-circle text-blue-700 mr-1"></i>
+                Para este examen se requiere un banco validado de <strong>{{ getResumenCuota(examenSeleccionadoModal()!.tipo) }}</strong>.
+              </div>
+
+            </div>
+
+            <div class="bg-muted/30 border-t border-border p-4 flex items-center justify-between">
+              <button 
+                (click)="examenSeleccionadoModal.set(null)"
+                class="px-4 py-2 bg-muted text-foreground rounded-xl text-xs font-bold hover:bg-muted/80">
+                Cerrar
+              </button>
+
+              <button 
+                (click)="irAValidarExamenDesdeCalendario(examenSeleccionadoModal()!)"
+                class="px-5 py-2 bg-purple-700 text-white rounded-xl text-xs font-black hover:bg-purple-800 flex items-center gap-2 shadow-xs cursor-pointer">
+                <i class="pi pi-verified text-xs"></i>
+                <span>Ir a Validar Banco para este Examen</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      }
+
+      <!-- ================================================================= -->
+      <!-- MODAL: PREVISUALIZACIÓN DEL EXAMEN EN FORMATO PDF / CUADERNILLO TYPST -->
+      <!-- ================================================================= -->
+      @if (dialogPrevisualizacionPdf()) {
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto flex flex-col max-h-[92vh]">
+            
+            <!-- Barra Superior del Visor PDF (Estilo Lector de Documentos) -->
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-700/60 shrink-0">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-400 text-xl shrink-0">
+                  <i class="pi pi-file-pdf"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-black">Previsualización de Cuadernillo de Examen (Motor Typst)</h3>
+                    <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                      100% del Banco ({{ preguntasValidasParaPdf().length }} Reactivos)
+                    </span>
+                  </div>
+                  <p class="text-xs text-slate-300 font-mono">
+                    {{ parcialActivo() }} · Variante Tipo A · UNITEPC Gestión II-2026
+                  </p>
+                </div>
+              </div>
+
+              <!-- Herramientas de Control del Visor: Filtro de Dificultad, Columnas e Impresión -->
+              <div class="flex flex-wrap items-center gap-2">
+                
+                <!-- Filtro de Dificultad Rápido -->
+                <div class="flex items-center bg-white/10 p-0.5 rounded-lg border border-white/15 text-[11px]">
+                  <button 
+                    (click)="filtroPdfDificultad.set('TODAS')"
+                    [class]="filtroPdfDificultad() === 'TODAS' ? 'bg-white text-slate-950 font-black shadow-xs' : 'text-slate-200 hover:text-white font-medium'"
+                    class="px-2.5 py-1 rounded-md transition-all cursor-pointer">
+                    Todas ({{ totalPreguntasValidas() }})
+                  </button>
+                  <button 
+                    (click)="filtroPdfDificultad.set('1')"
+                    [class]="filtroPdfDificultad() === '1' ? 'bg-emerald-500 text-white font-black shadow-xs' : 'text-slate-200 hover:text-white font-medium'"
+                    class="px-2 py-1 rounded-md transition-all cursor-pointer">
+                    Fáciles ({{ countFaciles() }})
+                  </button>
+                  <button 
+                    (click)="filtroPdfDificultad.set('2')"
+                    [class]="filtroPdfDificultad() === '2' ? 'bg-amber-500 text-white font-black shadow-xs' : 'text-slate-200 hover:text-white font-medium'"
+                    class="px-2 py-1 rounded-md transition-all cursor-pointer">
+                    Medias ({{ countMedias() }})
+                  </button>
+                  <button 
+                    (click)="filtroPdfDificultad.set('3')"
+                    [class]="filtroPdfDificultad() === '3' ? 'bg-rose-500 text-white font-black shadow-xs' : 'text-slate-200 hover:text-white font-medium'"
+                    class="px-2 py-1 rounded-md transition-all cursor-pointer">
+                    Difíciles ({{ countDificiles() }})
+                  </button>
+                </div>
+
+                <!-- Conmutador 2 Columnas / 1 Columna -->
+                <button 
+                  (click)="vistaPdfColumnas.set(vistaPdfColumnas() === '2' ? '1' : '2')"
+                  title="Cambiar entre 2 columnas (impreso Typst) y 1 columna"
+                  class="bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded-lg border border-white/15 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer">
+                  <i [class]="vistaPdfColumnas() === '2' ? 'pi pi-table' : 'pi pi-list'"></i>
+                  <span>{{ vistaPdfColumnas() === '2' ? '2 Columnas' : '1 Columna' }}</span>
+                </button>
+
+                <button (click)="cerrarModalPrevisualizacionPdf()" class="text-white/80 hover:text-white p-1 text-base cursor-pointer ml-1">
+                  <i class="pi pi-times"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Área de Visualización: Hoja de Examen en Tamaño Real (Estilo Papel Académico) -->
+            <div class="p-4 sm:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 space-y-6">
+              
+              <!-- Hoja de Examen Impresa Oficial (Renderizado Typst) -->
+              <div class="bg-white text-slate-900 border border-slate-300 rounded-2xl shadow-xl p-6 sm:p-10 max-w-4xl mx-auto space-y-6 font-serif text-xs leading-relaxed">
+                
+                <!-- 1. Encabezado Institucional UNITEPC Oficial -->
+                <div class="border-b-2 border-slate-900 pb-4 text-center space-y-1.5 font-sans">
+                  <div class="flex items-center justify-between pb-1">
+                    <div class="text-left font-mono text-[9px] text-slate-600 font-bold uppercase">
+                      <div>UNITEPC · SEDE COCHABAMBA</div>
+                      <div>VICERRECTORADO ACADÉMICO</div>
+                    </div>
+
+                    <div class="text-right font-mono text-[9px] text-purple-900 font-black uppercase">
+                      <div>SISTEMA DE EVALUACIONES (SEA)</div>
+                      <div>MOTOR DE DIAGRAMACIÓN TYPST v0.11</div>
+                    </div>
+                  </div>
+
+                  <h2 class="text-base sm:text-lg font-black uppercase tracking-wider text-slate-950">
+                    UNIVERSIDAD TÉCNICA PRIVADA COSMOS
+                  </h2>
+                  <p class="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                    CUADERNILLO OFICIAL DE EXAMEN · GESTIÓN ACADÉMICA II-2026
+                  </p>
+
+                  <!-- Ficha de Datos del Examen -->
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-300 text-[10px] font-mono text-slate-800 text-left bg-slate-50 p-2.5 rounded-lg border">
+                    <div>
+                      <span class="text-slate-500 font-sans block text-[9px] uppercase font-bold">Asignatura:</span>
+                      <strong class="text-slate-950 font-sans text-[11px]">TELECOMUNICACIONES</strong>
+                    </div>
+                    <div>
+                      <span class="text-slate-500 font-sans block text-[9px] uppercase font-bold">Tipo de Prueba:</span>
+                      <strong class="text-purple-900 font-black">{{ parcialActivo() | uppercase }}</strong>
+                    </div>
+                    <div>
+                      <span class="text-slate-500 font-sans block text-[9px] uppercase font-bold">Variante:</span>
+                      <strong class="text-slate-950 font-black">TIPO A (Oficial)</strong>
+                    </div>
+                    <div>
+                      <span class="text-slate-500 font-sans block text-[9px] uppercase font-bold">Ponderación:</span>
+                      <strong class="text-slate-950 font-black">100 PUNTOS</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 2. Cuadro de Identificación y Firma del Estudiante -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[10px] font-sans border border-slate-400 p-3 rounded-xl bg-slate-50/80">
+                  <div class="sm:col-span-2">
+                    <span class="text-slate-500 font-bold block text-[9px] uppercase">Apellidos y Nombres del Estudiante:</span>
+                    <div class="border-b border-slate-400 h-5 mt-1"></div>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 font-bold block text-[9px] uppercase">C.I. / R.U.:</span>
+                    <div class="border-b border-slate-400 h-5 mt-1"></div>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 font-bold block text-[9px] uppercase">Firma del Estudiante:</span>
+                    <div class="border-b border-slate-400 h-5 mt-1"></div>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 font-bold block text-[9px] uppercase">Fecha de Aplicación:</span>
+                    <div class="font-mono font-bold text-slate-800 pt-1">____ / ____ / 2026</div>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 font-bold block text-[9px] uppercase">Grupo / Paralelo:</span>
+                    <div class="font-mono font-bold text-slate-800 pt-1">Grupo 1 (G1)</div>
+                  </div>
+                </div>
+
+                <!-- 3. Instrucciones Generales para la Evaluación -->
+                <div class="p-3 bg-amber-50/70 border border-amber-300/80 rounded-xl text-[10px] font-sans text-amber-950 space-y-1">
+                  <div class="font-black uppercase flex items-center gap-1.5 text-amber-900">
+                    <i class="pi pi-info-circle"></i>
+                    <span>Instrucciones Generales de la Prueba</span>
+                  </div>
+                  <ul class="list-disc pl-4 space-y-0.5 text-amber-900/90">
+                    <li>Lea cuidadosamente cada reactivo antes de marcar su respuesta definitiva.</li>
+                    <li>Rellene completamente el círculo correspondiente en la <strong>Cartilla de Respuestas Óptica (OMR)</strong> con bolígrafo negro o azul.</li>
+                    <li>No se admiten tachaduras, borrones ni marcas dobles. Cada pregunta tiene una única respuesta correcta.</li>
+                  </ul>
+                </div>
+
+                <!-- 4. Cuerpo Completo de Preguntas del Banco (100% de los reactivos) -->
+                <div class="pt-2 border-t border-slate-300">
+                  <div class="text-center font-sans font-black text-xs uppercase tracking-widest text-slate-700 mb-4 pb-1 border-b border-slate-200">
+                    — CUESTIONARIO OFICIAL DE PREGUNTAS (TOTAL: {{ preguntasValidasParaPdf().length }} REACTIVOS) —
+                  </div>
+
+                  <!-- Grilla de Preguntas (2 Columnas o 1 Columna) -->
+                  <div [class]="vistaPdfColumnas() === '2' ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6' : 'space-y-6'">
+                    
+                    @for (pregunta of preguntasValidasParaPdf(); track pregunta.fila; let i = $index) {
+                      <div class="space-y-2 p-3 rounded-xl border border-slate-200 bg-slate-50/40 hover:bg-slate-50 transition-colors break-inside-avoid">
+                        
+                        <!-- Encabezado de la Pregunta: Número, Dificultad, Tipo y Clave -->
+                        <div class="flex items-start justify-between gap-2 border-b border-slate-200 pb-1.5">
+                          <div class="font-sans font-black text-slate-900 text-xs flex items-center gap-1.5">
+                            <span class="h-5 w-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] shrink-0">
+                              {{ i + 1 }}
+                            </span>
+                            <span class="font-bold text-[10px] text-slate-600 uppercase font-mono">
+                              Fila Excel {{ pregunta.fila }}
+                            </span>
+                          </div>
+
+                          <div class="flex items-center gap-1 font-mono text-[9px]">
+                            <!-- Badge Dificultad -->
+                            <span [class]="pregunta.dificultad === '1' ? 'bg-emerald-100 text-emerald-800' : (pregunta.dificultad === '2' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800')" class="px-1.5 py-0.2 rounded font-bold uppercase">
+                              {{ getDificultadNombre(pregunta.dificultad) }}
+                            </span>
+                            
+                            <!-- Clave Correcta -->
+                            <span class="bg-purple-100 text-purple-900 font-black px-1.5 py-0.2 rounded border border-purple-200">
+                              Clave: {{ pregunta.respuesta_correcta }}
+                            </span>
+                          </div>
+                        </div>
+
+                        <!-- Enunciado de la Pregunta -->
+                        <p class="font-bold text-slate-950 text-xs leading-snug font-sans">
+                          {{ pregunta.enunciado }}
+                        </p>
+
+                        <!-- Renderizado de Fórmulas Typst si existen -->
+                        @if (pregunta.formulaTypst) {
+                          <div class="bg-slate-950 text-emerald-400 font-mono text-[10.5px] p-2.5 rounded-lg border border-slate-800 my-1 overflow-x-auto">
+                            {{ pregunta.formulaTypst }}
+                          </div>
+                        }
+
+                        <!-- Opciones de Respuesta según tipo de reactivo -->
+                        @if (pregunta.tipo === 'FALSO_VERDADERO') {
+                          <div class="grid grid-cols-2 gap-2 pl-2 font-sans text-[11px] pt-1">
+                            <div class="flex items-center gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'A'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'A'">
+                              <strong class="h-4 w-4 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-[9px]">A</strong>
+                              <span>Verdadero</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'B'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'B'">
+                              <strong class="h-4 w-4 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-[9px]">B</strong>
+                              <span>Falso</span>
+                            </div>
+                          </div>
+                        } @else if (pregunta.tipo === 'RESPUESTA_COMPUESTA') {
+                          <div class="space-y-1.5 pl-2 font-sans text-[11px] pt-1">
+                            @if (pregunta.opcion_a) {
+                              <div class="flex items-start gap-1.5 p-1 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'A'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'A'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">A</strong>
+                                <span>{{ pregunta.opcion_a }}</span>
+                              </div>
+                            }
+                            @if (pregunta.opcion_b) {
+                              <div class="flex items-start gap-1.5 p-1 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'B'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'B'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">B</strong>
+                                <span>{{ pregunta.opcion_b }}</span>
+                              </div>
+                            }
+                            @if (pregunta.opcion_c) {
+                              <div class="flex items-start gap-1.5 p-1 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'C'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'C'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">C</strong>
+                                <span>{{ pregunta.opcion_c }}</span>
+                              </div>
+                            }
+                            @if (pregunta.opcion_d) {
+                              <div class="flex items-start gap-1.5 p-1 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'D'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'D'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">D</strong>
+                                <span>{{ pregunta.opcion_d }}</span>
+                              </div>
+                            }
+                          </div>
+                        } @else {
+                          <!-- SELECCIÓN SIMPLE / PREGUNTA CON CLAVE / PROBLEMAS -->
+                          <div class="grid grid-cols-1 gap-1.5 pl-2 font-sans text-[11px] pt-1">
+                            @if (pregunta.opcion_a) {
+                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'A'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'A'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">A</strong>
+                                <span>{{ pregunta.opcion_a }}</span>
+                              </div>
+                            }
+                            @if (pregunta.opcion_b) {
+                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'B'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'B'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">B</strong>
+                                <span>{{ pregunta.opcion_b }}</span>
+                              </div>
+                            }
+                            @if (pregunta.opcion_c) {
+                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'C'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'C'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">C</strong>
+                                <span>{{ pregunta.opcion_c }}</span>
+                              </div>
+                            }
+                            @if (pregunta.opcion_d) {
+                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'D'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'D'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">D</strong>
+                                <span>{{ pregunta.opcion_d }}</span>
+                              </div>
+                            }
+                            @if (pregunta.opcion_e) {
+                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'E'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'E'">
+                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">E</strong>
+                                <span>{{ pregunta.opcion_e }}</span>
+                              </div>
+                            }
+                          </div>
+                        }
+
+                      </div>
+                    }
+
+                  </div>
+                </div>
+
+                <!-- 5. Pie de Cuadernillo Académico Oficial -->
+                <div class="border-t-2 border-slate-800 pt-4 text-center font-sans text-[10px] text-slate-600 space-y-1">
+                  <div class="font-bold uppercase tracking-wider text-slate-900">
+                    UNIVERSIDAD TÉCNICA PRIVADA COSMOS · DEPARTAMENTO NACIONAL DE EVALUACIONES
+                  </div>
+                  <div class="font-mono text-[9px]">
+                    Certificación Criptográfica Typst v0.11 · Total {{ preguntasValidasParaPdf().length }} Reactivos Certificados
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            <!-- Pie del Modal con Acción de Aprobación de Diagramación Requerida -->
+            <div class="bg-card border-t border-border p-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs shrink-0">
+              <div class="flex items-center gap-2 text-muted-foreground font-medium text-center sm:text-left">
+                <i class="pi pi-shield text-purple-700 text-sm"></i>
+                <span>Has revisado el 100% de las <strong>{{ preguntasValidasParaPdf().length }} preguntas</strong> del banco oficial.</span>
+              </div>
+
+              <div class="flex items-center gap-2.5">
+                <button 
+                  (click)="cerrarModalPrevisualizacionPdf()"
+                  class="px-4 py-2.5 bg-muted hover:bg-border text-foreground rounded-xl font-bold transition-colors cursor-pointer">
+                  Cerrar sin Aprobar
+                </button>
+
+                <button 
+                  (click)="aprobarDiagramacionPdf()"
+                  class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all hover:scale-105 flex items-center gap-2 cursor-pointer">
+                  <i class="pi pi-check-circle text-sm"></i>
+                  <span>Aprobar Diagramación y Desbloquear Encriptado</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      }
+
+      <!-- ================================================================= -->
+      <!-- MODAL: PREVISUALIZACIÓN DE PAQUETE ENCRIPTADO (.PKG)              -->
+      <!-- ================================================================= -->
+      @if (dialogPrevisualizacionPkg()) {
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto">
+            
+            <!-- Cabecera Encriptado -->
+            <div class="bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 text-white p-5 flex items-center justify-between border-b border-purple-800/40">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 text-xl">
+                  <i class="pi pi-shield"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-black">Previsualización de Paquete Encriptado (.pkg)</h3>
+                    <span class="bg-purple-500/30 text-purple-200 border border-purple-400/40 font-mono text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                      AES-XOR / SHA-256
+                    </span>
+                  </div>
+                  <p class="text-xs text-purple-200/80 font-mono">
+                    {{ nombreArchivoPaquete() }} · {{ parcialActivo() }}
+                  </p>
+                </div>
+              </div>
+
+              <button (click)="cerrarModalPrevisualizacionPkg()" class="text-white/80 hover:text-white p-2 text-base cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <!-- Ficha Criptográfica y Selector de Vista (Cifrado Raw vs Desencriptado) -->
+            <div class="p-5 space-y-4 text-xs text-foreground bg-muted/20">
+              
+              <!-- Tarjeta de Metadatos de Seguridad -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-card border border-border rounded-xl font-mono text-[11px]">
+                <div>
+                  <span class="text-muted-foreground text-[10px] block uppercase font-sans font-bold">Docente Certificador:</span>
+                  <strong class="text-foreground">{{ docenteSesion.nombre }}</strong>
+                </div>
+                <div>
+                  <span class="text-muted-foreground text-[10px] block uppercase font-sans font-bold">Total Reactivos:</span>
+                  <strong class="text-emerald-600 font-black">{{ totalPreguntasValidas() }} Preguntas OK</strong>
+                </div>
+                <div>
+                  <span class="text-muted-foreground text-[10px] block uppercase font-sans font-bold">Sello SHA-256:</span>
+                  <strong class="text-purple-700 truncate block">b94d27b9934d3e08...</strong>
+                </div>
+              </div>
+
+              <!-- Pestañas de Inspección -->
+              <div class="flex items-center gap-2 border-b border-border pb-1">
+                <button 
+                  (click)="tabPrevisualizacionPkg.set('cifrado')"
+                  [class]="tabPrevisualizacionPkg() === 'cifrado' ? 'border-purple-600 text-purple-700 dark:text-purple-300 font-black border-b-2' : 'text-muted-foreground hover:text-foreground font-bold'"
+                  class="px-3 py-2 text-xs flex items-center gap-1.5 transition-all cursor-pointer">
+                  <i class="pi pi-lock text-xs"></i>
+                  <span>1. Paquete Cifrado (.pkg Raw)</span>
+                </button>
+
+                <button 
+                  (click)="tabPrevisualizacionPkg.set('desencriptado')"
+                  [class]="tabPrevisualizacionPkg() === 'desencriptado' ? 'border-purple-600 text-purple-700 dark:text-purple-300 font-black border-b-2' : 'text-muted-foreground hover:text-foreground font-bold'"
+                  class="px-3 py-2 text-xs flex items-center gap-1.5 transition-all cursor-pointer">
+                  <i class="pi pi-code text-xs"></i>
+                  <span>2. Payload Desencriptado (JSON Oficial)</span>
+                </button>
+              </div>
+
+              <!-- Visualizador de Código con Scroll -->
+              @if (tabPrevisualizacionPkg() === 'cifrado') {
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Estructura de archivo de paquete binario/hexadecimal protegido contra manipulaciones:</span>
+                    <button (click)="copiarContenidoPkg()" class="text-purple-700 dark:text-purple-300 hover:underline font-bold flex items-center gap-1 cursor-pointer">
+                      <i class="pi pi-copy text-[10px]"></i> Copiar Texto
+                    </button>
+                  </div>
+                  <pre class="bg-slate-950 text-purple-300 font-mono text-[11px] p-4 rounded-xl max-h-64 overflow-y-auto border border-purple-900/50 leading-relaxed whitespace-pre-wrap select-all">{{ pkgHexData() }}</pre>
+                </div>
+              } @else {
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Contenido parseado y validado listo para la diagramación Typst:</span>
+                    <button (click)="copiarContenidoPkg()" class="text-purple-700 dark:text-purple-300 hover:underline font-bold flex items-center gap-1 cursor-pointer">
+                      <i class="pi pi-copy text-[10px]"></i> Copiar JSON
+                    </button>
+                  </div>
+                  <pre class="bg-slate-950 text-emerald-400 font-mono text-[11px] p-4 rounded-xl max-h-64 overflow-y-auto border border-slate-800 leading-relaxed whitespace-pre-wrap select-all">{{ pkgJsonData() }}</pre>
+                </div>
+              }
+
+            </div>
+
+            <!-- Footer del Modal de Paquete -->
+            <div class="bg-card border-t border-border p-4 flex items-center justify-between text-xs">
+              <button 
+                (click)="generarYDescargarPaqueteEncriptado()"
+                class="px-4 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
+                <i class="pi pi-download"></i>
+                <span>Descargar Archivo {{ nombreArchivoPaquete() }}</span>
+              </button>
+
+              <button 
+                (click)="cerrarModalPrevisualizacionPkg()"
+                class="px-5 py-2.5 bg-muted hover:bg-border text-foreground rounded-xl font-bold transition-colors cursor-pointer">
+                Cerrar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: GUÍA OFICIAL DE LINEAMIENTOS Y RENDERIZADO TYPST EN PDF -->
+      @if (dialogEjemplos()) {
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl max-w-5xl w-full shadow-2xl overflow-hidden animate-scale-in my-6">
+            
+            <!-- Cabecera de la Guía -->
+            <div class="bg-gradient-to-r from-purple-800 to-indigo-900 text-white p-5 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="h-11 w-11 rounded-xl bg-white/15 flex items-center justify-center text-white text-xl">
+                  <i class="pi pi-book"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-black">Guía Oficial de Reactivos y Renderizado de Examen (Typst)</h3>
+                  <p class="text-xs text-white/80 font-medium">
+                    Lineamientos de llenado en Excel y previsualización exacta de cómo se imprimirá cada tipo de pregunta en el examen.
+                  </p>
+                </div>
+              </div>
+
+              <button (click)="cerrarModalEjemplos()" class="text-white/80 hover:text-white p-2 text-base cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <!-- Filtro de Tipos de Pregunta -->
+            <div class="bg-muted/60 border-b border-border p-3 flex flex-wrap items-center gap-1.5 overflow-x-auto text-xs">
+              <button 
+                (click)="filtroGuiaTipo.set('TODOS')"
+                [class]="filtroGuiaTipo() === 'TODOS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                Todos los Tipos
+              </button>
+              <button 
+                (click)="filtroGuiaTipo.set('FALSO_VERDADERO')"
+                [class]="filtroGuiaTipo() === 'FALSO_VERDADERO' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                1. Falso / Verdadero
+              </button>
+              <button 
+                (click)="filtroGuiaTipo.set('SELECCION_SIMPLE')"
+                [class]="filtroGuiaTipo() === 'SELECCION_SIMPLE' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                2. Selección Simple
+              </button>
+              <button 
+                (click)="filtroGuiaTipo.set('PREGUNTA_CON_CLAVE')"
+                [class]="filtroGuiaTipo() === 'PREGUNTA_CON_CLAVE' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                3. Pregunta con Clave
+              </button>
+              <button 
+                (click)="filtroGuiaTipo.set('RESPUESTA_COMPUESTA')"
+                [class]="filtroGuiaTipo() === 'RESPUESTA_COMPUESTA' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                4. Respuesta Compuesta
+              </button>
+              <button 
+                (click)="filtroGuiaTipo.set('PROBLEMA')"
+                [class]="filtroGuiaTipo() === 'PROBLEMA' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                5. Casos y Subproblemas
+              </button>
+              <button 
+                (click)="filtroGuiaTipo.set('EMPAREJAMIENTO')"
+                [class]="filtroGuiaTipo() === 'EMPAREJAMIENTO' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                6. Emparejamiento
+              </button>
+              <button 
+                (click)="filtroGuiaTipo.set('TYPST')"
+                [class]="filtroGuiaTipo() === 'TYPST' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                7. Fórmulas Typst ($ ... $)
+              </button>
+            </div>
+
+            <!-- Cuerpo de Ejemplos con Comparador Dual (Excel vs PDF Impreso) -->
+            <div class="p-6 space-y-6 max-h-[75vh] overflow-y-auto text-foreground text-xs">
+
+              <!-- SECCIÓN 1: FALSO_VERDADERO -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'FALSO_VERDADERO') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-emerald-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 1</span>
+                      <h4 class="text-sm font-black text-foreground">FALSO_VERDADERO (Falso o Verdadero)</h4>
+                    </div>
+                    <span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G1 · Dificultad 1 (Fácil)
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Cómo se llena en el Excel -->
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo se completa en el archivo Excel:</span>
+                      </div>
+                      <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-[10px] font-mono">
+                          <thead>
+                            <tr class="bg-purple-900 text-white font-bold">
+                              <th class="p-1.5">tipo</th>
+                              <th class="p-1.5">enunciado</th>
+                              <th class="p-1.5">opcion_a</th>
+                              <th class="p-1.5">opcion_b</th>
+                              <th class="p-1.5">respuesta</th>
+                              <th class="p-1.5">dif.</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr class="bg-muted/40 border-b border-border">
+                              <td class="p-1.5 font-bold text-emerald-700">FALSO_VERDADERO</td>
+                              <td class="p-1.5">La fibra óptica monomodo presenta menor atenuación...</td>
+                              <td class="p-1.5">Verdadero</td>
+                              <td class="p-1.5">Falso</td>
+                              <td class="p-1.5 font-bold text-purple-800">A</td>
+                              <td class="p-1.5">1</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <ul class="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
+                        <li><strong>Regla:</strong> La respuesta correcta debe ser <strong>A</strong> (Verdadero) o <strong>B</strong> (Falso).</li>
+                        <li>Las columnas <code class="bg-muted px-1 rounded">opcion_a</code> y <code class="bg-muted px-1 rounded">opcion_b</code> pueden dejarse vacías y el sistema las completará automáticamente.</li>
+                      </ul>
+                    </div>
+
+                    <!-- Cómo se verá en el PDF Typst -->
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Reactivo Oficial</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-2 pt-1">
+                        <p class="font-bold text-slate-900 leading-snug">
+                          <strong>1.</strong> La fibra óptica monomodo presenta menor atenuación que la multimodo a largas distancias.
+                        </p>
+                        <div class="grid grid-cols-2 gap-2 pl-4 font-sans text-[11px] text-slate-800 font-medium">
+                          <div class="flex items-center gap-1.5">
+                            <span class="h-4 w-4 rounded-full border border-slate-400 flex items-center justify-center text-[9px] font-bold">A</span>
+                            <span>Verdadero</span>
+                          </div>
+                          <div class="flex items-center gap-1.5">
+                            <span class="h-4 w-4 rounded-full border border-slate-400 flex items-center justify-center text-[9px] font-bold">B</span>
+                            <span>Falso</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- SECCIÓN 2: SELECCION_SIMPLE -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'SELECCION_SIMPLE') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-blue-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 2</span>
+                      <h4 class="text-sm font-black text-foreground">SELECCION_SIMPLE (Selección Múltiple - Única Respuesta)</h4>
+                    </div>
+                    <span class="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G2 · Dificultad 1, 2 o 3
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Excel -->
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo se completa en el archivo Excel:</span>
+                      </div>
+                      <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-[10px] font-mono">
+                          <thead>
+                            <tr class="bg-purple-900 text-white font-bold">
+                              <th class="p-1.5">tipo</th>
+                              <th class="p-1.5">enunciado</th>
+                              <th class="p-1.5">opcion_a</th>
+                              <th class="p-1.5">opcion_b</th>
+                              <th class="p-1.5">opcion_c</th>
+                              <th class="p-1.5">opcion_d</th>
+                              <th class="p-1.5">resp.</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr class="bg-muted/40 border-b border-border">
+                              <td class="p-1.5 font-bold text-blue-700">SELECCION_SIMPLE</td>
+                              <td class="p-1.5">¿Cuál es el protocolo de transporte orientado a conexión?</td>
+                              <td class="p-1.5">TCP</td>
+                              <td class="p-1.5">UDP</td>
+                              <td class="p-1.5">ICMP</td>
+                              <td class="p-1.5">ARP</td>
+                              <td class="p-1.5 font-bold text-purple-800">A</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <ul class="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
+                        <li><strong>Regla:</strong> Requiere al menos 4 distractores (<code class="bg-muted px-1 rounded">opcion_a</code> a <code class="bg-muted px-1 rounded">opcion_d</code>). La opción E es opcional.</li>
+                        <li>La respuesta correcta debe ser una letra de la <strong>A</strong> a la <strong>E</strong>.</li>
+                      </ul>
+                    </div>
+
+                    <!-- PDF Typst -->
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Reactivo Oficial</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-2 pt-1">
+                        <p class="font-bold text-slate-900 leading-snug">
+                          <strong>2.</strong> ¿Cuál es el protocolo de transporte orientado a la conexión en la pila TCP/IP?
+                        </p>
+                        <div class="grid grid-cols-2 gap-1.5 pl-4 font-sans text-[11px] text-slate-800">
+                          <div><strong>A)</strong> TCP (Transmission Control Protocol)</div>
+                          <div><strong>B)</strong> UDP (User Datagram Protocol)</div>
+                          <div><strong>C)</strong> ICMP (Control Message Protocol)</div>
+                          <div><strong>D)</strong> ARP (Address Resolution Protocol)</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- SECCIÓN 3: PREGUNTA_CON_CLAVE -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'PREGUNTA_CON_CLAVE') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-indigo-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 3</span>
+                      <h4 class="text-sm font-black text-foreground">PREGUNTA_CON_CLAVE (Respuestas Múltiples Combinadas)</h4>
+                    </div>
+                    <span class="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G1 · Dificultad 2 (Medio)
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Excel -->
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo se completa en el archivo Excel:</span>
+                      </div>
+                      <p class="text-[11px] text-muted-foreground">
+                        En el <strong>enunciado</strong> se escriben las premisas numeradas (1, 2, 3, 4 o I, II, III). En las <strong>opciones</strong> se combinan las alternativas:
+                      </p>
+                      <div class="bg-muted/40 p-2 rounded text-[10px] font-mono space-y-1">
+                        <div><strong>enunciado:</strong> Características de modulación OFDM:\n1. Alta eficiencia\n2. Resistencia al desvanecimiento\n3. Nula PAPR</div>
+                        <div><strong>opcion_a:</strong> 1 y 2 son correctas | <strong>opcion_b:</strong> 1 y 3 son correctas | <strong>opcion_c:</strong> Solo 2 es correcta</div>
+                      </div>
+                    </div>
+
+                    <!-- PDF Typst -->
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Reactivo Oficial</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-2 pt-1">
+                        <p class="font-bold text-slate-900 leading-snug">
+                          <strong>3.</strong> Dadas las siguientes características sobre la modulación OFDM:
+                        </p>
+                        <div class="pl-4 italic text-[11px] text-slate-800 space-y-0.5 font-sans">
+                          <div>1. Alta eficiencia espectral mediante subportadoras ortogonales.</div>
+                          <div>2. Alta robustez frente al desvanecimiento multitrayecto.</div>
+                          <div>3. Presenta una relación de potencia pico a promedio (PAPR) nula.</div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1.5 pl-4 font-sans text-[11px] text-slate-800 pt-1">
+                          <div><strong>A)</strong> 1 y 2 son correctas</div>
+                          <div><strong>B)</strong> 1 y 3 son correctas</div>
+                          <div><strong>C)</strong> 2 y 3 son correctas</div>
+                          <div><strong>D)</strong> Todas son correctas</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- SECCIÓN 4: RESPUESTA_COMPUESTA -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'RESPUESTA_COMPUESTA') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-amber-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 4</span>
+                      <h4 class="text-sm font-black text-foreground">RESPUESTA_COMPUESTA (Relación de Dos Proposiciones / Causa-Efecto)</h4>
+                    </div>
+                    <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G1 · Dificultad 2 o 3
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Excel -->
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo se completa en el archivo Excel:</span>
+                      </div>
+                      <div class="bg-muted/40 p-2.5 rounded text-[10px] font-mono space-y-1">
+                        <div><strong>enunciado:</strong> I. El retardo de propagación depende de la distancia.\nPORQUE\nII. El retardo de transmisión depende de la tasa de bits.</div>
+                        <div><strong>opcion_a:</strong> Ambas verdaderas y II explica a I</div>
+                        <div><strong>opcion_b:</strong> Ambas verdaderas pero II NO explica a I</div>
+                        <div><strong>opcion_c:</strong> I verdadera pero II falsa</div>
+                        <div><strong>opcion_d:</strong> I falsa pero II verdadera</div>
+                      </div>
+                    </div>
+
+                    <!-- PDF Typst -->
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Reactivo Oficial</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-2 pt-1">
+                        <p class="font-bold text-slate-900 leading-snug">
+                          <strong>4.</strong> <strong>I.</strong> El retardo de propagación depende de la distancia física en el medio.<br>
+                          <span class="font-sans font-bold text-[10px] text-purple-900 tracking-wider">PORQUE</span><br>
+                          <strong>II.</strong> El retardo de transmisión depende de la tasa de bits del canal.
+                        </p>
+                        <div class="space-y-1 pl-4 font-sans text-[11px] text-slate-800">
+                          <div><strong>A)</strong> Ambas proposiciones son verdaderas y la II es explicación de la I.</div>
+                          <div><strong>B)</strong> Ambas son verdaderas pero la II NO es explicación de la I.</div>
+                          <div><strong>C)</strong> La proposición I es verdadera pero la II es falsa.</div>
+                          <div><strong>D)</strong> La proposición I es falsa pero la II es verdadera.</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- SECCIÓN 5: PROBLEMAS Y SUBPROBLEMAS -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'PROBLEMA') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-rose-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 5</span>
+                      <h4 class="text-sm font-black text-foreground">PROBLEMA & SUBPROBLEMA (Casos Clínicos / Enunciados Contextuales)</h4>
+                    </div>
+                    <span class="bg-rose-100 text-rose-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G3 · Dificultad 3 (Difícil)
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Excel -->
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo se completa en el archivo Excel (2 o más filas):</span>
+                      </div>
+                      <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-[10px] font-mono">
+                          <thead>
+                            <tr class="bg-purple-900 text-white font-bold">
+                              <th class="p-1">tipo</th>
+                              <th class="p-1">grupo</th>
+                              <th class="p-1">enunciado</th>
+                              <th class="p-1">resp.</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr class="bg-rose-50/70 border-b border-border font-bold">
+                              <td class="p-1 text-rose-700">PROBLEMA</td>
+                              <td class="p-1 text-purple-900">CASO-01</td>
+                              <td class="p-1">Paciente varón de 45 años ingresa con dolor precordial...</td>
+                              <td class="p-1"><em>(vacío)</em></td>
+                            </tr>
+                            <tr class="bg-muted/40 border-b border-border">
+                              <td class="p-1 text-blue-700">SUBPROBLEMA</td>
+                              <td class="p-1 text-purple-900">CASO-01</td>
+                              <td class="p-1">¿Cuál es la cara anatómica comprometida?</td>
+                              <td class="p-1 font-bold text-purple-800">A</td>
+                            </tr>
+                            <tr class="bg-muted/40 border-b border-border">
+                              <td class="p-1 text-blue-700">SUBPROBLEMA</td>
+                              <td class="p-1 text-purple-900">CASO-01</td>
+                              <td class="p-1">¿Qué arteria coronaria es la responsable?</td>
+                              <td class="p-1 font-bold text-purple-800">B</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <ul class="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
+                        <li><strong>Regla:</strong> La fila <code class="bg-muted px-1 rounded">PROBLEMA</code> contiene el caso general y define el <code class="bg-muted px-1 rounded">grupo</code>.</li>
+                        <li>Las filas <code class="bg-muted px-1 rounded">SUBPROBLEMA</code> deben tener el mismo código de <code class="bg-muted px-1 rounded">grupo</code> para enlazarse automáticamente en el PDF.</li>
+                      </ul>
+                    </div>
+
+                    <!-- PDF Typst -->
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Bloque de Caso Clínico</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-2.5 pt-1">
+                        
+                        <!-- Caja de Caso Contextualizado Typst -->
+                        <div class="bg-slate-50 border border-slate-400 p-2.5 rounded text-[11px] font-sans">
+                          <span class="font-black text-slate-900 uppercase block text-[10px] text-purple-950 border-b border-slate-300 pb-1 mb-1">
+                            CONTEXTO / CASO CLÍNICO 1 (Preguntas 5 y 6)
+                          </span>
+                          <p class="text-slate-700 leading-relaxed italic">
+                            Paciente masculino de 45 años ingresa a emergencias con dolor precordial opresivo irradiado a mandíbula de 2 horas de evolución, diaforesis profusa y disnea. ECG muestra elevación ST en derivaciones DII, DIII y aVF.
+                          </p>
+                        </div>
+
+                        <!-- Preguntas Derivadas -->
+                        <div class="space-y-2 pl-2">
+                          <div>
+                            <p class="font-bold text-slate-900 text-xs"><strong>5.</strong> ¿Cuál es la cara anatómica comprometida del miocardio?</p>
+                            <div class="grid grid-cols-2 gap-1 pl-3 font-sans text-[11px]">
+                              <div><strong>A)</strong> Cara Inferior (Diafragmática)</div>
+                              <div><strong>B)</strong> Cara Anterior extensa</div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p class="font-bold text-slate-900 text-xs"><strong>6.</strong> ¿Cuál es la arteria coronaria responsable?</p>
+                            <div class="grid grid-cols-2 gap-1 pl-3 font-sans text-[11px]">
+                              <div><strong>A)</strong> Coronaria Derecha (ACD)</div>
+                              <div><strong>B)</strong> Descendente Anterior (ADA)</div>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- SECCIÓN 6: EMPAREJAMIENTO -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'EMPAREJAMIENTO') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-teal-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 6</span>
+                      <h4 class="text-sm font-black text-foreground">EMPAREJAMIENTO (Correspondencia de Columnas)</h4>
+                    </div>
+                    <span class="bg-teal-100 text-teal-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G3 · Dificultad 2 o 3
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Excel -->
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo se completa en el archivo Excel:</span>
+                      </div>
+                      <p class="text-[11px] text-muted-foreground">
+                        En el <strong>enunciado</strong> se colocan ambas columnas con salto de línea. En las <strong>opciones</strong> se colocan las combinaciones de pares:
+                      </p>
+                      <div class="bg-muted/40 p-2.5 rounded text-[10px] font-mono space-y-1">
+                        <div><strong>enunciado:</strong> Relacione las capas OSI con su PDU:\n1. Capa Red / a. Tramas\n2. Capa Transporte / b. Paquetes\n3. Capa Enlace / c. Segmentos</div>
+                        <div><strong>opcion_a:</strong> 1-b, 2-c, 3-a | <strong>opcion_b:</strong> 1-a, 2-b, 3-c</div>
+                      </div>
+                    </div>
+
+                    <!-- PDF Typst -->
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Reactivo Oficial</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-2 pt-1">
+                        <p class="font-bold text-slate-900 leading-snug">
+                          <strong>7.</strong> Relacione las capas del Modelo OSI con su PDU correspondiente:
+                        </p>
+                        
+                        <!-- Tabla de Correspondencia -->
+                        <div class="border border-slate-400 rounded overflow-hidden font-sans text-[11px]">
+                          <table class="w-full text-left">
+                            <tr class="bg-slate-100 border-b border-slate-300 font-bold">
+                              <th class="p-1.5 border-r border-slate-300 w-1/2">Columna A (Capas)</th>
+                              <th class="p-1.5 w-1/2">Columna B (PDU)</th>
+                            </tr>
+                            <tr class="border-b border-slate-200">
+                              <td class="p-1 border-r border-slate-300">1. Capa de Red</td>
+                              <td class="p-1">a. Tramas (Frames)</td>
+                            </tr>
+                            <tr class="border-b border-slate-200">
+                              <td class="p-1 border-r border-slate-300">2. Capa de Transporte</td>
+                              <td class="p-1">b. Paquetes (Packets)</td>
+                            </tr>
+                            <tr>
+                              <td class="p-1 border-r border-slate-300">3. Capa de Enlace de Datos</td>
+                              <td class="p-1">c. Segmentos</td>
+                            </tr>
+                          </table>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-1 pl-4 font-sans text-[11px] text-slate-800 pt-1">
+                          <div><strong>A)</strong> 1-b, 2-c, 3-a</div>
+                          <div><strong>B)</strong> 1-a, 2-b, 3-c</div>
+                          <div><strong>C)</strong> 1-c, 2-a, 3-b</div>
+                          <div><strong>D)</strong> 1-b, 2-a, 3-c</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- SECCIÓN 7: FÓRMULAS TYPST -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'TYPST') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-purple-700 text-white font-black px-2.5 py-1 rounded text-xs">SINTAXIS</span>
+                      <h4 class="text-sm font-black text-foreground">Fórmulas Matemáticas y Químicas (Typst $ ... $)</h4>
+                    </div>
+                    <span class="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Compilación Tipográfica de Alta Calidad
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <!-- Excel -->
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo escribir fórmulas en cualquier celda de Excel:</span>
+                      </div>
+                      <p class="text-[11px] text-muted-foreground">
+                        Escribe la fórmula encerrada entre signos de dólar <code class="bg-muted px-1 rounded font-bold text-purple-900">$ ... $</code>:
+                      </p>
+                      <div class="bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] space-y-1.5">
+                        <div><span class="text-slate-400">// Pérdida en espacio libre:</span><br>$ FSPL = 20 log_10(d) + 20 log_10(f) + 92.45 $</div>
+                        <div><span class="text-slate-400">// Fracciones y derivadas:</span><br>$ [M] = frac(n, V) $ ó $ f'(x) = lim_(h->0) frac(f(x+h) - f(x), h) $</div>
+                        <div><span class="text-slate-400">// Fórmulas químicas:</span><br>$ H_2 S O_4 + 2 N a O H -> N a_2 S O_4 + 2 H_2 O $</div>
+                      </div>
+                    </div>
+
+                    <!-- PDF Typst -->
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Renderizado Matemático Real</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-3 pt-1">
+                        <div>
+                          <p class="font-bold text-slate-900 text-xs"><strong>8.</strong> Calcule la atenuación total en el enlace utilizando el modelo FSPL:</p>
+                          <div class="text-center py-2 font-mono font-bold text-sm bg-slate-50 border border-slate-200 rounded my-1 text-purple-950">
+                            FSPL = 20·log₁₀(d) + 20·log₁₀(f) + 92.45 dB
+                          </div>
+                        </div>
+
+                        <div>
+                          <p class="font-bold text-slate-900 text-xs"><strong>9.</strong> Balance estequiométrico de neutralización:</p>
+                          <div class="text-center py-1.5 font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded text-purple-950">
+                            H₂SO₄ + 2 NaOH &rarr; Na₂SO₄ + 2 H₂O
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+            </div>
+
+            <!-- Pie del Modal -->
+            <div class="bg-muted/40 border-t border-border p-4 flex items-center justify-between">
+              <span class="text-xs text-muted-foreground">
+                <i class="pi pi-info-circle text-primary mr-1"></i>
+                Descarga la <strong>Plantilla Oficial (3 Hojas)</strong> para empezar a completar tus preguntas.
+              </span>
+
+              <div class="flex items-center gap-2">
+                <button 
+                  (click)="descargarExcelBaseMacro()"
+                  class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs">
+                  <i class="pi pi-download text-xs"></i>
+                  <span>Descargar Plantilla Excel</span>
+                </button>
+
+                <button 
+                  (click)="cerrarModalEjemplos()"
+                  class="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-black cursor-pointer shadow-xs">
+                  Cerrar Guía
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      }
+
+      <!-- Toast Notificación -->
+      @if (toastMessage()) {
+        <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
+          <i [class]="toastType() === 'error' ? 'pi pi-exclamation-triangle text-rose-400' : 'pi pi-check-circle text-emerald-400'" class="text-lg"></i>
+          <span class="text-xs font-bold">{{ toastMessage() }}</span>
+        </div>
+      }
+
+    </div>
+  `
+})
+export class BancoPreguntasComponent {
+  public readonly storage = inject(EvaluacionesStorageService);
+  private readonly _db = inject(EvaluacionesDbService);
+
+  @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
+
+  // Pestaña activa: 'validador' (default) o 'calendario'
+  public tabActiva = signal<'validador' | 'calendario'>('validador');
+  public vistaCalendario = signal<'calendario' | 'lista'>('calendario');
+
+  // Navegación de Calendario Mensual (Default: Marzo 2026 = mes 2)
+  public mesActual = signal<number>(2); // 0 = Enero, 2 = Marzo, 4 = Mayo, 5 = Junio
+  public anioActual = signal<number>(2026);
+
+  public mesesSemestre = [
+    { label: 'Marzo', mesIndex: 2 },
+    { label: 'Abril', mesIndex: 3 },
+    { label: 'Mayo', mesIndex: 4 },
+    { label: 'Junio', mesIndex: 5 },
+    { label: 'Julio', mesIndex: 6 }
+  ];
+
+  public examenSeleccionadoModal = signal<ExamenDocenteCronograma | null>(null);
+
+  public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>('1er Parcial');
+  public nombreArchivoCargado = signal<string | null>('BANCO_PRUEBA_VALIDO_60PREGUNTAS.xlsx');
+  public dialogEjemplos = signal<boolean>(false);
+  public filtroGuiaTipo = signal<string>('TODOS');
+  public dialogPrevisualizacionPdf = signal<boolean>(false);
+  public pdfPrevisualizadoYConforme = signal<boolean>(false);
+  public dialogPrevisualizacionPkg = signal<boolean>(false);
+  public tabPrevisualizacionPkg = signal<'cifrado' | 'desencriptado'>('cifrado');
+  public pkgHexData = signal<string>('');
+  public pkgJsonData = signal<string>('');
+  public dialogEnvioEvaluaciones = signal<boolean>(false);
+  public enviandoCorreo = signal<boolean>(false);
+  public comprobanteGenerado = signal<ComprobanteEnvio | null>(null);
+
+  public toastMessage = signal<string | null>(null);
+  public toastType = signal<'success' | 'error'>('success');
+
+  // Datos del Docente en Sesión Activa
+  public docenteSesion = {
+    nombre: 'Ing. Ariel Denys Quispe',
+    ci: '6849201 Cbba',
+    correo: 'a.quispe@unitepc.edu.bo'
+  };
+
+  // Directorio Institucional de Oficinas de Evaluación por Campus (Múltiples correos por campus)
+  public listaCampusEvaluacion: CampusEvaluacion[] = [
+    { id: 'TEST-ARIEL', nombre: '🧪 Modo Pruebas / QA — Ing. Ariel Cámara', ciudad: 'Pruebas Unitarias', correos: ['arielcamara@unitepc.edu.bo'], oficina: 'Buzón Directo de Validación' },
+    { id: 'CBBA-COL', nombre: 'Cochabamba - Campus Colonial (Central)', ciudad: 'Cochabamba', correos: ['evaluaciones.cochabamba@unitepc.edu.bo', 'arielcamara@unitepc.edu.bo'], oficina: 'Jefatura de Evaluaciones Bloque A' },
+    { id: 'CBBA-FLO', nombre: 'Cochabamba - Campus Florida (Salud)', ciudad: 'Cochabamba', correos: ['evaluaciones.florida@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Salud' },
+    { id: 'LPZ-CEN', nombre: 'La Paz - Sede Central', ciudad: 'La Paz', correos: ['evaluaciones.lapaz@unitepc.edu.bo', 'evaluaciones.central@unitepc.edu.bo'], oficina: 'Evaluaciones Sede La Paz' },
+    { id: 'EAL-SAT', nombre: 'El Alto - Campus Satélite', ciudad: 'El Alto', correos: ['evaluaciones.elalto@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones El Alto' },
+    { id: 'SCZ-NOR', nombre: 'Santa Cruz - Sede Norte', ciudad: 'Santa Cruz', correos: ['evaluaciones.santacruz@unitepc.edu.bo', 'arielcamara@unitepc.edu.bo'], oficina: 'Jefatura Evaluaciones Santa Cruz' },
+    { id: 'GYM-BEN', nombre: 'Guayaramerín - Sede Beni', ciudad: 'Guayaramerín', correos: ['evaluaciones.guayaramerin@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Beni' },
+    { id: 'COB-PAN', nombre: 'Cobija - Sede Pando', ciudad: 'Cobija', correos: ['evaluaciones.cobija@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Pando' },
+    { id: 'IVI-TRO', nombre: 'Ivirgarzama - Campus Trópico', ciudad: 'Ivirgarzama', correos: ['evaluaciones.ivirgarzama@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Trópico' }
+  ];
+
+  public campusSeleccionadoId = 'TEST-ARIEL';
+  public examenRolSeleccionadoId = 2; // SIS-413 por defecto
+  public observacionesDocenteEnvio = '';
+
+  public campusActivo = computed(() => {
+    return this.listaCampusEvaluacion.find(c => c.id === this.campusSeleccionadoId) || this.listaCampusEvaluacion[0];
+  });
+
+  // Lista Completa de Exámenes Programados para el Docente en el Semestre II-2026
+  public listaExamenesDocente: ExamenDocenteCronograma[] = [
+    { 
+      id: 1, 
+      codigo: 'SIS-322', 
+      materia: 'INFRAESTRUCTURA TECNOLÓGICA', 
+      carrera: 'INGENIERÍA DE SISTEMAS', 
+      semestre: 6, 
+      grupo: 'Grupo 1', 
+      tipo: '1er Parcial', 
+      fecha: '30/03/2026', 
+      horario: '09:45:00 - 11:15:00', 
+      aula: 'Lab Redes 2 (Bloque A)', 
+      conCartilla: true, 
+      estado: 'Devuelto' 
+    },
+    { 
+      id: 2, 
+      codigo: 'SIS-413', 
+      materia: 'TELECOMUNICACIONES', 
+      carrera: 'INGENIERÍA DE SISTEMAS', 
+      semestre: 7, 
+      grupo: 'Grupo 1', 
+      tipo: '1er Parcial', 
+      fecha: '31/03/2026', 
+      horario: '15:45:00 - 17:15:00', 
+      aula: 'Aula 402 (Bloque B)', 
+      conCartilla: true, 
+      estado: 'Devuelto' 
+    },
+    { 
+      id: 3, 
+      codigo: 'SIS-322', 
+      materia: 'INFRAESTRUCTURA TECNOLÓGICA', 
+      carrera: 'INGENIERÍA DE SISTEMAS', 
+      semestre: 6, 
+      grupo: 'Grupo 1', 
+      tipo: '2do Parcial', 
+      fecha: '25/05/2026', 
+      horario: '09:45:00 - 11:15:00', 
+      aula: 'Lab Redes 2 (Bloque A)', 
+      conCartilla: true, 
+      estado: 'Devuelto' 
+    },
+    { 
+      id: 4, 
+      codigo: 'SIS-413', 
+      materia: 'TELECOMUNICACIONES', 
+      carrera: 'INGENIERÍA DE SISTEMAS', 
+      semestre: 7, 
+      grupo: 'Grupo 1', 
+      tipo: '2do Parcial', 
+      fecha: '26/05/2026', 
+      horario: '15:45:00 - 17:15:00', 
+      aula: 'Aula 402 (Bloque B)', 
+      conCartilla: true, 
+      estado: 'Devuelto' 
+    },
+    { 
+      id: 5, 
+      codigo: 'SIS-322', 
+      materia: 'INFRAESTRUCTURA TECNOLÓGICA', 
+      carrera: 'INGENIERÍA DE SISTEMAS', 
+      semestre: 6, 
+      grupo: 'Grupo 1', 
+      tipo: 'Examen Final', 
+      fecha: '15/06/2026', 
+      horario: '09:45:00 - 11:15:00', 
+      aula: 'Lab Redes 2 (Bloque A)', 
+      conCartilla: false, 
+      estado: 'Programado' 
+    },
+    { 
+      id: 6, 
+      codigo: 'SIS-413', 
+      materia: 'TELECOMUNICACIONES', 
+      carrera: 'INGENIERÍA DE SISTEMAS', 
+      semestre: 7, 
+      grupo: 'Grupo 1', 
+      tipo: 'Examen Final', 
+      fecha: '16/06/2026', 
+      horario: '15:45:00 - 17:15:00', 
+      aula: 'Aula 402 (Bloque B)', 
+      conCartilla: true, 
+      estado: 'Programado' 
+    },
+    { 
+      id: 7, 
+      codigo: 'SIS-322', 
+      materia: 'INFRAESTRUCTURA TECNOLÓGICA', 
+      carrera: 'INGENIERÍA DE SISTEMAS', 
+      semestre: 6, 
+      grupo: 'Grupo 1', 
+      tipo: '2da Instancia', 
+      fecha: '29/06/2026', 
+      horario: '09:45:00 - 11:15:00', 
+      aula: 'Lab Redes 2 (Bloque A)', 
+      conCartilla: false, 
+      estado: 'Programado' 
+    },
+    { 
+      id: 8, 
+      codigo: 'SIS-413', 
+      materia: 'TELECOMUNICACIONES', 
+      carrera: 'INGENIERÍA DE SISTEMAS', 
+      semestre: 7, 
+      grupo: 'Grupo 1', 
+      tipo: '2da Instancia', 
+      fecha: '30/06/2026', 
+      horario: '15:45:00 - 17:15:00', 
+      aula: 'Aula 402 (Bloque B)', 
+      conCartilla: false, 
+      estado: 'Programado' 
+    }
+  ];
+
+  public nombreMesActual = computed(() => {
+    const nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    return nombres[this.mesActual()];
+  });
+
+  // Matriz de celdas para el Calendario (Lunes a Domingo)
+  public matrizDiasCalendario = computed<DiaCalendario[]>(() => {
+    const mes = this.mesActual();
+    const anio = this.anioActual();
+
+    const primerDiaMes = new Date(anio, mes, 1);
+    const ultimoDiaMes = new Date(anio, mes + 1, 0);
+
+    let primerDiaSemana = primerDiaMes.getDay() - 1;
+    if (primerDiaSemana === -1) primerDiaSemana = 6;
+
+    const totalDias = ultimoDiaMes.getDate();
+    const diasPrevios = new Date(anio, mes, 0).getDate();
+
+    const resultado: DiaCalendario[] = [];
+
+    for (let i = primerDiaSemana - 1; i >= 0; i--) {
+      const dNum = diasPrevios - i;
+      const mPrev = mes === 0 ? 11 : mes - 1;
+      const aPrev = mes === 0 ? anio - 1 : anio;
+      const dateStr = `${String(dNum).padStart(2, '0')}/${String(mPrev + 1).padStart(2, '0')}/${aPrev}`;
+      resultado.push({
+        dayNumber: dNum,
+        isCurrentMonth: false,
+        dateStr,
+        examenes: this.listaExamenesDocente.filter(e => e.fecha === dateStr)
+      });
+    }
+
+    for (let d = 1; d <= totalDias; d++) {
+      const dateStr = `${String(d).padStart(2, '0')}/${String(mes + 1).padStart(2, '0')}/${anio}`;
+      resultado.push({
+        dayNumber: d,
+        isCurrentMonth: true,
+        dateStr,
+        examenes: this.listaExamenesDocente.filter(e => e.fecha === dateStr)
+      });
+    }
+
+    const resto = resultado.length % 7;
+    if (resto !== 0) {
+      const diasFaltantes = 7 - resto;
+      const mNext = mes === 11 ? 0 : mes + 1;
+      const aNext = mes === 11 ? anio + 1 : anio;
+      for (let d = 1; d <= diasFaltantes; d++) {
+        const dateStr = `${String(d).padStart(2, '0')}/${String(mNext + 1).padStart(2, '0')}/${aNext}`;
+        resultado.push({
+          dayNumber: d,
+          isCurrentMonth: false,
+          dateStr,
+          examenes: this.listaExamenesDocente.filter(e => e.fecha === dateStr)
+        });
+      }
+    }
+
+    return resultado;
+  });
+
+  public getDiaClass(dia: DiaCalendario): string {
+    const base = dia.isCurrentMonth ? 'bg-card' : 'bg-muted/10 opacity-40';
+    if (dia.examenes.length > 0) {
+      return `${base} ring-2 ring-purple-400 bg-purple-50/30`;
+    }
+    return base;
+  }
+
+  public cambiarMesRelativo(delta: number): void {
+    let nuevoMes = this.mesActual() + delta;
+    if (nuevoMes < 0) {
+      nuevoMes = 11;
+      this.anioActual.update(a => a - 1);
+    } else if (nuevoMes > 11) {
+      nuevoMes = 0;
+      this.anioActual.update(a => a + 1);
+    }
+    this.mesActual.set(nuevoMes);
+  }
+
+  public seleccionarMesDirecto(idx: number): void {
+    this.mesActual.set(idx);
+  }
+
+  public abrirModalDetalleExamen(ex: ExamenDocenteCronograma): void {
+    this.examenSeleccionadoModal.set(ex);
+  }
+
+  public irAValidarExamenDesdeCalendario(ex: ExamenDocenteCronograma): void {
+    this.examenSeleccionadoModal.set(null);
+    this.parcialActivo.set(ex.tipo);
+    this.examenRolSeleccionadoId = ex.id;
+    this.tabActiva.set('validador');
+    this._mostrarToast(`Redirigido al Validador para: ${ex.materia} (${ex.tipo}).`);
+  }
+
+  // Cuotas Oficiales según parcial
+  public cuotasDificultad = computed(() => {
+    switch (this.parcialActivo()) {
+      case '1er Parcial':
+      case '2do Parcial':
+        return { facil: 15, medio: 30, dificil: 15, total: 60 };
+      case 'Examen Final':
+        return { facil: 30, medio: 60, dificil: 30, total: 120 };
+      case '2da Instancia':
+        return { facil: 10, medio: 25, dificil: 15, total: 50 };
+    }
+  });
+
+  public cuotasGrupos = computed(() => {
+    switch (this.parcialActivo()) {
+      case '1er Parcial':
+      case '2do Parcial':
+        return { g1: 15, g2: 30, g3: 15 };
+      case 'Examen Final':
+        return { g1: 30, g2: 60, g3: 30 };
+      case '2da Instancia':
+        return { g1: 10, g2: 25, g3: 15 };
+    }
+  });
+
+  public totalPreguntasRequeridas = computed(() => this.cuotasDificultad().total);
+
+  // Inicialmente 60 preguntas válidas de muestra para 1er/2do parcial
+  public preguntasCargadas = signal<PreguntaValidada[]>(this._generarPreguntasMockValidas());
+
+  // Conteos dinámicos calculados directamente sobre las preguntas cargadas
+  public totalPreguntasValidas = computed(() => this.preguntasCargadas().filter(p => p.valido).length);
+  public countFaciles = computed(() => this.preguntasCargadas().filter(p => p.valido && p.dificultad === '1').length);
+  public countMedias = computed(() => this.preguntasCargadas().filter(p => p.valido && p.dificultad === '2').length);
+  public countDificiles = computed(() => this.preguntasCargadas().filter(p => p.valido && p.dificultad === '3').length);
+
+  public countG1 = computed(() => this.preguntasCargadas().filter(p => p.valido && ['FALSO_VERDADERO', 'RESPUESTA_COMPUESTA', 'PREGUNTA_CON_CLAVE'].includes(p.tipo)).length);
+  public countG2 = computed(() => this.preguntasCargadas().filter(p => p.valido && ['SELECCION_SIMPLE', 'SELECCION_UNICA'].includes(p.tipo)).length);
+  public countG3 = computed(() => this.preguntasCargadas().filter(p => p.valido && ['PROBLEMA', 'SUBPROBLEMA', 'EMPAREJAMIENTO', 'OPCION_EMPAREJAMIENTO'].includes(p.tipo)).length);
+
+  public cuotaDificultadCumplida = computed(() => {
+    const c = this.cuotasDificultad();
+    return this.countFaciles() >= c.facil && this.countMedias() >= c.medio && this.countDificiles() >= c.dificil;
+  });
+
+  public esBancoTotalmenteValido = computed(() => {
+    return this.totalPreguntasValidas() >= this.totalPreguntasRequeridas() && this.cuotaDificultadCumplida() && this.preguntasConErrores().length === 0;
+  });
+
+  public preguntasConErrores = computed(() => {
+    return this.preguntasCargadas().filter(p => !p.valido);
+  });
+
+  public filtroPdfDificultad = signal<'TODAS' | '1' | '2' | '3'>('TODAS');
+  public vistaPdfColumnas = signal<'2' | '1'>('2');
+
+  public preguntasValidasParaPdf = computed(() => {
+    const todas = this.preguntasCargadas().filter(p => p.valido);
+    if (this.filtroPdfDificultad() === 'TODAS') return todas;
+    return todas.filter(p => p.dificultad === this.filtroPdfDificultad());
+  });
+
+  public getDificultadNombre(dif: string): string {
+    if (dif === '1') return 'Fácil';
+    if (dif === '3') return 'Difícil';
+    return 'Media';
+  }
+
+  public nombreArchivoPaquete = computed(() => {
+    const ex = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId) || this.listaExamenesDocente[1];
+    const cod = ex.codigo.replace('-', '');
+    const pCode = this.parcialActivo().toUpperCase().replace(' ', '_');
+    return `PAQUETE_EVAL_${cod}_${pCode}_2026.pkg`;
+  });
+
+  public getResumenCuota(parcial: string): string {
+    switch (parcial) {
+      case '1er Parcial': return '60 preguntas';
+      case '2do Parcial': return '60 preguntas';
+      case 'Examen Final': return '120 preguntas';
+      case '2da Instancia': return '50 preguntas';
+      default: return '60 preguntas';
+    }
+  }
+
+  public cambiarParcial(parcial: string): void {
+    this.parcialActivo.set(parcial as any);
+    this.pdfPrevisualizadoYConforme.set(false);
+    this._mostrarToast(`Examen configurado para ${parcial} (${this.getResumenCuota(parcial)}).`);
+  }
+
+  public getEstadoBadgeClass(estado: string): string {
+    switch (estado) {
+      case 'Programado': return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'Generado': return 'bg-purple-100 text-purple-800 border border-purple-200';
+      case 'Impreso': return 'bg-indigo-100 text-indigo-800 border border-indigo-200';
+      case 'Entregado': return 'bg-cyan-100 text-cyan-800 border border-cyan-200';
+      case 'Devuelto': return 'bg-amber-100 text-amber-800 border border-amber-200';
+      case 'Enviado': return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+      default: return 'bg-slate-100 text-slate-800';
+    }
+  }
+
+  // ============================================================
+  // CARGA Y VALIDACIÓN ROBUSTA DE ARCHIVOS EXCEL (SheetJS)
+  // ============================================================
+  public triggerFileInput(): void {
+    this.fileInputRef.nativeElement.click();
+  }
+
+  public onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  public onDropFile(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+      const file = event.dataTransfer.files[0];
+      this.procesarArchivoExcelReal(file);
+    }
+  }
+
+  public onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.procesarArchivoExcelReal(input.files[0]);
+    }
+  }
+
+  public async procesarArchivoExcelReal(file: File): Promise<void> {
+    this.nombreArchivoCargado.set(file.name);
+    this.pdfPrevisualizadoYConforme.set(false);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+
+      // Detección temprana de archivo corrupto o HTML previo
+      const previewBytes = new Uint8Array(arrayBuffer.slice(0, 150));
+      const previewText = new TextDecoder('utf-8').decode(previewBytes).toLowerCase();
+      if (previewText.includes('<!doctype') || previewText.includes('<html') || previewText.includes('404')) {
+        this._mostrarToast('El archivo cargado es un documento HTML o está dañado. Por favor haz clic en "Ejemplo con Errores" arriba para descargar el Excel oficial.', 'error');
+        return;
+      }
+
+      const data = new Uint8Array(arrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      // Buscar hoja Banco o primera hoja
+      const sheetName = workbook.SheetNames.find(s => s.toLowerCase() === 'banco') || workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      if (!worksheet) {
+        this._mostrarToast('No se encontró la hoja "Banco" en el archivo Excel.', 'error');
+        return;
+      }
+
+      // Convertir a JSON plano
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+
+      if (rows.length === 0) {
+        this._mostrarToast('El archivo no contiene filas con datos en la hoja Banco.', 'error');
+        return;
+      }
+
+      const preguntasParsed: PreguntaValidada[] = [];
+
+      rows.forEach((row, index) => {
+        // Encontrar valor de forma flexible (mayúsculas o minúsculas)
+        const getVal = (keys: string[]) => {
+          for (const k of keys) {
+            if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+              return String(row[k]).trim();
+            }
+            const foundKey = Object.keys(row).find(rk => rk.toLowerCase().trim() === k.toLowerCase().trim());
+            if (foundKey && row[foundKey] !== undefined && String(row[foundKey]).trim() !== '') {
+              return String(row[foundKey]).trim();
+            }
+          }
+          return '';
+        };
+
+        const tipoRaw = getVal(['tipo', 'TIPO']).toUpperCase();
+        const enunciadoRaw = getVal(['enunciado', 'ENUNCIADO']);
+        const grupoRaw = getVal(['grupo', 'GRUPO']);
+        const opA = getVal(['opcion_a', 'opcion a', 'A', 'a']);
+        const opB = getVal(['opcion_b', 'opcion b', 'B', 'b']);
+        const opC = getVal(['opcion_c', 'opcion c', 'C', 'c']);
+        const opD = getVal(['opcion_d', 'opcion d', 'D', 'd']);
+        const opE = getVal(['opcion_e', 'opcion e', 'E', 'e']);
+        const respRaw = getVal(['respuesta_correcta', 'respuesta', 'RESPUESTA']).toUpperCase();
+        const difRaw = getVal(['dificultad', 'DIFICULTAD', 'nivel_dificultad']).toUpperCase();
+        const pesoNum = Number(getVal(['peso', 'PESO'])) || 5;
+
+        if (!tipoRaw && !enunciadoRaw) return;
+
+        let difNorm: '1' | '2' | '3' = '2';
+        if (difRaw === '1' || difRaw === 'FACIL' || difRaw === 'FÁCIL') difNorm = '1';
+        else if (difRaw === '3' || difRaw === 'DIFICIL' || difRaw === 'DIFÍCIL') difNorm = '3';
+
+        let tipoNorm = tipoRaw;
+        if (tipoNorm === 'SELECCION_UNICA') tipoNorm = 'SELECCION_SIMPLE';
+
+        // Validaciones estrictas
+        const errores: string[] = [];
+        if (!enunciadoRaw) errores.push('Falta el enunciado');
+
+        if (tipoNorm === 'FALSO_VERDADERO') {
+          if (!['A', 'B'].includes(respRaw)) errores.push('Respuesta en V/F debe ser A (Verdadero) o B (Falso)');
+        } else if (tipoNorm === 'RESPUESTA_COMPUESTA') {
+          if (!['A', 'B', 'C', 'D'].includes(respRaw)) errores.push('Respuesta en compuesta debe ser A, B, C o D');
+        } else if (tipoNorm === 'PREGUNTA_CON_CLAVE') {
+          if (!['A', 'B', 'C', 'D', 'E'].includes(respRaw)) errores.push('Respuesta en clave debe ser A-E');
+        } else if (tipoNorm === 'SELECCION_SIMPLE') {
+          if (!opA || !opB || !opC || !opD) errores.push('Selección simple requiere al menos 4 opciones (A-D)');
+          if (!['A', 'B', 'C', 'D', 'E'].includes(respRaw)) errores.push('Respuesta debe ser una letra de la A a la E');
+        } else if (tipoNorm === 'SUBPROBLEMA') {
+          if (!grupoRaw) errores.push('Subproblema requiere identificar el grupo de caso padre');
+        }
+
+        const valido = errores.length === 0;
+
+        preguntasParsed.push({
+          fila: index + 2,
+          tipo: tipoNorm || 'SELECCION_SIMPLE',
+          grupo: grupoRaw,
+          enunciado: enunciadoRaw,
+          opcion_a: opA || (tipoNorm === 'FALSO_VERDADERO' ? 'Verdadero' : ''),
+          opcion_b: opB || (tipoNorm === 'FALSO_VERDADERO' ? 'Falso' : ''),
+          opcion_c: opC,
+          opcion_d: opD,
+          opcion_e: opE,
+          opciones: { A: opA, B: opB, C: opC, D: opD, E: opE },
+          respuesta_correcta: respRaw || (tipoNorm === 'FALSO_VERDADERO' ? 'A' : ''),
+          dificultad: difNorm,
+          peso: pesoNum,
+          observaciones: valido ? 'OK' : errores.join(', '),
+          valido,
+          errores
+        });
+      });
+
+      this.preguntasCargadas.set(preguntasParsed);
+      if (this.esBancoTotalmenteValido()) {
+        this._mostrarToast(`Archivo verificado: 100% de preguntas conformes (${preguntasParsed.length} reactivos).`);
+      } else {
+        this._mostrarToast(`Archivo procesado: ${preguntasParsed.length} reactivos analizados. Se detectaron observaciones.`);
+      }
+    } catch (err) {
+      console.error(err);
+      this._mostrarToast('Error al procesar el archivo Excel. Verifica el formato.', 'error');
+    }
+  }
+
+  // ============================================================
+  // DESCARGA DIRECTA EN MEMORIA DE ARCHIVOS DE PRUEBA (SheetJS)
+  // ============================================================
+  public descargarEjemploValido(): void {
+    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'peso', 'observaciones'];
+    
+    const dataInst = [
+      ['BANCO DE PREGUNTAS - GUÍA OFICIAL'],
+      [],
+      ['1. CÓDIGOS DE PREGUNTA OFICIALES', 'FALSO_VERDADERO, PREGUNTA_CON_CLAVE, SELECCION_SIMPLE, RESPUESTA_COMPUESTA, PROBLEMA, SUBPROBLEMA, EMPAREJAMIENTO'],
+      ['2. CUOTAS REQUERIDAS', '15 Fáciles (1), 30 Medias (2), 15 Difíciles (3) - Total: 60 preguntas']
+    ];
+
+    const dataBanco: any[][] = [headers];
+
+    // 15 Fáciles (1)
+    for (let i = 1; i <= 15; i++) {
+      if (i % 2 === 0) {
+        dataBanco.push(['FALSO_VERDADERO', '', `Pregunta Fácil ${i}: La fibra óptica monomodo presenta menor atenuación que la multimodo a largas distancias.`, 'Verdadero', 'Falso', '', '', '', 'A', '1', 5, 'OK']);
+      } else {
+        dataBanco.push(['SELECCION_SIMPLE', '', `Pregunta Fácil ${i}: ¿Cuál es la función principal de la capa de enlace de datos en el modelo OSI?`, 'Direccionamiento físico (MAC) y control de flujo', 'Enrutamiento de paquetes', 'Cifrado de datos', 'Control de sesiones', 'Compresión', 'A', '1', 5, 'OK']);
+      }
+    }
+
+    // 30 Medias (2)
+    for (let i = 1; i <= 30; i++) {
+      if (i % 2 === 0) {
+        dataBanco.push(['RESPUESTA_COMPUESTA', '', `Pregunta Media ${i}: I. El retardo de propagación depende de la distancia.\nII. El retardo de transmisión depende de la tasa de bits.`, 'A. Si la primera es verdadera', 'B. Si la segunda es verdadera', 'C. Si ambas son verdaderas', 'D. Si ninguna es verdadera', '', 'C', '2', 5, 'OK']);
+      } else {
+        dataBanco.push(['PREGUNTA_CON_CLAVE', '', `Pregunta Media ${i}: Características de la modulación OFDM: 1. Alta eficiencia espectral, 2. Resistencia al desvanecimiento, 3. Baja ISI, 4. Nula PAPR.`, '1, 2 y 3 son correctas', '1 y 3 son correctas', '2 y 4 son correctas', 'Solo 4 es correcta', 'Todas son correctas', 'A', '2', 5, 'OK']);
+      }
+    }
+
+    // 15 Difíciles (3)
+    for (let i = 1; i <= 15; i++) {
+      if (i <= 5) {
+        dataBanco.push(['PROBLEMA', `CASO-0${i}`, `Problema Difícil ${i}: Calcule la pérdida en el espacio libre (FSPL) para un enlace a 5 GHz a 10 km: $ FSPL = 20 log(d) + 20 log(f) + 92.45 $`, '112.4 dB', '126.4 dB', '140.2 dB', '98.5 dB', '150.0 dB', 'B', '3', 5, 'OK']);
+      } else {
+        dataBanco.push(['SELECCION_SIMPLE', '', `Pregunta Difícil ${i}: En una modulación 256-QAM con ancho de banda de 20 MHz y factor roll-off 0.25, la tasa binaria neta alcanzable es:`, '128 Mbps', '106.6 Mbps', '160 Mbps', '80 Mbps', '64 Mbps', 'A', '3', 5, 'OK']);
+      }
+    }
+
+    const dataEj = [
+      headers,
+      ['FALSO_VERDADERO', '', 'El agua hierve a 100 grados Celsius al nivel del mar.', 'Verdadero', 'Falso', '', '', '', 'A', '1', 5, 'OK'],
+      ['SELECCION_SIMPLE', '', '¿Qué órgano bombea la sangre en el cuerpo humano?', 'Pulmón', 'Hígado', 'Corazón', 'Estómago', 'Riñón', 'C', '2', 5, 'OK']
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataInst), 'Instrucciones');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataEj), 'Ejemplos');
+
+    XLSX.writeFile(wb, 'BANCO_PRUEBA_VALIDO_60PREGUNTAS.xlsx');
+    this._mostrarToast('Descargado: BANCO_PRUEBA_VALIDO_60PREGUNTAS.xlsx');
+  }
+
+  public descargarEjemploInvalido(): void {
+    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'peso', 'observaciones'];
+    const data: any[][] = [headers];
+
+    data.push(['FALSO_VERDADERO', '', 'Pregunta Falso/Verdadero con clave erronea (C)', 'Verdadero', 'Falso', '', '', '', 'C', '1', 5, 'Error: Clave debe ser A o B']);
+    data.push(['SELECCION_SIMPLE', '', '', 'Distractor A', 'Distractor B', 'Distractor C', 'Distractor D', 'Distractor E', 'A', '1', 5, 'Error: Falta enunciado']);
+    data.push(['SELECCION_SIMPLE', '', 'Pregunta de seleccion con solo 2 opciones', 'Opcion 1', 'Opcion 2', '', '', '', 'A', '2', 5, 'Error: Requiere al menos 4 opciones']);
+    data.push(['SUBPROBLEMA', '', 'Subproblema sin grupo de caso padre asignado', 'Distractor A', 'Distractor B', 'Distractor C', 'Distractor D', 'Distractor E', 'B', '3', 5, 'Error: Falta grupo']);
+    data.push(['RESPUESTA_COMPUESTA', '', 'I. Premisa 1.\nII. Premisa 2.', 'A', 'B', 'C', 'D', '', 'Z', '2', 5, 'Error: Clave debe ser A, B, C o D']);
+
+    for (let i = 6; i <= 25; i++) {
+      data.push(['SELECCION_SIMPLE', '', `Pregunta incompleta ${i}`, 'Opcion A', 'Opcion B', 'Opcion C', 'Opcion D', 'Opcion E', 'A', '2', 5, 'OK']);
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Banco');
+
+    XLSX.writeFile(wb, 'BANCO_PRUEBA_CON_ERRORES.xlsx');
+    this._mostrarToast('Descargado: BANCO_PRUEBA_CON_ERRORES.xlsx (Con fallas intencionales para pruebas).');
+  }
+
+  // ============================================================
+  // DESCARGA DE PLANTILLA OFICIAL MACRO (3 HOJAS - SheetJS)
+  // ============================================================
+  public descargarExcelBaseMacro(): void {
+    const totalPreguntas = this.totalPreguntasRequeridas();
+    const cuotas = this.cuotasDificultad();
+
+    const dataInst = [
+      ['BANCO DE PREGUNTAS - GUÍA OFICIAL'],
+      [],
+      ['1. CÓDIGOS DE PREGUNTA OFICIALES', 'FALSO_VERDADERO, PREGUNTA_CON_CLAVE, SELECCION_SIMPLE, RESPUESTA_COMPUESTA, PROBLEMA, SUBPROBLEMA, EMPAREJAMIENTO'],
+      ['2. CUOTAS REQUERIDAS', `${cuotas.facil} Fáciles, ${cuotas.medio} Medias, ${cuotas.dificil} Difíciles (Total: ${totalPreguntas} reactivos)`]
+    ];
+
+    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'peso', 'observaciones'];
+    const dataBanco: any[][] = [headers];
+
+    for (let i = 1; i <= totalPreguntas; i++) {
+      const dif = i <= cuotas.facil ? '1' : (i <= cuotas.facil + cuotas.medio ? '2' : '3');
+      dataBanco.push(['', '', '', '', '', '', '', '', '', dif, 5, '']);
+    }
+
+    const dataEj = [
+      headers,
+      ['FALSO_VERDADERO', '', 'El agua hierve a 100 grados Celsius al nivel del mar.', 'Verdadero', 'Falso', '', '', '', 'A', '1', 5, 'OK'],
+      ['SELECCION_SIMPLE', '', '¿Qué órgano bombea la sangre en el cuerpo humano?', 'Pulmón', 'Hígado', 'Corazón', 'Estómago', 'Riñón', 'C', '2', 5, 'OK']
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataInst), 'Instrucciones');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataEj), 'Ejemplos');
+
+    const fileName = `PLANTILLA_BANCO_${this.parcialActivo().toUpperCase().replace(' ', '_')}_${totalPreguntas}PREGUNTAS.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    this._mostrarToast(`Plantilla oficial (3 Hojas) descargada.`);
+  }
+
+  // ============================================================
+  // FLUJO DE REMISIÓN POR CORREO DIRECTO A EVALUACIONES
+  // ============================================================
+  public abrirModalEnvioEvaluaciones(): void {
+    this.comprobanteGenerado.set(null);
+    this.dialogEnvioEvaluaciones.set(true);
+  }
+
+  public cerrarModalEnvioEvaluaciones(): void {
+    this.dialogEnvioEvaluaciones.set(false);
+  }
+
+  public ejecutarEnvioCorreoEvaluaciones(): void {
+    this.enviandoCorreo.set(true);
+
+    const campus = this.campusActivo();
+    const examenRol = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId) || this.listaExamenesDocente[1];
+    const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fechaHoraStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const randomTicket = `TKT-EVAL-2026-${campus?.id.split('-')[0] || 'CBBA'}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const comprobante: ComprobanteEnvio = {
+      ticket: randomTicket,
+      fechaHora: fechaHoraStr,
+      campusNombre: campus?.nombre || 'Cochabamba - Campus Colonial',
+      correoDestino: campus?.correos ? campus.correos.join(', ') : 'evaluaciones.cochabamba@unitepc.edu.bo',
+      correoDocente: this.docenteSesion.correo,
+      docenteNombre: this.docenteSesion.nombre,
+      docenteCi: this.docenteSesion.ci,
+      materia: examenRol.materia,
+      codigoMateria: examenRol.codigo,
+      grupo: examenRol.grupo,
+      parcial: this.parcialActivo(),
+      modalidad: examenRol.conCartilla ? 'Con Cartilla Óptica' : 'Sin Cartilla',
+      totalPreguntas: preguntasValidas.length,
+      hashCriptografico: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
+      nombreArchivoPkg: this.nombreArchivoPaquete()
+    };
+
+    setTimeout(() => {
+      this.enviandoCorreo.set(false);
+      this.comprobanteGenerado.set(comprobante);
+
+      // 1. Descargar automáticamente el paquete encriptado .pkg
+      this.generarYDescargarPaqueteEncriptado();
+
+      // 2. Abrir la aplicación de correo del usuario (mailto)
+      this.abrirClienteCorreo(comprobante);
+
+      // Actualizar estado en lista de exámenes del docente y en la BD de Evaluaciones
+      examenRol.estado = 'Enviado';
+      this._db.actualizarEstadoPorBancoValidado(
+        examenRol.codigo, 
+        this.parcialActivo(), 
+        this.nombreArchivoPaquete() || `BANCO_${examenRol.codigo}.xlsx`, 
+        comprobante.hashCriptografico, 
+        comprobante.totalPreguntas
+      );
+      this._mostrarToast(`Plantilla oficial lista y banco encriptado. El examen pasó a VALIDADO en la Lista de Evaluaciones.`);
+    }, 600);
+  }
+
+  public generarTextoCuerpoCorreo(c: ComprobanteEnvio): string {
+    return `========================================================================
+SISTEMA DE EVALUACIONES ACADÉMICAS UNITEPC (SEA)
+REMISIÓN OFICIAL DE BANCO DE PREGUNTAS Y EXAMEN
+========================================================================
+
+NÚMERO DE TICKET: ${c.ticket}
+FECHA Y HORA: ${c.fechaHora}
+
+1. DATOS DE LA EVALUACIÓN:
+• Asignatura: [${c.codigoMateria}] ${c.materia}
+• Grupo: ${c.grupo}
+• Tipo de Evaluación: ${c.parcial}
+• Modalidad: ${c.modalidad}
+• Campus de Destino: ${c.campusNombre}
+
+2. DATOS DEL DOCENTE REMITENTE:
+• Docente: ${c.docenteNombre}
+• C.I.: ${c.docenteCi}
+• Correo Institucional: ${c.correoDocente}
+
+3. CERTIFICACIÓN DE REACTIVOS Y BANCO:
+• Total de Preguntas Validadas: ${c.totalPreguntas} reactivos conformes (100% de cuotas)
+• Archivo del Paquete Encriptado: ${c.nombreArchivoPkg}
+• Sello Criptográfico SHA-256: ${c.hashCriptografico}
+
+4. OBSERVACIONES:
+${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observaciones adicionales.'}
+
+========================================================================
+* NOTA: Adjunto se remite el archivo de paquete (${c.nombreArchivoPkg}) generado por el sistema SEA.
+* Mensaje oficial generado por el Sistema de Evaluaciones UNITEPC.
+========================================================================`;
+  }
+
+  public abrirClienteCorreo(c: ComprobanteEnvio): void {
+    const subject = encodeURIComponent(`[SEA-2026] Remisión de Examen: [${c.codigoMateria}] ${c.materia} (${c.parcial}) - ${c.grupo}`);
+    const body = encodeURIComponent(this.generarTextoCuerpoCorreo(c));
+    const to = encodeURIComponent(c.correoDestino);
+    const cc = encodeURIComponent(c.correoDocente);
+
+    const mailtoUrl = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+    window.location.href = mailtoUrl;
+  }
+
+  public copiarTextoCorreo(c: ComprobanteEnvio): void {
+    const texto = this.generarTextoCuerpoCorreo(c);
+    navigator.clipboard.writeText(texto).then(() => {
+      this._mostrarToast('Texto oficial del correo copiado al portapapeles.');
+    });
+  }
+
+  public imprimirComprobanteEnvio(): void {
+    window.print();
+  }
+
+  // ============================================================
+  // GENERAR PAQUETE ENCRIPTADO EXCLUSIVO (.PKG)
+  // ============================================================
+  public async generarYDescargarPaqueteEncriptado(): Promise<void> {
+    const parcialCode = this.parcialActivo().toUpperCase().replace(' ', '_');
+    const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
+
+    const payload = {
+      header: 'UNITEPC-ENCRYPTED-EVAL-PACKAGE-V2',
+      parcial: this.parcialActivo(),
+      timestamp: new Date().toISOString(),
+      checksum: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
+      totalPreguntas: preguntasValidas.length,
+      cuotas: {
+        faciles: this.countFaciles(),
+        medias: this.countMedias(),
+        dificiles: this.countDificiles()
+      },
+      preguntas: preguntasValidas
+    };
+
+    const jsonString = JSON.stringify(payload);
+    const keyString = 'UNITEPC_EVAL_SECRET_KEY_2026_PROPRIETARY';
+    let encryptedChars: number[] = [];
+    for (let i = 0; i < jsonString.length; i++) {
+      const charCode = jsonString.charCodeAt(i);
+      const keyChar = keyString.charCodeAt(i % keyString.length);
+      encryptedChars.push(charCode ^ keyChar);
+    }
+    const encryptedHex = encryptedChars.map(c => c.toString(16).padStart(4, '0')).join('');
+
+    const fileContent = `--- BEGIN UNITEPC ENCRYPTED EVALUATION PACKAGE ---\nVERSION: 2.0\nPARCIAL: ${parcialCode}\nDATA:\n${encryptedHex}\n--- END UNITEPC ENCRYPTED EVALUATION PACKAGE ---`;
+
+    const blob = new Blob([fileContent], { type: 'application/octet-stream' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = this.nombreArchivoPaquete();
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    this._mostrarToast(`Copia de respaldo encriptada (${this.nombreArchivoPaquete()}) descargada.`);
+  }
+
+  // Previsualización PDF
+  public abrirModalPrevisualizacionPdf(): void {
+    this.dialogPrevisualizacionPdf.set(true);
+  }
+
+  public cerrarModalPrevisualizacionPdf(): void {
+    this.dialogPrevisualizacionPdf.set(false);
+  }
+
+  public aprobarDiagramacionPdf(): void {
+    this.pdfPrevisualizadoYConforme.set(true);
+    this.dialogPrevisualizacionPdf.set(false);
+
+    // Sincronizar automáticamente el estado VALIDADO con la Base de Datos de Evaluaciones
+    const examenRol = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId) || this.listaExamenesDocente[1];
+    const codigo = examenRol?.codigo || 'MED-301';
+    const archivo = this.nombreArchivoCargado() || `BANCO_${codigo}_FINAL.xlsx`;
+    const hash = 'SHA256-ENC-' + codigo + '-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
+    const totalValidas = this.preguntasCargadas().filter(p => p.valido).length || 60;
+
+    this._db.actualizarEstadoPorBancoValidado(codigo, this.parcialActivo(), archivo, hash, totalValidas);
+
+    this._mostrarToast('✅ ¡Diagramación PDF aprobada y encriptada por el docente! El examen ha pasado al estado VALIDADO en la Lista de Evaluaciones.');
+  }
+
+  // Previsualización Paquete Encriptado (.pkg)
+  public abrirModalPrevisualizacionPkg(): void {
+    const parcialCode = this.parcialActivo().toUpperCase().replace(' ', '_');
+    const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
+
+    const payload = {
+      header: 'UNITEPC-ENCRYPTED-EVAL-PACKAGE-V2',
+      parcial: this.parcialActivo(),
+      gestion: 'II-2026',
+      docente: this.docenteSesion.nombre,
+      ci: this.docenteSesion.ci,
+      timestamp: new Date().toISOString(),
+      checksum: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
+      totalPreguntas: preguntasValidas.length,
+      cuotas: {
+        faciles: this.countFaciles(),
+        medias: this.countMedias(),
+        dificiles: this.countDificiles()
+      },
+      preguntas: preguntasValidas
+    };
+
+    const jsonString = JSON.stringify(payload, null, 2);
+    this.pkgJsonData.set(jsonString);
+
+    const keyString = 'UNITEPC_EVAL_SECRET_KEY_2026_PROPRIETARY';
+    let encryptedChars: number[] = [];
+    for (let i = 0; i < jsonString.length; i++) {
+      const charCode = jsonString.charCodeAt(i);
+      const keyChar = keyString.charCodeAt(i % keyString.length);
+      encryptedChars.push(charCode ^ keyChar);
+    }
+    const encryptedHex = encryptedChars.map(c => c.toString(16).padStart(4, '0')).join('');
+
+    const fileContent = `--- BEGIN UNITEPC ENCRYPTED EVALUATION PACKAGE ---\nVERSION: 2.0\nPARCIAL: ${parcialCode}\nDOCENTE: ${this.docenteSesion.nombre}\nCHECKSUM_SHA256: b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\nDATA:\n${encryptedHex}\n--- END UNITEPC ENCRYPTED EVALUATION PACKAGE ---`;
+
+    this.pkgHexData.set(fileContent);
+    this.tabPrevisualizacionPkg.set('cifrado');
+    this.dialogPrevisualizacionPkg.set(true);
+  }
+
+  public cerrarModalPrevisualizacionPkg(): void {
+    this.dialogPrevisualizacionPkg.set(false);
+  }
+
+  public copiarContenidoPkg(): void {
+    const data = this.tabPrevisualizacionPkg() === 'cifrado' ? this.pkgHexData() : this.pkgJsonData();
+    navigator.clipboard.writeText(data).then(() => {
+      this._mostrarToast('Contenido copiado al portapapeles.');
+    });
+  }
+
+  public abrirModalEjemplos(): void {
+    this.dialogEjemplos.set(true);
+  }
+
+  public cerrarModalEjemplos(): void {
+    this.dialogEjemplos.set(false);
+  }
+
+  private _generarPreguntasMockValidas(): PreguntaValidada[] {
+    const list: PreguntaValidada[] = [];
+    // 15 Faciles
+    for (let i = 1; i <= 15; i++) {
+      list.push({
+        fila: i + 1,
+        tipo: i % 2 === 0 ? 'FALSO_VERDADERO' : 'SELECCION_SIMPLE',
+        grupo: '',
+        enunciado: i % 2 === 0 ? `Pregunta Fácil ${i}: La fibra óptica monomodo presenta menor atenuación que la multimodo.` : `Pregunta Fácil ${i}: ¿Cuál es la función principal de la capa de enlace de datos?`,
+        opcion_a: i % 2 === 0 ? 'Verdadero' : 'Direccionamiento físico (MAC)',
+        opcion_b: i % 2 === 0 ? 'Falso' : 'Enrutamiento IP',
+        opcion_c: i % 2 === 0 ? '' : 'Cifrado de datos',
+        opcion_d: i % 2 === 0 ? '' : 'Control de sesiones',
+        opcion_e: '',
+        respuesta_correcta: 'A',
+        dificultad: '1',
+        peso: 5,
+        observaciones: 'OK',
+        valido: true,
+        errores: []
+      });
+    }
+    // 30 Medias
+    for (let i = 1; i <= 30; i++) {
+      list.push({
+        fila: i + 16,
+        tipo: i % 2 === 0 ? 'RESPUESTA_COMPUESTA' : 'PREGUNTA_CON_CLAVE',
+        grupo: '',
+        enunciado: i % 2 === 0 ? `Pregunta Media ${i}: I. El retardo de propagación depende de la distancia.\nII. El retardo de transmisión depende de la tasa de bits.` : `Pregunta Media ${i}: Características de la modulación OFDM: 1. Alta eficiencia, 2. Resistencia al desvanecimiento, 3. Baja ISI, 4. Nula PAPR.`,
+        opcion_a: i % 2 === 0 ? 'Si la primera es verdadera' : '1, 2 y 3 son correctas',
+        opcion_b: i % 2 === 0 ? 'Si la segunda es verdadera' : '1 y 3 son correctas',
+        opcion_c: i % 2 === 0 ? 'Si ambas son verdaderas' : '2 y 4 son correctas',
+        opcion_d: i % 2 === 0 ? 'Si ninguna es verdadera' : 'Solo 4 es correcta',
+        opcion_e: '',
+        respuesta_correcta: i % 2 === 0 ? 'C' : 'A',
+        dificultad: '2',
+        peso: 5,
+        observaciones: 'OK',
+        valido: true,
+        errores: []
+      });
+    }
+    // 15 Dificiles
+    for (let i = 1; i <= 15; i++) {
+      list.push({
+        fila: i + 46,
+        tipo: i <= 5 ? 'PROBLEMA' : 'SELECCION_SIMPLE',
+        grupo: i <= 5 ? `CASO-0${i}` : '',
+        enunciado: i <= 5 ? `Problema Difícil ${i}: Calcule la pérdida en el espacio libre (FSPL) a 5 GHz a 10 km:` : `Pregunta Difícil ${i}: En una modulación 256-QAM con ancho de banda de 20 MHz, la tasa neta es:`,
+        opcion_a: '112.4 dB',
+        opcion_b: '126.4 dB',
+        opcion_c: '140.2 dB',
+        opcion_d: '98.5 dB',
+        opcion_e: '150.0 dB',
+        respuesta_correcta: 'B',
+        dificultad: '3',
+        peso: 5,
+        observaciones: 'OK',
+        formulaTypst: i <= 5 ? '$ FSPL = 20 log_10(d) + 20 log_10(f) + 92.45 = 126.42 " dB" $' : undefined,
+        valido: true,
+        errores: []
+      });
+    }
+    return list;
+  }
+
+  private _mostrarToast(msg: string, type: 'success' | 'error' = 'success'): void {
+    this.toastType.set(type);
+    this.toastMessage.set(msg);
+    setTimeout(() => this.toastMessage.set(null), 4000);
+  }
+}

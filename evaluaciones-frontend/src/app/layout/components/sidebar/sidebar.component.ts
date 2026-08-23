@@ -1,0 +1,140 @@
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
+
+export interface MenuItem {
+  label: string;
+  route: string;
+  icon: string;
+  badge?: string;
+  description: string;
+}
+
+@Component({
+  selector: 'sea-sidebar',
+  standalone: true,
+  imports: [CommonModule, RouterModule],
+  template: `
+    <aside class="w-64 bg-card border-r border-border h-full p-4 flex flex-col justify-between shrink-0 overflow-y-auto">
+      
+      <!-- Menús de Navegación -->
+      <div class="space-y-6">
+        
+        <div>
+          <span class="text-[10px] font-extrabold text-muted-foreground/70 uppercase tracking-widest px-3 block mb-2">
+            Módulos del Proceso
+          </span>
+          
+          <nav class="space-y-1">
+            @for (item of menuItems; track item.route) {
+              <a 
+                [routerLink]="item.route" 
+                routerLinkActive="bg-primary/10 text-primary border-primary font-bold shadow-2xs"
+                [routerLinkActiveOptions]="{ exact: false }"
+                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent transition-all group">
+                <i [class]="item.icon + ' text-base transition-colors group-hover:text-primary'"></i>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="truncate">{{ item.label }}</span>
+                    @if (item.badge) {
+                      <span class="bg-indigo-100 text-primary text-[10px] font-black px-1.5 py-0.5 rounded-md">
+                        {{ item.badge }}
+                      </span>
+                    }
+                  </div>
+                </div>
+              </a>
+            }
+          </nav>
+        </div>
+
+        <!-- Banner de Ayuda / Información de Evaluación -->
+        <div class="bg-primary/5 border border-primary/20 rounded-xl p-3.5 space-y-2">
+          <div class="flex items-center gap-2 text-primary font-bold text-xs">
+            <i class="pi pi-shield"></i>
+            <span>Seguridad de Exámenes</span>
+          </div>
+          <p class="text-[11px] text-muted-foreground leading-relaxed">
+            Bloqueo de rol activo a 72h. Patrones oficiales cifrados hasta 3h post-inicio.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Pie de Navegación: Usuario y Sede -->
+      <div class="border-t border-border pt-4 px-2">
+        <div class="flex items-center gap-3">
+          <div class="h-9 w-9 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-primary font-black text-xs">
+            AD
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-xs font-bold text-foreground truncate">Ariel Camara</h4>
+            <p class="text-[10px] text-muted-foreground truncate">Sede Cochabamba · Admin</p>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+  `
+})
+export class SidebarComponent {
+  public readonly menuItems: MenuItem[] = [
+    {
+      label: 'Dashboard',
+      route: '/dashboard',
+      icon: 'pi pi-chart-pie',
+      description: 'Métricas, KPIs y estadísticas generales de evaluaciones'
+    },
+    {
+      label: 'Servicios SEA',
+      route: '/catalogo-academico',
+      icon: 'pi pi-building-columns',
+      badge: 'API Live',
+      description: 'Sedes, Carreras, Materias, Grupos, Horarios y Campus sincronizados del SEA'
+    },
+    {
+      label: 'Plan de Estudios',
+      route: '/plan-estudios',
+      icon: 'pi pi-book',
+      description: 'Asignaturas, docentes y estado de banco por carrera'
+    },
+    {
+      label: 'Lista de Evaluaciones por Día',
+      route: '/evaluaciones-dia',
+      icon: 'pi pi-calendar-clock',
+      badge: 'Hoy',
+      description: 'Exámenes del día, horarios y generación de paquetes'
+    },
+    {
+      label: 'Banco de Preguntas',
+      route: '/banco-preguntas',
+      icon: 'pi pi-question-circle',
+      description: 'Descarga de plantillas, validación y previsualización de preguntas'
+    },
+    {
+      label: 'Administración de Evaluaciones',
+      route: '/administracion-evaluaciones',
+      icon: 'pi pi-sliders-h',
+      description: 'Parámetros institucionales, cuotas de dificultad y tiempos'
+    },
+    {
+      label: 'Reporte de Evaluaciones',
+      route: '/reporte-evaluaciones',
+      icon: 'pi pi-file-excel',
+      description: 'Auditoría, cobertura de bancos y consolidado nacional'
+    },
+    {
+      label: 'Rol de Exámenes',
+      route: '/rol-examenes',
+      icon: 'pi pi-calendar',
+      description: 'Calendarización, grilla semanal y subida de Excel'
+    },
+    {
+      label: 'Auditoría & Bitácora',
+      route: '/auditoria',
+      icon: 'pi pi-shield-check',
+      badge: 'Seguridad',
+      description: 'Seguimiento de accesos, terminales MAC, IPs públicas y trazabilidad'
+    }
+  ];
+}

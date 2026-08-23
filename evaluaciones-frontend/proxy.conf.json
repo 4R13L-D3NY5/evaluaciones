@@ -1,0 +1,11 @@
+{
+  "/gw-unitepc": {
+    "target": "https://gw-dev.unitepc.solutions",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/gw-unitepc": ""
+    },
+    "logLevel": "debug"
+  }
+}

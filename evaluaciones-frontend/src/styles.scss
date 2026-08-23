@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "primeicons/primeicons.css";
+@import "primeng/resources/themes/lara-light-indigo/theme.css";
+@import "primeng/resources/primeng.min.css";
+
+:root {
+  --primary-color: #4f39f6;
+  --primary-color-text: #ffffff;
+  --surface-ground: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-border: #e2e8f0;
+  --text-color: #0f172a;
+  --text-color-secondary: #64748b;
+  --border-radius: 12px;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--surface-ground);
+  color: var(--text-color);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* PrimeNG Overrides for SEA Theme */
+.p-button {
+  border-radius: 0.5rem;
+  font-weight: 600;
+  &.p-button-primary {
+    background: #4f39f6;
+    border-color: #4f39f6;
+    &:hover {
+      background: #432dd7 !important;
+      border-color: #432dd7 !important;
+    }
+  }
+  &.p-button-success {
+    background: #009767;
+    border-color: #009767;
+    &:hover {
+      background: #007956 !important;
+      border-color: #007956 !important;
+    }
+  }
+}
+
+.p-card {
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.p-datatable {
+  .p-datatable-header {
+    background: #ffffff;
+    border-color: #e2e8f0;
+  }
+  .p-datatable-thead > tr > th {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-color: #e2e8f0;
+  }
+  .p-datatable-tbody > tr {
+    transition: background 0.15s;
+    &:hover {
+      background: #f8fafc;
+    }
+    > td {
+      border-color: #f1f5f9;
+      font-size: 0.875rem;
+    }
+  }
+}
+
+/* Global Modal Full-Viewport Overlay Fix */
+.sea-modal-backdrop,
+div[class*="fixed inset-0"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 1rem !important;
+  box-sizing: border-box !important;
+}
+
+/* ============================================================ */
+/* Print and PDF Export Styles (UNITEPC Quad / OMR Engine)      */
+/* ============================================================ */
+@media print {
+  @page {
+    size: auto;
+    margin: 8mm 6mm 8mm 6mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  sea-sidebar,
+  sea-topbar,
+  .print\:hidden,
+  button,
+  .p-toast {
+    display: none !important;
+  }
+
+  .fixed.inset-0,
+  div[class*="fixed inset-0"] {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .bg-card,
+  .shadow-2xl,
+  .shadow-lg,
+  .shadow-md {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .print\:break-after-page {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
