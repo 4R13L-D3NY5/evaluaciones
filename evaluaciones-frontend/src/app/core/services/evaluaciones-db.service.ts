@@ -13,6 +13,8 @@ export interface MapeoEstudianteExamen {
   parcial: string;
 }
 
+export type ModalidadExamen = 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';
+
 export interface RolExamenPersistedItem {
   id: string;
   seaGroupId: string;
@@ -29,6 +31,7 @@ export interface RolExamenPersistedItem {
   tipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia';
   estado: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'REVISADO' | 'SUBIDO' | 'SUSPENDIDO' | 'PENDIENTE_FECHA';
   conCartilla: boolean;
+  modalidad?: ModalidadExamen;
   semana: number;
   dia: string;
   fecha: string;
@@ -81,14 +84,16 @@ export class EvaluacionesDbService {
   }
 
   /**
-   * Obtiene todos los exámenes persistidos en la base de datos de Evaluaciones
+   * Obtiene todos los exámenes persistidos en la base de datos de Evaluaciones (con auto-seed de materia piloto)
    */
   public getRolesExamenes(branchCode?: string, careerCode?: string): RolExamenPersistedItem[] {
     try {
       const raw = localStorage.getItem(DB_KEY_ROLES);
-      if (!raw) return [];
-      const list: RolExamenPersistedItem[] = JSON.parse(raw);
-      if (!Array.isArray(list)) return [];
+      let list: RolExamenPersistedItem[] = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(list) || list.length === 0) {
+        list = this.getPilotExamSeed();
+        this.saveRolesExamenes(list);
+      }
 
       if (branchCode && careerCode) {
         return list.filter(item => 
@@ -98,8 +103,42 @@ export class EvaluacionesDbService {
       }
       return list;
     } catch {
-      return [];
+      return this.getPilotExamSeed();
     }
+  }
+
+  /**
+   * Genera el registro inicial oficial de la materia piloto CPEC18 Auditoría Tributaria
+   */
+  public getPilotExamSeed(): RolExamenPersistedItem[] {
+    return [
+      {
+        id: 'ROL-CPEC18-TA01-1P',
+        seaGroupId: 'grp-cpec18-ta01',
+        seaSyllabusCourseId: 'syl-cpec18',
+        sedeCode: 'CBA',
+        careerCode: 'CONT-COMPL',
+        codigo: 'CPEC18',
+        materia: 'AUDITORÍA TRIBUTARIA',
+        semestre: 3,
+        grupo: 'TA-01',
+        tipoClase: 'TA',
+        docenteNombre: 'MAURICIO QUIROZ LAFUENTE',
+        docenteCI: '4529102',
+        tipo: '1er Parcial',
+        estado: 'PROGRAMADO',
+        conCartilla: true,
+        modalidad: 'PRESENCIAL_CARTILLA',
+        semana: 1,
+        dia: 'Sábado',
+        fecha: '2026-08-22',
+        fechaDisplay: '22/08/2026',
+        horario: '08:15 - 09:45',
+        aula: 'Aula 204',
+        campus: 'Campus Colonial',
+        estudiantesInscritosCount: 3
+      }
+    ];
   }
 
   /**

@@ -137,17 +137,18 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             </select>
           </div>
 
-          <!-- Modalidad (Con o Sin Cartilla) -->
+          <!-- Modalidad (Con Cartilla, Sin Cartilla o Virtual) -->
           <div>
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
-              <i class="pi pi-id-card text-primary text-[10px]"></i> Modalidad
+              <i class="pi pi-desktop text-primary text-[10px]"></i> Modalidad
             </label>
             <select 
               [(ngModel)]="filtroCartilla"
               class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
               <option value="Todos">Todas</option>
-              <option value="Con Cartilla">Con Cartilla</option>
-              <option value="Sin Cartilla">Sin Cartilla</option>
+              <option value="Con Cartilla">Con Cartilla OMR</option>
+              <option value="Sin Cartilla">Sin Cartilla (Físico)</option>
+              <option value="Virtual">Virtual Online</option>
             </select>
           </div>
 
@@ -309,15 +310,19 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       </div>
                     </td>
 
-                    <!-- Modalidad Cartilla -->
+                    <!-- Modalidad (Cartilla OMR, Físico o Virtual) -->
                     <td class="p-3.5 text-center">
-                      @if (item.conCartilla) {
-                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full">
-                          Con Cartilla
+                      @if (item.modalidad === 'VIRTUAL') {
+                        <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <i class="pi pi-desktop text-[9px]"></i> Virtual Online
+                        </span>
+                      } @else if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA' || !item.conCartilla) {
+                        <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <i class="pi pi-file-edit text-[9px]"></i> Físico / Sin Cartilla
                         </span>
                       } @else {
-                        <span class="bg-muted text-muted-foreground border border-border text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          Físico
+                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <i class="pi pi-check-circle text-[9px]"></i> Con Cartilla OMR
                         </span>
                       }
                     </td>
@@ -1259,7 +1264,7 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   // Filtros Parametrizados
   public filtroParcial: string = '1er Parcial';
-  public filtroCartilla: 'Todos' | 'Con Cartilla' | 'Sin Cartilla' = 'Todos';
+  public filtroCartilla: 'Todos' | 'Con Cartilla' | 'Sin Cartilla' | 'Virtual' = 'Todos';
   
   public readonly hoyIso = new Date().toISOString().split('T')[0];
   public filtroFechaInicio: string = this.hoyIso;
@@ -1365,9 +1370,11 @@ export class EvaluacionesDiaComponent implements OnInit {
     }
 
     if (this.filtroCartilla === 'Con Cartilla') {
-      list = list.filter(e => e.conCartilla === true);
+      list = list.filter(e => e.modalidad === 'PRESENCIAL_CARTILLA' || (e.conCartilla === true && e.modalidad !== 'VIRTUAL'));
     } else if (this.filtroCartilla === 'Sin Cartilla') {
-      list = list.filter(e => e.conCartilla === false);
+      list = list.filter(e => e.modalidad === 'PRESENCIAL_SIN_CARTILLA' || (e.conCartilla === false && e.modalidad !== 'VIRTUAL'));
+    } else if (this.filtroCartilla === 'Virtual') {
+      list = list.filter(e => e.modalidad === 'VIRTUAL');
     }
 
     if (estados.length > 0) {

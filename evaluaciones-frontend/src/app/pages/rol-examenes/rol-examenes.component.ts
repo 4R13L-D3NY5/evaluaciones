@@ -57,8 +57,8 @@ export type RolExamenItem = RolExamenPersistedItem;
       <!-- Barra de Filtros Reactiva con Signals -->
       <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
         
-        <!-- Fila 1 de Filtros Principales -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <!-- Fila 1 de Filtros Principales (5 Filtros) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           
           <!-- Sede (Desde SEA Gateway) -->
           <div>
@@ -121,6 +121,22 @@ export type RolExamenItem = RolExamenPersistedItem;
               <option value="2do Parcial">2do Parcial</option>
               <option value="Final">Examen Final</option>
               <option value="2da Instancia">2da Instancia</option>
+            </select>
+          </div>
+
+          <!-- Modalidad de Examen -->
+          <div>
+            <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+              <i class="pi pi-desktop text-primary text-[10px]"></i> Modalidad
+            </label>
+            <select 
+              [ngModel]="filtroModalidad()"
+              (ngModelChange)="filtroModalidad.set($event)"
+              class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
+              <option value="Todos">Todas las Modalidades</option>
+              <option value="PRESENCIAL_CARTILLA">Con Cartilla OMR</option>
+              <option value="PRESENCIAL_SIN_CARTILLA">Sin Cartilla (Físico)</option>
+              <option value="VIRTUAL">Virtual Online</option>
             </select>
           </div>
 
@@ -288,15 +304,19 @@ export type RolExamenItem = RolExamenPersistedItem;
                       </span>
                     </td>
 
-                    <!-- Modalidad Cartilla -->
+                    <!-- Modalidad (Cartilla OMR, Físico o Virtual) -->
                     <td class="p-3.5 text-center">
-                      @if (row.conCartilla) {
-                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full">
-                          Con Cartilla
+                      @if (row.modalidad === 'VIRTUAL') {
+                        <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <i class="pi pi-desktop text-[9px]"></i> Virtual Online
+                        </span>
+                      } @else if (row.modalidad === 'PRESENCIAL_SIN_CARTILLA' || !row.conCartilla) {
+                        <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <i class="pi pi-file-edit text-[9px]"></i> Físico / Sin Cartilla
                         </span>
                       } @else {
-                        <span class="bg-muted text-muted-foreground border border-border text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          Físico / Sin Cartilla
+                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <i class="pi pi-check-circle text-[9px]"></i> Con Cartilla OMR
                         </span>
                       }
                     </td>
@@ -545,12 +565,13 @@ export type RolExamenItem = RolExamenPersistedItem;
                     class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
                 </div>
 
-                <!-- Modalidad de Cartilla -->
+                <!-- Modalidad de Evaluación (3 Opciones) -->
                 <div class="col-span-2">
                   <label class="block font-bold text-muted-foreground mb-1">Modalidad de Examen</label>
-                  <select [(ngModel)]="formConCartilla" class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary cursor-pointer">
-                    <option [ngValue]="true">Con Cartilla (Digital Typst + OMR Óptico)</option>
-                    <option [ngValue]="false">Sin Cartilla (Físico / Práctico / Oral)</option>
+                  <select [(ngModel)]="formModalidad" class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary cursor-pointer">
+                    <option value="PRESENCIAL_CARTILLA">🟦 Presencial con Cartilla (Digital Typst + OMR Óptico)</option>
+                    <option value="PRESENCIAL_SIN_CARTILLA">🟩 Presencial sin Cartilla (Físico / Cuadernillo de Desarrollo)</option>
+                    <option value="VIRTUAL">🟪 Virtual Online (Resolución Web Sincrónica)</option>
                   </select>
                 </div>
 
@@ -601,6 +622,7 @@ export class RolExamenesComponent implements OnInit {
   // Filtros Reactivos con Signals
   public filtroSemestre = signal<string | number>('Todos');
   public filtroTipo = signal<string>('Todos');
+  public filtroModalidad = signal<string>('Todos');
   public busquedaMateria = signal<string>('');
   public filtroFechaDesde = signal<string>('');
   public filtroFechaHasta = signal<string>('');
@@ -621,7 +643,7 @@ export class RolExamenesComponent implements OnInit {
 
   public formTipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' = '1er Parcial';
   public formFecha = '';
-  public formConCartilla = true;
+  public formModalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'PRESENCIAL_CARTILLA';
 
   // Lista de Exámenes del Rol (Cargada desde la BD persistente)
   public examenes = signal<RolExamenItem[]>([]);
@@ -657,6 +679,7 @@ export class RolExamenesComponent implements OnInit {
     const query = this._normalizar(this.busquedaMateria());
     const sem = this.filtroSemestre();
     const tipo = this.filtroTipo();
+    const modalidad = this.filtroModalidad();
     const desde = this.filtroFechaDesde();
     const hasta = this.filtroFechaHasta();
 
@@ -666,6 +689,13 @@ export class RolExamenesComponent implements OnInit {
 
     if (tipo !== 'Todos') {
       list = list.filter(e => e.tipo === tipo);
+    }
+
+    if (modalidad !== 'Todos') {
+      list = list.filter(e => {
+        const modItem = e.modalidad || (e.conCartilla ? 'PRESENCIAL_CARTILLA' : 'PRESENCIAL_SIN_CARTILLA');
+        return modItem === modalidad;
+      });
     }
 
     if (desde) {
@@ -753,6 +783,7 @@ export class RolExamenesComponent implements OnInit {
     this.busquedaMateria.set('');
     this.filtroSemestre.set('Todos');
     this.filtroTipo.set('Todos');
+    this.filtroModalidad.set('Todos');
     this.filtroFechaDesde.set('');
     this.filtroFechaHasta.set('');
   }
@@ -971,7 +1002,7 @@ export class RolExamenesComponent implements OnInit {
     }
     this.formTipo = '1er Parcial';
     this.formFecha = '';
-    this.formConCartilla = true;
+    this.formModalidad = 'PRESENCIAL_CARTILLA';
     this.dialogFormulario.set(true);
   }
 
@@ -983,7 +1014,7 @@ export class RolExamenesComponent implements OnInit {
     this.formGrupoObj.set(grp);
     this.formTipo = item.tipo;
     this.formFecha = item.fecha;
-    this.formConCartilla = item.conCartilla;
+    this.formModalidad = item.modalidad || (item.conCartilla ? 'PRESENCIAL_CARTILLA' : 'PRESENCIAL_SIN_CARTILLA');
     this.dialogFormulario.set(true);
   }
 
@@ -1011,6 +1042,7 @@ export class RolExamenesComponent implements OnInit {
       }
     }
 
+    const conCartilla = this.formModalidad === 'PRESENCIAL_CARTILLA';
     const edit = this.itemEditando();
     if (edit) {
       edit.codigo = mat.courseCode;
@@ -1031,7 +1063,8 @@ export class RolExamenesComponent implements OnInit {
         edit.campus = sch.campus || edit.campus;
         edit.dia = this._obtenerNombreDia(sch.day);
       }
-      edit.conCartilla = this.formConCartilla;
+      edit.modalidad = this.formModalidad;
+      edit.conCartilla = conCartilla;
       edit.estado = this.formFecha ? 'PROGRAMADO' : 'PENDIENTE_FECHA';
       
       this._db.upsertRolExamen(edit);
@@ -1053,7 +1086,8 @@ export class RolExamenesComponent implements OnInit {
         docenteCI: grp?.teacherIdentityNumber || '',
         tipo: this.formTipo,
         estado: this.formFecha ? 'PROGRAMADO' : 'PENDIENTE_FECHA',
-        conCartilla: this.formConCartilla,
+        modalidad: this.formModalidad,
+        conCartilla: conCartilla,
         semana: 8,
         dia: sch ? this._obtenerNombreDia(sch.day) : 'Lunes',
         fecha: this.formFecha,
