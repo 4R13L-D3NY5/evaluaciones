@@ -378,19 +378,19 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
         end_q = start_q + 15
         table_rows = []
         for num in range(start_q, end_q):
-            table_rows.append(f"""        [#text(size: 6.8pt, weight: "bold")[{num}.]],
-        [#circle(radius: 3.3pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 4.8pt, weight: "bold")[A]]]],
-        [#circle(radius: 3.3pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 4.8pt, weight: "bold")[B]]]],
-        [#circle(radius: 3.3pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 4.8pt, weight: "bold")[C]]]],
-        [#circle(radius: 3.3pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 4.8pt, weight: "bold")[D]]]],
-        [#circle(radius: 3.3pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 4.8pt, weight: "bold")[E]]]]""")
+            table_rows.append(f"""        [#text(size: 7.2pt, weight: "bold")[{num}.]],
+        [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[A]]]],
+        [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[B]]]],
+        [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[C]]]],
+        [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[D]]]],
+        [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[E]]]]""")
         
         rows_str = ",\n".join(table_rows)
         grid_cols.append(f"""    [
       #table(
         columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
         stroke: none,
-        inset: (x: 0pt, y: 0.7pt),
+        inset: (x: 0pt, y: 1.4pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
 {rows_str}
       )
@@ -400,7 +400,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 
     # =========================================================================
     # HOJA 1: Cabecera 100% Horizontal + Datos 100% + Cartilla 4 Col x 15 Filas +
-    #         INSTRUCCIÓN + PREGUNTAS 1 A 6
+    #         INSTRUCCIÓN + TÍTULO PREGUNTAS + SECCIÓN 1
     # =========================================================================
     content = f"""
 // ============================================================================
@@ -422,11 +422,11 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   }}
 )
 
-// Cabecera Oficial (100% Horizontal)
+// Cabecera Oficial (100% Horizontal con margen interno adecuado)
 #table(
   columns: (22%, 78%),
   stroke: 0.75pt + black,
-  inset: 3pt,
+  inset: (x: 6pt, y: 4.5pt),
   align: (center + horizon, center + horizon),
   [
     #image("logo_unitepc_clean.png", width: 85%)
@@ -434,20 +434,20 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   [
     #text(weight: "bold")[UNIVERSIDAD TECNICA PRIVADA COSMOS]\\
     #text(weight: "bold")[GESTION 2-2026]\\
-    #v(-5pt)
+    #v(-4pt)
     #line(length: 100%, stroke: 0.5pt + black)
-    #v(-3pt)
+    #v(-2pt)
     #text(weight: "bold")[EVALUACION TEORICA 1ER PARCIAL]
   ]
 )
 
-#v(-6pt)
+#v(-4pt)
 
-// Datos del Estudiante (100% Horizontal)
+// Datos del Estudiante (100% Horizontal con margen interno)
 #table(
   columns: (62%, 38%),
   stroke: 0.5pt + black,
-  inset: (x: 4pt, y: 1.8pt),
+  inset: (x: 5pt, y: 2.8pt),
   [*NOMBRE:* {estudiante_nombre.upper()}],
   [*CODIGO:* {estudiante_codigo}],
   [*CARRERA:* AUDITORÍA / CONTADURÍA],
@@ -462,16 +462,16 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   [*ID:* {estudiante_codigo}]
 )
 
-#v(1pt)
+#v(2.5pt)
 #text(size: 9.5pt)[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
-#v(1pt)
+#v(2.5pt)
 
 // CARTILLA HORIZONTAL (4 COLUMNAS DE 15 PREGUNTAS = 60 PREGUNTAS TOTAL)
-#rect(width: 100%, stroke: 0.85pt + black, fill: rgb("#fafafa"), inset: (x: 3pt, y: 2pt), radius: 2pt)[
+#rect(width: 100%, stroke: 0.85pt + black, fill: rgb("#fafafa"), inset: (x: 4pt, y: 3.5pt), radius: 2pt)[
   #align(center)[
-    #text(weight: "bold", size: 9pt)[CARTILLA DE RESPUESTAS (1 A 60)]
+    #text(weight: "bold", size: 9.5pt)[CARTILLA DE RESPUESTAS (1 A 60)]
   ]
-  #v(-4pt)
+  #v(-3pt)
   #grid(
     columns: (25%, 25%, 25%, 25%),
     column-gutter: 3pt,
@@ -479,9 +479,17 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   )
 ]
 
-#v(2pt)
+#v(4pt)
 
-// SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA (Preguntas 1 a 6)
+// TÍTULO GENERAL DE PREGUNTAS
+#align(center)[
+  #text(size: 11pt, weight: "bold")[CUESTIONARIO DE PREGUNTAS]
+]
+#v(-3pt)
+#line(length: 100%, stroke: 0.5pt + black)
+#v(2.5pt)
+
+// SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA
 #text(weight: "bold")[SELECCION DE LA MEJOR RESPUESTA]\\
 #v(-4pt)
 #text(size: 9.5pt)[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
@@ -491,7 +499,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     # Preguntas 1 a 6 de Sección 1
     for p in p_sec1:
         content += f"""
-#block(spacing: 2.8pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *{p['numero']}.*  {p['enunciado']}
   #v(0.8pt)
   #pad(left: 12pt)[
@@ -502,10 +510,8 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
         content += "  ]\n]\n"
 
     content += """
-#pagebreak()
-
 // ============================================================================
-// PÁGINA 2: SECCIONES 2, 3 Y 4 DE PREGUNTAS
+// SECCIONES 2, 3 Y 4 DE PREGUNTAS (DISTRIBUCIÓN CONTINUA Y LIMPIA)
 // ============================================================================
 """
 
@@ -566,10 +572,8 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 """
 
     content += """
-#pagebreak()
-
 // ============================================================================
-// PÁGINA 3: SECCIONES 5 Y 6 DE PREGUNTAS (CASO CLÍNICO + EMPAREJAMIENTO)
+// SECCIONES 5 Y 6 DE PREGUNTAS (CASO CLÍNICO + EMPAREJAMIENTO)
 // ============================================================================
 """
 
