@@ -1,4 +1,4 @@
-﻿# Plan de Implementación Integral: Sistema de Evaluaciones SEA / SISA (XpertiFlow)
+# Plan de Implementación Integral: Sistema de Evaluaciones SEA / SISA (XpertiFlow)
 
 Documento maestro de alcance y hoja de ruta secuencial para la completitud y puesta en producción del flujo operativo de evaluaciones institucionales UNITEPC, utilizando la materia piloto **[CPEC18] Auditoría Tributaria (Complementaria Contaduría Pública)**.
 
@@ -40,7 +40,7 @@ flowchart TD
 ---
 
 ### FASE 2: Subida y Validación del Banco de Preguntas (Rol: Docente)
-- **Objetivo**: Garantizar que el banco cargado cumpla con la estructura pedagógica de las 6 tipologías oficiales UNITEPC.
+- **Objetivo**: Garantizar que el banco cargado cumpla con la estructura pedagógica de las 6 tipologías oficiales UNITEPC y cuente con validación de seguridad de doble factor.
 - **Acciones Clave**:
   - Carga masiva de archivo `.xlsx` (30 o 60 preguntas).
   - Validador sintáctico y de consistencia pedagógica:
@@ -51,25 +51,35 @@ flowchart TD
     - *Sección 5*: Caso Clínico / Problema (Caso estructurado con preguntas dependientes).
     - *Sección 6*: Emparejamiento Ampliado (Enunciados contra lista maestra de opciones A-E).
   - Feedback visual interactivo: Resumen de reactivos válidos, advertencias y detección de errores por fila/columna.
-  - Transición formal de estado del examen a **`VALIDADO`** (congelamiento de reactivos para evitar adulteraciones posteriores).
+  - **Doble Autenticación Docente (2FA / MFA)**:
+    - Mecanismo de seguridad en dos pasos (Código de Verificación / OTP / Token de Seguridad) requerido para que el docente autorice la entrega formal y el sellado criptográfico del banco.
+  - Transición formal de estado del examen a **`VALIDADO`** (congelamiento de reactivos y firma digital para evitar adulteraciones posteriores).
 
 ---
 
 ### FASE 3: Parametrización y Generación Typst (Rol: Personal de Evaluaciones)
-- **Objetivo**: Renderizado de alta velocidad de cuadernillos y matrices de corrección.
+- **Objetivo**: Renderizado de alta velocidad de cuadernillos, matrices de corrección y planillas de firmas.
 - **Acciones Clave**:
   - Parametrización:
     - Generación de 2 a 5 Variantes (Tipo A, B, C, D, E).
     - Aleatorización determinista mediante semilla por estudiante.
-    - Sincronización con lista de estudiantes (API Gateway de Estudiantes).
-  - Compilación Typst:
+    - Sincronización en tiempo real con lista de estudiantes (API Gateway `byGroup?groupId={{groupId}}`).
+  - Compilación Typst de Exámenes (Blanco y Negro Puro):
     - Tipografía estandarizada: **Times New Roman 11pt**.
-    - Hoja oficio (*US Legal*), margen superior `2 cm`, márgenes laterales `1.8 cm` e inferior `1.3 cm`.
-    - Cartilla OMR maximizada de 60 filas con burbujas de radio `4.1pt` y línea punteada de firma al ras del renglón.
-    - Distribución sin espacios vacíos (Página 1 completa con Sección 1 + Cartilla; Página 2 con Secciones 2 a 6).
+    - Hoja oficio (*US Legal*), margen general de `2 cm` a todos los lados.
+    - **Cero Fondos Grises/Colores (`fill: none`)**: Optimizado para fotocopiado e impresión masiva a blanco y negro.
+    - **Código de Estudiante al Doble de Tamaño (`18pt Bold`)**: Identificación visual inmediata en mesa y lectura rápida.
+    - **Espacio Ampliado de Firma de Estudiante**: Renglón punteado de firma extendido ocupando todo el ancho de la cabecera.
+    - Cartilla OMR horizontal con el doble de espaciado vertical entre números (1 a 60 reactivos con 5 opciones A-E).
+    - Pie de página dinámico con nombre completo y código del alumno en hojas impares (Páginas 1 y 3).
+  - **Generación de Planilla Oficial de Asistencia y Firmas de Estudiantes (PDF)**:
+    - Documento complementario indispensable que se entrega físicamente junto con el paquete de exámenes al docente/veedor.
+    - Cabecera institucional completa idéntica a la del examen (Logo UNITEPC, Gestión, Carrera, Materia, Docente, Grupo, Fecha, Aula).
+    - Tabla ordenada con: `N°`, `Código`, `Apellidos y Nombres`, `Variante Asignada (Tipo A/B)`, y `Espacio de Firma de Puño y Letra`.
+    - Cuadro resumen de asistencia: Total Matriculados, Presentes, Ausentes y firma de conformidad del docente titular.
   - Generación de Patrones Oficiales de Corrección:
-    - PDF oficial de matriz 1 a 60 reactivos con resaltado púrpura de claves activas y `(-)` para reactivos de reserva.
-    - Exportación a planilla Remark Excel (`P1` a `P60`) como respaldo.
+    - PDF oficial de matriz 1 a 60 reactivos con resaltado de claves activas y reactivos de reserva.
+    - Exportación a planilla Remark Excel (`P1` a `P60`) como respaldo para el motor OMR.
 
 ---
 

@@ -426,6 +426,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 #table(
   columns: (22%, 78%),
   stroke: 0.75pt + black,
+  fill: none,
   inset: (x: 5pt, y: 3.5pt),
   align: (center + horizon, center + horizon),
   [
@@ -443,13 +444,14 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 
 #v(-5pt)
 
-// Datos del Estudiante (100% Horizontal con margen interno)
+// Datos del Estudiante (100% Horizontal, Sin Fondos, Código Doble de Tamaño y Firma Amplia)
 #table(
-  columns: (62%, 38%),
+  columns: (58%, 42%),
   stroke: 0.5pt + black,
+  fill: none,
   inset: (x: 5pt, y: 2.2pt),
   [*NOMBRE:* {estudiante_nombre.upper()}],
-  [*CODIGO:* {estudiante_codigo}],
+  [#align(left + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[{estudiante_codigo}]]],
   [*CARRERA:* AUDITORÍA / CONTADURÍA],
   [*GRUPO:* TA-01],
   [*DOCENTE:* MAURICIO QUIROZ LAFUENTE],
@@ -458,16 +460,23 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   [*FECHA:* 22/08/2026],
   [*SEMESTRE:* 3],
   [*HORA:* 08:15:00 - 09:45:00],
-  [#grid(columns: (auto, 1fr), column-gutter: 4pt, align: (bottom + left, bottom), [*FIRMA ESTUDIANTE:*], [#box(width: 1fr, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.75pt)))])],
-  [*ID:* {estudiante_codigo}]
+  table.cell(colspan: 2)[
+    #grid(
+      columns: (auto, 1fr),
+      column-gutter: 8pt,
+      align: (bottom + left, bottom),
+      [*FIRMA DEL ESTUDIANTE:*],
+      [#box(width: 100%, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt)))]
+    )
+  ]
 )
 
 #v(1.5pt)
 #text(size: 9pt)[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
 #v(1.5pt)
 
-// CARTILLA HORIZONTAL (4 COLUMNAS DE 15 PREGUNTAS = 60 PREGUNTAS TOTAL)
-#rect(width: 100%, stroke: 0.85pt + black, fill: rgb("#fafafa"), inset: (x: 4pt, y: 2.5pt), radius: 2pt)[
+// CARTILLA HORIZONTAL (4 COLUMNAS DE 15 PREGUNTAS = 60 PREGUNTAS TOTAL - SIN FONDOS)
+#rect(width: 100%, stroke: 0.85pt + black, fill: none, inset: (x: 4pt, y: 2.5pt), radius: 2pt)[
   #align(center)[
     #text(weight: "bold", size: 9pt)[CARTILLA DE RESPUESTAS (1 A 60)]
   ]
@@ -573,11 +582,11 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 
     content += """
 // ============================================================================
-// SECCIONES 5 Y 6 DE PREGUNTAS (CASO CLÍNICO + EMPAREJAMIENTO)
+// SECCIONES 5 Y 6 DE PREGUNTAS (CASO CLÍNICO + EMPAREJAMIENTO SIN FONDOS)
 // ============================================================================
 """
 
-    # SECCIÓN 5: ÍTEMS AGRUPADOS POR CASO CLÍNICO O PROBLEMA
+    # SECCIÓN 5: ÍTEMS AGRUPADOS POR CASO CLÍNICO O PROBLEMA (SIN FONDOS)
     content += f"""
 #v(2pt)
 #text(weight: "bold")[ITEMS AGRUPADOS POR CASO CLINICO O PROBLEMA]\\
@@ -585,7 +594,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 #text(size: 9.5pt)[*Instrucciones:* El siguiente caso clinico o problema tendra varias preguntas. Seleccione la respuesta correcta en cada una.]
 #v(2pt)
 
-#rect(width: 100%, stroke: 0.75pt + black, fill: rgb("#f8fafc"), inset: 6pt, radius: 2pt)[
+#rect(width: 100%, stroke: 0.75pt + black, fill: none, inset: 6pt, radius: 2pt)[
   #text(weight: "bold")[{CASO_PROBLEMA_TEXTO}]
 ]
 #v(2pt)
@@ -602,7 +611,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
             content += f"""    {l}) {text} \\\n"""
         content += "  ]\n]\n"
 
-    # SECCIÓN 6: EMPAREJAMIENTO AMPLIADO
+    # SECCIÓN 6: EMPAREJAMIENTO AMPLIADO (SIN FONDOS)
     content += """
 #v(3pt)
 #text(weight: "bold")[EMPAREJAMIENTO AMPLIADO]\\
@@ -610,7 +619,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 #text(size: 9.5pt)[*Instrucciones:* De la lista de opciones, seleccione la respuesta correcta para cada enunciado.]
 #v(2pt)
 
-#rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f1f5f9"), inset: 6pt, radius: 2pt)[
+#rect(width: 100%, stroke: 0.75pt + black, fill: none, inset: 6pt, radius: 2pt)[
   #text(weight: "bold")[De la lista de opciones, seleccione la respuesta correcta para cada enunciado:]\\
   #v(2pt)
   #pad(left: 10pt)[
@@ -768,6 +777,130 @@ def main():
     os.makedirs(assets_dir, exist_ok=True)
     os.makedirs(public_assets_dir, exist_ok=True)
     
+def generar_typst_lista_firmas(estudiantes_lista, output_typ_path):
+    typ_content = """#set page(
+  paper: "us-legal",
+  margin: 2cm,
+  header: none,
+  footer: [
+    #line(length: 100%, stroke: 0.5pt + black)
+    #v(-2pt)
+    #grid(
+      columns: (50%, 50%),
+      align: (left, right),
+      [#text(size: 8pt, fill: luma(80))[UNIVERSIDAD TÉCNICA PRIVADA COSMOS · SEA EVALUACIONES]],
+      [#text(size: 8pt, fill: luma(80))[PÁGINA #counter(page).display()]]
+    )
+  ]
+)
+#set text(font: "Times New Roman", size: 10.5pt, lang: "es")
+#set par(leading: 0.52em)
+
+// Cabecera Oficial Institucional (Sin Fondos)
+#table(
+  columns: (22%, 78%),
+  stroke: 0.75pt + black,
+  fill: none,
+  inset: (x: 5pt, y: 3.5pt),
+  align: (center + horizon, center + horizon),
+  [
+    #image("logo_unitepc_clean.png", width: 85%)
+  ],
+  [
+    #text(weight: "bold")[UNIVERSIDAD TECNICA PRIVADA COSMOS]\\
+    #text(weight: "bold")[GESTION 2-2026]\\
+    #v(-4.5pt)
+    #line(length: 100%, stroke: 0.5pt + black)
+    #v(-2.5pt)
+    #text(weight: "bold")[PLANILLA OFICIAL DE ASISTENCIA Y FIRMAS DE EVALUACION]
+  ]
+)
+
+#v(-4pt)
+
+// Datos de la Asignatura y Examen (Sin Fondos)
+#table(
+  columns: (58%, 42%),
+  stroke: 0.5pt + black,
+  fill: none,
+  inset: (x: 5pt, y: 2.2pt),
+  [*CARRERA:* AUDITORÍA / CONTADURÍA],
+  [*GRUPO:* TA-01],
+  [*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA],
+  [*EXAMEN:* 1er Parcial],
+  [*DOCENTE:* MAURICIO QUIROZ LAFUENTE],
+  [*FECHA:* 22/08/2026],
+  [*SEMESTRE:* 3],
+  [*HORA:* 08:15:00 - 09:45:00],
+  [*AULA / CAMPUS:* Aula Central · Cochabamba],
+  [*MODALIDAD:* Presencial con Cartilla OMR]
+)
+
+#v(4pt)
+
+#text(size: 9pt)[*INSTRUCCIONES PARA EL CONTROL DE ASISTENCIA:* Cada estudiante debe verificar sus datos, registrar su firma de puño y letra al recibir el examen y confirmar la variante asignada.]
+
+#v(3pt)
+
+// TABLA OFICIAL DE ESTUDIANTES Y FIRMAS (SIN FONDOS)
+#table(
+  columns: (6%, 15%, 39%, 12%, 28%),
+  stroke: 0.5pt + black,
+  fill: none,
+  inset: (x: 4pt, y: 6pt),
+  align: (center + horizon, center + horizon, left + horizon, center + horizon, center + horizon),
+  
+  // Encabezados
+  [*N°*], [*CÓDIGO*], [*APELLIDOS Y NOMBRES*], [*VARIANTE*], [*FIRMA DEL ESTUDIANTE*],
+"""
+    variantes = ['TIPO A', 'TIPO B']
+    for idx, est in enumerate(estudiantes_lista):
+        var = variantes[idx % len(variantes)]
+        typ_content += f"""  [{idx + 1}], [{est['codigo']}], [{est['nombre'].upper()}], [*{var}*], [#box(width: 100%, baseline: 4pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.75pt)))],\n"""
+
+    typ_content += f"""
+)
+
+#v(12pt)
+
+// RESUMEN Y FIRMAS DE CONFORMIDAD
+#table(
+  columns: (50%, 50%),
+  stroke: 0.5pt + black,
+  fill: none,
+  inset: 6pt,
+  [
+    #text(weight: "bold")[RESUMEN DE ASISTENCIA:]\\
+    #v(3pt)
+    Total Estudiantes Matriculados: #strong[{len(estudiantes_lista)}]\\
+    Total Estudiantes Presentes: #box(width: 30pt, baseline: 3pt, line(length: 100%, stroke: 0.5pt + black))\\
+    Total Estudiantes Ausentes: #box(width: 30pt, baseline: 3pt, line(length: 100%, stroke: 0.5pt + black))
+  ],
+  [
+    #align(center)[
+      #v(20pt)
+      #line(length: 75%, stroke: 0.75pt + black)
+      #v(-2pt)
+      #text(weight: "bold", size: 9pt)[FIRMA DOCENTE TITULAR]\\
+      #text(size: 8pt)[MAURICIO QUIROZ LAFUENTE]
+    ]
+  ]
+)
+"""
+    with open(output_typ_path, "w", encoding="utf-8") as f:
+        f.write(typ_content)
+
+
+def main():
+    bases_dir = r"c:\laragon\www\evaluaciones\bases"
+    typst_exe = r"c:\laragon\www\evaluaciones\typst.exe"
+    assets_dir = r"c:\laragon\www\evaluaciones\evaluaciones-frontend\src\assets\examenes"
+    public_assets_dir = r"c:\laragon\www\evaluaciones\evaluaciones-frontend\public\assets\examenes"
+    
+    os.makedirs(bases_dir, exist_ok=True)
+    os.makedirs(assets_dir, exist_ok=True)
+    os.makedirs(public_assets_dir, exist_ok=True)
+    
     # Copiar logo limpio a todas las carpetas
     for d in [assets_dir, public_assets_dir, r"c:\laragon\www\evaluaciones\evaluaciones-frontend\src\assets"]:
         try:
@@ -838,8 +971,23 @@ def main():
     generar_remark_excel(patrones_variantes, remark_path)
     shutil.copy2(remark_path, os.path.join(assets_dir, remark_name))
     shutil.copy2(remark_path, os.path.join(public_assets_dir, remark_name))
+
+    # =========================================================================
+    # 4. GENERAR PLANILLA OFICIAL DE ASISTENCIA Y FIRMAS DE ESTUDIANTES
+    # =========================================================================
+    base_name_firmas = f"{cod}_{sede}_{grupo}_{tipo_examen}_{fecha}_Lista_Firmas"
+    typ_firmas = os.path.join(bases_dir, f"{base_name_firmas}.typ")
+    pdf_firmas = os.path.join(bases_dir, f"{base_name_firmas}.pdf")
+    generar_typst_lista_firmas(ESTUDIANTES_OFICIALES, typ_firmas)
+    res_f = subprocess.run([typst_exe, "compile", typ_firmas, pdf_firmas], cwd=bases_dir, capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if res_f.returncode == 0:
+        print(f"[OK] Planilla de Asistencia y Firmas compilada exitosamente ({os.path.getsize(pdf_firmas)} bytes)")
+        shutil.copy2(pdf_firmas, os.path.join(assets_dir, f"{base_name_firmas}.pdf"))
+        shutil.copy2(pdf_firmas, os.path.join(public_assets_dir, f"{base_name_firmas}.pdf"))
+    else:
+        print(f"[ERROR Lista Firmas]: {res_f.stderr}")
     
-    print("[OK] Generación Typst Finalizada con Cartilla de 60 Reactivos y Puntos Bajos!")
+    print("[OK] Generación Typst Finalizada con Cartilla de 60 Reactivos y Planilla de Firmas!")
 
 if __name__ == "__main__":
     main()

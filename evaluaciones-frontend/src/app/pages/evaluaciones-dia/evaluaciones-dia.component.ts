@@ -400,6 +400,21 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           </div>
                         </div>
 
+                        <!-- 4. Planilla Oficial de Asistencia y Firmas de Estudiantes (PDF) -->
+                        <div class="relative group/doc4">
+                          <button 
+                            (click)="abrirListaFirmasPdfTypst(item)"
+                            class="h-7 w-7 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 flex items-center justify-center transition-colors cursor-pointer">
+                            <i class="pi pi-users text-xs"></i>
+                          </button>
+                          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc4:flex flex-col items-center z-50 pointer-events-none">
+                            <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                              Planilla Oficial de Asistencia y Firmas (PDF)
+                            </span>
+                            <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                          </div>
+                        </div>
+
                       </div>
                     </td>
 
@@ -1808,6 +1823,12 @@ export class EvaluacionesDiaComponent implements OnInit {
     link.download = filename;
     link.click();
     this._mostrarToast(`Descargando ${filename}...`);
+  }
+
+  public abrirListaFirmasPdfTypst(item?: EvaluacionItemUI): void {
+    const filename = `CPEC18_Cochabamba_TA-01_1erParcial_20260822_Lista_Firmas.pdf`;
+    window.open(`assets/examenes/${filename}`, '_blank');
+    this._mostrarToast(`Abriendo Planilla Oficial de Asistencia y Firmas...`);
   }
 
   public imprimirVentanaLimpia(): void {

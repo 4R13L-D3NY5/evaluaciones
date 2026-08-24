@@ -29,6 +29,7 @@
 #table(
   columns: (22%, 78%),
   stroke: 0.75pt + black,
+  fill: none,
   inset: (x: 5pt, y: 3.5pt),
   align: (center + horizon, center + horizon),
   [
@@ -46,13 +47,14 @@
 
 #v(-5pt)
 
-// Datos del Estudiante (100% Horizontal con margen interno)
+// Datos del Estudiante (100% Horizontal, Sin Fondos, Código Doble de Tamaño y Firma Amplia)
 #table(
-  columns: (62%, 38%),
+  columns: (58%, 42%),
   stroke: 0.5pt + black,
+  fill: none,
   inset: (x: 5pt, y: 2.2pt),
   [*NOMBRE:* RODRIGO ALEJANDRO CONDORI RODRÍGUEZ],
-  [*CODIGO:* 6928103],
+  [#align(left + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[6928103]]],
   [*CARRERA:* AUDITORÍA / CONTADURÍA],
   [*GRUPO:* TA-01],
   [*DOCENTE:* MAURICIO QUIROZ LAFUENTE],
@@ -61,16 +63,23 @@
   [*FECHA:* 22/08/2026],
   [*SEMESTRE:* 3],
   [*HORA:* 08:15:00 - 09:45:00],
-  [#grid(columns: (auto, 1fr), column-gutter: 4pt, align: (bottom + left, bottom), [*FIRMA ESTUDIANTE:*], [#box(width: 1fr, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.75pt)))])],
-  [*ID:* 6928103]
+  table.cell(colspan: 2)[
+    #grid(
+      columns: (auto, 1fr),
+      column-gutter: 8pt,
+      align: (bottom + left, bottom),
+      [*FIRMA DEL ESTUDIANTE:*],
+      [#box(width: 100%, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt)))]
+    )
+  ]
 )
 
 #v(1.5pt)
 #text(size: 9pt)[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
 #v(1.5pt)
 
-// CARTILLA HORIZONTAL (4 COLUMNAS DE 15 PREGUNTAS = 60 PREGUNTAS TOTAL)
-#rect(width: 100%, stroke: 0.85pt + black, fill: rgb("#fafafa"), inset: (x: 4pt, y: 2.5pt), radius: 2pt)[
+// CARTILLA HORIZONTAL (4 COLUMNAS DE 15 PREGUNTAS = 60 PREGUNTAS TOTAL - SIN FONDOS)
+#rect(width: 100%, stroke: 0.85pt + black, fill: none, inset: (x: 4pt, y: 2.5pt), radius: 2pt)[
   #align(center)[
     #text(weight: "bold", size: 9pt)[CARTILLA DE RESPUESTAS (1 A 60)]
   ]
@@ -706,7 +715,7 @@
 ]
 
 // ============================================================================
-// SECCIONES 5 Y 6 DE PREGUNTAS (CASO CLÍNICO + EMPAREJAMIENTO)
+// SECCIONES 5 Y 6 DE PREGUNTAS (CASO CLÍNICO + EMPAREJAMIENTO SIN FONDOS)
 // ============================================================================
 
 #v(2pt)
@@ -715,7 +724,7 @@
 #text(size: 9.5pt)[*Instrucciones:* El siguiente caso clinico o problema tendra varias preguntas. Seleccione la respuesta correcta en cada una.]
 #v(2pt)
 
-#rect(width: 100%, stroke: 0.75pt + black, fill: rgb("#f8fafc"), inset: 6pt, radius: 2pt)[
+#rect(width: 100%, stroke: 0.75pt + black, fill: none, inset: 6pt, radius: 2pt)[
   #text(weight: "bold")[CASO N 1:
 La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización externa por la gestión fiscal 2024. El auditor evidenció: (a) compras de mercadería por Bs. 80.000 pagadas en efectivo con factura original, (b) gastos de viaje por Bs. 15.000 sin respaldo de pasajes ni rendición, y (c) omisión de registro de ventas por Bs. 40.000.]
 ]
@@ -779,7 +788,7 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
 #text(size: 9.5pt)[*Instrucciones:* De la lista de opciones, seleccione la respuesta correcta para cada enunciado.]
 #v(2pt)
 
-#rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f1f5f9"), inset: 6pt, radius: 2pt)[
+#rect(width: 100%, stroke: 0.75pt + black, fill: none, inset: 6pt, radius: 2pt)[
   #text(weight: "bold")[De la lista de opciones, seleccione la respuesta correcta para cada enunciado:]\
   #v(2pt)
   #pad(left: 10pt)[
