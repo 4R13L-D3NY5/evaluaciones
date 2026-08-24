@@ -419,6 +419,16 @@ import {
                     }
                   </div>
 
+                  <!-- Botón Ver Estudiantes Matriculados en Vivo (byGroup) -->
+                  <div class="pt-2 border-t border-border">
+                    <button 
+                      (click)="abrirModalEstudiantes(grp)"
+                      class="w-full bg-primary/10 hover:bg-primary text-primary hover:text-white font-bold text-xs py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
+                      <i class="pi pi-users text-xs"></i>
+                      <span>Ver Estudiantes Matriculados</span>
+                    </button>
+                  </div>
+
                 </div>
               }
             </div>
@@ -507,6 +517,97 @@ import {
         </div>
       }
 
+      <!-- Modal: Estudiantes Matriculados por Grupo (Gateway byGroup) -->
+      @if (modalEstudiantesAbierto()) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden">
+            
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-border bg-muted/40 flex items-start justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-mono font-black text-sm">
+                  {{ grupoSeleccionado()?.code || 'GRP' }}
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-black text-foreground">Estudiantes Matriculados</h3>
+                    <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      {{ estudiantesGrupo().length }} Alumnos
+                    </span>
+                  </div>
+                  <p class="text-xs text-muted-foreground mt-0.5">
+                    Docente: <strong class="text-foreground">{{ grupoSeleccionado()?.teacherName || 'No Asignado' }}</strong> · Gestión: {{ grupoSeleccionado()?.term }}
+                  </p>
+                </div>
+              </div>
+
+              <button 
+                (click)="cerrarModalEstudiantes()" 
+                class="h-8 w-8 rounded-lg bg-muted hover:bg-border text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors">
+                <i class="pi pi-times text-xs"></i>
+              </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-5 overflow-y-auto space-y-4 flex-1">
+              @if (cargandoEstudiantes()) {
+                <div class="py-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                  <i class="pi pi-spin pi-spinner text-3xl text-primary"></i>
+                  <span class="text-xs font-bold">Consultando estudiantes matriculados en vivo del Gateway...</span>
+                  <span class="text-[11px] font-mono text-muted-foreground">GET /students/byGroup?groupId={{ grupoSeleccionado()?.groupId }}</span>
+                </div>
+              } @else if (estudiantesGrupo().length === 0) {
+                <div class="py-12 text-center text-muted-foreground text-xs font-medium space-y-1">
+                  <i class="pi pi-info-circle text-2xl text-muted-foreground block mb-2"></i>
+                  <div class="font-bold">No se encontraron estudiantes matriculados en este grupo.</div>
+                  <div class="text-[11px]">Es posible que el período de matriculación aún no haya iniciado para este grupo.</div>
+                </div>
+              } @else {
+                <div class="border border-border rounded-xl overflow-hidden">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-muted/60 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground border-b border-border">
+                        <th class="p-3 text-center">N°</th>
+                        <th class="p-3">Código</th>
+                        <th class="p-3">Nombre Completo del Estudiante</th>
+                        <th class="p-3 text-center">Estado Académico</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border text-xs">
+                      @for (est of estudiantesGrupo(); track est.studentCode; let i = $index) {
+                        <tr class="hover:bg-muted/30 transition-colors">
+                          <td class="p-3 text-center font-mono font-bold text-muted-foreground text-[11px]">{{ i + 1 }}</td>
+                          <td class="p-3 font-mono font-black text-primary">{{ est.studentCode }}</td>
+                          <td class="p-3 font-bold text-foreground">{{ est.fullName }}</td>
+                          <td class="p-3 text-center">
+                            <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                              <i class="pi pi-check text-[9px]"></i> {{ est.courseState || 'CURSANDO' }}
+                            </span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-border bg-muted/20 flex items-center justify-between">
+              <div class="text-[11px] text-muted-foreground font-mono truncate max-w-sm">
+                GroupId: {{ grupoSeleccionado()?.groupId }}
+              </div>
+              <button 
+                (click)="cerrarModalEstudiantes()" 
+                class="bg-muted hover:bg-border text-foreground font-bold text-xs py-2 px-4 rounded-xl transition-colors">
+                Cerrar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      }
+
     </div>
   `
 })
@@ -519,6 +620,12 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   public cargandoCarreras = signal<boolean>(false);
   public cargandoMaterias = signal<boolean>(false);
   public cargandoGrupos = signal<boolean>(false);
+  public cargandoEstudiantes = signal<boolean>(false);
+
+  // Modal Estudiantes
+  public modalEstudiantesAbierto = signal<boolean>(false);
+  public grupoSeleccionado = signal<GroupItem | null>(null);
+  public estudiantesGrupo = signal<any[]>([]);
 
   // Datos
   public sedes = signal<BranchOffice[]>([]);
@@ -685,5 +792,30 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
       },
       error: () => {}
     });
+  }
+
+  public abrirModalEstudiantes(grp: GroupItem): void {
+    this.grupoSeleccionado.set(grp);
+    this.estudiantesGrupo.set([]);
+    this.modalEstudiantesAbierto.set(true);
+    this.cargandoEstudiantes.set(true);
+
+    this._gateway.getStudentsByGroup(grp.groupId).subscribe({
+      next: data => {
+        this.estudiantesGrupo.set(data || []);
+        this.cargandoEstudiantes.set(false);
+      },
+      error: err => {
+        console.error('[CatalogoUnitepcComponent] Error al cargar estudiantes:', err);
+        this.estudiantesGrupo.set([]);
+        this.cargandoEstudiantes.set(false);
+      }
+    });
+  }
+
+  public cerrarModalEstudiantes(): void {
+    this.modalEstudiantesAbierto.set(false);
+    this.grupoSeleccionado.set(null);
+    this.estudiantesGrupo.set([]);
   }
 }

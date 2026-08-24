@@ -1600,8 +1600,8 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.evaluacionSeleccionadaParaParametrizar.set(item);
     this.ratioEstudiantesPorVariante.set(this._db.getEstudiantesPorVarianteParam());
 
-    // Cargar la nómina de estudiantes
-    this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo).subscribe({
+    // Cargar la nómina de estudiantes en vivo desde el Gateway por groupId
+    this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, item.seaGroupId).subscribe({
       next: estudiantes => {
         this.estudiantesInscritos.set(estudiantes);
       }

@@ -9,7 +9,8 @@ import {
   Course, 
   GroupItem, 
   Campus, 
-  TimeFrame 
+  TimeFrame,
+  GroupStudentItem
 } from '../models/unitepc-gateway.models';
 
 /**
@@ -158,6 +159,24 @@ export class UnitepcGatewayService {
       }),
       catchError(err => {
         console.error(`[UnitepcGatewayService] Error al obtener Grupos para term ${term}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  /**
+   * Obtiene la nómina de estudiantes matriculados en un grupo
+   * GET /students/byGroup?groupId={groupId}
+   */
+  public getStudentsByGroup(groupId: string): Observable<GroupStudentItem[]> {
+    return this.getAccessToken().pipe(
+      switchMap(token => {
+        const headers = this._buildHeaders(token);
+        const params = new HttpParams().set('groupId', groupId);
+        return this._http.get<GroupStudentItem[]>(`${this._studentBaseUrl}/students/byGroup`, { headers, params });
+      }),
+      catchError(err => {
+        console.error(`[UnitepcGatewayService] Error al obtener Estudiantes para grupo ${groupId}:`, err);
         return throwError(() => err);
       })
     );

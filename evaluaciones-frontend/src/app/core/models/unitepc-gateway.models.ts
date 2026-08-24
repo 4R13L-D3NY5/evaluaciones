@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Modelo de datos del Gateway UNITEPC (SEA / SISA)
  * @author Ariel Camara / XpertiFlow
  */
@@ -68,4 +68,12 @@ export interface TimeFrame {
   name: string;
   code: string;
   isActive?: boolean;
+}
+
+export interface GroupStudentItem {
+  studentCode: string;
+  fullName: string;
+  courseState: string;
+  groupId: string;
+  syllabusCourseId: string;
 }
