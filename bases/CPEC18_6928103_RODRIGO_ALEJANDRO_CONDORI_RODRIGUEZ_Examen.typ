@@ -4,7 +4,7 @@
   header: none
 )
 #set text(font: "Times New Roman", size: 11pt, lang: "es")
-#set par(leading: 0.58em, justify: true)
+#set par(leading: 0.52em, justify: true)
 
 // ============================================================================
 // EXAMEN OFICIAL UNITEPC - RODRIGO ALEJANDRO CONDORI RODRÍGUEZ (ID: 6928103)
@@ -29,7 +29,7 @@
 #table(
   columns: (22%, 78%),
   stroke: 0.75pt + black,
-  inset: (x: 6pt, y: 4.5pt),
+  inset: (x: 5pt, y: 3.5pt),
   align: (center + horizon, center + horizon),
   [
     #image("logo_unitepc_clean.png", width: 85%)
@@ -37,20 +37,20 @@
   [
     #text(weight: "bold")[UNIVERSIDAD TECNICA PRIVADA COSMOS]\
     #text(weight: "bold")[GESTION 2-2026]\
-    #v(-4pt)
+    #v(-4.5pt)
     #line(length: 100%, stroke: 0.5pt + black)
-    #v(-2pt)
+    #v(-2.5pt)
     #text(weight: "bold")[EVALUACION TEORICA 1ER PARCIAL]
   ]
 )
 
-#v(-4pt)
+#v(-5pt)
 
 // Datos del Estudiante (100% Horizontal con margen interno)
 #table(
   columns: (62%, 38%),
   stroke: 0.5pt + black,
-  inset: (x: 5pt, y: 2.8pt),
+  inset: (x: 5pt, y: 2.2pt),
   [*NOMBRE:* RODRIGO ALEJANDRO CONDORI RODRÍGUEZ],
   [*CODIGO:* 6928103],
   [*CARRERA:* AUDITORÍA / CONTADURÍA],
@@ -65,14 +65,14 @@
   [*ID:* 6928103]
 )
 
-#v(2.5pt)
-#text(size: 9.5pt)[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
-#v(2.5pt)
+#v(1.5pt)
+#text(size: 9pt)[*INSTRUCCION DE COMPLETADO DE CARTILLA:* Debe rellenar con cuidado la opción que considere correcta en la Cartilla con lapicero de color AZUL o NEGRO.]
+#v(1.5pt)
 
 // CARTILLA HORIZONTAL (4 COLUMNAS DE 15 PREGUNTAS = 60 PREGUNTAS TOTAL)
-#rect(width: 100%, stroke: 0.85pt + black, fill: rgb("#fafafa"), inset: (x: 4pt, y: 3.5pt), radius: 2pt)[
+#rect(width: 100%, stroke: 0.85pt + black, fill: rgb("#fafafa"), inset: (x: 4pt, y: 2.5pt), radius: 2pt)[
   #align(center)[
-    #text(weight: "bold", size: 9.5pt)[CARTILLA DE RESPUESTAS (1 A 60)]
+    #text(weight: "bold", size: 9pt)[CARTILLA DE RESPUESTAS (1 A 60)]
   ]
   #v(-3pt)
   #grid(
@@ -82,7 +82,7 @@
       #table(
         columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
         stroke: none,
-        inset: (x: 0pt, y: 1.4pt),
+        inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
         [#text(size: 7.2pt, weight: "bold")[1.]],
         [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[A]]]],
@@ -180,7 +180,7 @@
       #table(
         columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
         stroke: none,
-        inset: (x: 0pt, y: 1.4pt),
+        inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
         [#text(size: 7.2pt, weight: "bold")[16.]],
         [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[A]]]],
@@ -278,7 +278,7 @@
       #table(
         columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
         stroke: none,
-        inset: (x: 0pt, y: 1.4pt),
+        inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
         [#text(size: 7.2pt, weight: "bold")[31.]],
         [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[A]]]],
@@ -376,7 +376,7 @@
       #table(
         columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
         stroke: none,
-        inset: (x: 0pt, y: 1.4pt),
+        inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
         [#text(size: 7.2pt, weight: "bold")[46.]],
         [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[A]]]],
@@ -473,15 +473,15 @@
   )
 ]
 
-#v(4pt)
+#v(2.5pt)
 
 // TÍTULO GENERAL DE PREGUNTAS
 #align(center)[
-  #text(size: 11pt, weight: "bold")[CUESTIONARIO DE PREGUNTAS]
+  #text(size: 10.5pt, weight: "bold")[CUESTIONARIO DE PREGUNTAS]
 ]
 #v(-3pt)
 #line(length: 100%, stroke: 0.5pt + black)
-#v(2.5pt)
+#v(1.5pt)
 
 // SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA
 #text(weight: "bold")[SELECCION DE LA MEJOR RESPUESTA]\
@@ -489,9 +489,9 @@
 #text(size: 9.5pt)[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
 #v(1pt)
 
-#block(breakable: false, spacing: 3.5pt)[
+#block(breakable: false, spacing: 2.8pt)[
   *1.*  Al final de cada proceso de auditoría tributaria para determinar la base imponible del IUE se debe:
-  #v(0.8pt)
+  #v(0.6pt)
   #pad(left: 12pt)[
     A) Excluir los gastos personales sin respaldo de factura legal \
     B) Ninguna de las anteriores \
@@ -501,9 +501,9 @@
   ]
 ]
 
-#block(breakable: false, spacing: 3.5pt)[
+#block(breakable: false, spacing: 2.8pt)[
   *2.*  Según el Código Tributario Boliviano (Ley 2492), el término de prescripción de las facultades de fiscalización es de:
-  #v(0.8pt)
+  #v(0.6pt)
   #pad(left: 12pt)[
     A) 2 años calendario continuos \
     B) Ninguna de las anteriores \
@@ -513,9 +513,9 @@
   ]
 ]
 
-#block(breakable: false, spacing: 3.5pt)[
+#block(breakable: false, spacing: 2.8pt)[
   *3.*  Para el cómputo del Crédito Fiscal IVA en compras de bienes y servicios, el documento fiscal debe:
-  #v(0.8pt)
+  #v(0.6pt)
   #pad(left: 12pt)[
     A) Todas las anteriores \
     B) Ninguna de las anteriores \
@@ -525,9 +525,9 @@
   ]
 ]
 
-#block(breakable: false, spacing: 3.5pt)[
+#block(breakable: false, spacing: 2.8pt)[
   *4.*  En una auditoría tributaria, la técnica de confirmación de saldos con terceros verifica principalmente:
-  #v(0.8pt)
+  #v(0.6pt)
   #pad(left: 12pt)[
     A) Estructura societaria y tenencia accionaria \
     B) Todas las anteriores \
@@ -537,9 +537,9 @@
   ]
 ]
 
-#block(breakable: false, spacing: 3.5pt)[
+#block(breakable: false, spacing: 2.8pt)[
   *5.*  El método de determinación de la base imponible sobre base presunta procede cuando:
-  #v(0.8pt)
+  #v(0.6pt)
   #pad(left: 12pt)[
     A) Se cuenta con estados financieros auditados limpios \
     B) El sujeto pasivo no presenta libros ni documentación fidedigna \
@@ -549,9 +549,9 @@
   ]
 ]
 
-#block(breakable: false, spacing: 3.5pt)[
+#block(breakable: false, spacing: 2.8pt)[
   *6.*  La alícuota general del Impuesto a las Transacciones (IT) según la Ley 843 es del:
-  #v(0.8pt)
+  #v(0.6pt)
   #pad(left: 12pt)[
     A) Ninguna de las anteriores \
     B) 3% sobre los ingresos brutos devengados o percibidos \
@@ -568,45 +568,45 @@
 #v(2pt)
 #text(weight: "bold")[VERDADERO O FALSO SIMPLE]\
 #v(-4pt)
-#text(size: 10pt)[*Instrucciones:* Marque A si el enunciado es verdadero o B si el enunciado es falso.]
-#v(2pt)
+#text(size: 9.5pt)[*Instrucciones:* Marque A si el enunciado es verdadero o B si el enunciado es falso.]
+#v(1.5pt)
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *7.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) El Impuesto al Valor Agregado (IVA) grava únicamente las ventas en efectivo y excluye las ventas al crédito.
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *8.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Las donaciones a entidades sin fines de lucro autorizadas son deducibles hasta el límite del 10% de la utilidad neta.
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *9.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) La bancarización obligatoria aplica a transacciones iguales o superiores a Bs. 50.000 respaldadas con documentos de pago.
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *10.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) El IUE efectivamente pagado se compensa contra el IT a partir del mismo mes en que fue cancelado.
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *11.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Las pérdidas fiscales no compensadas en el IUE pueden trasladarse sucesivamente hasta un máximo de cinco ejercicios posteriores.
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *12.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) La no emisión de factura mercantil amerita clausura directa e inmediata del establecimiento comercial.
 ]
 
-#v(4pt)
+#v(3pt)
 #text(weight: "bold")[VERDADERO O FALSO COMPLEJAS]\
 #v(-4pt)
-#text(size: 10pt)[*Instrucciones:* Seleccione la opción correcta de acuerdo con la siguiente clave:\
+#text(size: 9.5pt)[*Instrucciones:* Seleccione la opción correcta de acuerdo con la siguiente clave:\
 #h(12pt) A: 1, 2 y 3 son verdaderas. #h(12pt) B: 1 y 3 son verdaderas. #h(12pt) C: 2 y 4 son verdaderas.\
 #h(12pt) D: Solo 4 es verdadera. #h(12pt) E: Todas son verdaderas.]
-#v(2pt)
+#v(1.5pt)
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *13.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Seleccione los incisos verdaderos sobre la deducibilidad del gasto en el IUE:
-  #v(1pt)
-  #pad(left: 18pt)[
+  #v(0.8pt)
+  #pad(left: 16pt)[
     1. La deducibilidad del gasto exige documento mercantil original y vinculado a la actividad. \
     2. Las depreciaciones de vehículos se amortizan a una tasa máxima del 20% anual. \
     3. Los aportes patronales efectivamente devengados y cancelados son deducibles. \
@@ -614,10 +614,10 @@
   ]
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *14.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Seleccione los incisos verdaderos sobre el Crédito Fiscal IVA:
-  #v(1pt)
-  #pad(left: 18pt)[
+  #v(0.8pt)
+  #pad(left: 16pt)[
     1. Requiere factura original debidamente dosificada o electrónica. \
     2. Las compras de combustible computan el 100% de crédito fiscal. \
     3. Es obligatorio el medio fehaciente de pago para importes mayores a Bs. 50.000. \
@@ -625,10 +625,10 @@
   ]
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *15.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Seleccione los incisos verdaderos sobre la prescripción según Código Tributario (Ley 2492):
-  #v(1pt)
-  #pad(left: 18pt)[
+  #v(0.8pt)
+  #pad(left: 16pt)[
     1. Las facultades de control y fiscalización prescriben a los 8 años. \
     2. La prescripción se suspende con la notificación de la Resolución Determinativa. \
     3. Las sanciones pecuniarias por contravenciones prescriben a los 5 años. \
@@ -636,10 +636,10 @@
   ]
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *16.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Seleccione los incisos verdaderos sobre los regímenes tributarios:
-  #v(1pt)
-  #pad(left: 18pt)[
+  #v(0.8pt)
+  #pad(left: 16pt)[
     1. El Régimen Tributario Simplificado emite factura válida para crédito fiscal. \
     2. Los comerciantes minoristas y artesanos pertenecen al Régimen Simplificado. \
     3. Las empresas unipersonales están exentas de presentar estados financieros. \
@@ -647,10 +647,10 @@
   ]
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *17.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Seleccione los incisos verdaderos sobre los procedimientos de impugnación tributaria:
-  #v(1pt)
-  #pad(left: 18pt)[
+  #v(0.8pt)
+  #pad(left: 16pt)[
     1. El Recurso de Alzada se interpone dentro de los 20 días siguientes a la notificación. \
     2. La interposición del Recurso Jerárquico suspende la ejecución tributaria. \
     3. La Autoridad General de Impugnación Tributaria (AGIT) resuelve en instancia final administrativa. \
@@ -658,10 +658,10 @@
   ]
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *18.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Seleccione los incisos verdaderos sobre las retenciones impositivas:
-  #v(1pt)
-  #pad(left: 18pt)[
+  #v(0.8pt)
+  #pad(left: 16pt)[
     1. La retención por compra de bienes no respaldada es del 5% IUE y 3% IT. \
     2. La retención por contratación de servicios independientes es del 12.5% IUE y 3% IT. \
     3. El agente de retención es solidariamente responsable ante el fisco por el tributo no retenido. \
@@ -669,38 +669,38 @@
   ]
 ]
 
-#v(4pt)
+#v(3pt)
 #text(weight: "bold")[RESPUESTA A / B / AMBAS / NINGUNA]\
 #v(-4pt)
-#text(size: 10pt)[*Instrucciones:* Las siguientes preguntas están compuestas por dos premisas. Responda con:\
+#text(size: 9.5pt)[*Instrucciones:* Las siguientes preguntas están compuestas por dos premisas. Responda con:\
 #h(12pt) A: si solo la primera premisa es verdadera. #h(12pt) B: si solo la segunda premisa es verdadera.\
 #h(12pt) C: si ambas premisas son verdaderas. #h(12pt) D: si ninguna premisa es verdadera.]
-#v(2pt)
+#v(1.5pt)
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *19.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) I. El Impuesto a las Transacciones se calcula sobre los ingresos brutos devengados o percibidos.\
-  #pad(left: 38pt)[
+  #pad(left: 36pt)[
     II. El IT efectivamente pagado es deducible como gasto en el IUE cuando no ha sido compensado.
   ]
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *20.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) I. La provisión para incobrables del 3% anual es acumulativa indefinidamente sin límite.\
-  #pad(left: 38pt)[
+  #pad(left: 36pt)[
     II. Los créditos incobrables deben contar con un año de mora y cobranza judicial iniciada.
   ]
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *21.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) I. Las compras de combustible computan el 70% del valor facturado como crédito fiscal.\
-  #pad(left: 38pt)[
+  #pad(left: 36pt)[
     II. El 30% restante no computado para crédito fiscal es gasto deducible en el IUE.
   ]
 ]
 
-#block(spacing: 4.5pt)[
+#block(breakable: false, spacing: 3.2pt)[
   *22.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) I. Las notas de crédito/débito pueden emitirse válidamente hasta 36 meses después de la factura.\
-  #pad(left: 38pt)[
+  #pad(left: 36pt)[
     II. Las notas de crédito/débito no modifican el débito ni crédito fiscal de los períodos originales.
   ]
 ]
@@ -712,20 +712,20 @@
 #v(2pt)
 #text(weight: "bold")[ITEMS AGRUPADOS POR CASO CLINICO O PROBLEMA]\
 #v(-4pt)
-#text(size: 10pt)[*Instrucciones:* El siguiente caso clinico o problema tendra varias preguntas. Seleccione la respuesta correcta en cada una.]
-#v(3pt)
+#text(size: 9.5pt)[*Instrucciones:* El siguiente caso clinico o problema tendra varias preguntas. Seleccione la respuesta correcta en cada una.]
+#v(2pt)
 
-#rect(width: 100%, stroke: 0.75pt + black, fill: rgb("#f8fafc"), inset: 7pt, radius: 2pt)[
+#rect(width: 100%, stroke: 0.75pt + black, fill: rgb("#f8fafc"), inset: 6pt, radius: 2pt)[
   #text(weight: "bold")[CASO N 1:
 La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización externa por la gestión fiscal 2024. El auditor evidenció: (a) compras de mercadería por Bs. 80.000 pagadas en efectivo con factura original, (b) gastos de viaje por Bs. 15.000 sin respaldo de pasajes ni rendición, y (c) omisión de registro de ventas por Bs. 40.000.]
 ]
-#v(3pt)
+#v(2pt)
 
-#block(spacing: 5pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *23.*  ¿Qué determinación técnica y legal corresponde a la compra de Bs. 80.000 cancelada en efectivo?\
-  #text(style: "italic", size: 10pt)[(Seleccione un solo inciso)]
-  #v(1pt)
-  #pad(left: 14pt)[
+  #text(style: "italic", size: 9.5pt)[(Seleccione un solo inciso)]
+  #v(0.8pt)
+  #pad(left: 12pt)[
     A) Depuración del Crédito Fiscal IVA y gasto no deducible en IUE por falta de bancarización \
     B) Ninguna de las anteriores \
     C) Aceptación plena del Crédito Fiscal IVA y del gasto \
@@ -734,11 +734,11 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
   ]
 ]
 
-#block(spacing: 5pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *24.*  ¿Cuál es el tratamiento tributario de los gastos de viaje de Bs. 15.000 sin respaldo documental?\
-  #text(style: "italic", size: 10pt)[(Seleccione un solo inciso)]
-  #v(1pt)
-  #pad(left: 14pt)[
+  #text(style: "italic", size: 9.5pt)[(Seleccione un solo inciso)]
+  #v(0.8pt)
+  #pad(left: 12pt)[
     A) Todas las anteriores \
     B) Ajuste en la conciliación tributaria como gasto no deducible del IUE \
     C) Exención tributaria bajo el D.S. 24051 \
@@ -747,11 +747,11 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
   ]
 ]
 
-#block(spacing: 5pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *25.*  ¿Qué reparos tributarios genera la omisión de registro de ventas por Bs. 40.000?\
-  #text(style: "italic", size: 10pt)[(Seleccione un solo inciso)]
-  #v(1pt)
-  #pad(left: 14pt)[
+  #text(style: "italic", size: 9.5pt)[(Seleccione un solo inciso)]
+  #v(0.8pt)
+  #pad(left: 12pt)[
     A) Ninguna de las anteriores \
     B) Únicamente rectificatoria de libros de compras \
     C) Compensación automática con créditos acumulados \
@@ -760,11 +760,11 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
   ]
 ]
 
-#block(spacing: 5pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *26.*  ¿Qué calificación de conducta tributaria preliminar corresponde a las ventas no declaradas?\
-  #text(style: "italic", size: 10pt)[(Seleccione un solo inciso)]
-  #v(1pt)
-  #pad(left: 14pt)[
+  #text(style: "italic", size: 9.5pt)[(Seleccione un solo inciso)]
+  #v(0.8pt)
+  #pad(left: 12pt)[
     A) Todas las anteriores \
     B) Error involuntario de cálculo contable \
     C) Omisión de pago sujeta a sanción del 60% del tributo omitido o defraudación tributaria \
@@ -773,13 +773,13 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
   ]
 ]
 
-#v(4pt)
+#v(3pt)
 #text(weight: "bold")[EMPAREJAMIENTO AMPLIADO]\
 #v(-4pt)
-#text(size: 10pt)[*Instrucciones:* De la lista de opciones, seleccione la respuesta correcta para cada enunciado.]
-#v(3pt)
+#text(size: 9.5pt)[*Instrucciones:* De la lista de opciones, seleccione la respuesta correcta para cada enunciado.]
+#v(2pt)
 
-#rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f1f5f9"), inset: 7pt, radius: 2pt)[
+#rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f1f5f9"), inset: 6pt, radius: 2pt)[
   #text(weight: "bold")[De la lista de opciones, seleccione la respuesta correcta para cada enunciado:]\
   #v(2pt)
   #pad(left: 10pt)[
@@ -792,20 +792,20 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
     ]
   ]
 ]
-#v(4pt)
+#v(3pt)
 
-#block(spacing: 5pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *27.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Documento administrativo formal que notifica el inicio, alcance y funcionarios asignados a la auditoría tributaria.
 ]
 
-#block(spacing: 5pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *28.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Acto administrativo preliminar que fija los hechos, reparos preliminares y otorga 30 días de plazo para descargos.
 ]
 
-#block(spacing: 5pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *29.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Título administrativo final emitido por la Administración que liquida la deuda tributaria y califica sanciones.
 ]
 
-#block(spacing: 5pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *30.* #h(2pt) #box(stroke: (bottom: 0.85pt), width: 24pt)[] #h(8pt) Acto administrativo que da inicio a la cobranza coactiva con embargo y retención de fondos bancarios.
 ]
