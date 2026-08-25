@@ -267,6 +267,8 @@ export interface DiaCalendario {
                 <span>Guía de Reglas (6 Tipologías)</span>
               </button>
             </div>
+          </div>
+
           <!-- Zona Principal de Validación y Acciones de Aprobación -->
           <div class="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
             
@@ -677,8 +679,6 @@ export interface DiaCalendario {
                 </div>
               </div>
             }
-
-          </div>
 
         </div>
       }
