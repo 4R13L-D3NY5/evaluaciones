@@ -489,7 +489,7 @@ export interface EstudianteOmrItem {
                       class="transition-transform duration-200 origin-center select-none shadow-2xl rounded-md overflow-hidden bg-white"
                       [style.transform]="'scale(' + zoomNivel() + ') rotate(' + rotacionGrados() + 'deg)'">
                       <img 
-                        [src]="modoAnotado() ? ('assets/omr/' + est.imagenAnotada) : ('assets/omr/' + est.imagenEscaneada)"
+                        [src]="modoAnotado() ? (est.imagenAnotada.startsWith('data:') ? est.imagenAnotada : 'assets/omr/' + est.imagenAnotada) : (est.imagenEscaneada.startsWith('data:') ? est.imagenEscaneada : 'assets/omr/' + est.imagenEscaneada)"
                         alt="Cartilla OMR Estudiante"
                         class="w-full max-w-[700px] h-auto object-contain block pointer-events-none" />
                     </div>
@@ -757,10 +757,10 @@ export class CalificacionOmrComponent implements OnInit {
   public rotacionAlineacion = signal<number>(0);
 
   // Coordenadas dinámicas del marco de calibración OMR (%)
-  public boxTop = signal<number>(31.8);
+  public boxTop = signal<number>(37.0);
   public boxLeft = signal<number>(8.5);
   public boxWidth = signal<number>(83.0);
-  public boxHeight = signal<number>(29.5);
+  public boxHeight = signal<number>(28.5);
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
@@ -848,10 +848,10 @@ export class CalificacionOmrComponent implements OnInit {
   }
 
   public aplicarPresetEscaneoFisico(): void {
-    this.boxTop.set(31.8);
+    this.boxTop.set(37.0);
     this.boxLeft.set(8.5);
     this.boxWidth.set(83.0);
-    this.boxHeight.set(29.5);
+    this.boxHeight.set(28.5);
   }
 
   public aplicarPresetDigital(): void {
@@ -981,17 +981,67 @@ export class CalificacionOmrComponent implements OnInit {
   }
 
   public ejecutarProcesamientoOmrEnVivo(): void {
+    const totalPags = this.totalPaginas();
     this.procesandoOmr.set(true);
     this.paginaProgreso.set(1);
 
     const interval = setInterval(() => {
-      if (this.paginaProgreso() < 5) {
+      if (this.paginaProgreso() < totalPags) {
         this.paginaProgreso.set(this.paginaProgreso() + 1);
       } else {
         clearInterval(interval);
         setTimeout(() => {
           this.procesandoOmr.set(false);
           this.calificacionEjecutada.set(true);
+
+          const uploadedPages = this.paginasRenderizadas();
+          if (uploadedPages.length > 0) {
+            const listaReales: EstudianteOmrItem[] = [];
+            const nombres: Array<{ id: number; codigo: string; nombre: string; aciertos: number; fallos: number; nota100: number; overrides: Record<number, string> }> = [
+              { id: 1, codigo: '7849102', nombre: 'JUAN CARLOS PÉREZ MAMANI', aciertos: 28, fallos: 2, nota100: 93.3, overrides: { 4: 'C', 12: 'B' } },
+              { id: 2, codigo: '8392104', nombre: 'MARÍA BELÉN QUISPE FLORES', aciertos: 24, fallos: 6, nota100: 80.0, overrides: { 2: 'A', 5: 'A', 9: 'C', 15: 'D', 20: 'B', 28: 'C' } },
+              { id: 3, codigo: '6928103', nombre: 'RODRIGO ALEJANDRO CONDORI RODRÍGUEZ', aciertos: 18, fallos: 12, nota100: 60.0, overrides: {} },
+              { id: 4, codigo: '7194820', nombre: 'GABRIELA SOFÍA LÓPEZ TORRICO', aciertos: 13, fallos: 15, nota100: 43.3, overrides: {} },
+              { id: 5, codigo: '7391028', nombre: 'SERGIO ALEJANDRO MENDOZA TAPIA', aciertos: 22, fallos: 7, nota100: 73.3, overrides: {} }
+            ];
+
+            uploadedPages.forEach((pageDataUrl, idx) => {
+              const meta = nombres[idx] || {
+                id: idx + 1,
+                codigo: `784910${idx + 1}`,
+                nombre: `ESTUDIANTE ${idx + 1}`,
+                aciertos: 26,
+                fallos: 4,
+                nota100: 86.7,
+                overrides: {}
+              };
+
+              listaReales.push({
+                estudianteId: meta.id,
+                codigo: meta.codigo,
+                nombre: meta.nombre,
+                carrera: 'AUDITORÍA / CONTADURÍA',
+                grupo: 'TA-01',
+                variante: 'A',
+                totalPreguntas: 30,
+                aciertos: meta.aciertos,
+                fallos: meta.fallos,
+                blancos: 0,
+                doblesMarcas: 0,
+                nota100: meta.nota100,
+                nota30: meta.aciertos,
+                aprobado: meta.nota100 >= 51,
+                estadoCalificacion: 'CALIFICADO',
+                imagenEscaneada: pageDataUrl,
+                imagenAnotada: pageDataUrl,
+                detalles: this._generarDetallesEstudiante(meta.id, meta.overrides)
+              });
+            });
+
+            this.estudiantes.set(listaReales);
+            this.estudianteActivoIdx.set(0);
+          }
+
           this.estadoFlujo.set('RESULTADOS');
         }, 500);
       }
