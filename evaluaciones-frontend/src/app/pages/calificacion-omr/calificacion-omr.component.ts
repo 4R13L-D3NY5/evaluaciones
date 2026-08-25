@@ -64,6 +64,22 @@ export interface EstudianteOmrItem {
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5">
+          <!-- Input oculto para subir PDF o imágenes -->
+          <input 
+            type="file" 
+            #fileInput 
+            (change)="onFileSelected($event)" 
+            accept=".pdf,image/png,image/jpeg" 
+            class="hidden" />
+
+          <!-- Botón Subir PDF Escaneado (Destacado) -->
+          <button 
+            (click)="fileInput.click()"
+            class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+            <i class="pi pi-upload"></i>
+            <span>Subir PDF Escaneado</span>
+          </button>
+
           <!-- Botón Ver Patrón Oficial -->
           <button 
             (click)="dialogPatron.set(true)"
@@ -79,7 +95,7 @@ export interface EstudianteOmrItem {
             target="_blank"
             class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-2.5 px-3.5 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
             <i class="pi pi-download text-purple-700"></i>
-            <span>Descargar PDF 5 Exámenes</span>
+            <span>Descargar Plantilla 5 Exámenes</span>
           </a>
 
           @if (estadoFlujo() === 'RESULTADOS') {
@@ -138,7 +154,7 @@ export interface EstudianteOmrItem {
                   Lote de Exámenes Escaneados Listo para Calificación
                 </h4>
                 <p class="text-xs text-muted-foreground mt-0.5">
-                  Archivo activo: <span class="font-mono font-bold text-purple-700">CPEC18_Lote_5_Cartillas_Escaneadas.pdf</span> (5 Estudiantes · 30 Reactivos).
+                  Archivo activo: <span class="font-mono font-bold text-purple-700">{{ archivoCargadoNombre() }}</span> (5 Estudiantes · 30 Reactivos).
                 </p>
                 <div class="flex items-center gap-2 mt-2">
                   <span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">
@@ -154,13 +170,22 @@ export interface EstudianteOmrItem {
               </div>
             </div>
 
-            <!-- Botón Principal de Ejecución OMR -->
-            <button 
-              (click)="ejecutarProcesamientoOmrEnVivo()"
-              class="bg-gradient-to-r from-purple-700 via-indigo-600 to-blue-600 hover:from-purple-800 hover:to-blue-700 text-white font-black text-sm px-6 py-3.5 rounded-xl flex items-center gap-2.5 shadow-lg shadow-purple-500/25 transition-transform hover:scale-105 cursor-pointer shrink-0">
-              <i class="pi pi-bolt text-amber-300 text-base"></i>
-              <span>Ejecutar Calificación OMR (5 Páginas)</span>
-            </button>
+            <!-- Botones de Acción de Carga y Ejecución -->
+            <div class="flex flex-wrap items-center gap-3 shrink-0">
+              <button 
+                (click)="fileInput.click()"
+                class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-3 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                <i class="pi pi-folder-open text-purple-700"></i>
+                <span>Cambiar / Subir PDF</span>
+              </button>
+
+              <button 
+                (click)="ejecutarProcesamientoOmrEnVivo()"
+                class="bg-gradient-to-r from-purple-700 via-indigo-600 to-blue-600 hover:from-purple-800 hover:to-blue-700 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/25 transition-transform hover:scale-105 cursor-pointer">
+                <i class="pi pi-bolt text-amber-300"></i>
+                <span>Ejecutar Calificación OMR (5 Páginas)</span>
+              </button>
+            </div>
           </div>
 
           <!-- Visor de Alineación e Inspección Geométrica -->
@@ -724,6 +749,19 @@ export class CalificacionOmrComponent implements OnInit {
 
   public ngOnInit(): void {
     this._cargarResultadosOmr();
+  }
+
+  public onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      this.archivoCargadoNombre.set(file.name);
+      this.estadoFlujo.set('ALINEACION');
+      this.paginaAlineacionIdx.set(0);
+      this.zoomAlineacion.set(0.85);
+      this.rotacionAlineacion.set(0);
+      this.mostrarGuiasAlineacion.set(true);
+    }
   }
 
   public ejecutarProcesamientoOmrEnVivo(): void {
