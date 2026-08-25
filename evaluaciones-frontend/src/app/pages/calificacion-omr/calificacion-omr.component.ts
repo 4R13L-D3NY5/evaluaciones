@@ -1052,6 +1052,61 @@ export class CalificacionOmrComponent implements OnInit {
     }
   }
 
+  private _detectarContornoCartillaEnCanvas(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number
+  ): { rx: number; ry: number; rw: number; rh: number } {
+    const minY = Math.floor(height * 0.18);
+    const maxY = Math.floor(height * 0.65);
+    const minX = Math.floor(width * 0.05);
+    const maxX = Math.floor(width * 0.95);
+
+    let topBorderY = -1;
+    let bottomBorderY = -1;
+    let leftBorderX = -1;
+    let rightBorderX = -1;
+
+    for (let y = minY; y < maxY; y++) {
+      let darkCount = 0;
+      let firstDarkX = -1;
+      let lastDarkX = -1;
+
+      for (let x = minX; x < maxX; x++) {
+        const idx = (y * width + x) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        if (brightness < 125) {
+          darkCount++;
+          if (firstDarkX === -1) firstDarkX = x;
+          lastDarkX = x;
+        }
+      }
+
+      if (darkCount > width * 0.60 && (lastDarkX - firstDarkX) > width * 0.68) {
+        if (topBorderY === -1) {
+          topBorderY = y;
+          leftBorderX = firstDarkX;
+          rightBorderX = lastDarkX;
+        }
+        bottomBorderY = y;
+      }
+    }
+
+    if (topBorderY !== -1 && (bottomBorderY - topBorderY) > (height * 0.12)) {
+      const rw = rightBorderX - leftBorderX;
+      const rh = bottomBorderY - topBorderY;
+      return { rx: leftBorderX, ry: topBorderY, rw, rh };
+    }
+
+    // Fallback calibrado
+    return {
+      rx: Math.floor(width * 0.085),
+      ry: Math.floor(height * 0.370),
+      rw: Math.floor(width * 0.830),
+      rh: Math.floor(height * 0.285)
+    };
+  }
+
   private _procesarPaginaOmrConCanvas(
     imgDataUrl: string,
     bTopPct: number,
@@ -1088,20 +1143,20 @@ export class CalificacionOmrComponent implements OnInit {
           return;
         }
 
-        // Dibujar imagen original
         ctx.drawImage(img, 0, 0);
 
         const imgData = ctx.getImageData(0, 0, img.width, img.height);
         const data = imgData.data;
 
-        // Coordenadas absolutas de la cartilla
-        const rx = (bLeftPct / 100.0) * img.width;
-        const ry = (bTopPct / 100.0) * img.height;
-        const rw = (bWidthPct / 100.0) * img.width;
-        const rh = (bHeightPct / 100.0) * img.height;
+        // Detectar automáticamente el recuadro negro exacto de la cartilla
+        const detected = this._detectarContornoCartillaEnCanvas(data, img.width, img.height);
+        const rx = detected.rx;
+        const ry = detected.ry;
+        const rw = detected.rw;
+        const rh = detected.rh;
 
         const col_w = rw / 4.0;
-        const title_h = rh * 0.085;
+        const title_h = rh * 0.11;
         const grid_y = ry + title_h;
         const row_h = (rh - title_h) / 15.0;
 
