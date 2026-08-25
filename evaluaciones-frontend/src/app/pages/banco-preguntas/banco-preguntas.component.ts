@@ -267,136 +267,6 @@ export interface DiaCalendario {
                 <span>Guía de Reglas (6 Tipologías)</span>
               </button>
             </div>
-          </div>
-
-          <!-- Paneles de Métricas y Balance del Examen -->
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            <!-- Tarjeta 1: Estado de Validación -->
-            <div class="lg:col-span-3 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3 flex flex-col justify-between">
-              <div>
-                <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Estado del Examen</span>
-                <h3 class="text-base font-black text-foreground mt-0.5">{{ parcialActivo() }}</h3>
-                <p class="text-xs font-bold text-primary font-mono mt-1">
-                  {{ totalPreguntasValidas() }}/{{ totalPreguntasRequeridas() }} preguntas validadas
-                </p>
-              </div>
-              
-              <div>
-                @if (esBancoTotalmenteValido()) {
-                  <div class="bg-emerald-50 border border-emerald-300 p-3 rounded-xl text-center space-y-1">
-                    <span class="text-emerald-800 font-black text-xs flex items-center justify-center gap-1">
-                      <i class="pi pi-shield text-emerald-600"></i> EXAMEN 100% APROBADO
-                    </span>
-                    <p class="text-[10px] text-emerald-700">Cuotas cumplidas y reactivos conformes</p>
-                  </div>
-                } @else {
-                  <div class="bg-amber-50 border border-amber-300 p-3 rounded-xl text-center space-y-0.5">
-                    <span class="text-amber-800 font-bold text-xs">Pendiente de Aprobación</span>
-                    <p class="text-[9px] text-amber-700 font-mono">Faltan reactivos o corregir errores</p>
-                  </div>
-                }
-              </div>
-            </div>
-
-            <!-- Tarjeta 2: Conteo por Dificultad (OBLIGATORIO) -->
-            <div class="lg:col-span-5 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
-              <div class="flex items-center justify-between border-b border-border pb-2">
-                <span class="text-xs font-black text-foreground uppercase tracking-wide">Cuotas por Dificultad</span>
-                <span class="bg-rose-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
-                  OBLIGATORIO
-                </span>
-              </div>
-
-              <div class="space-y-2.5 text-xs">
-                <!-- Fáciles (1) -->
-                <div>
-                  <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-emerald-700">Fáciles (1)</span>
-                    <span class="font-mono text-foreground">{{ countFaciles() }}/{{ cuotasDificultad().facil }}</span>
-                  </div>
-                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="(countFaciles() / cuotasDificultad().facil) * 100"></div>
-                  </div>
-                </div>
-
-                <!-- Medias (2) -->
-                <div>
-                  <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-amber-600">Medias (2)</span>
-                    <span class="font-mono text-foreground">{{ countMedias() }}/{{ cuotasDificultad().medio }}</span>
-                  </div>
-                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-amber-500 rounded-full transition-all duration-500" [style.width.%]="(countMedias() / cuotasDificultad().medio) * 100"></div>
-                  </div>
-                </div>
-
-                <!-- Difíciles (3) -->
-                <div>
-                  <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-rose-600">Difíciles (3)</span>
-                    <span class="font-mono text-foreground">{{ countDificiles() }}/{{ cuotasDificultad().dificil }}</span>
-                  </div>
-                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-rose-500 rounded-full transition-all duration-500" [style.width.%]="(countDificiles() / cuotasDificultad().dificil) * 100"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div [class]="cuotaDificultadCumplida() ? 'text-emerald-700' : 'text-amber-700'" class="text-[10px] font-extrabold flex items-center gap-1 pt-1">
-                <i [class]="cuotaDificultadCumplida() ? 'pi pi-check-circle text-xs' : 'pi pi-exclamation-circle text-xs'"></i>
-                <span>{{ cuotaDificultadCumplida() ? '100% de cuotas alcanzadas para este examen' : 'Cuotas incompletas según parcial' }}</span>
-              </div>
-            </div>
-
-            <!-- Tarjeta 3: Conteo por Grupo de Tipo (REFERENCIAL) -->
-            <div class="lg:col-span-4 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
-              <div class="flex items-center justify-between border-b border-border pb-2">
-                <span class="text-xs font-black text-foreground uppercase tracking-wide">Mezcla por Grupo de Tipo</span>
-                <span class="bg-slate-700 text-white font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
-                  REFERENCIAL
-                </span>
-              </div>
-
-              <div class="space-y-2.5 text-xs">
-                <div>
-                  <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-emerald-700">G1 (VF + Compuesta + Clave)</span>
-                    <span class="font-mono text-foreground">{{ countG1() }}/{{ cuotasGrupos().g1 }}</span>
-                  </div>
-                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="(countG1() / cuotasGrupos().g1) * 100"></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-blue-600">G2 (Selección Simple / Mejor Rpta)</span>
-                    <span class="font-mono text-foreground">{{ countG2() }}/{{ cuotasGrupos().g2 }}</span>
-                  </div>
-                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-blue-500 rounded-full transition-all duration-500" [style.width.%]="(countG2() / cuotasGrupos().g2) * 100"></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-purple-700">G3 (Casos / Fórmulas Typst + Emp.)</span>
-                    <span class="font-mono text-foreground">{{ countG3() }}/{{ cuotasGrupos().g3 }}</span>
-                  </div>
-                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-purple-600 rounded-full transition-all duration-500" [style.width.%]="(countG3() / cuotasGrupos().g3) * 100"></div>
-                  </div>
-                </div>
-              </div>
-
-              <p class="text-[10px] text-muted-foreground leading-tight pt-1">
-                Balance referencial de tipos de reactivos.
-              </p>
-            </div>
-
-          </div>
-
           <!-- Zona Principal de Validación y Acciones de Aprobación -->
           <div class="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
             
@@ -563,6 +433,135 @@ export interface DiaCalendario {
                 </ul>
               </div>
             }
+          </div>
+
+          <!-- Paneles de Métricas y Balance del Examen -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            <!-- Tarjeta 1: Estado de Validación -->
+            <div class="lg:col-span-3 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3 flex flex-col justify-between">
+              <div>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Estado del Examen</span>
+                <h3 class="text-base font-black text-foreground mt-0.5">{{ parcialActivo() }}</h3>
+                <p class="text-xs font-bold text-primary font-mono mt-1">
+                  {{ totalPreguntasValidas() }}/{{ totalPreguntasRequeridas() }} preguntas validadas
+                </p>
+              </div>
+              
+              <div>
+                @if (esBancoTotalmenteValido()) {
+                  <div class="bg-emerald-50 border border-emerald-300 p-3 rounded-xl text-center space-y-1">
+                    <span class="text-emerald-800 font-black text-xs flex items-center justify-center gap-1">
+                      <i class="pi pi-shield text-emerald-600"></i> EXAMEN 100% APROBADO
+                    </span>
+                    <p class="text-[10px] text-emerald-700">Cuotas cumplidas y reactivos conformes</p>
+                  </div>
+                } @else {
+                  <div class="bg-amber-50 border border-amber-300 p-3 rounded-xl text-center space-y-0.5">
+                    <span class="text-amber-800 font-bold text-xs">Pendiente de Aprobación</span>
+                    <p class="text-[9px] text-amber-700 font-mono">Faltan reactivos o corregir errores</p>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Tarjeta 2: Conteo por Dificultad (OBLIGATORIO) -->
+            <div class="lg:col-span-5 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
+              <div class="flex items-center justify-between border-b border-border pb-2">
+                <span class="text-xs font-black text-foreground uppercase tracking-wide">Cuotas por Dificultad</span>
+                <span class="bg-rose-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
+                  OBLIGATORIO
+                </span>
+              </div>
+
+              <div class="space-y-2.5 text-xs">
+                <!-- Fáciles (1) -->
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-emerald-700">Fáciles (1)</span>
+                    <span class="font-mono text-foreground">{{ countFaciles() }}/{{ cuotasDificultad().facil }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="(countFaciles() / cuotasDificultad().facil) * 100"></div>
+                  </div>
+                </div>
+
+                <!-- Medias (2) -->
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-amber-600">Medias (2)</span>
+                    <span class="font-mono text-foreground">{{ countMedias() }}/{{ cuotasDificultad().medio }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-amber-500 rounded-full transition-all duration-500" [style.width.%]="(countMedias() / cuotasDificultad().medio) * 100"></div>
+                  </div>
+                </div>
+
+                <!-- Difíciles (3) -->
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-rose-600">Difíciles (3)</span>
+                    <span class="font-mono text-foreground">{{ countDificiles() }}/{{ cuotasDificultad().dificil }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-rose-500 rounded-full transition-all duration-500" [style.width.%]="(countDificiles() / cuotasDificultad().dificil) * 100"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div [class]="cuotaDificultadCumplida() ? 'text-emerald-700' : 'text-amber-700'" class="text-[10px] font-extrabold flex items-center gap-1 pt-1">
+                <i [class]="cuotaDificultadCumplida() ? 'pi pi-check-circle text-xs' : 'pi pi-exclamation-circle text-xs'"></i>
+                <span>{{ cuotaDificultadCumplida() ? '100% de cuotas alcanzadas para este examen' : 'Cuotas incompletas según parcial' }}</span>
+              </div>
+            </div>
+
+            <!-- Tarjeta 3: Conteo por Grupo de Tipo (REFERENCIAL) -->
+            <div class="lg:col-span-4 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
+              <div class="flex items-center justify-between border-b border-border pb-2">
+                <span class="text-xs font-black text-foreground uppercase tracking-wide">Mezcla por Grupo de Tipo</span>
+                <span class="bg-slate-700 text-white font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
+                  REFERENCIAL
+                </span>
+              </div>
+
+              <div class="space-y-2.5 text-xs">
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-emerald-700">G1 (VF + Compuesta + Clave)</span>
+                    <span class="font-mono text-foreground">{{ countG1() }}/{{ cuotasGrupos().g1 }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="(countG1() / cuotasGrupos().g1) * 100"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-blue-600">G2 (Selección Simple / Mejor Rpta)</span>
+                    <span class="font-mono text-foreground">{{ countG2() }}/{{ cuotasGrupos().g2 }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500 rounded-full transition-all duration-500" [style.width.%]="(countG2() / cuotasGrupos().g2) * 100"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex justify-between font-bold text-[11px] mb-1">
+                    <span class="text-purple-700">G3 (Casos / Fórmulas Typst + Emp.)</span>
+                    <span class="font-mono text-foreground">{{ countG3() }}/{{ cuotasGrupos().g3 }}</span>
+                  </div>
+                  <div class="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div class="h-full bg-purple-600 rounded-full transition-all duration-500" [style.width.%]="(countG3() / cuotasGrupos().g3) * 100"></div>
+                  </div>
+                </div>
+              </div>
+
+              <p class="text-[10px] text-muted-foreground leading-tight pt-1">
+                Balance referencial de tipos de reactivos.
+              </p>
+            </div>
+
+          </div>
 
             <!-- ================================================================= -->
             <!-- TABLA INTERACTIVA DE REACTIVOS CARGADOS Y VALIDACIONES EN TIEMPO REAL -->
