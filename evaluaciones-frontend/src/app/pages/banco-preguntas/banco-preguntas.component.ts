@@ -152,30 +152,34 @@ export interface DiaCalendario {
             <div class="flex flex-wrap items-center gap-2">
               <button 
                 (click)="descargarExcelBaseMacro()"
-                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                title="Descargar la plantilla oficial en blanco con 4 hojas, listas desplegables y fórmulas automáticas"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
                 <i class="pi pi-download text-xs"></i>
-                <span>Plantilla Oficial (3 Hojas)</span>
+                <span>Plantilla Oficial (4 Hojas)</span>
               </button>
 
               <button 
                 (click)="descargarEjemploValido()"
-                class="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                title="Descargar y cargar en vivo un banco 100% conforme con 60 preguntas y las 6 tipologías"
+                class="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
                 <i class="pi pi-check-circle text-xs"></i>
-                <span>Ejemplo Válido</span>
+                <span>Ejemplo Válido (60 Reactivos)</span>
               </button>
 
               <button 
                 (click)="descargarEjemploInvalido()"
-                class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                title="Descargar y cargar en vivo un banco con observaciones intencionales para probar el validador"
+                class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
                 <i class="pi pi-exclamation-triangle text-xs"></i>
                 <span>Ejemplo con Errores</span>
               </button>
 
               <button 
                 (click)="abrirModalEjemplos()"
-                class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
-                <i class="pi pi-info-circle text-xs"></i>
-                <span>Guía de Reglas</span>
+                title="Abrir la Guía Oficial interactiva con las 6 tipologías pedagógicas de UNITEPC"
+                class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                <i class="pi pi-book text-xs"></i>
+                <span>Guía de Reglas (6 Tipologías)</span>
               </button>
             </div>
           </div>
@@ -1614,43 +1618,43 @@ export interface DiaCalendario {
                 (click)="filtroGuiaTipo.set('TODOS')"
                 [class]="filtroGuiaTipo() === 'TODOS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                Todos los Tipos
+                Todas las Tipologías
               </button>
               <button 
-                (click)="filtroGuiaTipo.set('FALSO_VERDADERO')"
-                [class]="filtroGuiaTipo() === 'FALSO_VERDADERO' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                (click)="filtroGuiaTipo.set('VF_SIMPLE')"
+                [class]="filtroGuiaTipo() === 'VF_SIMPLE' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                1. Falso / Verdadero
+                1. V/F Simple
               </button>
               <button 
-                (click)="filtroGuiaTipo.set('SELECCION_SIMPLE')"
-                [class]="filtroGuiaTipo() === 'SELECCION_SIMPLE' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                (click)="filtroGuiaTipo.set('VF_COMPLEJAS')"
+                [class]="filtroGuiaTipo() === 'VF_COMPLEJAS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                2. Selección Simple
+                2. V/F Complejas (1-4)
               </button>
               <button 
-                (click)="filtroGuiaTipo.set('PREGUNTA_CON_CLAVE')"
-                [class]="filtroGuiaTipo() === 'PREGUNTA_CON_CLAVE' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                (click)="filtroGuiaTipo.set('PREMISAS')"
+                [class]="filtroGuiaTipo() === 'PREMISAS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                3. Pregunta con Clave
+                3. Premisas A/B/Ambas/Ninguna
               </button>
               <button 
-                (click)="filtroGuiaTipo.set('RESPUESTA_COMPUESTA')"
-                [class]="filtroGuiaTipo() === 'RESPUESTA_COMPUESTA' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                (click)="filtroGuiaTipo.set('SELECCION')"
+                [class]="filtroGuiaTipo() === 'SELECCION' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                4. Respuesta Compuesta
+                4. Selección de la Mejor Rpta
               </button>
               <button 
-                (click)="filtroGuiaTipo.set('PROBLEMA')"
-                [class]="filtroGuiaTipo() === 'PROBLEMA' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
+                (click)="filtroGuiaTipo.set('CASOS')"
+                [class]="filtroGuiaTipo() === 'CASOS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                5. Casos y Subproblemas
+                5. Casos Clínicos y Problemas
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('EMPAREJAMIENTO')"
                 [class]="filtroGuiaTipo() === 'EMPAREJAMIENTO' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                6. Emparejamiento
+                6. Emparejamiento Ampliado
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('TYPST')"
@@ -1663,13 +1667,13 @@ export interface DiaCalendario {
             <!-- Cuerpo de Ejemplos con Comparador Dual (Excel vs PDF Impreso) -->
             <div class="p-6 space-y-6 max-h-[75vh] overflow-y-auto text-foreground text-xs">
 
-              <!-- SECCIÓN 1: FALSO_VERDADERO -->
-              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'FALSO_VERDADERO') {
+              <!-- SECCIÓN 1: VERDADERO O FALSO SIMPLE -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'VF_SIMPLE') {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-emerald-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 1</span>
-                      <h4 class="text-sm font-black text-foreground">FALSO_VERDADERO (Falso o Verdadero)</h4>
+                      <span class="bg-emerald-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 1</span>
+                      <h4 class="text-sm font-black text-foreground">Verdadero o Falso Simple</h4>
                     </div>
                     <span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
                       Grupo G1 · Dificultad 1 (Fácil)
@@ -1691,14 +1695,14 @@ export interface DiaCalendario {
                               <th class="p-1.5">enunciado</th>
                               <th class="p-1.5">opcion_a</th>
                               <th class="p-1.5">opcion_b</th>
-                              <th class="p-1.5">respuesta</th>
+                              <th class="p-1.5">resp.</th>
                               <th class="p-1.5">dif.</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr class="bg-muted/40 border-b border-border">
-                              <td class="p-1.5 font-bold text-emerald-700">FALSO_VERDADERO</td>
-                              <td class="p-1.5">La fibra óptica monomodo presenta menor atenuación...</td>
+                              <td class="p-1.5 font-bold text-emerald-700">Verdadero o Falso Simple</td>
+                              <td class="p-1.5">El principio de devengado tributario reconoce ingresos y gastos cuando se generan legalmente...</td>
                               <td class="p-1.5">Verdadero</td>
                               <td class="p-1.5">Falso</td>
                               <td class="p-1.5 font-bold text-purple-800">A</td>
@@ -1709,7 +1713,7 @@ export interface DiaCalendario {
                       </div>
                       <ul class="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
                         <li><strong>Regla:</strong> La respuesta correcta debe ser <strong>A</strong> (Verdadero) o <strong>B</strong> (Falso).</li>
-                        <li>Las columnas <code class="bg-muted px-1 rounded">opcion_a</code> y <code class="bg-muted px-1 rounded">opcion_b</code> pueden dejarse vacías y el sistema las completará automáticamente.</li>
+                        <li>Las columnas <code class="bg-muted px-1 rounded">opcion_a</code> y <code class="bg-muted px-1 rounded">opcion_b</code> se preparan automáticamente en la plantilla Excel.</li>
                       </ul>
                     </div>
 
@@ -1717,11 +1721,11 @@ export interface DiaCalendario {
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
                         <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
-                        <span>Reactivo Oficial</span>
+                        <span>Sección I</span>
                       </div>
                       <div class="font-serif text-xs space-y-2 pt-1">
                         <p class="font-bold text-slate-900 leading-snug">
-                          <strong>1.</strong> La fibra óptica monomodo presenta menor atenuación que la multimodo a largas distancias.
+                          <strong>1.</strong> El principio contable de devengado establece que los ingresos y gastos deben reconocerse en el ejercicio en que se generan legalmente, con independencia de su cobro o pago.
                         </p>
                         <div class="grid grid-cols-2 gap-2 pl-4 font-sans text-[11px] text-slate-800 font-medium">
                           <div class="flex items-center gap-1.5">
@@ -1739,13 +1743,123 @@ export interface DiaCalendario {
                 </div>
               }
 
-              <!-- SECCIÓN 2: SELECCION_SIMPLE -->
-              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'SELECCION_SIMPLE') {
+              <!-- SECCIÓN 2: VERDADERO O FALSO COMPLEJAS -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'VF_COMPLEJAS') {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-blue-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 2</span>
-                      <h4 class="text-sm font-black text-foreground">SELECCION_SIMPLE (Selección Múltiple - Única Respuesta)</h4>
+                      <span class="bg-teal-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 2</span>
+                      <h4 class="text-sm font-black text-foreground">Verdadero o Falso Complejas (Proposiciones 1, 2, 3 y 4)</h4>
+                    </div>
+                    <span class="bg-teal-100 text-teal-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G1 · Dificultad 2 (Medio)
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo se completa en el archivo Excel:</span>
+                      </div>
+                      <p class="text-[11px] text-muted-foreground">
+                        Use las columnas <code class="bg-muted px-1 rounded">opcion_a</code> a <code class="bg-muted px-1 rounded">opcion_d</code> para las proposiciones 1 a 4. La respuesta usa la lista canónica:
+                      </p>
+                      <div class="bg-muted/40 p-2.5 rounded text-[10px] font-mono space-y-1">
+                        <div><strong>opcion_a:</strong> 1. Gasto respaldado con facturas originales</div>
+                        <div><strong>opcion_b:</strong> 2. Gasto vinculado a la actividad gravada</div>
+                        <div><strong>opcion_c:</strong> 3. Bancarización en pagos &gt;= Bs 50.000</div>
+                        <div><strong>opcion_d:</strong> 4. Donaciones deducibles hasta el 50% (Falso)</div>
+                        <div><strong>respuesta:</strong> A (1, 2 y 3 son verdaderas) | <strong>dificultad:</strong> 2</div>
+                      </div>
+                    </div>
+
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Sección II</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-2 pt-1">
+                        <p class="font-bold text-slate-900 leading-snug">
+                          <strong>2.</strong> Respecto a los requisitos de deducibilidad del IUE según la Ley 843, analice las afirmaciones:
+                        </p>
+                        <div class="pl-4 text-[11px] text-slate-800 space-y-0.5 font-sans">
+                          <div>1. El gasto debe estar respaldado documentalmente con facturas originales.</div>
+                          <div>2. Los gastos deben estar dirigidos a la obtención y conservación de la fuente.</div>
+                          <div>3. Pagos &gt;= Bs 50.000 deben contar con documento fehaciente de bancarización.</div>
+                          <div>4. Las donaciones son deducibles hasta el 50% de la utilidad imponible.</div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1.5 pl-4 font-sans text-[11px] text-slate-800 pt-1">
+                          <div><strong>A)</strong> 1, 2 y 3 son verdaderas</div>
+                          <div><strong>B)</strong> 1 y 3 son verdaderas</div>
+                          <div><strong>C)</strong> 2 y 4 son verdaderas</div>
+                          <div><strong>D)</strong> Solo 4 es verdadera</div>
+                          <div><strong>E)</strong> Todas son verdaderas</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- SECCIÓN 3: PREMISAS A/B/AMBAS/NINGUNA -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'PREMISAS') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-cyan-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 3</span>
+                      <h4 class="text-sm font-black text-foreground">Respuesta A/B/Ambas/Ninguna (Premisas I y II)</h4>
+                    </div>
+                    <span class="bg-cyan-100 text-cyan-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G1 · Dificultad 2 o 3
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
+                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
+                        <i class="pi pi-file-excel text-emerald-600"></i>
+                        <span>1. Cómo se completa en el archivo Excel:</span>
+                      </div>
+                      <div class="bg-muted/40 p-2.5 rounded text-[10px] font-mono space-y-1">
+                        <div><strong>enunciado:</strong> I. El crédito fiscal IVA por compras vinculadas es computable.\nII. Las retenciones a informales no requieren declaración mensual.</div>
+                        <div><strong>opcion_a:</strong> A. Si la primera es verdadera</div>
+                        <div><strong>opcion_b:</strong> B. Si la segunda es verdadera</div>
+                        <div><strong>opcion_c:</strong> C. Si ambas son verdaderas</div>
+                        <div><strong>opcion_d:</strong> D. Si ninguna es verdadera</div>
+                        <div><strong>respuesta:</strong> A | <strong>dificultad:</strong> 2</div>
+                      </div>
+                    </div>
+
+                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
+                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span>Sección III</span>
+                      </div>
+                      <div class="font-serif text-xs space-y-2 pt-1">
+                        <p class="font-bold text-slate-900 leading-snug">
+                          <strong>3.</strong> <strong>I.</strong> El crédito fiscal IVA respaldado por compras vinculadas a la actividad gravada es computable.<br>
+                          <strong>II.</strong> Las retenciones tributarias a proveedores informales de servicios extinguen la obligación sin requerir declaración jurada.
+                        </p>
+                        <div class="space-y-1 pl-4 font-sans text-[11px] text-slate-800">
+                          <div><strong>A)</strong> Si la primera proposición es verdadera</div>
+                          <div><strong>B)</strong> Si la segunda proposición es verdadera</div>
+                          <div><strong>C)</strong> Si ambas proposiciones son verdaderas</div>
+                          <div><strong>D)</strong> Si ninguna proposición es verdadera</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- SECCIÓN 4: SELECCIÓN MEJOR RESPUESTA -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'SELECCION') {
+                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
+                  <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="bg-blue-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 4</span>
+                      <h4 class="text-sm font-black text-foreground">Selección de la Mejor Respuesta (5 Opciones A-E)</h4>
                     </div>
                     <span class="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
                       Grupo G2 · Dificultad 1, 2 o 3
@@ -1753,168 +1867,36 @@ export interface DiaCalendario {
                   </div>
 
                   <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    <!-- Excel -->
-                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
-                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
-                        <i class="pi pi-file-excel text-emerald-600"></i>
-                        <span>1. Cómo se completa en el archivo Excel:</span>
-                      </div>
-                      <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse text-[10px] font-mono">
-                          <thead>
-                            <tr class="bg-purple-900 text-white font-bold">
-                              <th class="p-1.5">tipo</th>
-                              <th class="p-1.5">enunciado</th>
-                              <th class="p-1.5">opcion_a</th>
-                              <th class="p-1.5">opcion_b</th>
-                              <th class="p-1.5">opcion_c</th>
-                              <th class="p-1.5">opcion_d</th>
-                              <th class="p-1.5">resp.</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr class="bg-muted/40 border-b border-border">
-                              <td class="p-1.5 font-bold text-blue-700">SELECCION_SIMPLE</td>
-                              <td class="p-1.5">¿Cuál es el protocolo de transporte orientado a conexión?</td>
-                              <td class="p-1.5">TCP</td>
-                              <td class="p-1.5">UDP</td>
-                              <td class="p-1.5">ICMP</td>
-                              <td class="p-1.5">ARP</td>
-                              <td class="p-1.5 font-bold text-purple-800">A</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      <ul class="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
-                        <li><strong>Regla:</strong> Requiere al menos 4 distractores (<code class="bg-muted px-1 rounded">opcion_a</code> a <code class="bg-muted px-1 rounded">opcion_d</code>). La opción E es opcional.</li>
-                        <li>La respuesta correcta debe ser una letra de la <strong>A</strong> a la <strong>E</strong>.</li>
-                      </ul>
-                    </div>
-
-                    <!-- PDF Typst -->
-                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
-                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
-                        <span>Reactivo Oficial</span>
-                      </div>
-                      <div class="font-serif text-xs space-y-2 pt-1">
-                        <p class="font-bold text-slate-900 leading-snug">
-                          <strong>2.</strong> ¿Cuál es el protocolo de transporte orientado a la conexión en la pila TCP/IP?
-                        </p>
-                        <div class="grid grid-cols-2 gap-1.5 pl-4 font-sans text-[11px] text-slate-800">
-                          <div><strong>A)</strong> TCP (Transmission Control Protocol)</div>
-                          <div><strong>B)</strong> UDP (User Datagram Protocol)</div>
-                          <div><strong>C)</strong> ICMP (Control Message Protocol)</div>
-                          <div><strong>D)</strong> ARP (Address Resolution Protocol)</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              }
-
-              <!-- SECCIÓN 3: PREGUNTA_CON_CLAVE -->
-              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'PREGUNTA_CON_CLAVE') {
-                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
-                  <div class="flex items-center justify-between border-b border-border pb-3">
-                    <div class="flex items-center gap-2">
-                      <span class="bg-indigo-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 3</span>
-                      <h4 class="text-sm font-black text-foreground">PREGUNTA_CON_CLAVE (Respuestas Múltiples Combinadas)</h4>
-                    </div>
-                    <span class="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                      Grupo G1 · Dificultad 2 (Medio)
-                    </span>
-                  </div>
-
-                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    <!-- Excel -->
                     <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
                       <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
                         <i class="pi pi-file-excel text-emerald-600"></i>
                         <span>1. Cómo se completa en el archivo Excel:</span>
                       </div>
                       <p class="text-[11px] text-muted-foreground">
-                        En el <strong>enunciado</strong> se escriben las premisas numeradas (1, 2, 3, 4 o I, II, III). En las <strong>opciones</strong> se combinan las alternativas:
+                        Llene las 5 opciones en <code class="bg-muted px-1 rounded">opcion_a</code> a <code class="bg-muted px-1 rounded">opcion_e</code>. La respuesta correcta debe ser una letra de la A a la E.
                       </p>
-                      <div class="bg-muted/40 p-2 rounded text-[10px] font-mono space-y-1">
-                        <div><strong>enunciado:</strong> Características de modulación OFDM:\n1. Alta eficiencia\n2. Resistencia al desvanecimiento\n3. Nula PAPR</div>
-                        <div><strong>opcion_a:</strong> 1 y 2 son correctas | <strong>opcion_b:</strong> 1 y 3 son correctas | <strong>opcion_c:</strong> Solo 2 es correcta</div>
-                      </div>
-                    </div>
-
-                    <!-- PDF Typst -->
-                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
-                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
-                        <span>Reactivo Oficial</span>
-                      </div>
-                      <div class="font-serif text-xs space-y-2 pt-1">
-                        <p class="font-bold text-slate-900 leading-snug">
-                          <strong>3.</strong> Dadas las siguientes características sobre la modulación OFDM:
-                        </p>
-                        <div class="pl-4 italic text-[11px] text-slate-800 space-y-0.5 font-sans">
-                          <div>1. Alta eficiencia espectral mediante subportadoras ortogonales.</div>
-                          <div>2. Alta robustez frente al desvanecimiento multitrayecto.</div>
-                          <div>3. Presenta una relación de potencia pico a promedio (PAPR) nula.</div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-1.5 pl-4 font-sans text-[11px] text-slate-800 pt-1">
-                          <div><strong>A)</strong> 1 y 2 son correctas</div>
-                          <div><strong>B)</strong> 1 y 3 son correctas</div>
-                          <div><strong>C)</strong> 2 y 3 son correctas</div>
-                          <div><strong>D)</strong> Todas son correctas</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              }
-
-              <!-- SECCIÓN 4: RESPUESTA_COMPUESTA -->
-              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'RESPUESTA_COMPUESTA') {
-                <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
-                  <div class="flex items-center justify-between border-b border-border pb-3">
-                    <div class="flex items-center gap-2">
-                      <span class="bg-amber-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 4</span>
-                      <h4 class="text-sm font-black text-foreground">RESPUESTA_COMPUESTA (Relación de Dos Proposiciones / Causa-Efecto)</h4>
-                    </div>
-                    <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                      Grupo G1 · Dificultad 2 o 3
-                    </span>
-                  </div>
-
-                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    <!-- Excel -->
-                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
-                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
-                        <i class="pi pi-file-excel text-emerald-600"></i>
-                        <span>1. Cómo se completa en el archivo Excel:</span>
-                      </div>
                       <div class="bg-muted/40 p-2.5 rounded text-[10px] font-mono space-y-1">
-                        <div><strong>enunciado:</strong> I. El retardo de propagación depende de la distancia.\nPORQUE\nII. El retardo de transmisión depende de la tasa de bits.</div>
-                        <div><strong>opcion_a:</strong> Ambas verdaderas y II explica a I</div>
-                        <div><strong>opcion_b:</strong> Ambas verdaderas pero II NO explica a I</div>
-                        <div><strong>opcion_c:</strong> I verdadera pero II falsa</div>
-                        <div><strong>opcion_d:</strong> I falsa pero II verdadera</div>
+                        <div><strong>enunciado:</strong> ¿Cuál es el efecto jurídico del vencimiento de los 60 días sin Resolución Determinativa?</div>
+                        <div><strong>opcion_a:</strong> Suspende intereses moratorios | <strong>opcion_b:</strong> Caducidad absoluta</div>
+                        <div><strong>respuesta:</strong> A | <strong>dificultad:</strong> 3</div>
                       </div>
                     </div>
 
-                    <!-- PDF Typst -->
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
                         <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
-                        <span>Reactivo Oficial</span>
+                        <span>Sección IV</span>
                       </div>
                       <div class="font-serif text-xs space-y-2 pt-1">
                         <p class="font-bold text-slate-900 leading-snug">
-                          <strong>4.</strong> <strong>I.</strong> El retardo de propagación depende de la distancia física en el medio.<br>
-                          <span class="font-sans font-bold text-[10px] text-purple-900 tracking-wider">PORQUE</span><br>
-                          <strong>II.</strong> El retardo de transmisión depende de la tasa de bits del canal.
+                          <strong>4.</strong> ¿Cuál es el efecto jurídico del vencimiento del término probatorio en una fiscalización sin emisión de Resolución Determinativa en 60 días?
                         </p>
-                        <div class="space-y-1 pl-4 font-sans text-[11px] text-slate-800">
-                          <div><strong>A)</strong> Ambas proposiciones son verdaderas y la II es explicación de la I.</div>
-                          <div><strong>B)</strong> Ambas son verdaderas pero la II NO es explicación de la I.</div>
-                          <div><strong>C)</strong> La proposición I es verdadera pero la II es falsa.</div>
-                          <div><strong>D)</strong> La proposición I es falsa pero la II es verdadera.</div>
+                        <div class="grid grid-cols-1 gap-1 pl-4 font-sans text-[11px] text-slate-800">
+                          <div><strong>A)</strong> No opera la caducidad pero suspende el cómputo de intereses moratorios.</div>
+                          <div><strong>B)</strong> Opera la caducidad automática de pleno derecho.</div>
+                          <div><strong>C)</strong> Se convalida la declaración jurada original quedando extinguida la deuda.</div>
+                          <div><strong>D)</strong> El SIN queda inhabilitado para fiscalizar.</div>
+                          <div><strong>E)</strong> Pasa de oficio a la Autoridad de Impugnación Tributaria.</div>
                         </div>
                       </div>
                     </div>
@@ -1922,21 +1904,20 @@ export interface DiaCalendario {
                 </div>
               }
 
-              <!-- SECCIÓN 5: PROBLEMAS Y SUBPROBLEMAS -->
-              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'PROBLEMA') {
+              <!-- SECCIÓN 5: CASOS CLÍNICOS Y PROBLEMAS -->
+              @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'CASOS') {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-rose-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 5</span>
-                      <h4 class="text-sm font-black text-foreground">PROBLEMA & SUBPROBLEMA (Casos Clínicos / Enunciados Contextuales)</h4>
+                      <span class="bg-indigo-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 5</span>
+                      <h4 class="text-sm font-black text-foreground">Ítems Agrupados por Caso Clínico o Problema (Tronco + Subítems)</h4>
                     </div>
-                    <span class="bg-rose-100 text-rose-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                      Grupo G3 · Dificultad 3 (Difícil)
+                    <span class="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G3 · Dificultad 2 y 3
                     </span>
                   </div>
 
                   <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    <!-- Excel -->
                     <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
                       <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
                         <i class="pi pi-file-excel text-emerald-600"></i>
@@ -1953,143 +1934,87 @@ export interface DiaCalendario {
                             </tr>
                           </thead>
                           <tbody>
-                            <tr class="bg-rose-50/70 border-b border-border font-bold">
-                              <td class="p-1 text-rose-700">PROBLEMA</td>
-                              <td class="p-1 text-purple-900">CASO-01</td>
-                              <td class="p-1">Paciente varón de 45 años ingresa con dolor precordial...</td>
+                            <tr class="bg-indigo-50/70 border-b border-border font-bold">
+                              <td class="p-1 text-indigo-700">Ítems agrupados...</td>
+                              <td class="p-1 text-purple-900">CASO-TRIB1</td>
+                              <td class="p-1">Caso: En la fiscalización a 'Comercial Andina'...</td>
                               <td class="p-1"><em>(vacío)</em></td>
                             </tr>
                             <tr class="bg-muted/40 border-b border-border">
-                              <td class="p-1 text-blue-700">SUBPROBLEMA</td>
-                              <td class="p-1 text-purple-900">CASO-01</td>
-                              <td class="p-1">¿Cuál es la cara anatómica comprometida?</td>
+                              <td class="p-1 text-blue-700">Subítem de caso...</td>
+                              <td class="p-1 text-purple-900">CASO-TRIB1</td>
+                              <td class="p-1">¿Cuál es el reparo en IUE (25%) e IVA?</td>
                               <td class="p-1 font-bold text-purple-800">A</td>
-                            </tr>
-                            <tr class="bg-muted/40 border-b border-border">
-                              <td class="p-1 text-blue-700">SUBPROBLEMA</td>
-                              <td class="p-1 text-purple-900">CASO-01</td>
-                              <td class="p-1">¿Qué arteria coronaria es la responsable?</td>
-                              <td class="p-1 font-bold text-purple-800">B</td>
                             </tr>
                           </tbody>
                         </table>
                       </div>
-                      <ul class="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
-                        <li><strong>Regla:</strong> La fila <code class="bg-muted px-1 rounded">PROBLEMA</code> contiene el caso general y define el <code class="bg-muted px-1 rounded">grupo</code>.</li>
-                        <li>Las filas <code class="bg-muted px-1 rounded">SUBPROBLEMA</code> deben tener el mismo código de <code class="bg-muted px-1 rounded">grupo</code> para enlazarse automáticamente en el PDF.</li>
-                      </ul>
                     </div>
 
-                    <!-- PDF Typst -->
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
                         <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
-                        <span>Bloque de Caso Clínico</span>
+                        <span>Sección V</span>
                       </div>
                       <div class="font-serif text-xs space-y-2.5 pt-1">
-                        
-                        <!-- Caja de Caso Contextualizado Typst -->
                         <div class="bg-slate-50 border border-slate-400 p-2.5 rounded text-[11px] font-sans">
                           <span class="font-black text-slate-900 uppercase block text-[10px] text-purple-950 border-b border-slate-300 pb-1 mb-1">
-                            CONTEXTO / CASO CLÍNICO 1 (Preguntas 5 y 6)
+                            CONTEXTO / CASO TRIBUTARIO 1 (Preguntas 5 y 6)
                           </span>
                           <p class="text-slate-700 leading-relaxed italic">
-                            Paciente masculino de 45 años ingresa a emergencias con dolor precordial opresivo irradiado a mandíbula de 2 horas de evolución, diaforesis profusa y disnea. ECG muestra elevación ST en derivaciones DII, DIII y aVF.
+                            Durante la auditoría tributaria a "Manufacturas del Valle S.A." se detectaron compras por Bs 200.000 pagadas en efectivo sin bancarización y ventas no facturadas por Bs 80.000.
                           </p>
                         </div>
-
-                        <!-- Preguntas Derivadas -->
-                        <div class="space-y-2 pl-2">
-                          <div>
-                            <p class="font-bold text-slate-900 text-xs"><strong>5.</strong> ¿Cuál es la cara anatómica comprometida del miocardio?</p>
-                            <div class="grid grid-cols-2 gap-1 pl-3 font-sans text-[11px]">
-                              <div><strong>A)</strong> Cara Inferior (Diafragmática)</div>
-                              <div><strong>B)</strong> Cara Anterior extensa</div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p class="font-bold text-slate-900 text-xs"><strong>6.</strong> ¿Cuál es la arteria coronaria responsable?</p>
-                            <div class="grid grid-cols-2 gap-1 pl-3 font-sans text-[11px]">
-                              <div><strong>A)</strong> Coronaria Derecha (ACD)</div>
-                              <div><strong>B)</strong> Descendente Anterior (ADA)</div>
-                            </div>
+                        <div class="space-y-1 pl-2">
+                          <p class="font-bold text-slate-900 text-xs"><strong>5.</strong> ¿Cuál es el reparo impositivo aplicable por IUE no deducible y pérdida de crédito fiscal?</p>
+                          <div class="grid grid-cols-2 gap-1 pl-3 font-sans text-[11px]">
+                            <div><strong>A)</strong> Reparo IUE Bs 50.000 + IVA Bs 26.000</div>
+                            <div><strong>B)</strong> Solo sanción formal de 500 UFV</div>
                           </div>
                         </div>
-
                       </div>
                     </div>
                   </div>
                 </div>
               }
 
-              <!-- SECCIÓN 6: EMPAREJAMIENTO -->
+              <!-- SECCIÓN 6: EMPAREJAMIENTO AMPLIADO -->
               @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'EMPAREJAMIENTO') {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-teal-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPO 6</span>
-                      <h4 class="text-sm font-black text-foreground">EMPAREJAMIENTO (Correspondencia de Columnas)</h4>
+                      <span class="bg-amber-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 6</span>
+                      <h4 class="text-sm font-black text-foreground">Emparejamiento Ampliado (Claves Maestras + Opciones)</h4>
                     </div>
-                    <span class="bg-teal-100 text-teal-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                      Grupo G3 · Dificultad 2 o 3
+                    <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                      Grupo G3 · Dificultad 1 y 2
                     </span>
                   </div>
 
                   <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    <!-- Excel -->
                     <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
                       <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
                         <i class="pi pi-file-excel text-emerald-600"></i>
                         <span>1. Cómo se completa en el archivo Excel:</span>
                       </div>
-                      <p class="text-[11px] text-muted-foreground">
-                        En el <strong>enunciado</strong> se colocan ambas columnas con salto de línea. En las <strong>opciones</strong> se colocan las combinaciones de pares:
-                      </p>
                       <div class="bg-muted/40 p-2.5 rounded text-[10px] font-mono space-y-1">
-                        <div><strong>enunciado:</strong> Relacione las capas OSI con su PDU:\n1. Capa Red / a. Tramas\n2. Capa Transporte / b. Paquetes\n3. Capa Enlace / c. Segmentos</div>
-                        <div><strong>opcion_a:</strong> 1-b, 2-c, 3-a | <strong>opcion_b:</strong> 1-a, 2-b, 3-c</div>
+                        <div><strong>Fila Madre:</strong> Emparejamiento Ampliado | grupo: EMP-TRIB1 | opcion_a: Verificación Externa | opcion_b: Fiscalización Integral</div>
+                        <div><strong>Fila Hija 1:</strong> Opción de Emparejamiento | grupo: EMP-TRIB1 | enunciado: Revisión puntual de transacción | resp: A</div>
                       </div>
                     </div>
 
-                    <!-- PDF Typst -->
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
                         <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
-                        <span>Reactivo Oficial</span>
+                        <span>Sección VI</span>
                       </div>
                       <div class="font-serif text-xs space-y-2 pt-1">
                         <p class="font-bold text-slate-900 leading-snug">
-                          <strong>7.</strong> Relacione las capas del Modelo OSI con su PDU correspondiente:
+                          <strong>Lista de Claves:</strong> [A] Verificación Externa Focalizada | [B] Fiscalización Integral | [C] Control en Punto Fijo
                         </p>
-                        
-                        <!-- Tabla de Correspondencia -->
-                        <div class="border border-slate-400 rounded overflow-hidden font-sans text-[11px]">
-                          <table class="w-full text-left">
-                            <tr class="bg-slate-100 border-b border-slate-300 font-bold">
-                              <th class="p-1.5 border-r border-slate-300 w-1/2">Columna A (Capas)</th>
-                              <th class="p-1.5 w-1/2">Columna B (PDU)</th>
-                            </tr>
-                            <tr class="border-b border-slate-200">
-                              <td class="p-1 border-r border-slate-300">1. Capa de Red</td>
-                              <td class="p-1">a. Tramas (Frames)</td>
-                            </tr>
-                            <tr class="border-b border-slate-200">
-                              <td class="p-1 border-r border-slate-300">2. Capa de Transporte</td>
-                              <td class="p-1">b. Paquetes (Packets)</td>
-                            </tr>
-                            <tr>
-                              <td class="p-1 border-r border-slate-300">3. Capa de Enlace de Datos</td>
-                              <td class="p-1">c. Segmentos</td>
-                            </tr>
-                          </table>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-1 pl-4 font-sans text-[11px] text-slate-800 pt-1">
-                          <div><strong>A)</strong> 1-b, 2-c, 3-a</div>
-                          <div><strong>B)</strong> 1-a, 2-b, 3-c</div>
-                          <div><strong>C)</strong> 1-c, 2-a, 3-b</div>
-                          <div><strong>D)</strong> 1-b, 2-a, 3-c</div>
+                        <div class="space-y-1.5 pl-2">
+                          <p class="text-xs"><strong>7.</strong> Revisión puntual de una transacción o crédito fiscal mediante requerimiento de información.</p>
+                          <div class="font-sans text-[11px] text-purple-900 font-bold pl-3">➡️ Clave de Emparejamiento: [A]</div>
                         </div>
                       </div>
                     </div>
@@ -2102,51 +2027,30 @@ export interface DiaCalendario {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-purple-700 text-white font-black px-2.5 py-1 rounded text-xs">SINTAXIS</span>
-                      <h4 class="text-sm font-black text-foreground">Fórmulas Matemáticas y Químicas (Typst $ ... $)</h4>
+                      <span class="bg-purple-700 text-white font-black px-2.5 py-1 rounded text-xs">MOTOR TYPST</span>
+                      <h4 class="text-sm font-black text-foreground">Renderizado de Fórmulas Matemáticas y Químicas ($ ... $)</h4>
                     </div>
                     <span class="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                      Compilación Tipográfica de Alta Calidad
+                      Todas las Tipologías
                     </span>
                   </div>
 
-                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    <!-- Excel -->
-                    <div class="lg:col-span-6 bg-card border border-border rounded-xl p-4 space-y-2.5">
-                      <div class="flex items-center gap-1.5 font-bold text-purple-900 text-xs">
-                        <i class="pi pi-file-excel text-emerald-600"></i>
-                        <span>1. Cómo escribir fórmulas en cualquier celda de Excel:</span>
+                  <div class="p-4 bg-card border border-border rounded-xl space-y-3">
+                    <p class="text-xs text-muted-foreground">
+                      Puedes insertar fórmulas matemáticas en el enunciado o en las opciones envolviendo la expresión con el signo de dólar <code class="bg-muted px-1 rounded font-mono">$ ... $</code>.
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-[11px]">
+                      <div class="p-3 bg-muted/40 rounded-xl border border-border">
+                        <span class="text-[10px] text-muted-foreground block font-bold">Cálculo Financiero:</span>
+                        <code>$ "Reparo" = 150.000 times 25% $</code>
                       </div>
-                      <p class="text-[11px] text-muted-foreground">
-                        Escribe la fórmula encerrada entre signos de dólar <code class="bg-muted px-1 rounded font-bold text-purple-900">$ ... $</code>:
-                      </p>
-                      <div class="bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] space-y-1.5">
-                        <div><span class="text-slate-400">// Pérdida en espacio libre:</span><br>$ FSPL = 20 log_10(d) + 20 log_10(f) + 92.45 $</div>
-                        <div><span class="text-slate-400">// Fracciones y derivadas:</span><br>$ [M] = frac(n, V) $ ó $ f'(x) = lim_(h->0) frac(f(x+h) - f(x), h) $</div>
-                        <div><span class="text-slate-400">// Fórmulas químicas:</span><br>$ H_2 S O_4 + 2 N a O H -> N a_2 S O_4 + 2 H_2 O $</div>
+                      <div class="p-3 bg-muted/40 rounded-xl border border-border">
+                        <span class="text-[10px] text-muted-foreground block font-bold">Ecuación Cuadrática:</span>
+                        <code>$ x = (-b +- sqrt(b^2 - 4a c)) / (2a) $</code>
                       </div>
-                    </div>
-
-                    <!-- PDF Typst -->
-                    <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
-                      <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
-                        <span>Renderizado Matemático Real</span>
-                      </div>
-                      <div class="font-serif text-xs space-y-3 pt-1">
-                        <div>
-                          <p class="font-bold text-slate-900 text-xs"><strong>8.</strong> Calcule la atenuación total en el enlace utilizando el modelo FSPL:</p>
-                          <div class="text-center py-2 font-mono font-bold text-sm bg-slate-50 border border-slate-200 rounded my-1 text-purple-950">
-                            FSPL = 20·log₁₀(d) + 20·log₁₀(f) + 92.45 dB
-                          </div>
-                        </div>
-
-                        <div>
-                          <p class="font-bold text-slate-900 text-xs"><strong>9.</strong> Balance estequiométrico de neutralización:</p>
-                          <div class="text-center py-1.5 font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded text-purple-950">
-                            H₂SO₄ + 2 NaOH &rarr; Na₂SO₄ + 2 H₂O
-                          </div>
-                        </div>
+                      <div class="p-3 bg-muted/40 rounded-xl border border-border">
+                        <span class="text-[10px] text-muted-foreground block font-bold">Química / Subíndices:</span>
+                        <code>$ H_2 S O_4 + 2 N a O H arrow N a_2 S O_4 $</code>
                       </div>
                     </div>
                   </div>
@@ -2888,81 +2792,191 @@ export class BancoPreguntasComponent {
   }
 
   // ============================================================
-  // DESCARGA DIRECTA EN MEMORIA DE ARCHIVOS DE PRUEBA (SheetJS)
+  // DESCARGA Y CARGA DE EJEMPLOS OFICIALES (SheetJS - 4 Hojas)
   // ============================================================
   public descargarEjemploValido(): void {
-    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'peso', 'observaciones'];
+    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'parcial', 'observaciones'];
     
     const dataInst = [
-      ['BANCO DE PREGUNTAS - GUÍA OFICIAL'],
+      ['BANCO DE PREGUNTAS - GUÍA OFICIAL UNITEPC'],
       [],
-      ['1. CÓDIGOS DE PREGUNTA OFICIALES', 'FALSO_VERDADERO, PREGUNTA_CON_CLAVE, SELECCION_SIMPLE, RESPUESTA_COMPUESTA, PROBLEMA, SUBPROBLEMA, EMPAREJAMIENTO'],
-      ['2. CUOTAS REQUERIDAS', '15 Fáciles (1), 30 Medias (2), 15 Difíciles (3) - Total: 60 preguntas']
+      ['1. CÓDIGOS DE PREGUNTA OFICIALES', 'Verdadero o Falso Simple, Verdadero o Falso Complejas, Respuesta A/B/Ambas/Ninguna, Selección de la mejor respuesta, Ítems agrupados por caso clínico o problema, Subítem de caso o problema, Emparejamiento Ampliado, Opción de Emparejamiento Ampliado'],
+      ['2. CUOTAS OFICIALES EXIGIDAS', '15 Fáciles (1), 30 Medias (2), 15 Difíciles (3) - Total: 60 preguntas para 1er/2do Parcial'],
+      ['3. MATERIA PILOTO', '[CPEC18] Auditoría Tributaria - Carrera Complementaria Contaduría Pública (Cochabamba)']
     ];
 
     const dataBanco: any[][] = [headers];
+    const preguntasParsed: PreguntaValidada[] = [];
 
-    // 15 Fáciles (1)
+    // 15 Fáciles (Nivel 1): V/F Simple, Selección, Emparejamiento
     for (let i = 1; i <= 15; i++) {
-      if (i % 2 === 0) {
-        dataBanco.push(['FALSO_VERDADERO', '', `Pregunta Fácil ${i}: La fibra óptica monomodo presenta menor atenuación que la multimodo a largas distancias.`, 'Verdadero', 'Falso', '', '', '', 'A', '1', 5, 'OK']);
-      } else {
-        dataBanco.push(['SELECCION_SIMPLE', '', `Pregunta Fácil ${i}: ¿Cuál es la función principal de la capa de enlace de datos en el modelo OSI?`, 'Direccionamiento físico (MAC) y control de flujo', 'Enrutamiento de paquetes', 'Cifrado de datos', 'Control de sesiones', 'Compresión', 'A', '1', 5, 'OK']);
+      let tipo = 'Verdadero o Falso Simple';
+      let grupo = '';
+      let enun = `Pregunta Fácil ${i}: El principio de devengado tributario reconoce ingresos y gastos cuando se generan legalmente, con independencia del cobro o pago.`;
+      let opA = 'Verdadero';
+      let opB = 'Falso';
+      let opC = '';
+      let opD = '';
+      let opE = '';
+      let resp = 'A';
+      let dif = '1';
+
+      if (i > 5 && i <= 10) {
+        tipo = 'Selección de la mejor respuesta';
+        enun = `Pregunta Fácil ${i}: ¿Cuál es el plazo reglamentario para la presentación de descargos ante una Orden de Verificación del SIN?`;
+        opA = '20 días hábiles computables a partir de la notificación legal';
+        opB = '5 días calendario improrrogables';
+        opC = '60 días hábiles administrativos';
+        opD = '15 días continuos según código tributario';
+        opE = 'No existe plazo formal establecido';
+        resp = 'A';
+      } else if (i > 10) {
+        tipo = 'Opción de Emparejamiento Ampliado';
+        grupo = 'EMP-TRIB1';
+        enun = `Concepto ${i}: Base imponible presunta calculada sobre ventas brutas declaradas en el periodo fiscal.`;
+        opA = ''; opB = ''; opC = ''; opD = ''; opE = '';
+        resp = 'B';
       }
+
+      dataBanco.push([tipo, grupo, enun, opA, opB, opC, opD, opE, resp, dif, '1P', 'OK']);
     }
 
-    // 30 Medias (2)
+    // 30 Medias (Nivel 2): Premisas A/B/Ambas/Ninguna, V/F Complejas
     for (let i = 1; i <= 30; i++) {
-      if (i % 2 === 0) {
-        dataBanco.push(['RESPUESTA_COMPUESTA', '', `Pregunta Media ${i}: I. El retardo de propagación depende de la distancia.\nII. El retardo de transmisión depende de la tasa de bits.`, 'A. Si la primera es verdadera', 'B. Si la segunda es verdadera', 'C. Si ambas son verdaderas', 'D. Si ninguna es verdadera', '', 'C', '2', 5, 'OK']);
-      } else {
-        dataBanco.push(['PREGUNTA_CON_CLAVE', '', `Pregunta Media ${i}: Características de la modulación OFDM: 1. Alta eficiencia espectral, 2. Resistencia al desvanecimiento, 3. Baja ISI, 4. Nula PAPR.`, '1, 2 y 3 son correctas', '1 y 3 son correctas', '2 y 4 son correctas', 'Solo 4 es correcta', 'Todas son correctas', 'A', '2', 5, 'OK']);
+      let tipo = 'Respuesta A/B/Ambas/Ninguna';
+      let grupo = '';
+      let enun = `Pregunta Media ${i}: I. El crédito fiscal IVA respaldado por compras vinculadas a la actividad gravada es computable.\nII. Las retenciones tributarias no liberan al sujeto pasivo de su obligación formal.`;
+      let opA = 'A. Si la primera es verdadera';
+      let opB = 'B. Si la segunda es verdadera';
+      let opC = 'C. Si ambas son verdaderas';
+      let opD = 'D. Si ninguna es verdadera';
+      let opE = '';
+      let resp = 'C';
+      let dif = '2';
+
+      if (i > 15) {
+        tipo = 'Verdadero o Falso Complejas';
+        enun = `Pregunta Media ${i}: Respecto a los reparos tributarios en auditoría fiscal determine la validez: 1. Omisión de ingresos, 2. Falta de bancarización, 3. Crédito fiscal indebido, 4. Errores aritméticos.`;
+        opA = '1. Omisión de ingresos reales en estados financieros auditados.';
+        opB = '2. Gastos no deducibles por falta de documento de bancarización.';
+        opC = '3. Crédito fiscal computado sin factura original o electrónica.';
+        opD = '4. Errores aritméticos en libros de compras y ventas IVA.';
+        resp = 'A';
       }
+
+      dataBanco.push([tipo, grupo, enun, opA, opB, opC, opD, opE, resp, dif, '1P', 'OK']);
     }
 
-    // 15 Difíciles (3)
+    // 15 Difíciles (Nivel 3): Casos Clínicos / Problemas y Selección Avanzada
     for (let i = 1; i <= 15; i++) {
-      if (i <= 5) {
-        dataBanco.push(['PROBLEMA', `CASO-0${i}`, `Problema Difícil ${i}: Calcule la pérdida en el espacio libre (FSPL) para un enlace a 5 GHz a 10 km: $ FSPL = 20 log(d) + 20 log(f) + 92.45 $`, '112.4 dB', '126.4 dB', '140.2 dB', '98.5 dB', '150.0 dB', 'B', '3', 5, 'OK']);
-      } else {
-        dataBanco.push(['SELECCION_SIMPLE', '', `Pregunta Difícil ${i}: En una modulación 256-QAM con ancho de banda de 20 MHz y factor roll-off 0.25, la tasa binaria neta alcanzable es:`, '128 Mbps', '106.6 Mbps', '160 Mbps', '80 Mbps', '64 Mbps', 'A', '3', 5, 'OK']);
+      let tipo = 'Subítem de caso o problema';
+      let grupo = 'CASO-TRIB1';
+      let enun = `Problema Tributario ${i}: En la fiscalización a 'Comercial Andina S.R.L.', se detectaron facturas sin medio fehaciente de pago por Bs 150.000. Calcule el reparo impositivo aplicable por IUE no deducible (25%).`;
+      let opA = 'Reparo IUE Bs 37.500 (25%) + Sanción formal 500 UFV';
+      let opB = 'Reparo IUE Bs 19.500 (13%) + Sanción formal 200 UFV';
+      let opC = 'Reparo IUE Bs 45.000 (30%) + Sanción formal 1.000 UFV';
+      let opD = 'No procede reparo si la factura tiene código de autorización vigente';
+      let opE = 'Reparo total acumulado de Bs 75.000';
+      let resp = 'A';
+      let dif = '3';
+
+      if (i > 5) {
+        tipo = 'Selección de la mejor respuesta';
+        grupo = '';
+        enun = `Pregunta Difícil ${i}: En una fiscalización externa, ¿cuál es el efecto jurídico del vencimiento del término probatorio sin emisión de Resolución Determinativa dentro del plazo de 60 días?`;
+        opA = 'No opera la prescripción pero suspende el cómputo de intereses moratorios';
+        opB = 'Caducidad automática de pleno derecho de la facultad fiscalizadora';
+        opC = 'Anulación de la Vista de Cargo emitida previamente';
+        opD = 'Extinción de la deuda tributaria y costas procesales';
+        opE = 'Imposibilidad de recurrir a la Autoridad de Impugnación Tributaria';
+        resp = 'A';
       }
+
+      dataBanco.push([tipo, grupo, enun, opA, opB, opC, opD, opE, resp, dif, '1P', 'OK']);
     }
 
     const dataEj = [
       headers,
-      ['FALSO_VERDADERO', '', 'El agua hierve a 100 grados Celsius al nivel del mar.', 'Verdadero', 'Falso', '', '', '', 'A', '1', 5, 'OK'],
-      ['SELECCION_SIMPLE', '', '¿Qué órgano bombea la sangre en el cuerpo humano?', 'Pulmón', 'Hígado', 'Corazón', 'Estómago', 'Riñón', 'C', '2', 5, 'OK']
+      ['Verdadero o Falso Simple', '', 'El agua hierve a 100 grados Celsius al nivel del mar.', 'Verdadero', 'Falso', '', '', '', 'A', '1', '1P', 'OK'],
+      ['Selección de la mejor respuesta', '', '¿Qué órgano bombea la sangre en el cuerpo humano?', 'Pulmón', 'Hígado', 'Corazón', 'Estómago', 'Riñón', 'C', '2', '1P', 'OK']
+    ];
+
+    const dataVal = [
+      ['TIPOS_PREGUNTA', 'RESP_ABCDE', 'RESP_ABCD', 'RESP_AB', 'DIFICULTADES_123'],
+      ['Verdadero o Falso Simple', 'A', 'A', 'A', '1'],
+      ['Verdadero o Falso Complejas', 'B', 'B', 'B', '2'],
+      ['Respuesta A/B/Ambas/Ninguna', 'C', 'C', '', '3'],
+      ['Selección de la mejor respuesta', 'D', 'D', '', ''],
+      ['Ítems agrupados por caso clínico o problema', 'E', '', '', ''],
+      ['Subítem de caso o problema', '', '', '', ''],
+      ['Emparejamiento Ampliado', '', '', '', ''],
+      ['Opción de Emparejamiento Ampliado', '', '', '', '']
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataVal), 'VALIDACIONES');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataInst), 'Instrucciones');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataEj), 'Ejemplo');
+
+    const fileName = `BANCO_OFICIAL_VALIDO_CPEC18_60PREGUNTAS.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    // Cargar directamente en memoria para inspección visual instantánea
+    this.nombreArchivoCargado.set(fileName);
+    this.pdfPrevisualizadoYConforme.set(false);
+    this.preguntasCargadas.set(this._generarPreguntasMockValidas());
+    this._mostrarToast(`Descargado y cargado en vivo: ${fileName} (100% Conforme).`);
+  }
+
+  public descargarEjemploInvalido(): void {
+    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'parcial', 'observaciones'];
+    const dataBanco: any[][] = [headers];
+
+    // Filas con errores pedagógicos y sintácticos intencionales
+    dataBanco.push(['Verdadero o Falso Simple', '', 'Pregunta V/F con clave errónea (marcada C en vez de A/B)', 'Verdadero', 'Falso', '', '', '', 'C', '1', '1P', 'Falta revisar: respuesta A-B']);
+    dataBanco.push(['Selección de la mejor respuesta', '', '', 'Distractor A', 'Distractor B', 'Distractor C', 'Distractor D', 'Distractor E', 'A', '1', '1P', 'Falta revisar: enunciado']);
+    dataBanco.push(['Selección de la mejor respuesta', '', 'Pregunta de selección incompleta con solo 3 opciones', 'Opción 1', 'Opción 2', 'Opción 3', '', '', 'A', '2', '1P', 'Falta revisar: incisos A-E']);
+    dataBanco.push(['Subítem de caso o problema', '', 'Subítem sin código de grupo identificador del caso padre', 'Opción A', 'Opción B', 'Opción C', 'Opción D', 'Opción E', 'B', '3', '1P', 'Falta revisar: grupo']);
+    dataBanco.push(['Respuesta A/B/Ambas/Ninguna', '', 'I. Premisa tributaria 1.\nII. Premisa 2.', 'A. Primera verdadera', 'B. Segunda verdadera', 'C. Ambas', 'D. Ninguna', '', 'Z', '2', '1P', 'Falta revisar: respuesta A-D']);
+    dataBanco.push(['Emparejamiento Ampliado', 'EMP-01', 'Emparejamiento con solo 1 clave definida', 'Clave 1', '', '', '', '', '', '', '1P', 'Falta revisar: minimo 2 claves']);
+    dataBanco.push(['Verdadero o Falso Complejas', '', 'V/F compleja con proposición 3 vacía', '1. Premisa 1', '2. Premisa 2', '', '4. Premisa 4', '', 'A', '2', '1P', 'Falta revisar: incisos 1-4']);
+
+    for (let i = 8; i <= 25; i++) {
+      dataBanco.push(['Selección de la mejor respuesta', '', `Pregunta sin completar cuota ${i}`, 'Opción A', 'Opción B', 'Opción C', 'Opción D', 'Opción E', 'A', '2', '1P', 'OK']);
+    }
+
+    const dataInst = [
+      ['BANCO DE PREGUNTAS CON ERRORES PARA PRUEBAS DE VALIDACIÓN'],
+      ['Este archivo contiene fallas intencionales para verificar el validador institucional UNITEPC.']
     ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataInst), 'Instrucciones');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataEj), 'Ejemplos');
 
-    XLSX.writeFile(wb, 'BANCO_PRUEBA_VALIDO_60PREGUNTAS.xlsx');
-    this._mostrarToast('Descargado: BANCO_PRUEBA_VALIDO_60PREGUNTAS.xlsx');
-  }
+    const fileName = `BANCO_OFICIAL_CON_OBSERVACIONES_CPEC18.xlsx`;
+    XLSX.writeFile(wb, fileName);
 
-  public descargarEjemploInvalido(): void {
-    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'peso', 'observaciones'];
-    const data: any[][] = [headers];
+    // Parsear y cargar directamente en el validador interactivo
+    const errList: PreguntaValidada[] = [
+      { fila: 2, tipo: 'VERDADERO_O_FALSO_SIMPLE', grupo: '', enunciado: 'Pregunta V/F con clave errónea (marcada C en vez de A/B)', opcion_a: 'Verdadero', opcion_b: 'Falso', opcion_c: '', opcion_d: '', opcion_e: '', respuesta_correcta: 'C', dificultad: '1', peso: 5, observaciones: 'Falta revisar: respuesta A-B', valido: false, errores: ['Respuesta en V/F debe ser A (Verdadero) o B (Falso)'] },
+      { fila: 3, tipo: 'SELECCION_MEJOR_RESPUESTA', grupo: '', enunciado: '', opcion_a: 'Distractor A', opcion_b: 'Distractor B', opcion_c: 'Distractor C', opcion_d: 'Distractor D', opcion_e: 'Distractor E', respuesta_correcta: 'A', dificultad: '1', peso: 5, observaciones: 'Falta revisar: enunciado', valido: false, errores: ['Falta enunciado de la pregunta'] },
+      { fila: 4, tipo: 'SELECCION_MEJOR_RESPUESTA', grupo: '', enunciado: 'Pregunta de selección incompleta con solo 3 opciones', opcion_a: 'Opción 1', opcion_b: 'Opción 2', opcion_c: 'Opción 3', opcion_d: '', opcion_e: '', respuesta_correcta: 'A', dificultad: '2', peso: 5, observaciones: 'Falta revisar: incisos A-E', valido: false, errores: ['Requiere 5 opciones completas (incisos A al E)'] },
+      { fila: 5, tipo: 'SUBITEM_CASO', grupo: '', enunciado: 'Subítem sin código de grupo identificador del caso padre', opcion_a: 'Opción A', opcion_b: 'Opción B', opcion_c: 'Opción C', opcion_d: 'Opción D', opcion_e: 'Opción E', respuesta_correcta: 'B', dificultad: '3', peso: 5, observaciones: 'Falta revisar: grupo', valido: false, errores: ['Falta código de grupo identificador (ej. CASO-01)'] },
+      { fila: 6, tipo: 'RESPUESTA_PREMISAS_ABCD', grupo: '', enunciado: 'I. Premisa tributaria 1.\nII. Premisa 2.', opcion_a: 'A. Primera verdadera', opcion_b: 'B. Segunda verdadera', opcion_c: 'C. Ambas', opcion_d: 'D. Ninguna', opcion_e: '', respuesta_correcta: 'Z', dificultad: '2', peso: 5, observaciones: 'Falta revisar: respuesta A-D', valido: false, errores: ['Respuesta en premisas debe ser A, B, C o D'] },
+      { fila: 7, tipo: 'EMPAREJAMIENTO_TRONCO', grupo: 'EMP-01', enunciado: 'Emparejamiento con solo 1 clave definida', opcion_a: 'Clave 1', opcion_b: '', opcion_c: '', opcion_d: '', opcion_e: '', respuesta_correcta: '', dificultad: '1', peso: 5, observaciones: 'Falta revisar: minimo 2 claves', valido: false, errores: ['Emparejamiento requiere al menos 2 claves/conceptos en opciones A y B'] },
+      { fila: 8, tipo: 'VERDADERO_O_FALSO_COMPLEJAS', grupo: '', enunciado: 'V/F compleja con proposición 3 vacía', opcion_a: '1. Premisa 1', opcion_b: '2. Premisa 2', opcion_c: '', opcion_d: '4. Premisa 4', opcion_e: '', respuesta_correcta: 'A', dificultad: '2', peso: 5, observaciones: 'Falta revisar: incisos 1-4', valido: false, errores: ['Requiere las 4 proposiciones (1 a 4) en incisos A-D'] }
+    ];
 
-    data.push(['FALSO_VERDADERO', '', 'Pregunta Falso/Verdadero con clave erronea (C)', 'Verdadero', 'Falso', '', '', '', 'C', '1', 5, 'Error: Clave debe ser A o B']);
-    data.push(['SELECCION_SIMPLE', '', '', 'Distractor A', 'Distractor B', 'Distractor C', 'Distractor D', 'Distractor E', 'A', '1', 5, 'Error: Falta enunciado']);
-    data.push(['SELECCION_SIMPLE', '', 'Pregunta de seleccion con solo 2 opciones', 'Opcion 1', 'Opcion 2', '', '', '', 'A', '2', 5, 'Error: Requiere al menos 4 opciones']);
-    data.push(['SUBPROBLEMA', '', 'Subproblema sin grupo de caso padre asignado', 'Distractor A', 'Distractor B', 'Distractor C', 'Distractor D', 'Distractor E', 'B', '3', 5, 'Error: Falta grupo']);
-    data.push(['RESPUESTA_COMPUESTA', '', 'I. Premisa 1.\nII. Premisa 2.', 'A', 'B', 'C', 'D', '', 'Z', '2', 5, 'Error: Clave debe ser A, B, C o D']);
-
-    for (let i = 6; i <= 25; i++) {
-      data.push(['SELECCION_SIMPLE', '', `Pregunta incompleta ${i}`, 'Opcion A', 'Opcion B', 'Opcion C', 'Opcion D', 'Opcion E', 'A', '2', 5, 'OK']);
+    for (let i = 9; i <= 25; i++) {
+      errList.push({ fila: i, tipo: 'SELECCION_MEJOR_RESPUESTA', grupo: '', enunciado: `Pregunta sin completar cuota ${i}`, opcion_a: 'Opción A', opcion_b: 'Opción B', opcion_c: 'Opción C', opcion_d: 'Opción D', opcion_e: 'Opción E', respuesta_correcta: 'A', dificultad: '2', peso: 5, observaciones: 'OK', valido: true, errores: [] });
     }
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Banco');
-
-    XLSX.writeFile(wb, 'BANCO_PRUEBA_CON_ERRORES.xlsx');
-    this._mostrarToast('Descargado: BANCO_PRUEBA_CON_ERRORES.xlsx (Con fallas intencionales para pruebas).');
+    this.nombreArchivoCargado.set(fileName);
+    this.pdfPrevisualizadoYConforme.set(false);
+    this.preguntasCargadas.set(errList);
+    this._mostrarToast(`Descargado y analizado: ${fileName} (Se detectaron 7 observaciones).`, 'error');
   }
 
   // ============================================================
