@@ -158,11 +158,11 @@ export interface DiaCalendario {
               <!-- Select 1: Sede -->
               <div class="space-y-1.5">
                 <label class="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <i class="pi pi-building text-purple-700"></i> Sede / Campus
+                  <i class="pi pi-building text-purple-700"></i> Sede
                 </label>
                 <select 
                   [ngModel]="sedeSeleccionada()"
-                  (ngModelChange)="sedeSeleccionada.set($event)"
+                  (ngModelChange)="onSedeChange($event)"
                   class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
                   @for (s of sedesCatalogo; track s) {
                     <option [value]="s">{{ s }}</option>
@@ -179,7 +179,7 @@ export interface DiaCalendario {
                   [ngModel]="carreraSeleccionada()"
                   (ngModelChange)="onCarreraChange($event)"
                   class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
-                  @for (c of carrerasCatalogo; track c) {
+                  @for (c of carrerasDisponibles(); track c) {
                     <option [value]="c">{{ c }}</option>
                   }
                 </select>
@@ -2319,25 +2319,65 @@ export class BancoPreguntasComponent {
   // SELECTS DE ASIGNACIÓN ACADÉMICA DEL EXAMEN (SEDE, CARRERA, ASIG, GRUPO)
   // ============================================================
   public sedesCatalogo: string[] = [
-    'Cochabamba - Campus Colonial (Central)',
-    'Cochabamba - Campus Florida (Salud)',
-    'La Paz - Sede Central',
-    'El Alto - Campus Satélite',
-    'Santa Cruz - Sede Norte',
-    'Guayaramerín - Sede Beni',
-    'Cobija - Sede Pando',
-    'Ivirgarzama - Campus Trópico'
+    'Cochabamba',
+    'La Paz',
+    'El Alto',
+    'Santa Cruz',
+    'Guayaramerín',
+    'Cobija',
+    'Ivirgarzama'
   ];
 
-  public carrerasCatalogo: string[] = [
-    'Complementaria Contaduría Pública',
-    'Auditoría Financiera',
-    'Medicina',
-    'Odontología',
-    'Ingeniería de Sistemas',
-    'Derecho',
-    'Fisioterapia y Kinesiología'
-  ];
+  public carrerasPorSede: Record<string, string[]> = {
+    'Cochabamba': [
+      'Complementaria Contaduría Pública',
+      'Auditoría Financiera',
+      'Medicina',
+      'Odontología',
+      'Ingeniería de Sistemas',
+      'Derecho',
+      'Fisioterapia y Kinesiología',
+      'Bioquímica y Farmacia',
+      'Enfermería'
+    ],
+    'La Paz': [
+      'Medicina',
+      'Odontología',
+      'Fisioterapia y Kinesiología',
+      'Bioquímica y Farmacia',
+      'Derecho'
+    ],
+    'El Alto': [
+      'Medicina',
+      'Odontología',
+      'Enfermería',
+      'Fisioterapia y Kinesiología'
+    ],
+    'Santa Cruz': [
+      'Medicina',
+      'Odontología',
+      'Bioquímica y Farmacia',
+      'Fisioterapia y Kinesiología',
+      'Veterinaria y Zootecnia'
+    ],
+    'Guayaramerín': [
+      'Medicina',
+      'Enfermería',
+      'Fisioterapia y Kinesiología',
+      'Derecho'
+    ],
+    'Cobija': [
+      'Medicina',
+      'Odontología',
+      'Enfermería'
+    ],
+    'Ivirgarzama': [
+      'Medicina',
+      'Enfermería',
+      'Agronomía',
+      'Veterinaria y Zootecnia'
+    ]
+  };
 
   public asignaturasPorCarrera: Record<string, string[]> = {
     'Complementaria Contaduría Pública': ['[CPEC18] AUDITORÍA TRIBUTARIA', '[CPEC12] CONTABILIDAD GUBERNAMENTAL', '[CPEC15] GABINETE DE AUDITORÍA'],
@@ -2346,7 +2386,11 @@ export class BancoPreguntasComponent {
     'Odontología': ['[ODO-102] ANATOMÍA DENTAL', '[ODO-201] CIRUGÍA BUCAL I'],
     'Ingeniería de Sistemas': ['[SIS-413] TELECOMUNICACIONES', '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA', '[SIS-210] ESTRUCTURA DE DATOS'],
     'Derecho': ['[DER-301] DERECHO TRIBUTARIO', '[DER-205] DERECHO PROCESAL PENAL'],
-    'Fisioterapia y Kinesiología': ['[FIS-101] KINESIOLOGÍA APLICADA', '[FIS-203] BIOMECÁNICA']
+    'Fisioterapia y Kinesiología': ['[FIS-101] KINESIOLOGÍA APLICADA', '[FIS-203] BIOMECÁNICA'],
+    'Bioquímica y Farmacia': ['[BQ-201] BIOQUÍMICA CLÍNICA', '[BQ-305] TOXICOLOGÍA'],
+    'Enfermería': ['[ENF-101] ENFERMERÍA GENERAL', '[ENF-202] FARMACOLOGÍA ENFERMERÍA'],
+    'Veterinaria y Zootecnia': ['[VET-101] ANATOMÍA VETERINARIA', '[VET-205] PATOLOGÍA ANIMAL'],
+    'Agronomía': ['[AGR-101] EDAFOLOGÍA Y SUELOS', '[AGR-202] FITOPATOLOGÍA']
   };
 
   public gruposPorAsignatura: Record<string, string[]> = {
@@ -2359,10 +2403,14 @@ export class BancoPreguntasComponent {
     '[MED-204] FARMACOLOGÍA GENERAL': ['M1', 'M2']
   };
 
-  public sedeSeleccionada = signal<string>('Cochabamba - Campus Colonial (Central)');
+  public sedeSeleccionada = signal<string>('Cochabamba');
   public carreraSeleccionada = signal<string>('Complementaria Contaduría Pública');
   public asignaturaSeleccionada = signal<string>('[CPEC18] AUDITORÍA TRIBUTARIA');
   public grupoSeleccionado = signal<string>('TA-01');
+
+  public carrerasDisponibles = computed(() => {
+    return this.carrerasPorSede[this.sedeSeleccionada()] || ['Complementaria Contaduría Pública', 'Medicina'];
+  });
 
   public asignaturasDisponibles = computed(() => {
     return this.asignaturasPorCarrera[this.carreraSeleccionada()] || ['[CPEC18] AUDITORÍA TRIBUTARIA'];
@@ -2371,6 +2419,14 @@ export class BancoPreguntasComponent {
   public gruposDisponibles = computed(() => {
     return this.gruposPorAsignatura[this.asignaturaSeleccionada()] || ['Grupo 1', 'Grupo 2', 'TA-01'];
   });
+
+  public onSedeChange(sede: string): void {
+    this.sedeSeleccionada.set(sede);
+    const carreras = this.carrerasPorSede[sede] || [];
+    if (!carreras.includes(this.carreraSeleccionada())) {
+      this.onCarreraChange(carreras[0] || 'Medicina');
+    }
+  }
 
   public onCarreraChange(carrera: string): void {
     this.carreraSeleccionada.set(carrera);
