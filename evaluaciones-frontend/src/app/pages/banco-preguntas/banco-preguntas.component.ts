@@ -1351,27 +1351,49 @@ export interface DiaCalendario {
                   </div>
                 </div>
 
-                <!-- 2. Cuadro de Identificación y Firma del Estudiante -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[10px] font-sans border border-slate-400 p-3 rounded-xl bg-slate-50/80">
-                  <div class="sm:col-span-2">
-                    <span class="text-slate-500 font-bold block text-[9px] uppercase">Apellidos y Nombres del Estudiante:</span>
-                    <div class="border-b border-slate-400 h-5 mt-1"></div>
+                <!-- 2. Cuadro de Identificación y Firma del Estudiante (Espejo de Typst) -->
+                <div class="border border-slate-700 rounded-lg overflow-hidden text-[10px] font-sans bg-white">
+                  <div class="grid grid-cols-12 border-b border-slate-400">
+                    <div class="col-span-7 p-1.5 border-r border-slate-400">
+                      <strong>NOMBRE:</strong> <span class="text-slate-800">JUAN CARLOS PÉREZ MAMANI</span>
+                    </div>
+                    <div class="col-span-5 p-1.5">
+                      <strong>CARRERA:</strong> <span class="text-slate-800">{{ carreraSeleccionada() | uppercase }}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span class="text-slate-500 font-bold block text-[9px] uppercase">C.I. / R.U.:</span>
-                    <div class="border-b border-slate-400 h-5 mt-1"></div>
+                  <div class="grid grid-cols-12 border-b border-slate-400">
+                    <div class="col-span-7 p-1.5 border-r border-slate-400">
+                      <strong>MATERIA:</strong> <span class="text-slate-800">{{ asignaturaSeleccionada() | uppercase }}</span>
+                    </div>
+                    <div class="col-span-5 p-1.5">
+                      <strong>GRUPO:</strong> <span class="text-slate-800">{{ grupoSeleccionado() }}</span> <strong class="ml-2">SEMESTRE:</strong> 3
+                    </div>
                   </div>
-                  <div>
-                    <span class="text-slate-500 font-bold block text-[9px] uppercase">Firma del Estudiante:</span>
-                    <div class="border-b border-slate-400 h-5 mt-1"></div>
+                  <div class="grid grid-cols-12 border-b border-slate-400">
+                    <div class="col-span-7 p-1.5 border-r border-slate-400">
+                      <strong>DOCENTE:</strong> <span class="text-slate-800">MAURICIO QUIROZ LAFUENTE</span>
+                    </div>
+                    <div class="col-span-5 p-1.5">
+                      <strong>EXAMEN:</strong> <span class="text-slate-800">{{ parcialActivo() }}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span class="text-slate-500 font-bold block text-[9px] uppercase">Fecha de Aplicación:</span>
-                    <div class="font-mono font-bold text-slate-800 pt-1">____ / ____ / 2026</div>
+                  <div class="grid grid-cols-12 border-b border-slate-400">
+                    <div class="col-span-7 p-1.5 border-r border-slate-400">
+                      <strong>FECHA:</strong> <span class="text-slate-800">22/08/2026</span>
+                    </div>
+                    <div class="col-span-5 p-1.5">
+                      <strong>HORA:</strong> <span class="text-slate-800">08:15:00 - 09:45:00</span>
+                    </div>
                   </div>
-                  <div>
-                    <span class="text-slate-500 font-bold block text-[9px] uppercase">Grupo / Paralelo:</span>
-                    <div class="font-mono font-bold text-slate-800 pt-1">Grupo 1 (G1)</div>
+                  <div class="grid grid-cols-12">
+                    <div class="col-span-7 p-2 border-r border-slate-400 flex flex-col justify-between">
+                      <strong class="text-[9px] uppercase">FIRMA DEL ESTUDIANTE:</strong>
+                      <div class="border-b border-dotted border-slate-700 h-4 mt-1"></div>
+                    </div>
+                    <div class="col-span-5 p-2 flex items-center gap-2">
+                      <strong class="text-[10px]">CODIGO:</strong>
+                      <span class="text-lg font-black font-mono tracking-wider text-slate-950">7849102</span>
+                    </div>
                   </div>
                 </div>
 

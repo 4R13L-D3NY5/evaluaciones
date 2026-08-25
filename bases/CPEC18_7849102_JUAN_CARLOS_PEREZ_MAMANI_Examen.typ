@@ -47,31 +47,26 @@
 
 #v(-5pt)
 
-// Datos del Estudiante (100% Horizontal, Sin Fondos, Código Doble de Tamaño y Firma Amplia)
+// Datos del Estudiante (100% Horizontal, Sin Fondos, Código Doble de Tamaño y Firma en la Misma Fila)
 #table(
   columns: (58%, 42%),
   stroke: 0.5pt + black,
   fill: none,
   inset: (x: 5pt, y: 2.2pt),
   [*NOMBRE:* JUAN CARLOS PÉREZ MAMANI],
-  [#align(left + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[7849102]]],
   [*CARRERA:* AUDITORÍA / CONTADURÍA],
-  [*GRUPO:* TA-01],
+  [*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA],
+  [*GRUPO:* TA-01 #h(10pt) *SEMESTRE:* 3],
   [*DOCENTE:* MAURICIO QUIROZ LAFUENTE],
   [*EXAMEN:* 1er Parcial],
-  [*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA],
   [*FECHA:* 22/08/2026],
-  [*SEMESTRE:* 3],
   [*HORA:* 08:15:00 - 09:45:00],
-  table.cell(colspan: 2)[
-    #grid(
-      columns: (auto, 1fr),
-      column-gutter: 8pt,
-      align: (bottom + left, bottom),
-      [*FIRMA DEL ESTUDIANTE:*],
-      [#box(width: 100%, baseline: 3.5pt, line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt)))]
-    )
-  ]
+  [
+    *FIRMA DEL ESTUDIANTE:* \
+    #v(10pt)
+    #line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt))
+  ],
+  [#align(left + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[7849102]]]
 )
 
 #v(1.5pt)
