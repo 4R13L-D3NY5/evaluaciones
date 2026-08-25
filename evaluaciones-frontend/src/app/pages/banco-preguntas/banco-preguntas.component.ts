@@ -475,6 +475,121 @@ export interface DiaCalendario {
               </div>
             }
 
+            <!-- ================================================================= -->
+            <!-- TABLA INTERACTIVA DE REACTIVOS CARGADOS Y VALIDACIONES EN TIEMPO REAL -->
+            <!-- ================================================================= -->
+            @if (preguntasCargadas().length > 0) {
+              <div class="bg-card border border-border rounded-2xl p-5 shadow-xs space-y-4 animate-fade-in">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                  <div>
+                    <h4 class="text-sm font-black text-foreground flex items-center gap-2">
+                      <i class="pi pi-list text-purple-700"></i>
+                      <span>Reactivos Procesados del Banco ({{ preguntasCargadas().length }} Filas)</span>
+                    </h4>
+                    <p class="text-[11px] text-muted-foreground">
+                      Inspección detallada de las 6 tipologías pedagógicas según <code>formato_banco_preguntas_asig_EF.xlsx</code>
+                    </p>
+                  </div>
+
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">
+                      {{ totalPreguntasValidas() }} Válidas
+                    </span>
+                    @if (preguntasConErrores().length > 0) {
+                      <span class="bg-rose-100 text-rose-800 font-bold px-2.5 py-1 rounded-lg">
+                        {{ preguntasConErrores().length }} Observadas
+                      </span>
+                    }
+                  </div>
+                </div>
+
+                <div class="overflow-x-auto max-h-[500px] overflow-y-auto border border-border rounded-xl">
+                  <table class="w-full text-left border-collapse text-[11px]">
+                    <thead class="sticky top-0 bg-muted/90 backdrop-blur-xs z-10">
+                      <tr class="border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                        <th class="p-2.5 text-center w-12">Fila</th>
+                        <th class="p-2.5 w-44">Tipología</th>
+                        <th class="p-2.5 w-24">Grupo</th>
+                        <th class="p-2.5 min-w-[220px]">Enunciado / Pregunta</th>
+                        <th class="p-2.5 min-w-[200px]">Opciones (A-E)</th>
+                        <th class="p-2.5 text-center w-14">Clave</th>
+                        <th class="p-2.5 text-center w-20">Dificultad</th>
+                        <th class="p-2.5 w-32 text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                      @for (p of preguntasCargadas(); track p.fila) {
+                        <tr [class]="p.valido ? 'hover:bg-muted/30' : 'bg-rose-500/5 hover:bg-rose-500/10'" class="transition-colors">
+                          <td class="p-2.5 text-center font-mono font-bold text-muted-foreground">{{ p.fila }}</td>
+                          
+                          <td class="p-2.5">
+                            <span [class]="getTipoBadgeClass(p.tipo)" class="px-2 py-0.5 rounded text-[9px] font-bold inline-block leading-tight">
+                              {{ getTipoNombreAmigable(p.tipo) }}
+                            </span>
+                          </td>
+
+                          <td class="p-2.5 font-mono text-[10px] text-muted-foreground font-bold">
+                            {{ p.grupo || '—' }}
+                          </td>
+
+                          <td class="p-2.5 font-medium text-foreground">
+                            <div class="line-clamp-2" [title]="p.enunciado">{{ p.enunciado }}</div>
+                            @if (p.formulaTypst) {
+                              <span class="text-[9px] font-mono text-purple-700 bg-purple-50 px-1 py-0.5 rounded border border-purple-200 mt-1 inline-block">
+                                Typst: {{ p.formulaTypst }}
+                              </span>
+                            }
+                          </td>
+
+                          <td class="p-2.5 text-muted-foreground text-[10px]">
+                            @if (p.opcion_a || p.opcion_b) {
+                              <div class="space-y-0.5 max-w-[260px]">
+                                @if (p.opcion_a) { <div class="truncate"><strong>A:</strong> {{ p.opcion_a }}</div> }
+                                @if (p.opcion_b) { <div class="truncate"><strong>B:</strong> {{ p.opcion_b }}</div> }
+                                @if (p.opcion_c) { <div class="truncate"><strong>C:</strong> {{ p.opcion_c }}</div> }
+                                @if (p.opcion_d) { <div class="truncate"><strong>D:</strong> {{ p.opcion_d }}</div> }
+                                @if (p.opcion_e) { <div class="truncate"><strong>E:</strong> {{ p.opcion_e }}</div> }
+                              </div>
+                            } @else {
+                              <span class="text-muted-foreground/50 italic">—</span>
+                            }
+                          </td>
+
+                          <td class="p-2.5 text-center">
+                            @if (p.respuesta_correcta) {
+                              <span class="bg-purple-100 text-purple-800 font-mono font-black px-2 py-0.5 rounded text-[11px] border border-purple-200">
+                                {{ p.respuesta_correcta }}
+                              </span>
+                            } @else {
+                              <span class="text-muted-foreground/40 font-mono">—</span>
+                            }
+                          </td>
+
+                          <td class="p-2.5 text-center">
+                            <span [class]="p.dificultad === '1' ? 'bg-emerald-100 text-emerald-800' : (p.dificultad === '2' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800')" class="px-2 py-0.5 rounded text-[9px] font-extrabold font-mono">
+                              {{ p.dificultad === '1' ? 'Fácil (1)' : (p.dificultad === '2' ? 'Medio (2)' : 'Difícil (3)') }}
+                            </span>
+                          </td>
+
+                          <td class="p-2.5 text-center">
+                            @if (p.valido) {
+                              <span class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold px-2 py-0.5 rounded-full text-[10px] inline-flex items-center gap-1">
+                                <i class="pi pi-check text-[9px]"></i> OK
+                              </span>
+                            } @else {
+                              <span class="bg-rose-100 text-rose-800 border border-rose-300 font-bold px-2 py-0.5 rounded-full text-[9px] inline-flex items-center gap-1" [title]="p.errores.join(', ')">
+                                <i class="pi pi-times text-[9px]"></i> Observado
+                              </span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+
           </div>
 
         </div>
@@ -2067,6 +2182,78 @@ export interface DiaCalendario {
         </div>
       }
 
+      <!-- ================================================================= -->
+      <!-- MODAL: DOBLE AUTENTICACIÓN DOCENTE (2FA / OTP)                     -->
+      <!-- ================================================================= -->
+      @if (dialog2FA()) {
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-md w-full shadow-2xl p-6 space-y-5 animate-scale-in text-foreground">
+            
+            <div class="text-center space-y-2">
+              <div class="h-14 w-14 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-2xl mx-auto border border-purple-300">
+                <i class="pi pi-shield"></i>
+              </div>
+              <h3 class="text-lg font-black text-foreground">Doble Autenticación Docente (2FA)</h3>
+              <p class="text-xs text-muted-foreground leading-relaxed">
+                Para autorizar formalmente, sellar con <strong>SHA-256</strong> y validar el banco de preguntas, ingresa el código OTP de seguridad de 6 dígitos.
+              </p>
+            </div>
+
+            <!-- Input de Código 2FA -->
+            <div class="space-y-2">
+              <div class="flex justify-center">
+                <input 
+                  type="text" 
+                  maxlength="6"
+                  [(ngModel)]="codigo2FAIngresado"
+                  placeholder="202688"
+                  class="w-48 text-center text-2xl font-mono font-black tracking-widest bg-muted/60 border-2 border-purple-600 rounded-xl py-2.5 text-foreground outline-none focus:ring-4 focus:ring-purple-400/30">
+              </div>
+              <div class="text-center">
+                <span class="text-[11px] text-muted-foreground font-mono">Código demo sugerido: <strong class="text-purple-700 font-bold">202688</strong></span>
+              </div>
+            </div>
+
+            <!-- Ficha de Seguridad del Docente -->
+            <div class="bg-muted/40 rounded-xl p-3.5 text-[11px] text-muted-foreground space-y-1.5 font-mono border border-border">
+              <div class="flex justify-between">
+                <span>Docente Titular:</span>
+                <strong class="text-foreground font-sans">{{ docenteSesion.nombre }}</strong>
+              </div>
+              <div class="flex justify-between">
+                <span>C.I. / Documento:</span>
+                <strong class="text-foreground">{{ docenteSesion.ci }}</strong>
+              </div>
+              <div class="flex justify-between">
+                <span>Asignatura:</span>
+                <strong class="text-purple-800">[CPEC18] AUDITORÍA TRIBUTARIA</strong>
+              </div>
+              <div class="flex justify-between">
+                <span>Algoritmo de Sello:</span>
+                <strong class="text-emerald-700">TOTP SHA-256 (RFC 6238)</strong>
+              </div>
+            </div>
+
+            <!-- Botones de Acción 2FA -->
+            <div class="flex gap-2 pt-2 border-t border-border">
+              <button 
+                (click)="cerrarModal2FA()" 
+                class="w-1/2 py-2.5 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-muted transition-colors cursor-pointer">
+                Cancelar
+              </button>
+              <button 
+                (click)="confirmarCodigo2FA()" 
+                [disabled]="!codigo2FAIngresado || codigo2FAIngresado.trim().length < 6"
+                class="w-1/2 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white text-xs font-black shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5">
+                <i class="pi pi-lock-open text-xs"></i>
+                <span>Validar y Sellar</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -2398,9 +2585,26 @@ export class BancoPreguntasComponent {
   public countMedias = computed(() => this.preguntasCargadas().filter(p => p.valido && p.dificultad === '2').length);
   public countDificiles = computed(() => this.preguntasCargadas().filter(p => p.valido && p.dificultad === '3').length);
 
-  public countG1 = computed(() => this.preguntasCargadas().filter(p => p.valido && ['FALSO_VERDADERO', 'RESPUESTA_COMPUESTA', 'PREGUNTA_CON_CLAVE'].includes(p.tipo)).length);
-  public countG2 = computed(() => this.preguntasCargadas().filter(p => p.valido && ['SELECCION_SIMPLE', 'SELECCION_UNICA'].includes(p.tipo)).length);
-  public countG3 = computed(() => this.preguntasCargadas().filter(p => p.valido && ['PROBLEMA', 'SUBPROBLEMA', 'EMPAREJAMIENTO', 'OPCION_EMPAREJAMIENTO'].includes(p.tipo)).length);
+  public countG1 = computed(() => this.preguntasCargadas().filter(p => p.valido && [
+    'VERDADERO_O_FALSO_SIMPLE', 'FALSO_VERDADERO',
+    'RESPUESTA_PREMISAS_ABCD', 'RESPUESTA_COMPUESTA',
+    'VERDADERO_O_FALSO_COMPLEJAS', 'PREGUNTA_CON_CLAVE'
+  ].includes(p.tipo)).length);
+
+  public countG2 = computed(() => this.preguntasCargadas().filter(p => p.valido && [
+    'SELECCION_MEJOR_RESPUESTA', 'SELECCION_SIMPLE', 'SELECCION_UNICA'
+  ].includes(p.tipo)).length);
+
+  public countG3 = computed(() => this.preguntasCargadas().filter(p => p.valido && [
+    'CASO_CLINICO_TRONCO', 'PROBLEMA', 'CASO_CLINICO',
+    'SUBITEM_CASO', 'SUBPROBLEMA',
+    'EMPAREJAMIENTO_TRONCO', 'EMPAREJAMIENTO',
+    'OPCION_EMPAREJAMIENTO'
+  ].includes(p.tipo)).length);
+
+  // Estado del Modal de Doble Autenticación Docente (2FA / OTP)
+  public dialog2FA = signal<boolean>(false);
+  public codigo2FAIngresado: string = '';
 
   public cuotaDificultadCumplida = computed(() => {
     const c = this.cuotasDificultad();
@@ -2543,58 +2747,126 @@ export class BancoPreguntasComponent {
           return '';
         };
 
-        const tipoRaw = getVal(['tipo', 'TIPO']).toUpperCase();
+        const tipoRaw = getVal(['tipo', 'TIPO']).trim();
+        const tipoUpper = tipoRaw.toUpperCase();
         const enunciadoRaw = getVal(['enunciado', 'ENUNCIADO']);
         const grupoRaw = getVal(['grupo', 'GRUPO']);
-        const opA = getVal(['opcion_a', 'opcion a', 'A', 'a']);
-        const opB = getVal(['opcion_b', 'opcion b', 'B', 'b']);
-        const opC = getVal(['opcion_c', 'opcion c', 'C', 'c']);
-        const opD = getVal(['opcion_d', 'opcion d', 'D', 'd']);
-        const opE = getVal(['opcion_e', 'opcion e', 'E', 'e']);
-        const respRaw = getVal(['respuesta_correcta', 'respuesta', 'RESPUESTA']).toUpperCase();
-        const difRaw = getVal(['dificultad', 'DIFICULTAD', 'nivel_dificultad']).toUpperCase();
+        let opA = getVal(['opcion_a', 'opcion a', 'A', 'a']);
+        let opB = getVal(['opcion_b', 'opcion b', 'B', 'b']);
+        let opC = getVal(['opcion_c', 'opcion c', 'C', 'c']);
+        let opD = getVal(['opcion_d', 'opcion d', 'D', 'd']);
+        let opE = getVal(['opcion_e', 'opcion e', 'E', 'e']);
+        let respRaw = getVal(['respuesta_correcta', 'respuesta', 'RESPUESTA']).trim().toUpperCase();
+        const difRaw = getVal(['dificultad', 'DIFICULTAD', 'nivel_dificultad']).trim().toUpperCase();
         const pesoNum = Number(getVal(['peso', 'PESO'])) || 5;
 
         if (!tipoRaw && !enunciadoRaw) return;
 
+        // Normalizar Tipo de Pregunta Oficial UNITEPC
+        let tipoNorm = 'SELECCION_MEJOR_RESPUESTA';
+        if (tipoUpper.includes('VERDADERO O FALSO SIMPLE') || tipoUpper.includes('FALSO_VERDADERO') || tipoUpper === 'VF_SIMPLE') {
+          tipoNorm = 'VERDADERO_O_FALSO_SIMPLE';
+        } else if (tipoUpper.includes('VERDADERO O FALSO COMPLEJAS') || tipoUpper.includes('PREGUNTA_CON_CLAVE') || tipoUpper === 'VF_COMPLEJAS') {
+          tipoNorm = 'VERDADERO_O_FALSO_COMPLEJAS';
+        } else if (tipoUpper.includes('RESPUESTA A/B/AMBAS/NINGUNA') || tipoUpper.includes('RESPUESTA_COMPUESTA') || tipoUpper.includes('PREMISAS')) {
+          tipoNorm = 'RESPUESTA_PREMISAS_ABCD';
+        } else if (tipoUpper.includes('ÍTEMS AGRUPADOS') || tipoUpper.includes('ITEMS AGRUPADOS') || tipoUpper === 'PROBLEMA' || tipoUpper === 'CASO_CLINICO') {
+          tipoNorm = 'CASO_CLINICO_TRONCO';
+        } else if (tipoUpper.includes('SUBÍTEM') || tipoUpper.includes('SUBITEM') || tipoUpper === 'SUBPROBLEMA') {
+          tipoNorm = 'SUBITEM_CASO';
+        } else if (tipoUpper === 'EMPAREJAMIENTO AMPLIADO' || tipoUpper === 'EMPAREJAMIENTO') {
+          tipoNorm = 'EMPAREJAMIENTO_TRONCO';
+        } else if (tipoUpper.includes('OPCIÓN DE EMPAREJAMIENTO') || tipoUpper.includes('OPCION DE EMPAREJAMIENTO') || tipoUpper === 'OPCION_EMPAREJAMIENTO') {
+          tipoNorm = 'OPCION_EMPAREJAMIENTO';
+        } else if (tipoUpper.includes('SELECCIÓN') || tipoUpper.includes('SELECCION') || tipoUpper === 'SELECCION_SIMPLE' || tipoUpper === 'SELECCION_UNICA') {
+          tipoNorm = 'SELECCION_MEJOR_RESPUESTA';
+        }
+
+        // Normalizar Respuesta Correcta (extraer letra principal A-E)
+        let respNorm = respRaw;
+        if (respNorm.startsWith('A')) respNorm = 'A';
+        else if (respNorm.startsWith('B')) respNorm = 'B';
+        else if (respNorm.startsWith('C')) respNorm = 'C';
+        else if (respNorm.startsWith('D')) respNorm = 'D';
+        else if (respNorm.startsWith('E')) respNorm = 'E';
+        else if (respNorm === 'VERDADERO') respNorm = 'A';
+        else if (respNorm === 'FALSO') respNorm = 'B';
+
+        // Normalizar Dificultad (1, 2, 3)
         let difNorm: '1' | '2' | '3' = '2';
         if (difRaw === '1' || difRaw === 'FACIL' || difRaw === 'FÁCIL') difNorm = '1';
         else if (difRaw === '3' || difRaw === 'DIFICIL' || difRaw === 'DIFÍCIL') difNorm = '3';
 
-        let tipoNorm = tipoRaw;
-        if (tipoNorm === 'SELECCION_UNICA') tipoNorm = 'SELECCION_SIMPLE';
+        // Auto-completado inteligente de opciones según el tipo
+        if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE') {
+          if (!opA) opA = 'Verdadero';
+          if (!opB) opB = 'Falso';
+          if (!respNorm) respNorm = 'A';
+        } else if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD') {
+          if (!opA) opA = 'A. Si la primera es verdadera';
+          if (!opB) opB = 'B. Si la segunda es verdadera';
+          if (!opC) opC = 'C. Si ambas son verdaderas';
+          if (!opD) opD = 'D. Si ninguna es verdadera';
+        }
 
-        // Validaciones estrictas
+        // Validaciones Estrictas basadas en formato_banco_preguntas_asig_EF.xlsx
         const errores: string[] = [];
-        if (!enunciadoRaw) errores.push('Falta el enunciado');
+        if (!enunciadoRaw && tipoNorm !== 'EMPAREJAMIENTO_TRONCO') {
+          errores.push('Falta enunciado de la pregunta');
+        }
 
-        if (tipoNorm === 'FALSO_VERDADERO') {
-          if (!['A', 'B'].includes(respRaw)) errores.push('Respuesta en V/F debe ser A (Verdadero) o B (Falso)');
-        } else if (tipoNorm === 'RESPUESTA_COMPUESTA') {
-          if (!['A', 'B', 'C', 'D'].includes(respRaw)) errores.push('Respuesta en compuesta debe ser A, B, C o D');
-        } else if (tipoNorm === 'PREGUNTA_CON_CLAVE') {
-          if (!['A', 'B', 'C', 'D', 'E'].includes(respRaw)) errores.push('Respuesta en clave debe ser A-E');
-        } else if (tipoNorm === 'SELECCION_SIMPLE') {
-          if (!opA || !opB || !opC || !opD) errores.push('Selección simple requiere al menos 4 opciones (A-D)');
-          if (!['A', 'B', 'C', 'D', 'E'].includes(respRaw)) errores.push('Respuesta debe ser una letra de la A a la E');
-        } else if (tipoNorm === 'SUBPROBLEMA') {
-          if (!grupoRaw) errores.push('Subproblema requiere identificar el grupo de caso padre');
+        if (['CASO_CLINICO_TRONCO', 'SUBITEM_CASO', 'EMPAREJAMIENTO_TRONCO', 'OPCION_EMPAREJAMIENTO'].includes(tipoNorm)) {
+          if (!grupoRaw) {
+            errores.push('Falta código de grupo identificador (ej. CASO-01 o EMP-01)');
+          }
+        }
+
+        if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE') {
+          if (!['A', 'B'].includes(respNorm)) {
+            errores.push('Respuesta en V/F debe ser A (Verdadero) o B (Falso)');
+          }
+        } else if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD') {
+          if (!['A', 'B', 'C', 'D'].includes(respNorm)) {
+            errores.push('Respuesta en premisas debe ser A, B, C o D');
+          }
+        } else if (tipoNorm === 'VERDADERO_O_FALSO_COMPLEJAS') {
+          if (!opA || !opB || !opC || !opD) {
+            errores.push('Requiere las 4 proposiciones (1 a 4) en incisos A-D');
+          }
+          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+            errores.push('Respuesta en V/F complejas debe ser clave A-E');
+          }
+        } else if (tipoNorm === 'SELECCION_MEJOR_RESPUESTA' || tipoNorm === 'SUBITEM_CASO') {
+          if (!opA || !opB || !opC || !opD || !opE) {
+            errores.push('Requiere 5 opciones completas (incisos A al E)');
+          }
+          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+            errores.push('Respuesta debe ser una letra entre A y E');
+          }
+        } else if (tipoNorm === 'EMPAREJAMIENTO_TRONCO') {
+          if (!opA || !opB) {
+            errores.push('Emparejamiento requiere al menos 2 claves/conceptos en opciones A y B');
+          }
+        } else if (tipoNorm === 'OPCION_EMPAREJAMIENTO') {
+          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+            errores.push('Respuesta de emparejamiento debe ser la letra asignada (A-E)');
+          }
         }
 
         const valido = errores.length === 0;
 
         preguntasParsed.push({
           fila: index + 2,
-          tipo: tipoNorm || 'SELECCION_SIMPLE',
+          tipo: tipoNorm,
           grupo: grupoRaw,
-          enunciado: enunciadoRaw,
-          opcion_a: opA || (tipoNorm === 'FALSO_VERDADERO' ? 'Verdadero' : ''),
-          opcion_b: opB || (tipoNorm === 'FALSO_VERDADERO' ? 'Falso' : ''),
+          enunciado: enunciadoRaw || (tipoNorm === 'EMPAREJAMIENTO_TRONCO' ? 'De la lista de opciones, seleccione la respuesta correcta para cada enunciado' : ''),
+          opcion_a: opA,
+          opcion_b: opB,
           opcion_c: opC,
           opcion_d: opD,
           opcion_e: opE,
           opciones: { A: opA, B: opB, C: opC, D: opD, E: opE },
-          respuesta_correcta: respRaw || (tipoNorm === 'FALSO_VERDADERO' ? 'A' : ''),
+          respuesta_correcta: respNorm,
           dificultad: difNorm,
           peso: pesoNum,
           observaciones: valido ? 'OK' : errores.join(', '),
@@ -2694,41 +2966,15 @@ export class BancoPreguntasComponent {
   }
 
   // ============================================================
-  // DESCARGA DE PLANTILLA OFICIAL MACRO (3 HOJAS - SheetJS)
+  // DESCARGA DE PLANTILLA OFICIAL ENRIQUECIDA (4 HOJAS CON VALIDACIONES Y FÓRMULAS)
   // ============================================================
   public descargarExcelBaseMacro(): void {
-    const totalPreguntas = this.totalPreguntasRequeridas();
-    const cuotas = this.cuotasDificultad();
-
-    const dataInst = [
-      ['BANCO DE PREGUNTAS - GUÍA OFICIAL'],
-      [],
-      ['1. CÓDIGOS DE PREGUNTA OFICIALES', 'FALSO_VERDADERO, PREGUNTA_CON_CLAVE, SELECCION_SIMPLE, RESPUESTA_COMPUESTA, PROBLEMA, SUBPROBLEMA, EMPAREJAMIENTO'],
-      ['2. CUOTAS REQUERIDAS', `${cuotas.facil} Fáciles, ${cuotas.medio} Medias, ${cuotas.dificil} Difíciles (Total: ${totalPreguntas} reactivos)`]
-    ];
-
-    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'peso', 'observaciones'];
-    const dataBanco: any[][] = [headers];
-
-    for (let i = 1; i <= totalPreguntas; i++) {
-      const dif = i <= cuotas.facil ? '1' : (i <= cuotas.facil + cuotas.medio ? '2' : '3');
-      dataBanco.push(['', '', '', '', '', '', '', '', '', dif, 5, '']);
-    }
-
-    const dataEj = [
-      headers,
-      ['FALSO_VERDADERO', '', 'El agua hierve a 100 grados Celsius al nivel del mar.', 'Verdadero', 'Falso', '', '', '', 'A', '1', 5, 'OK'],
-      ['SELECCION_SIMPLE', '', '¿Qué órgano bombea la sangre en el cuerpo humano?', 'Pulmón', 'Hígado', 'Corazón', 'Estómago', 'Riñón', 'C', '2', 5, 'OK']
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataInst), 'Instrucciones');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataEj), 'Ejemplos');
-
-    const fileName = `PLANTILLA_BANCO_${this.parcialActivo().toUpperCase().replace(' ', '_')}_${totalPreguntas}PREGUNTAS.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    this._mostrarToast(`Plantilla oficial (3 Hojas) descargada.`);
+    const filename = 'formato_banco_preguntas_asig_EF.xlsx';
+    const link = document.createElement('a');
+    link.href = `assets/${filename}`;
+    link.download = `PLANTILLA_OFICIAL_BANCO_${this.parcialActivo().toUpperCase().replace(/\s+/g, '_')}_2026.xlsx`;
+    link.click();
+    this._mostrarToast(`Plantilla oficial UNITEPC (4 Hojas con Validaciones y Fórmulas) descargada.`);
   }
 
   // ============================================================
@@ -2905,20 +3151,105 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     this.dialogPrevisualizacionPdf.set(false);
   }
 
-  public aprobarDiagramacionPdf(): void {
+  public getTipoBadgeClass(tipo: string): string {
+    switch (tipo) {
+      case 'VERDADERO_O_FALSO_SIMPLE':
+      case 'FALSO_VERDADERO':
+        return 'bg-emerald-100 text-emerald-800 border border-emerald-300';
+      case 'VERDADERO_O_FALSO_COMPLEJAS':
+      case 'PREGUNTA_CON_CLAVE':
+        return 'bg-teal-100 text-teal-800 border border-teal-300';
+      case 'RESPUESTA_PREMISAS_ABCD':
+      case 'RESPUESTA_COMPUESTA':
+        return 'bg-cyan-100 text-cyan-800 border border-cyan-300';
+      case 'SELECCION_MEJOR_RESPUESTA':
+      case 'SELECCION_SIMPLE':
+      case 'SELECCION_UNICA':
+        return 'bg-blue-100 text-blue-800 border border-blue-300';
+      case 'CASO_CLINICO_TRONCO':
+      case 'PROBLEMA':
+      case 'CASO_CLINICO':
+        return 'bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold';
+      case 'SUBITEM_CASO':
+      case 'SUBPROBLEMA':
+        return 'bg-violet-100 text-violet-800 border border-violet-300';
+      case 'EMPAREJAMIENTO_TRONCO':
+      case 'EMPAREJAMIENTO':
+        return 'bg-amber-100 text-amber-900 border border-amber-300 font-bold';
+      case 'OPCION_EMPAREJAMIENTO':
+        return 'bg-orange-100 text-orange-800 border border-orange-300';
+      default:
+        return 'bg-slate-100 text-slate-800 border border-slate-300';
+    }
+  }
+
+  public getTipoNombreAmigable(tipo: string): string {
+    switch (tipo) {
+      case 'VERDADERO_O_FALSO_SIMPLE':
+      case 'FALSO_VERDADERO':
+        return '1. V/F Simple';
+      case 'VERDADERO_O_FALSO_COMPLEJAS':
+      case 'PREGUNTA_CON_CLAVE':
+        return '2. V/F Complejas';
+      case 'RESPUESTA_PREMISAS_ABCD':
+      case 'RESPUESTA_COMPUESTA':
+        return '3. Premisas A/B/Ambas/Ninguna';
+      case 'SELECCION_MEJOR_RESPUESTA':
+      case 'SELECCION_SIMPLE':
+      case 'SELECCION_UNICA':
+        return '4. Selección Mejor Respuesta';
+      case 'CASO_CLINICO_TRONCO':
+      case 'PROBLEMA':
+      case 'CASO_CLINICO':
+        return '5. Caso Clínico (Tronco)';
+      case 'SUBITEM_CASO':
+      case 'SUBPROBLEMA':
+        return '5.1 Subítem de Caso';
+      case 'EMPAREJAMIENTO_TRONCO':
+      case 'EMPAREJAMIENTO':
+        return '6. Emparejamiento (Claves)';
+      case 'OPCION_EMPAREJAMIENTO':
+        return '6.1 Enunciado a Emparejar';
+      default:
+        return tipo;
+    }
+  }
+
+  // Flujo 2FA Docente
+  public abrirModal2FA(): void {
+    this.dialog2FA.set(true);
+    this.codigo2FAIngresado = '';
+  }
+
+  public cerrarModal2FA(): void {
+    this.dialog2FA.set(false);
+  }
+
+  public confirmarCodigo2FA(): void {
+    if (!this.codigo2FAIngresado || this.codigo2FAIngresado.trim().length < 6) {
+      this._mostrarToast('Por favor ingresa un código de verificación de 6 dígitos.', 'error');
+      return;
+    }
+
+    this.dialog2FA.set(false);
     this.pdfPrevisualizadoYConforme.set(true);
     this.dialogPrevisualizacionPdf.set(false);
 
     // Sincronizar automáticamente el estado VALIDADO con la Base de Datos de Evaluaciones
     const examenRol = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId) || this.listaExamenesDocente[1];
-    const codigo = examenRol?.codigo || 'MED-301';
-    const archivo = this.nombreArchivoCargado() || `BANCO_${codigo}_FINAL.xlsx`;
-    const hash = 'SHA256-ENC-' + codigo + '-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
+    const codigo = examenRol?.codigo || 'CPEC18';
+    const archivo = this.nombreArchivoCargado() || `BANCO_${codigo}_OFICIAL.xlsx`;
+    const hash = 'SHA256-2FA-' + codigo + '-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
     const totalValidas = this.preguntasCargadas().filter(p => p.valido).length || 60;
 
     this._db.actualizarEstadoPorBancoValidado(codigo, this.parcialActivo(), archivo, hash, totalValidas);
 
-    this._mostrarToast('✅ ¡Diagramación PDF aprobada y encriptada por el docente! El examen ha pasado al estado VALIDADO en la Lista de Evaluaciones.');
+    this._mostrarToast('✅ ¡Doble Autenticación (2FA) exitosa! El banco ha sido sellado con SHA-256 y pasó a estado VALIDADO.');
+  }
+
+  public aprobarDiagramacionPdf(): void {
+    // Abre el modal 2FA para certificar con doble factor antes de validar
+    this.abrirModal2FA();
   }
 
   // Previsualización Paquete Encriptado (.pkg)
@@ -2983,67 +3314,149 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
   private _generarPreguntasMockValidas(): PreguntaValidada[] {
     const list: PreguntaValidada[] = [];
-    // 15 Faciles
+
+    // 15 Fáciles (1) - V/F Simple, Selección Mejor Respuesta, Emparejamiento
     for (let i = 1; i <= 15; i++) {
-      list.push({
-        fila: i + 1,
-        tipo: i % 2 === 0 ? 'FALSO_VERDADERO' : 'SELECCION_SIMPLE',
-        grupo: '',
-        enunciado: i % 2 === 0 ? `Pregunta Fácil ${i}: La fibra óptica monomodo presenta menor atenuación que la multimodo.` : `Pregunta Fácil ${i}: ¿Cuál es la función principal de la capa de enlace de datos?`,
-        opcion_a: i % 2 === 0 ? 'Verdadero' : 'Direccionamiento físico (MAC)',
-        opcion_b: i % 2 === 0 ? 'Falso' : 'Enrutamiento IP',
-        opcion_c: i % 2 === 0 ? '' : 'Cifrado de datos',
-        opcion_d: i % 2 === 0 ? '' : 'Control de sesiones',
-        opcion_e: '',
-        respuesta_correcta: 'A',
-        dificultad: '1',
-        peso: 5,
-        observaciones: 'OK',
-        valido: true,
-        errores: []
-      });
+      if (i <= 5) {
+        list.push({
+          fila: i + 1,
+          tipo: 'VERDADERO_O_FALSO_SIMPLE',
+          grupo: '',
+          enunciado: `Pregunta Fácil ${i}: El principio de devengado tributario reconoce ingresos y gastos cuando se generan legalmente, con independencia del cobro o pago.`,
+          opcion_a: 'Verdadero',
+          opcion_b: 'Falso',
+          opcion_c: '',
+          opcion_d: '',
+          opcion_e: '',
+          respuesta_correcta: 'A',
+          dificultad: '1',
+          peso: 5,
+          observaciones: 'OK',
+          valido: true,
+          errores: []
+        });
+      } else if (i <= 10) {
+        list.push({
+          fila: i + 1,
+          tipo: 'SELECCION_MEJOR_RESPUESTA',
+          grupo: '',
+          enunciado: `Pregunta Fácil ${i}: ¿Cuál es el plazo reglamentario para la presentación de descargos ante una Orden de Verificación del SIN?`,
+          opcion_a: '20 días hábiles computables a partir de la notificación legal',
+          opcion_b: '5 días calendario improrrogables',
+          opcion_c: '60 días hábiles administrativos',
+          opcion_d: '15 días continuos según código tributario',
+          opcion_e: 'No existe plazo formal establecido',
+          respuesta_correcta: 'A',
+          dificultad: '1',
+          peso: 5,
+          observaciones: 'OK',
+          valido: true,
+          errores: []
+        });
+      } else {
+        list.push({
+          fila: i + 1,
+          tipo: 'OPCION_EMPAREJAMIENTO',
+          grupo: 'EMP-GEN1',
+          enunciado: `Concepto ${i}: Base imponible presunta calculada sobre ventas brutas declaradas en el periodo fiscal.`,
+          opcion_a: '',
+          opcion_b: '',
+          opcion_c: '',
+          opcion_d: '',
+          opcion_e: '',
+          respuesta_correcta: 'B',
+          dificultad: '1',
+          peso: 5,
+          observaciones: 'OK',
+          valido: true,
+          errores: []
+        });
+      }
     }
-    // 30 Medias
+
+    // 30 Medias (2) - Premisas A/B/Ambas/Ninguna, V/F Complejas, Subítems
     for (let i = 1; i <= 30; i++) {
-      list.push({
-        fila: i + 16,
-        tipo: i % 2 === 0 ? 'RESPUESTA_COMPUESTA' : 'PREGUNTA_CON_CLAVE',
-        grupo: '',
-        enunciado: i % 2 === 0 ? `Pregunta Media ${i}: I. El retardo de propagación depende de la distancia.\nII. El retardo de transmisión depende de la tasa de bits.` : `Pregunta Media ${i}: Características de la modulación OFDM: 1. Alta eficiencia, 2. Resistencia al desvanecimiento, 3. Baja ISI, 4. Nula PAPR.`,
-        opcion_a: i % 2 === 0 ? 'Si la primera es verdadera' : '1, 2 y 3 son correctas',
-        opcion_b: i % 2 === 0 ? 'Si la segunda es verdadera' : '1 y 3 son correctas',
-        opcion_c: i % 2 === 0 ? 'Si ambas son verdaderas' : '2 y 4 son correctas',
-        opcion_d: i % 2 === 0 ? 'Si ninguna es verdadera' : 'Solo 4 es correcta',
-        opcion_e: '',
-        respuesta_correcta: i % 2 === 0 ? 'C' : 'A',
-        dificultad: '2',
-        peso: 5,
-        observaciones: 'OK',
-        valido: true,
-        errores: []
-      });
+      if (i <= 15) {
+        list.push({
+          fila: i + 16,
+          tipo: 'RESPUESTA_PREMISAS_ABCD',
+          grupo: '',
+          enunciado: `Pregunta Media ${i}: I. El crédito fiscal IVA respaldado por compras vinculadas a la actividad gravada es computable.\nII. Las retenciones tributarias no liberan al sujeto pasivo de su obligación formal.`,
+          opcion_a: 'A. Si la primera es verdadera',
+          opcion_b: 'B. Si la segunda es verdadera',
+          opcion_c: 'C. Si ambas son verdaderas',
+          opcion_d: 'D. Si ninguna es verdadera',
+          opcion_e: '',
+          respuesta_correcta: 'C',
+          dificultad: '2',
+          peso: 5,
+          observaciones: 'OK',
+          valido: true,
+          errores: []
+        });
+      } else {
+        list.push({
+          fila: i + 16,
+          tipo: 'VERDADERO_O_FALSO_COMPLEJAS',
+          grupo: '',
+          enunciado: `Pregunta Media ${i}: Respecto a los reparos tributarios en auditoría fiscal determine la validez: 1. Omisión de ingresos, 2. Gastos no deducibles por falta de bancarización, 3. Crédito fiscal indebido, 4. Errores aritméticos en libros de ventas.`,
+          opcion_a: '1. Omisión de ingresos reales en estados financieros auditados.',
+          opcion_b: '2. Gastos no deducibles por falta de documento de bancarización.',
+          opcion_c: '3. Crédito fiscal computado sin factura original o electrónica.',
+          opcion_d: '4. Errores aritméticos en libros de compras y ventas IVA.',
+          opcion_e: '',
+          respuesta_correcta: 'A',
+          dificultad: '2',
+          peso: 5,
+          observaciones: 'OK',
+          valido: true,
+          errores: []
+        });
+      }
     }
-    // 15 Dificiles
+
+    // 15 Difíciles (3) - Casos Clínicos / Problemas Financieros
     for (let i = 1; i <= 15; i++) {
-      list.push({
-        fila: i + 46,
-        tipo: i <= 5 ? 'PROBLEMA' : 'SELECCION_SIMPLE',
-        grupo: i <= 5 ? `CASO-0${i}` : '',
-        enunciado: i <= 5 ? `Problema Difícil ${i}: Calcule la pérdida en el espacio libre (FSPL) a 5 GHz a 10 km:` : `Pregunta Difícil ${i}: En una modulación 256-QAM con ancho de banda de 20 MHz, la tasa neta es:`,
-        opcion_a: '112.4 dB',
-        opcion_b: '126.4 dB',
-        opcion_c: '140.2 dB',
-        opcion_d: '98.5 dB',
-        opcion_e: '150.0 dB',
-        respuesta_correcta: 'B',
-        dificultad: '3',
-        peso: 5,
-        observaciones: 'OK',
-        formulaTypst: i <= 5 ? '$ FSPL = 20 log_10(d) + 20 log_10(f) + 92.45 = 126.42 " dB" $' : undefined,
-        valido: true,
-        errores: []
-      });
+      if (i <= 5) {
+        list.push({
+          fila: i + 46,
+          tipo: 'SUBITEM_CASO',
+          grupo: 'CASO-TRIB1',
+          enunciado: `Problema Tributario ${i}: En la auditoría fiscal a la empresa 'Comercial Andina S.R.L.', se detectaron facturas sin medio fehaciente de pago por un monto de Bs 150.000. Calcule el reparo impositivo aplicable por IUE no deducible y multa por incumplimiento a deberes formales.`,
+          opcion_a: 'Reparo IUE Bs 37.500 (25%) + Sanción formal 500 UFV',
+          opcion_b: 'Reparo IUE Bs 19.500 (13%) + Sanción formal 200 UFV',
+          opcion_c: 'Reparo IUE Bs 45.000 (30%) + Sanción formal 1.000 UFV',
+          opcion_d: 'No procede reparo si la factura tiene código de autorización vigente',
+          opcion_e: 'Reparo total acumulado de Bs 75.000',
+          respuesta_correcta: 'A',
+          dificultad: '3',
+          peso: 5,
+          observaciones: 'OK',
+          formulaTypst: '$ "Reparo IUE" = 150.000 times 25% = 37.500 " Bs" $',
+          valido: true,
+          errores: []
+        });
+      } else {
+        list.push({
+          fila: i + 46,
+          tipo: 'SELECCION_MEJOR_RESPUESTA',
+          grupo: '',
+          enunciado: `Pregunta Difícil ${i}: En una fiscalización externa, ¿cuál es el efecto jurídico del vencimiento del término probatorio sin emisión de Resolución Determinativa dentro del plazo de 60 días?`,
+          opcion_a: 'No opera la prescripción pero suspende el cómputo de intereses moratorios',
+          opcion_b: 'Caducidad automática de pleno derecho de la facultad fiscalizadora',
+          opcion_c: 'Anulación de la Vista de Cargo emitida previamente',
+          opcion_d: 'Extinción de la deuda tributaria y costas procesales',
+          opcion_e: 'Imposibilidad de recurrir a la Autoridad de Impugnación Tributaria',
+          respuesta_correcta: 'A',
+          dificultad: '3',
+          peso: 5,
+          observaciones: 'OK',
+          valido: true,
+          errores: []
+        });
+      }
     }
+
     return list;
   }
 
