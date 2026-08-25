@@ -132,6 +132,91 @@ export interface DiaCalendario {
       @if (tabActiva() === 'validador') {
         <div class="space-y-6 animate-fade-in">
           
+          <!-- Selector Académico: Sede, Carrera, Asignatura, Grupo -->
+          <div class="bg-card border border-border rounded-2xl p-5 shadow-xs space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+              <div class="flex items-center gap-2">
+                <span class="h-8 w-8 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center font-black text-sm">
+                  <i class="pi pi-sliders-h"></i>
+                </span>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Asignación Académica del Examen</h3>
+                  <p class="text-[11px] text-muted-foreground font-medium">Seleccione la sede, carrera, asignatura y grupo para parametrizar el banco de preguntas institucional.</p>
+                </div>
+              </div>
+              
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-900 border border-purple-200 rounded-full text-xs font-bold font-mono">
+                  <i class="pi pi-check-circle text-purple-600 text-xs"></i>
+                  {{ asignaturaSeleccionada() }} · {{ grupoSeleccionado() }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Grilla de 4 Selects Reactivos -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <!-- Select 1: Sede -->
+              <div class="space-y-1.5">
+                <label class="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <i class="pi pi-building text-purple-700"></i> Sede / Campus
+                </label>
+                <select 
+                  [ngModel]="sedeSeleccionada()"
+                  (ngModelChange)="sedeSeleccionada.set($event)"
+                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
+                  @for (s of sedesCatalogo; track s) {
+                    <option [value]="s">{{ s }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Select 2: Carrera -->
+              <div class="space-y-1.5">
+                <label class="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <i class="pi pi-graduation-cap text-purple-700"></i> Carrera
+                </label>
+                <select 
+                  [ngModel]="carreraSeleccionada()"
+                  (ngModelChange)="onCarreraChange($event)"
+                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
+                  @for (c of carrerasCatalogo; track c) {
+                    <option [value]="c">{{ c }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Select 3: Asignatura -->
+              <div class="space-y-1.5">
+                <label class="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <i class="pi pi-book text-purple-700"></i> Asignatura
+                </label>
+                <select 
+                  [ngModel]="asignaturaSeleccionada()"
+                  (ngModelChange)="onAsignaturaChange($event)"
+                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
+                  @for (a of asignaturasDisponibles(); track a) {
+                    <option [value]="a">{{ a }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Select 4: Grupo -->
+              <div class="space-y-1.5">
+                <label class="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <i class="pi pi-users text-purple-700"></i> Grupo / Paralelo
+                </label>
+                <select 
+                  [ngModel]="grupoSeleccionado()"
+                  (ngModelChange)="grupoSeleccionado.set($event)"
+                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
+                  @for (g of gruposDisponibles(); track g) {
+                    <option [value]="g">{{ g }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+          
           <!-- Barra Superior de Acciones y Recursos del Examen -->
           <div class="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -2230,6 +2315,78 @@ export class BancoPreguntasComponent {
     { id: 'IVI-TRO', nombre: 'Ivirgarzama - Campus Trópico', ciudad: 'Ivirgarzama', correos: ['evaluaciones.ivirgarzama@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Trópico' }
   ];
 
+  // ============================================================
+  // SELECTS DE ASIGNACIÓN ACADÉMICA DEL EXAMEN (SEDE, CARRERA, ASIG, GRUPO)
+  // ============================================================
+  public sedesCatalogo: string[] = [
+    'Cochabamba - Campus Colonial (Central)',
+    'Cochabamba - Campus Florida (Salud)',
+    'La Paz - Sede Central',
+    'El Alto - Campus Satélite',
+    'Santa Cruz - Sede Norte',
+    'Guayaramerín - Sede Beni',
+    'Cobija - Sede Pando',
+    'Ivirgarzama - Campus Trópico'
+  ];
+
+  public carrerasCatalogo: string[] = [
+    'Complementaria Contaduría Pública',
+    'Auditoría Financiera',
+    'Medicina',
+    'Odontología',
+    'Ingeniería de Sistemas',
+    'Derecho',
+    'Fisioterapia y Kinesiología'
+  ];
+
+  public asignaturasPorCarrera: Record<string, string[]> = {
+    'Complementaria Contaduría Pública': ['[CPEC18] AUDITORÍA TRIBUTARIA', '[CPEC12] CONTABILIDAD GUBERNAMENTAL', '[CPEC15] GABINETE DE AUDITORÍA'],
+    'Auditoría Financiera': ['[AUD-201] AUDITORÍA FINANCIERA I', '[AUD-305] AUDITORÍA FORENSE'],
+    'Medicina': ['[MED-101] ANATOMÍA HUMANA I', '[MED-204] FARMACOLOGÍA GENERAL', '[MED-301] FISIOPATOLOGÍA'],
+    'Odontología': ['[ODO-102] ANATOMÍA DENTAL', '[ODO-201] CIRUGÍA BUCAL I'],
+    'Ingeniería de Sistemas': ['[SIS-413] TELECOMUNICACIONES', '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA', '[SIS-210] ESTRUCTURA DE DATOS'],
+    'Derecho': ['[DER-301] DERECHO TRIBUTARIO', '[DER-205] DERECHO PROCESAL PENAL'],
+    'Fisioterapia y Kinesiología': ['[FIS-101] KINESIOLOGÍA APLICADA', '[FIS-203] BIOMECÁNICA']
+  };
+
+  public gruposPorAsignatura: Record<string, string[]> = {
+    '[CPEC18] AUDITORÍA TRIBUTARIA': ['TA-01', 'TA-02', 'TB-01'],
+    '[CPEC12] CONTABILIDAD GUBERNAMENTAL': ['TA-01', 'TA-02'],
+    '[CPEC15] GABINETE DE AUDITORÍA': ['TA-01'],
+    '[SIS-413] TELECOMUNICACIONES': ['Grupo 1', 'Grupo 2'],
+    '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA': ['Grupo 1', 'Grupo 2'],
+    '[MED-101] ANATOMÍA HUMANA I': ['M1', 'M2', 'M3'],
+    '[MED-204] FARMACOLOGÍA GENERAL': ['M1', 'M2']
+  };
+
+  public sedeSeleccionada = signal<string>('Cochabamba - Campus Colonial (Central)');
+  public carreraSeleccionada = signal<string>('Complementaria Contaduría Pública');
+  public asignaturaSeleccionada = signal<string>('[CPEC18] AUDITORÍA TRIBUTARIA');
+  public grupoSeleccionado = signal<string>('TA-01');
+
+  public asignaturasDisponibles = computed(() => {
+    return this.asignaturasPorCarrera[this.carreraSeleccionada()] || ['[CPEC18] AUDITORÍA TRIBUTARIA'];
+  });
+
+  public gruposDisponibles = computed(() => {
+    return this.gruposPorAsignatura[this.asignaturaSeleccionada()] || ['Grupo 1', 'Grupo 2', 'TA-01'];
+  });
+
+  public onCarreraChange(carrera: string): void {
+    this.carreraSeleccionada.set(carrera);
+    const asigs = this.asignaturasPorCarrera[carrera] || [];
+    if (asigs.length > 0) {
+      this.onAsignaturaChange(asigs[0]);
+    }
+  }
+
+  public onAsignaturaChange(asig: string): void {
+    this.asignaturaSeleccionada.set(asig);
+    const grps = this.gruposPorAsignatura[asig] || ['Grupo 1', 'TA-01'];
+    this.grupoSeleccionado.set(grps[0]);
+    this.pdfPrevisualizadoYConforme.set(false);
+  }
+
   public campusSeleccionadoId = 'TEST-ARIEL';
   public examenRolSeleccionadoId = 2; // SIS-413 por defecto
   public observacionesDocenteEnvio = '';
@@ -2984,11 +3141,12 @@ export class BancoPreguntasComponent {
   // ============================================================
   public descargarExcelBaseMacro(): void {
     const filename = 'formato_banco_preguntas_asig_EF.xlsx';
+    const asigClean = this.asignaturaSeleccionada().replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
     const link = document.createElement('a');
     link.href = `assets/${filename}`;
-    link.download = `PLANTILLA_OFICIAL_BANCO_${this.parcialActivo().toUpperCase().replace(/\s+/g, '_')}_2026.xlsx`;
+    link.download = `PLANTILLA_BANCO_${asigClean}_${this.grupoSeleccionado()}_${this.parcialActivo().toUpperCase().replace(/\s+/g, '_')}_2026.xlsx`;
     link.click();
-    this._mostrarToast(`Plantilla oficial UNITEPC (4 Hojas con Validaciones y Fórmulas) descargada.`);
+    this._mostrarToast(`Plantilla oficial descargada para ${this.asignaturaSeleccionada()} (${this.grupoSeleccionado()}).`);
   }
 
   // ============================================================
