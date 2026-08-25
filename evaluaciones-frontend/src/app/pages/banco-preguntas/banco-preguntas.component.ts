@@ -1390,7 +1390,7 @@ export interface DiaCalendario {
                       <strong class="text-[9px] uppercase">FIRMA DEL ESTUDIANTE:</strong>
                       <div class="border-b border-dotted border-slate-700 h-4 mt-1"></div>
                     </div>
-                    <div class="col-span-5 p-2 flex items-center gap-2">
+                    <div class="col-span-5 p-2 flex items-center justify-center gap-2">
                       <strong class="text-[10px]">CODIGO:</strong>
                       <span class="text-lg font-black font-mono tracking-wider text-slate-950">7849102</span>
                     </div>

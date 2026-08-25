@@ -66,7 +66,7 @@
     #v(10pt)
     #line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt))
   ],
-  [#align(left + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[8392104]]]
+  [#align(center + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[8392104]]]
 )
 
 #v(1.5pt)
