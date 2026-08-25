@@ -1,0 +1,2249 @@
+{
+  "materia": "[CPEC18] AUDITORÍA TRIBUTARIA",
+  "parcial": "1er Parcial",
+  "docente": "MAURICIO QUIROZ LAFUENTE",
+  "totalPreguntas": 30,
+  "fechaCalificacion": "25/08/2026 09:55:00",
+  "totalEstudiantes": 5,
+  "promedioCurso": 70.0,
+  "tasaAprobacion": 80.0,
+  "patronOficial": {
+    "1": "D",
+    "2": "C",
+    "3": "B",
+    "4": "B",
+    "5": "C",
+    "6": "A",
+    "7": "A",
+    "8": "A",
+    "9": "A",
+    "10": "A",
+    "11": "A",
+    "12": "A",
+    "13": "A",
+    "14": "A",
+    "15": "A",
+    "16": "A",
+    "17": "A",
+    "18": "A",
+    "19": "A",
+    "20": "A",
+    "21": "A",
+    "22": "A",
+    "23": "A",
+    "24": "A",
+    "25": "A",
+    "26": "A",
+    "27": "A",
+    "28": "A",
+    "29": "A",
+    "30": "A"
+  },
+  "estudiantes": [
+    {
+      "estudianteId": 1,
+      "codigo": "7849102",
+      "nombre": "JUAN CARLOS PÉREZ MAMANI",
+      "carrera": "AUDITORÍA / CONTADURÍA",
+      "grupo": "TA-01",
+      "variante": "A",
+      "totalPreguntas": 30,
+      "aciertos": 28,
+      "fallos": 2,
+      "blancos": 0,
+      "doblesMarcas": 0,
+      "nota100": 93.3,
+      "nota30": 28.0,
+      "aprobado": true,
+      "estadoCalificacion": "CALIFICADO",
+      "imagenEscaneada": "cartilla_simulada_estudiante_1_7849102.png",
+      "imagenAnotada": "cartilla_calificada_estudiante_1_7849102.png",
+      "detalles": [
+        {
+          "pregunta": 1,
+          "patron": "D",
+          "marcada": "D",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.3,
+            5.6,
+            5.6,
+            18.5,
+            7.4
+          ]
+        },
+        {
+          "pregunta": 2,
+          "patron": "C",
+          "marcada": "C",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.9,
+            5.6,
+            20.1,
+            8.3,
+            6.8
+          ]
+        },
+        {
+          "pregunta": 3,
+          "patron": "B",
+          "marcada": "B",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.0,
+            17.9,
+            4.9,
+            9.3,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 4,
+          "patron": "B",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            7.4,
+            21.0,
+            9.0,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 5,
+          "patron": "C",
+          "marcada": "C",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            5.6,
+            7.7,
+            22.8,
+            9.3,
+            8.6
+          ]
+        },
+        {
+          "pregunta": 6,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            22.2,
+            7.7,
+            6.5,
+            9.9,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 7,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            22.2,
+            6.8,
+            5.9,
+            9.3,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 8,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            23.8,
+            6.8,
+            5.6,
+            9.3,
+            7.7
+          ]
+        },
+        {
+          "pregunta": 9,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            24.4,
+            8.0,
+            7.1,
+            9.6,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 10,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            24.4,
+            8.3,
+            7.1,
+            9.9,
+            9.0
+          ]
+        },
+        {
+          "pregunta": 11,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            8.6,
+            6.8,
+            11.1,
+            10.5
+          ]
+        },
+        {
+          "pregunta": 12,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            6.8,
+            24.7,
+            7.1,
+            10.2,
+            9.3
+          ]
+        },
+        {
+          "pregunta": 13,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            26.2,
+            8.0,
+            7.1,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 14,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            9.0,
+            8.3,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 15,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            9.0,
+            7.4,
+            10.8,
+            9.9
+          ]
+        },
+        {
+          "pregunta": 16,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            12.7,
+            4.6,
+            3.4,
+            5.9,
+            4.3
+          ]
+        },
+        {
+          "pregunta": 17,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            14.2,
+            4.0,
+            3.1,
+            5.2,
+            4.6
+          ]
+        },
+        {
+          "pregunta": 18,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            16.4,
+            4.6,
+            4.3,
+            5.6,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 19,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            15.4,
+            4.6,
+            4.0,
+            5.2,
+            5.2
+          ]
+        },
+        {
+          "pregunta": 20,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.3,
+            5.2,
+            3.7,
+            6.5,
+            5.6
+          ]
+        },
+        {
+          "pregunta": 21,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.9,
+            5.9,
+            4.9,
+            7.1,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 22,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.6,
+            4.9,
+            3.7,
+            6.2,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 23,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            19.8,
+            5.2,
+            4.3,
+            6.2,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 24,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.2,
+            4.6,
+            6.2,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 25,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.2,
+            4.3,
+            6.5,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 26,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            6.5,
+            5.9,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 27,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.9,
+            4.6,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 28,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            21.6,
+            6.2,
+            5.6,
+            7.7,
+            6.5
+          ]
+        },
+        {
+          "pregunta": 29,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.7,
+            5.9,
+            5.2,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 30,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            21.0,
+            5.6,
+            4.6,
+            7.1,
+            6.8
+          ]
+        }
+      ]
+    },
+    {
+      "estudianteId": 2,
+      "codigo": "8392104",
+      "nombre": "MARÍA BELÉN QUISPE FLORES",
+      "carrera": "AUDITORÍA / CONTADURÍA",
+      "grupo": "TA-01",
+      "variante": "A",
+      "totalPreguntas": 30,
+      "aciertos": 24,
+      "fallos": 6,
+      "blancos": 0,
+      "doblesMarcas": 0,
+      "nota100": 80.0,
+      "nota30": 24.0,
+      "aprobado": true,
+      "estadoCalificacion": "CALIFICADO",
+      "imagenEscaneada": "cartilla_simulada_estudiante_2_8392104.png",
+      "imagenAnotada": "cartilla_calificada_estudiante_2_8392104.png",
+      "detalles": [
+        {
+          "pregunta": 1,
+          "patron": "D",
+          "marcada": "D",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.3,
+            5.6,
+            5.6,
+            18.5,
+            7.4
+          ]
+        },
+        {
+          "pregunta": 2,
+          "patron": "C",
+          "marcada": "A",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            18.2,
+            5.6,
+            5.2,
+            8.3,
+            6.8
+          ]
+        },
+        {
+          "pregunta": 3,
+          "patron": "B",
+          "marcada": "B",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.0,
+            17.9,
+            4.9,
+            9.3,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 4,
+          "patron": "B",
+          "marcada": "B",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            5.6,
+            17.6,
+            6.2,
+            9.0,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 5,
+          "patron": "C",
+          "marcada": "A",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            20.4,
+            7.7,
+            7.1,
+            9.3,
+            8.6
+          ]
+        },
+        {
+          "pregunta": 6,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            22.2,
+            7.7,
+            6.5,
+            9.9,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 7,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            22.2,
+            6.8,
+            5.9,
+            9.3,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 8,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            23.8,
+            6.8,
+            5.6,
+            9.3,
+            7.7
+          ]
+        },
+        {
+          "pregunta": 9,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            8.0,
+            27.5,
+            9.6,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 10,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            24.4,
+            8.3,
+            7.1,
+            9.9,
+            9.0
+          ]
+        },
+        {
+          "pregunta": 11,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            8.6,
+            6.8,
+            11.1,
+            10.5
+          ]
+        },
+        {
+          "pregunta": 12,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            26.5,
+            8.0,
+            7.1,
+            10.2,
+            9.3
+          ]
+        },
+        {
+          "pregunta": 13,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            26.2,
+            8.0,
+            7.1,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 14,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            9.0,
+            8.3,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 15,
+          "patron": "A",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.9,
+            9.0,
+            7.4,
+            31.2,
+            9.9
+          ]
+        },
+        {
+          "pregunta": 16,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            12.7,
+            4.6,
+            3.4,
+            5.9,
+            4.3
+          ]
+        },
+        {
+          "pregunta": 17,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            14.2,
+            4.0,
+            3.1,
+            5.2,
+            4.6
+          ]
+        },
+        {
+          "pregunta": 18,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            16.4,
+            4.6,
+            4.3,
+            5.6,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 19,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            15.4,
+            4.6,
+            4.0,
+            5.2,
+            5.2
+          ]
+        },
+        {
+          "pregunta": 20,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.4,
+            17.3,
+            3.7,
+            6.5,
+            5.6
+          ]
+        },
+        {
+          "pregunta": 21,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.9,
+            5.9,
+            4.9,
+            7.1,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 22,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.6,
+            4.9,
+            3.7,
+            6.2,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 23,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            19.8,
+            5.2,
+            4.3,
+            6.2,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 24,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.2,
+            4.6,
+            6.2,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 25,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.2,
+            4.3,
+            6.5,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 26,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            6.5,
+            5.9,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 27,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.9,
+            4.6,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 28,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.0,
+            6.2,
+            23.8,
+            7.7,
+            6.5
+          ]
+        },
+        {
+          "pregunta": 29,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.7,
+            5.9,
+            5.2,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 30,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            21.0,
+            5.6,
+            4.6,
+            7.1,
+            6.8
+          ]
+        }
+      ]
+    },
+    {
+      "estudianteId": 3,
+      "codigo": "6928103",
+      "nombre": "RODRIGO ALEJANDRO CONDORI RODRÍGUEZ",
+      "carrera": "AUDITORÍA / CONTADURÍA",
+      "grupo": "TA-01",
+      "variante": "A",
+      "totalPreguntas": 30,
+      "aciertos": 18,
+      "fallos": 12,
+      "blancos": 0,
+      "doblesMarcas": 0,
+      "nota100": 60.0,
+      "nota30": 18.0,
+      "aprobado": true,
+      "estadoCalificacion": "CALIFICADO",
+      "imagenEscaneada": "cartilla_simulada_estudiante_3_6928103.png",
+      "imagenAnotada": "cartilla_calificada_estudiante_3_6928103.png",
+      "detalles": [
+        {
+          "pregunta": 1,
+          "patron": "D",
+          "marcada": "A",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            16.4,
+            5.6,
+            5.6,
+            7.4,
+            7.4
+          ]
+        },
+        {
+          "pregunta": 2,
+          "patron": "C",
+          "marcada": "C",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.9,
+            5.6,
+            20.1,
+            8.3,
+            6.8
+          ]
+        },
+        {
+          "pregunta": 3,
+          "patron": "B",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.0,
+            6.8,
+            4.9,
+            22.2,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 4,
+          "patron": "B",
+          "marcada": "B",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            5.6,
+            17.6,
+            6.2,
+            9.0,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 5,
+          "patron": "C",
+          "marcada": "C",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            5.6,
+            7.7,
+            22.8,
+            9.3,
+            8.6
+          ]
+        },
+        {
+          "pregunta": 6,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            20.4,
+            6.5,
+            9.9,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 7,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            6.8,
+            24.4,
+            9.3,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 8,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            23.8,
+            6.8,
+            5.6,
+            9.3,
+            7.7
+          ]
+        },
+        {
+          "pregunta": 9,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            24.4,
+            8.0,
+            7.1,
+            9.6,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 10,
+          "patron": "A",
+          "marcada": "E",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            8.3,
+            7.1,
+            9.9,
+            33.3
+          ]
+        },
+        {
+          "pregunta": 11,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            8.6,
+            6.8,
+            11.1,
+            10.5
+          ]
+        },
+        {
+          "pregunta": 12,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            26.5,
+            8.0,
+            7.1,
+            10.2,
+            9.3
+          ]
+        },
+        {
+          "pregunta": 13,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.9,
+            25.3,
+            7.1,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 14,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            9.0,
+            8.3,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 15,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            9.0,
+            7.4,
+            10.8,
+            9.9
+          ]
+        },
+        {
+          "pregunta": 16,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            2.8,
+            4.6,
+            13.9,
+            5.9,
+            4.3
+          ]
+        },
+        {
+          "pregunta": 17,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            14.2,
+            4.0,
+            3.1,
+            5.2,
+            4.6
+          ]
+        },
+        {
+          "pregunta": 18,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            16.4,
+            4.6,
+            4.3,
+            5.6,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 19,
+          "patron": "A",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.1,
+            4.6,
+            4.0,
+            21.3,
+            5.2
+          ]
+        },
+        {
+          "pregunta": 20,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.3,
+            5.2,
+            3.7,
+            6.5,
+            5.6
+          ]
+        },
+        {
+          "pregunta": 21,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.9,
+            5.9,
+            4.9,
+            7.1,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 22,
+          "patron": "A",
+          "marcada": "E",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            2.5,
+            4.9,
+            3.7,
+            6.2,
+            24.1
+          ]
+        },
+        {
+          "pregunta": 23,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            19.8,
+            5.2,
+            4.3,
+            6.2,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 24,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.2,
+            4.6,
+            6.2,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 25,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.0,
+            20.4,
+            4.3,
+            6.5,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 26,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            6.5,
+            5.9,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 27,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.1,
+            5.9,
+            22.5,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 28,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            21.6,
+            6.2,
+            5.6,
+            7.7,
+            6.5
+          ]
+        },
+        {
+          "pregunta": 29,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.7,
+            5.9,
+            5.2,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 30,
+          "patron": "A",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.6,
+            5.6,
+            4.6,
+            29.0,
+            6.8
+          ]
+        }
+      ]
+    },
+    {
+      "estudianteId": 4,
+      "codigo": "7194820",
+      "nombre": "GABRIELA SOFÍA LÓPEZ TORRICO",
+      "carrera": "AUDITORÍA / CONTADURÍA",
+      "grupo": "TA-01",
+      "variante": "A",
+      "totalPreguntas": 30,
+      "aciertos": 13,
+      "fallos": 15,
+      "blancos": 2,
+      "doblesMarcas": 0,
+      "nota100": 43.3,
+      "nota30": 13.0,
+      "aprobado": false,
+      "estadoCalificacion": "CALIFICADO",
+      "imagenEscaneada": "cartilla_simulada_estudiante_4_7194820.png",
+      "imagenAnotada": "cartilla_calificada_estudiante_4_7194820.png",
+      "detalles": [
+        {
+          "pregunta": 1,
+          "patron": "D",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.3,
+            15.1,
+            5.6,
+            7.4,
+            7.4
+          ]
+        },
+        {
+          "pregunta": 2,
+          "patron": "C",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.9,
+            17.0,
+            5.2,
+            8.3,
+            6.8
+          ]
+        },
+        {
+          "pregunta": 3,
+          "patron": "B",
+          "marcada": "B",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.0,
+            17.9,
+            4.9,
+            9.3,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 4,
+          "patron": "B",
+          "marcada": "A",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            18.8,
+            7.4,
+            6.2,
+            9.0,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 5,
+          "patron": "C",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            20.1,
+            7.1,
+            9.3,
+            8.6
+          ]
+        },
+        {
+          "pregunta": 6,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            22.2,
+            7.7,
+            6.5,
+            9.9,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 7,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            20.4,
+            5.9,
+            9.3,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 8,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.6,
+            6.8,
+            25.3,
+            9.3,
+            7.7
+          ]
+        },
+        {
+          "pregunta": 9,
+          "patron": "A",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            8.0,
+            7.1,
+            29.6,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 10,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            24.4,
+            8.3,
+            7.1,
+            9.9,
+            9.0
+          ]
+        },
+        {
+          "pregunta": 11,
+          "patron": "A",
+          "marcada": "E",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            6.2,
+            8.6,
+            6.8,
+            11.1,
+            34.3
+          ]
+        },
+        {
+          "pregunta": 12,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            26.5,
+            8.0,
+            7.1,
+            10.2,
+            9.3
+          ]
+        },
+        {
+          "pregunta": 13,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            26.2,
+            8.0,
+            7.1,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 14,
+          "patron": "A",
+          "marcada": "BLANCO",
+          "estado": "EN_BLANCO",
+          "puntos": 0.0,
+          "densidades": [
+            6.8,
+            9.0,
+            8.3,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 15,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            9.0,
+            7.4,
+            10.8,
+            9.9
+          ]
+        },
+        {
+          "pregunta": 16,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            12.7,
+            4.6,
+            3.4,
+            5.9,
+            4.3
+          ]
+        },
+        {
+          "pregunta": 17,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            2.2,
+            15.1,
+            3.1,
+            5.2,
+            4.6
+          ]
+        },
+        {
+          "pregunta": 18,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.1,
+            4.6,
+            17.6,
+            5.6,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 19,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            15.4,
+            4.6,
+            4.0,
+            5.2,
+            5.2
+          ]
+        },
+        {
+          "pregunta": 20,
+          "patron": "A",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.4,
+            5.2,
+            3.7,
+            23.5,
+            5.6
+          ]
+        },
+        {
+          "pregunta": 21,
+          "patron": "A",
+          "marcada": "E",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.1,
+            5.9,
+            4.9,
+            7.1,
+            24.4
+          ]
+        },
+        {
+          "pregunta": 22,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.6,
+            4.9,
+            3.7,
+            6.2,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 23,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.4,
+            20.1,
+            4.3,
+            6.2,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 24,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.0,
+            5.2,
+            23.5,
+            6.2,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 25,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.2,
+            4.3,
+            6.5,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 26,
+          "patron": "A",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.4,
+            6.5,
+            5.9,
+            28.1,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 27,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.9,
+            4.6,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 28,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            21.6,
+            6.2,
+            5.6,
+            7.7,
+            6.5
+          ]
+        },
+        {
+          "pregunta": 29,
+          "patron": "A",
+          "marcada": "BLANCO",
+          "estado": "EN_BLANCO",
+          "puntos": 0.0,
+          "densidades": [
+            4.6,
+            5.9,
+            5.2,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 30,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            21.0,
+            5.6,
+            4.6,
+            7.1,
+            6.8
+          ]
+        }
+      ]
+    },
+    {
+      "estudianteId": 5,
+      "codigo": "7391028",
+      "nombre": "SERGIO ALEJANDRO MENDOZA TAPIA",
+      "carrera": "AUDITORÍA / CONTADURÍA",
+      "grupo": "TA-01",
+      "variante": "A",
+      "totalPreguntas": 30,
+      "aciertos": 22,
+      "fallos": 7,
+      "blancos": 0,
+      "doblesMarcas": 1,
+      "nota100": 73.3,
+      "nota30": 22.0,
+      "aprobado": true,
+      "estadoCalificacion": "CALIFICADO",
+      "imagenEscaneada": "cartilla_simulada_estudiante_5_7391028.png",
+      "imagenAnotada": "cartilla_calificada_estudiante_5_7391028.png",
+      "detalles": [
+        {
+          "pregunta": 1,
+          "patron": "D",
+          "marcada": "D",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.3,
+            5.6,
+            5.6,
+            18.5,
+            7.4
+          ]
+        },
+        {
+          "pregunta": 2,
+          "patron": "C",
+          "marcada": "C",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            4.9,
+            5.6,
+            20.1,
+            8.3,
+            6.8
+          ]
+        },
+        {
+          "pregunta": 3,
+          "patron": "B",
+          "marcada": "A",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            19.8,
+            6.8,
+            4.9,
+            9.3,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 4,
+          "patron": "B",
+          "marcada": "B",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            5.6,
+            17.6,
+            6.2,
+            9.0,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 5,
+          "patron": "C",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.6,
+            7.7,
+            7.1,
+            23.8,
+            8.6
+          ]
+        },
+        {
+          "pregunta": 6,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            22.2,
+            7.7,
+            6.5,
+            9.9,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 7,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            22.2,
+            6.8,
+            5.9,
+            9.3,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 8,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            4.6,
+            22.2,
+            5.6,
+            9.3,
+            7.7
+          ]
+        },
+        {
+          "pregunta": 9,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            24.4,
+            8.0,
+            7.1,
+            9.6,
+            8.0
+          ]
+        },
+        {
+          "pregunta": 10,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            24.4,
+            8.3,
+            7.1,
+            9.9,
+            9.0
+          ]
+        },
+        {
+          "pregunta": 11,
+          "patron": "A",
+          "marcada": "C",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            6.2,
+            8.6,
+            29.0,
+            11.1,
+            10.5
+          ]
+        },
+        {
+          "pregunta": 12,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            26.5,
+            8.0,
+            7.1,
+            10.2,
+            9.3
+          ]
+        },
+        {
+          "pregunta": 13,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            26.2,
+            8.0,
+            7.1,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 14,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            25.6,
+            9.0,
+            8.3,
+            10.8,
+            9.6
+          ]
+        },
+        {
+          "pregunta": 15,
+          "patron": "A",
+          "marcada": "E",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            5.9,
+            9.0,
+            7.4,
+            10.8,
+            35.5
+          ]
+        },
+        {
+          "pregunta": 16,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            12.7,
+            4.6,
+            3.4,
+            5.9,
+            4.3
+          ]
+        },
+        {
+          "pregunta": 17,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            14.2,
+            4.0,
+            3.1,
+            5.2,
+            4.6
+          ]
+        },
+        {
+          "pregunta": 18,
+          "patron": "A",
+          "marcada": "BA",
+          "estado": "DOBLE_MARCA",
+          "puntos": 0.0,
+          "densidades": [
+            16.4,
+            16.7,
+            4.3,
+            5.6,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 19,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            15.4,
+            4.6,
+            4.0,
+            5.2,
+            5.2
+          ]
+        },
+        {
+          "pregunta": 20,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.3,
+            5.2,
+            3.7,
+            6.5,
+            5.6
+          ]
+        },
+        {
+          "pregunta": 21,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            17.9,
+            5.9,
+            4.9,
+            7.1,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 22,
+          "patron": "A",
+          "marcada": "D",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            2.5,
+            4.9,
+            3.7,
+            23.8,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 23,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            19.8,
+            5.2,
+            4.3,
+            6.2,
+            4.9
+          ]
+        },
+        {
+          "pregunta": 24,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.2,
+            4.6,
+            6.2,
+            5.9
+          ]
+        },
+        {
+          "pregunta": 25,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            5.2,
+            4.3,
+            6.5,
+            6.2
+          ]
+        },
+        {
+          "pregunta": 26,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.1,
+            6.5,
+            5.9,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 27,
+          "patron": "A",
+          "marcada": "B",
+          "estado": "INCORRECTA",
+          "puntos": 0.0,
+          "densidades": [
+            3.1,
+            21.3,
+            4.6,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 28,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            21.6,
+            6.2,
+            5.6,
+            7.7,
+            6.5
+          ]
+        },
+        {
+          "pregunta": 29,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            20.7,
+            5.9,
+            5.2,
+            7.4,
+            7.1
+          ]
+        },
+        {
+          "pregunta": 30,
+          "patron": "A",
+          "marcada": "A",
+          "estado": "CORRECTA",
+          "puntos": 3.33,
+          "densidades": [
+            21.0,
+            5.6,
+            4.6,
+            7.1,
+            6.8
+          ]
+        }
+      ]
+    }
+  ]
+}

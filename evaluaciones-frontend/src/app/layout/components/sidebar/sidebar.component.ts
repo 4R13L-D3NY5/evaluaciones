@@ -134,6 +134,13 @@ export class SidebarComponent implements OnInit {
       description: 'Exámenes del día, horarios y generación de paquetes'
     },
     {
+      label: 'Calificación OMR',
+      route: '/calificacion-omr',
+      icon: 'pi pi-check-square',
+      badge: 'OMR',
+      description: 'Lector óptico interactivo, verificación de marcas y comparación con patrón'
+    },
+    {
       label: 'Banco de Preguntas',
       route: '/banco-preguntas',
       icon: 'pi pi-question-circle',

@@ -9,6 +9,7 @@ import { RolExamenesComponent } from './pages/rol-examenes/rol-examenes.componen
 import { BancoPreguntasComponent } from './pages/banco-preguntas/banco-preguntas.component';
 import { AuditoriaComponent } from './pages/auditoria/auditoria.component';
 import { CatalogoUnitepcComponent } from './pages/catalogo-unitepc/catalogo-unitepc.component';
+import { CalificacionOmrComponent } from './pages/calificacion-omr/calificacion-omr.component';
 
 export const routes: Routes = [
   {
@@ -20,6 +21,7 @@ export const routes: Routes = [
       { path: 'servicios-sea', component: CatalogoUnitepcComponent, title: 'Servicios SEA - Sistema de Evaluaciones' },
       { path: 'plan-estudios', component: PlanEstudiosComponent, title: 'Plan de Estudios - Sistema de Evaluaciones' },
       { path: 'evaluaciones-dia', component: EvaluacionesDiaComponent, title: 'Lista de Evaluaciones por Día - Sistema de Evaluaciones' },
+      { path: 'calificacion-omr', component: CalificacionOmrComponent, title: 'Calificación OMR - Sistema de Evaluaciones' },
       { path: 'banco-preguntas', component: BancoPreguntasComponent, title: 'Validador de Banco de Preguntas - Sistema de Evaluaciones' },
       { path: 'administracion-evaluaciones', component: AdministracionEvaluacionesComponent, title: 'Administración - Sistema de Evaluaciones' },
       { path: 'reporte-evaluaciones', component: ReporteEvaluacionesComponent, title: 'Reporte Evaluaciones - Sistema de Evaluaciones' },
