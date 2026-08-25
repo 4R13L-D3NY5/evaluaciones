@@ -1,12 +1,13 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/pdf.worker.min.mjs';
 }
 
 export interface DetallePreguntaOmr {
@@ -787,6 +788,9 @@ export class CalificacionOmrComponent implements OnInit {
     this._cargarResultadosOmr();
   }
 
+  public sanitizer = inject(DomSanitizer);
+  public pdfBlobUrl = signal<SafeResourceUrl | null>(null);
+
   public async onFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
@@ -798,11 +802,15 @@ export class CalificacionOmrComponent implements OnInit {
       this.rotacionAlineacion.set(0);
       this.mostrarGuiasAlineacion.set(true);
 
+      const objUrl = URL.createObjectURL(file);
+      this.pdfBlobUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(objUrl));
+
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         this.cargandoPdf.set(true);
         try {
           const arrayBuffer = await file.arrayBuffer();
-          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
           const pdfDoc = await loadingTask.promise;
           const renderedPages: string[] = [];
 
@@ -820,7 +828,9 @@ export class CalificacionOmrComponent implements OnInit {
             }
           }
 
-          this.paginasRenderizadas.set(renderedPages);
+          if (renderedPages.length > 0) {
+            this.paginasRenderizadas.set(renderedPages);
+          }
         } catch (err) {
           console.error('Error renderizando PDF escaneado:', err);
         } finally {
