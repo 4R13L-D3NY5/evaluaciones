@@ -3487,15 +3487,16 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     this.dialogPrevisualizacionPdf.set(false);
 
     // Sincronizar automáticamente el estado VALIDADO con la Base de Datos de Evaluaciones
-    const examenRol = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId) || this.listaExamenesDocente[1];
-    const codigo = examenRol?.codigo || 'CPEC18';
+    const asigRaw = this.asignaturaSeleccionada();
+    const matchCod = asigRaw.match(/\[([A-Za-z0-9\-]+)\]/);
+    const codigo = matchCod ? matchCod[1] : 'CPEC18';
     const archivo = this.nombreArchivoCargado() || `BANCO_${codigo}_OFICIAL.xlsx`;
     const hash = 'SHA256-2FA-' + codigo + '-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
     const totalValidas = this.preguntasCargadas().filter(p => p.valido).length || 60;
 
     this._db.actualizarEstadoPorBancoValidado(codigo, this.parcialActivo(), archivo, hash, totalValidas);
 
-    this._mostrarToast('✅ ¡Doble Autenticación (2FA) exitosa! El banco ha sido sellado con SHA-256 y pasó a estado VALIDADO.');
+    this._mostrarToast(`✅ ¡Doble Autenticación (2FA) exitosa! El banco de [${codigo}] ha sido sellado con SHA-256 y pasó a estado VALIDADO.`);
   }
 
   public aprobarDiagramacionPdf(): void {
