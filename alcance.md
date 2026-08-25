@@ -40,9 +40,16 @@ flowchart TD
 ---
 
 ### FASE 2: Subida y Validación del Banco de Preguntas (Rol: Docente)
-- **Objetivo**: Garantizar que el banco cargado cumpla con la estructura pedagógica de las 6 tipologías oficiales UNITEPC y cuente con validación de seguridad de doble factor.
+- **Objetivo**: Garantizar que el banco cargado cumpla con la estructura pedagógica de las 6 tipologías oficiales UNITEPC, soporte recursos gráficos (imágenes) y cuente con validación de seguridad de doble factor.
 - **Acciones Clave**:
   - Carga masiva de archivo `.xlsx` (30 o 60 preguntas).
+  - **Soporte de Imágenes y Recursos Gráficos en Preguntas**:
+    - **Sintaxis Inline en Enunciado y Opciones**: Soporte de etiquetas `[img: nombre_archivo.png]` con parámetros opcionales (`ancho=60%`, `alto=3cm`, `centrado=true`).
+    - **Modalidades de Carga de Recursos**:
+      1. Subida simultánea mixta (archivo Excel + imágenes arrastradas en bloque *Drag & Drop*).
+      2. Subida de archivo comprimido unificado (`.zip` con Excel y carpeta de imágenes).
+    - **Verificación Cruzada de Integridad**: Alerta en tiempo real si el Excel cita una imagen que no fue adjuntada por el docente (indicando número exacto de fila).
+    - **Filtro y Optimización B/N**: Conversión automática a escala de grises de alto contraste para garantizar fotocopiado e impresión nítida sin manchas de tóner.
   - Validador sintáctico y de consistencia pedagógica:
     - *Sección 1*: Selección Múltiple (5 opciones A-E, 1 sola correcta).
     - *Sección 2*: Verdadero / Falso Simple (Opciones A y B).
@@ -70,6 +77,7 @@ flowchart TD
     - **Cero Fondos Grises/Colores (`fill: none`)**: Optimizado para fotocopiado e impresión masiva a blanco y negro.
     - **Código de Estudiante al Doble de Tamaño (`18pt Bold`)**: Identificación visual inmediata en mesa y lectura rápida.
     - **Espacio Ampliado de Firma de Estudiante**: Renglón punteado de firma extendido ocupando todo el ancho de la cabecera.
+    - **Renderizado de Imágenes Typst**: Inserción de directivas `#image(...)` con dimensiones proporcionales y centrado automático en enunciados y opciones A-E.
     - Cartilla OMR horizontal con el doble de espaciado vertical entre números (1 a 60 reactivos con 5 opciones A-E).
     - Pie de página dinámico con nombre completo y código del alumno en hojas impares (Páginas 1 y 3).
   - **Generación de Planilla Oficial de Asistencia y Firmas de Estudiantes (PDF)**:
@@ -86,9 +94,11 @@ flowchart TD
 ### FASE 4: Motor de Calificación OMR Integrado (Rol: Personal de Evaluaciones)
 - **Objetivo**: Realizar la lectura y corrección óptica directamente dentro del sistema, sin depender de software de terceros.
 - **Acciones Clave**:
-  - Módulo de procesamiento de imágenes / escaneos de cartillas OMR (JPG, PNG, PDF escaneado).
-  - Algoritmo de visión computacional y lectura óptica:
-    - Detección de marcadores de esquina / alineación.
+  - **Visor y Preprocesamiento Interactivo en Canvas (Frontend Angular)**:
+    - Previsualización en vivo del escaneo (PDF o imagen JPG/PNG).
+    - Herramientas de edición previa: rotación rápida ($90^\circ, 180^\circ, 270^\circ$, ajuste fino de inclinación), zoom con paneo y delimitación manual de esquinas si el escaneo está severamente desalineado.
+  - Módulo de procesamiento de imágenes / escaneos de cartillas OMR (OpenCV / Python):
+    - Detección de marcadores de esquina y alineación geométrica (*Deskew* automático).
     - Segmentación de las 60 filas × 5 columnas de burbujas (A, B, C, D, E).
     - Detección de umbral de densidad de tinta / relleno (detección de omisiones, marcas múltiples y marcas dudosas).
     - Lectura del ID / Código de estudiante y Variante de examen.
