@@ -215,30 +215,69 @@ export interface EstudianteOmrItem {
                 </div>
               </div>
 
-              <!-- Herramientas de Alineación -->
-              <div class="flex items-center gap-2">
+              <!-- Herramientas de Calibración y Micro-Ajuste -->
+              <div class="flex flex-wrap items-center gap-2">
+                <!-- Botón Auto-Ajustar Inteligente -->
+                <button 
+                  (click)="autoCalibrarCartilla()"
+                  class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                  <i class="pi pi-sparkles text-amber-300"></i>
+                  <span>Auto-Ajustar</span>
+                </button>
+
+                <!-- Presets Rápidos -->
+                <div class="flex items-center gap-1 bg-card border border-border rounded-lg p-0.5">
+                  <button 
+                    (click)="aplicarPresetEscaneoFisico()"
+                    title="Ajustar a Escaneo Físico"
+                    class="px-2 py-1 text-[11px] font-bold rounded text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/60 cursor-pointer">
+                    Escaneo Físico
+                  </button>
+                  <button 
+                    (click)="aplicarPresetDigital()"
+                    title="Ajustar a PDF Digital"
+                    class="px-2 py-1 text-[11px] font-bold rounded text-muted-foreground hover:bg-muted cursor-pointer">
+                    Digital
+                  </button>
+                </div>
+
+                <!-- D-Pad Desplazamiento Manual (Flechas) -->
+                <div class="flex items-center gap-0.5 bg-card border border-border rounded-lg p-0.5 text-xs">
+                  <button (click)="moverCaja(0, -0.5)" title="Mover Arriba" class="h-6 w-6 flex items-center justify-center text-foreground hover:bg-muted rounded cursor-pointer font-bold">↑</button>
+                  <button (click)="moverCaja(0, 0.5)" title="Mover Abajo" class="h-6 w-6 flex items-center justify-center text-foreground hover:bg-muted rounded cursor-pointer font-bold">↓</button>
+                  <button (click)="moverCaja(-0.5, 0)" title="Mover Izquierda" class="h-6 w-6 flex items-center justify-center text-foreground hover:bg-muted rounded cursor-pointer font-bold">←</button>
+                  <button (click)="moverCaja(0.5, 0)" title="Mover Derecha" class="h-6 w-6 flex items-center justify-center text-foreground hover:bg-muted rounded cursor-pointer font-bold">→</button>
+                </div>
+
+                <!-- Ajuste de Dimensiones (+/-) -->
+                <div class="flex items-center gap-0.5 bg-card border border-border rounded-lg p-0.5 text-[10px] font-bold">
+                  <button (click)="ajustarDimensiones(0, 0.5)" title="Aumentar Alto" class="px-1.5 py-1 text-foreground hover:bg-muted rounded cursor-pointer">+Alto</button>
+                  <button (click)="ajustarDimensiones(0, -0.5)" title="Reducir Alto" class="px-1.5 py-1 text-foreground hover:bg-muted rounded cursor-pointer">-Alto</button>
+                  <button (click)="ajustarDimensiones(0.5, 0)" title="Aumentar Ancho" class="px-1.5 py-1 text-foreground hover:bg-muted rounded cursor-pointer">+Ancho</button>
+                  <button (click)="ajustarDimensiones(-0.5, 0)" title="Reducir Ancho" class="px-1.5 py-1 text-foreground hover:bg-muted rounded cursor-pointer">-Ancho</button>
+                </div>
+
                 <!-- Toggle Guía de Cuadrícula -->
                 <button 
                   (click)="mostrarGuiasAlineacion.set(!mostrarGuiasAlineacion())"
                   [class]="mostrarGuiasAlineacion() ? 'bg-emerald-600 text-white font-bold' : 'bg-card border border-border text-muted-foreground'"
-                  class="text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all">
+                  class="text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-all">
                   <i class="pi pi-th-large"></i>
-                  <span>{{ mostrarGuiasAlineacion() ? 'Guías OMR Activas' : 'Mostrar Guías' }}</span>
+                  <span>{{ mostrarGuiasAlineacion() ? 'Guías ON' : 'Guías OFF' }}</span>
                 </button>
 
                 <!-- Rotación 90° -->
                 <button 
                   (click)="rotacionAlineacion.set((rotacionAlineacion() + 90) % 360)"
                   title="Rotar 90 Grados"
-                  class="bg-card border border-border text-foreground px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 hover:bg-muted cursor-pointer">
+                  class="bg-card border border-border text-foreground px-2 py-1.5 rounded-lg text-xs flex items-center gap-1 hover:bg-muted cursor-pointer">
                   <i class="pi pi-replay"></i>
-                  <span>Rotar 90°</span>
                 </button>
 
                 <!-- Zoom -->
                 <div class="flex items-center gap-1 bg-card border border-border rounded-lg p-0.5">
                   <button (click)="zoomAlineacion.set(zoomAlineacion() - 0.1)" class="h-6 w-6 flex items-center justify-center text-foreground hover:bg-muted rounded text-xs cursor-pointer">-</button>
-                  <span class="text-[10px] font-mono font-bold px-1.5 text-foreground">{{ (zoomAlineacion() * 100) | number:'1.0-0' }}%</span>
+                  <span class="text-[10px] font-mono font-bold px-1 text-foreground">{{ (zoomAlineacion() * 100) | number:'1.0-0' }}%</span>
                   <button (click)="zoomAlineacion.set(zoomAlineacion() + 0.1)" class="h-6 w-6 flex items-center justify-center text-foreground hover:bg-muted rounded text-xs cursor-pointer">+</button>
                 </div>
               </div>
@@ -267,20 +306,24 @@ export interface EstudianteOmrItem {
                 <!-- Guías de Alineación Superpuestas (Bounding Box Verde Neón y Puntos de Calibración) -->
                 @if (mostrarGuiasAlineacion()) {
                   <div class="absolute inset-0 pointer-events-none">
-                    <!-- Rectángulo de Cartilla Detectado -->
-                    <div class="absolute border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_15px_rgba(52,211,153,0.5)] rounded"
-                         style="top: 23.6%; left: 6.9%; width: 86.2%; height: 25.9%;">
+                    <!-- Rectángulo de Cartilla Detectado Dinámicamente -->
+                    <div class="absolute border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_15px_rgba(52,211,153,0.5)] rounded transition-all duration-75"
+                         [style.top.%]="boxTop()"
+                         [style.left.%]="boxLeft()"
+                         [style.width.%]="boxWidth()"
+                         [style.height.%]="boxHeight()">
                       
-                      <div class="absolute top-1 left-2 bg-emerald-700 text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-black">
-                        ÁREA OMR DETECTADA · 4 COLUMNAS · 15 FILAS · ALINEACIÓN 100% OK
+                      <div class="absolute top-1 left-2 bg-emerald-700 text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-black flex items-center gap-1">
+                        <i class="pi pi-check text-[8px]"></i>
+                        <span>ÁREA OMR · [{{ boxTop() | number:'1.1-1' }}%, {{ boxLeft() | number:'1.1-1' }}% · {{ boxWidth() | number:'1.1-1' }}% × {{ boxHeight() | number:'1.1-1' }}%]</span>
                       </div>
 
-                      <!-- 4 Columnas Virtuales -->
-                      <div class="grid grid-cols-4 h-full w-full divide-x divide-emerald-400/40">
-                        <div class="p-1"></div>
-                        <div class="p-1"></div>
-                        <div class="p-1"></div>
-                        <div class="p-1"></div>
+                      <!-- 4 Columnas Virtuales y Subdivisión -->
+                      <div class="grid grid-cols-4 h-full w-full divide-x divide-emerald-400/40 pt-4">
+                        <div class="p-0.5 border-r border-dashed border-emerald-400/30"></div>
+                        <div class="p-0.5 border-r border-dashed border-emerald-400/30"></div>
+                        <div class="p-0.5 border-r border-dashed border-emerald-400/30"></div>
+                        <div class="p-0.5"></div>
                       </div>
                     </div>
 
@@ -713,6 +756,12 @@ export class CalificacionOmrComponent implements OnInit {
   public zoomAlineacion = signal<number>(0.85);
   public rotacionAlineacion = signal<number>(0);
 
+  // Coordenadas dinámicas del marco de calibración OMR (%)
+  public boxTop = signal<number>(31.8);
+  public boxLeft = signal<number>(8.5);
+  public boxWidth = signal<number>(83.0);
+  public boxHeight = signal<number>(29.5);
+
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
   public modoAnotado = signal<boolean>(true);
@@ -786,6 +835,88 @@ export class CalificacionOmrComponent implements OnInit {
 
   public ngOnInit(): void {
     this._cargarResultadosOmr();
+  }
+
+  public moverCaja(dx: number, dy: number): void {
+    this.boxLeft.set(Math.round((this.boxLeft() + dx) * 10) / 10);
+    this.boxTop.set(Math.round((this.boxTop() + dy) * 10) / 10);
+  }
+
+  public ajustarDimensiones(dw: number, dh: number): void {
+    this.boxWidth.set(Math.max(Math.round((this.boxWidth() + dw) * 10) / 10, 50));
+    this.boxHeight.set(Math.max(Math.round((this.boxHeight() + dh) * 10) / 10, 15));
+  }
+
+  public aplicarPresetEscaneoFisico(): void {
+    this.boxTop.set(31.8);
+    this.boxLeft.set(8.5);
+    this.boxWidth.set(83.0);
+    this.boxHeight.set(29.5);
+  }
+
+  public aplicarPresetDigital(): void {
+    this.boxTop.set(23.6);
+    this.boxLeft.set(6.9);
+    this.boxWidth.set(86.2);
+    this.boxHeight.set(25.9);
+  }
+
+  public autoCalibrarCartilla(): void {
+    const imgSrc = this.imagenActivaAlineacion();
+    if (!imgSrc) {
+      this.aplicarPresetEscaneoFisico();
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          this.aplicarPresetEscaneoFisico();
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+
+        const imgData = ctx.getImageData(0, 0, img.width, img.height);
+        const data = imgData.data;
+
+        let topY = -1;
+        let bottomY = -1;
+
+        const startY = Math.floor(img.height * 0.20);
+        const endY = Math.floor(img.height * 0.65);
+
+        for (let y = startY; y < endY; y++) {
+          let darkCount = 0;
+          for (let x = Math.floor(img.width * 0.1); x < Math.floor(img.width * 0.9); x++) {
+            const idx = (y * img.width + x) * 4;
+            const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+            if (brightness < 90) darkCount++;
+          }
+          if (darkCount > img.width * 0.45) {
+            if (topY === -1) topY = y;
+            bottomY = y;
+          }
+        }
+
+        if (topY !== -1 && (bottomY - topY) > (img.height * 0.15)) {
+          const pctTop = (topY / img.height) * 100;
+          const pctHeight = ((bottomY - topY) / img.height) * 100;
+          this.boxTop.set(Math.round(pctTop * 10) / 10);
+          this.boxHeight.set(Math.round(pctHeight * 10) / 10);
+        } else {
+          this.aplicarPresetEscaneoFisico();
+        }
+      } catch (e) {
+        this.aplicarPresetEscaneoFisico();
+      }
+    };
+    img.onerror = () => this.aplicarPresetEscaneoFisico();
+    img.src = imgSrc;
   }
 
   public sanitizer = inject(DomSanitizer);

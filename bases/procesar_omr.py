@@ -40,14 +40,15 @@ def detectar_rectangulo_cartilla(img_gray):
         area = rw * rh
         aspect_ratio = rw / float(rh) if rh > 0 else 0
         
-        # El contenedor de cartilla es ancho (aspect ratio ~2.4 a 2.8) y ocupa más del 70% del ancho
-        if 2.2 <= aspect_ratio <= 3.2 and rw > (w * 0.70) and 350 <= rh <= 460:
+        # El contenedor de cartilla es ancho (aspect ratio ~2.2 a 3.2) y ocupa más del 65% del ancho de la página
+        if 2.1 <= aspect_ratio <= 3.3 and rw > (w * 0.65) and (0.15 * h <= rh <= 0.45 * h):
             if area > max_area:
                 max_area = area
                 best_rect = (x, y, rw, rh)
                 
     if not best_rect:
-        best_rect = (84, 374, 1056, 410)
+        # Fallback proporcional al tamaño de la imagen
+        best_rect = (int(w * 0.08), int(h * 0.31), int(w * 0.83), int(h * 0.29))
         
     return best_rect
 
