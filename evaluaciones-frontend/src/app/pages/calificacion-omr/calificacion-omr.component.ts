@@ -756,11 +756,11 @@ export class CalificacionOmrComponent implements OnInit {
   public zoomAlineacion = signal<number>(0.85);
   public rotacionAlineacion = signal<number>(0);
 
-  // Coordenadas dinámicas del marco de calibración OMR (%) - Hoja 1 de Gran Formato
-  public boxTop = signal<number>(32.5);
-  public boxLeft = signal<number>(7.2);
-  public boxWidth = signal<number>(85.5);
-  public boxHeight = signal<number>(54.5);
+  // Coordenadas dinámicas del marco de calibración OMR (%) - Hoja Oficio (8.5 x 13 in)
+  public boxTop = signal<number>(22.5);
+  public boxLeft = signal<number>(6.0);
+  public boxWidth = signal<number>(88.0);
+  public boxHeight = signal<number>(27.0);
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
@@ -848,10 +848,10 @@ export class CalificacionOmrComponent implements OnInit {
   }
 
   public aplicarPresetEscaneoFisico(): void {
-    this.boxTop.set(32.5);
-    this.boxLeft.set(7.2);
-    this.boxWidth.set(85.5);
-    this.boxHeight.set(54.5);
+    this.boxTop.set(22.5);
+    this.boxLeft.set(6.0);
+    this.boxWidth.set(88.0);
+    this.boxHeight.set(27.0);
   }
 
   public aplicarPresetDigital(): void {
@@ -1099,12 +1099,12 @@ export class CalificacionOmrComponent implements OnInit {
       return { rx: leftBorderX, ry: topBorderY, rw, rh };
     }
 
-    // Fallback de alta precisión para Hoja 1 OMR
+    // Fallback de alta precisión para Cartilla en Hoja Oficio (8.5 x 13 in)
     return {
-      rx: Math.floor(width * 0.075),
-      ry: Math.floor(height * 0.330),
-      rw: Math.floor(width * 0.850),
-      rh: Math.floor(height * 0.540)
+      rx: Math.floor(width * 0.060),
+      ry: Math.floor(height * 0.225),
+      rw: Math.floor(width * 0.880),
+      rh: Math.floor(height * 0.270)
     };
   }
 
