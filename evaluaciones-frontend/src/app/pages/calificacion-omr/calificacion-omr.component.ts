@@ -980,72 +980,313 @@ export class CalificacionOmrComponent implements OnInit {
     }
   }
 
-  public ejecutarProcesamientoOmrEnVivo(): void {
+  public async ejecutarProcesamientoOmrEnVivo(): Promise<void> {
     const totalPags = this.totalPaginas();
     this.procesandoOmr.set(true);
     this.paginaProgreso.set(1);
 
-    const interval = setInterval(() => {
-      if (this.paginaProgreso() < totalPags) {
-        this.paginaProgreso.set(this.paginaProgreso() + 1);
-      } else {
-        clearInterval(interval);
-        setTimeout(() => {
-          this.procesandoOmr.set(false);
-          this.calificacionEjecutada.set(true);
+    const uploadedPages = this.paginasRenderizadas();
+    const bTop = this.boxTop();
+    const bLeft = this.boxLeft();
+    const bWidth = this.boxWidth();
+    const bHeight = this.boxHeight();
 
-          const uploadedPages = this.paginasRenderizadas();
-          if (uploadedPages.length > 0) {
-            const listaReales: EstudianteOmrItem[] = [];
-            const nombres: Array<{ id: number; codigo: string; nombre: string; aciertos: number; fallos: number; nota100: number; overrides: Record<number, string> }> = [
-              { id: 1, codigo: '7849102', nombre: 'JUAN CARLOS PÉREZ MAMANI', aciertos: 28, fallos: 2, nota100: 93.3, overrides: { 4: 'C', 12: 'B' } },
-              { id: 2, codigo: '8392104', nombre: 'MARÍA BELÉN QUISPE FLORES', aciertos: 24, fallos: 6, nota100: 80.0, overrides: { 2: 'A', 5: 'A', 9: 'C', 15: 'D', 20: 'B', 28: 'C' } },
-              { id: 3, codigo: '6928103', nombre: 'RODRIGO ALEJANDRO CONDORI RODRÍGUEZ', aciertos: 18, fallos: 12, nota100: 60.0, overrides: {} },
-              { id: 4, codigo: '7194820', nombre: 'GABRIELA SOFÍA LÓPEZ TORRICO', aciertos: 13, fallos: 15, nota100: 43.3, overrides: {} },
-              { id: 5, codigo: '7391028', nombre: 'SERGIO ALEJANDRO MENDOZA TAPIA', aciertos: 22, fallos: 7, nota100: 73.3, overrides: {} }
-            ];
+    const listaReales: EstudianteOmrItem[] = [];
 
-            uploadedPages.forEach((pageDataUrl, idx) => {
-              const meta = nombres[idx] || {
-                id: idx + 1,
-                codigo: `784910${idx + 1}`,
-                nombre: `ESTUDIANTE ${idx + 1}`,
-                aciertos: 26,
-                fallos: 4,
-                nota100: 86.7,
-                overrides: {}
-              };
+    // Metadatos por defecto para nombres si se reconocen por orden
+    const metadatosEstudiantes = [
+      { id: 1, codigo: '8392104', nombre: 'MARÍA BELÉN QUISPE FLORES', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' },
+      { id: 2, codigo: '7849102', nombre: 'JUAN CARLOS PÉREZ MAMANI', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' },
+      { id: 3, codigo: '6928103', nombre: 'RODRIGO ALEJANDRO CONDORI RODRÍGUEZ', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' },
+      { id: 4, codigo: '7194820', nombre: 'GABRIELA SOFÍA LÓPEZ TORRICO', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' },
+      { id: 5, codigo: '7391028', nombre: 'SERGIO ALEJANDRO MENDOZA TAPIA', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' }
+    ];
 
-              listaReales.push({
-                estudianteId: meta.id,
-                codigo: meta.codigo,
-                nombre: meta.nombre,
-                carrera: 'AUDITORÍA / CONTADURÍA',
-                grupo: 'TA-01',
-                variante: 'A',
-                totalPreguntas: 30,
-                aciertos: meta.aciertos,
-                fallos: meta.fallos,
-                blancos: 0,
-                doblesMarcas: 0,
-                nota100: meta.nota100,
-                nota30: meta.aciertos,
-                aprobado: meta.nota100 >= 51,
-                estadoCalificacion: 'CALIFICADO',
-                imagenEscaneada: pageDataUrl,
-                imagenAnotada: pageDataUrl,
-                detalles: this._generarDetallesEstudiante(meta.id, meta.overrides)
-              });
-            });
+    try {
+      if (uploadedPages.length > 0) {
+        for (let i = 0; i < uploadedPages.length; i++) {
+          this.paginaProgreso.set(i + 1);
+          const pageDataUrl = uploadedPages[i];
+          const omrResult = await this._procesarPaginaOmrConCanvas(pageDataUrl, bTop, bLeft, bWidth, bHeight);
 
-            this.estudiantes.set(listaReales);
-            this.estudianteActivoIdx.set(0);
+          const meta = metadatosEstudiantes[i] || {
+            id: i + 1,
+            codigo: `784910${i + 1}`,
+            nombre: `ESTUDIANTE ${i + 1}`,
+            carrera: 'AUDITORÍA / CONTADURÍA',
+            grupo: 'TA-01',
+            variante: 'A'
+          };
+
+          listaReales.push({
+            estudianteId: meta.id,
+            codigo: meta.codigo,
+            nombre: meta.nombre,
+            carrera: meta.carrera,
+            grupo: meta.grupo,
+            variante: meta.variante,
+            totalPreguntas: 30,
+            aciertos: omrResult.aciertos,
+            fallos: omrResult.fallos,
+            blancos: omrResult.blancos,
+            doblesMarcas: omrResult.dobles,
+            nota100: omrResult.nota100,
+            nota30: omrResult.aciertos,
+            aprobado: omrResult.nota100 >= 51,
+            estadoCalificacion: 'CALIFICADO',
+            imagenEscaneada: pageDataUrl,
+            imagenAnotada: omrResult.imagenAnotada,
+            detalles: omrResult.detalles
+          });
+        }
+
+        this.estudiantes.set(listaReales);
+        this.estudianteActivoIdx.set(0);
+      }
+    } catch (err) {
+      console.error('Error durante el procesamiento OMR en canvas:', err);
+    } finally {
+      this.procesandoOmr.set(false);
+      this.calificacionEjecutada.set(true);
+      this.estadoFlujo.set('RESULTADOS');
+    }
+  }
+
+  private _procesarPaginaOmrConCanvas(
+    imgDataUrl: string,
+    bTopPct: number,
+    bLeftPct: number,
+    bWidthPct: number,
+    bHeightPct: number
+  ): Promise<{
+    aciertos: number;
+    fallos: number;
+    blancos: number;
+    dobles: number;
+    nota100: number;
+    detalles: DetallePreguntaOmr[];
+    imagenAnotada: string;
+  }> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve({
+            aciertos: 0,
+            fallos: 30,
+            blancos: 30,
+            dobles: 0,
+            nota100: 0,
+            detalles: this._generarDetallesEstudiante(1, {}),
+            imagenAnotada: imgDataUrl
+          });
+          return;
+        }
+
+        // Dibujar imagen original
+        ctx.drawImage(img, 0, 0);
+
+        const imgData = ctx.getImageData(0, 0, img.width, img.height);
+        const data = imgData.data;
+
+        // Coordenadas absolutas de la cartilla
+        const rx = (bLeftPct / 100.0) * img.width;
+        const ry = (bTopPct / 100.0) * img.height;
+        const rw = (bWidthPct / 100.0) * img.width;
+        const rh = (bHeightPct / 100.0) * img.height;
+
+        const col_w = rw / 4.0;
+        const title_h = rh * 0.085;
+        const grid_y = ry + title_h;
+        const row_h = (rh - title_h) / 15.0;
+
+        const opciones = ['A', 'B', 'C', 'D', 'E'];
+        const centers_rel: number[] = [];
+        let accum = 0.18 * col_w;
+        for (let i = 0; i < 5; i++) {
+          const w_opt = 0.164 * col_w;
+          centers_rel.push(accum + 0.5 * w_opt);
+          accum += w_opt;
+        }
+
+        const detalles: DetallePreguntaOmr[] = [];
+        let aciertos = 0;
+        let fallos = 0;
+        let blancos = 0;
+        let dobles = 0;
+
+        const bubbleRadius = Math.max(Math.floor(row_h * 0.28), 4);
+
+        // Evaluar las 30 preguntas
+        for (let q = 1; q <= 30; q++) {
+          const c_idx = Math.floor((q - 1) / 15);
+          const r_idx = (q - 1) % 15;
+          const col_start = rx + c_idx * col_w;
+          const cy = Math.floor(grid_y + (r_idx + 0.5) * row_h);
+
+          const densidades: number[] = [];
+          const optCoords: { cx: number; cy: number }[] = [];
+
+          for (let optIdx = 0; optIdx < 5; optIdx++) {
+            const cx = Math.floor(col_start + centers_rel[optIdx]);
+            optCoords.push({ cx, cy });
+
+            // Muestreo de píxeles oscuros en la burbuja
+            let darkPixels = 0;
+            let totalSampled = 0;
+            const rSample = bubbleRadius;
+
+            for (let dy = -rSample; dy <= rSample; dy++) {
+              for (let dx = -rSample; dx <= rSample; dx++) {
+                if (dx * dx + dy * dy <= rSample * rSample) {
+                  const px = cx + dx;
+                  const py = cy + dy;
+                  if (px >= 0 && px < img.width && py >= 0 && py < img.height) {
+                    const idx = (py * img.width + px) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    const brightness = (r + g + b) / 3;
+                    
+                    // Píxel oscuro o tinta azul/negra
+                    if (brightness < 135 || (b > r + 20 && b > g + 20)) {
+                      darkPixels++;
+                    }
+                    totalSampled++;
+                  }
+                }
+              }
+            }
+
+            const pct = totalSampled > 0 ? (darkPixels / totalSampled) * 100 : 0;
+            densidades.push(pct);
           }
 
-          this.estadoFlujo.set('RESULTADOS');
-        }, 500);
-      }
-    }, 400);
+          // Encontrar máxima densidad
+          let maxDens = -1;
+          let maxIdx = 0;
+          let secondDens = -1;
+          let secondIdx = 0;
+
+          densidades.forEach((d, idx) => {
+            if (d > maxDens) {
+              secondDens = maxDens;
+              secondIdx = maxIdx;
+              maxDens = d;
+              maxIdx = idx;
+            } else if (d > secondDens) {
+              secondDens = d;
+              secondIdx = idx;
+            }
+          });
+
+          const patron = this.patronArray[q - 1].ans;
+          let marcada = '';
+          let estado: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' = 'CORRECTA';
+          let puntos = 0;
+
+          if (maxDens < 9.5) {
+            estado = 'EN_BLANCO';
+            marcada = '';
+            blancos++;
+          } else if (secondDens >= 12.0 && (maxDens - secondDens) < 3.5) {
+            estado = 'DOBLE_MARCA';
+            marcada = opciones[maxIdx] + opciones[secondIdx];
+            dobles++;
+            fallos++;
+          } else {
+            marcada = opciones[maxIdx];
+            if (marcada === patron) {
+              estado = 'CORRECTA';
+              puntos = 3.333;
+              aciertos++;
+            } else {
+              estado = 'INCORRECTA';
+              fallos++;
+            }
+          }
+
+          detalles.push({
+            pregunta: q,
+            patron,
+            marcada,
+            estado,
+            puntos: Math.round(puntos * 100) / 100,
+            densidades
+          });
+
+          // Dibujar anotación visual sobre el canvas
+          const patronIdx = opciones.indexOf(patron);
+          if (estado === 'CORRECTA') {
+            // Círculo Verde en la opción marcada correcta
+            const coord = optCoords[maxIdx];
+            ctx.strokeStyle = '#10B981';
+            ctx.lineWidth = Math.max(Math.floor(img.width / 400), 2.5);
+            ctx.beginPath();
+            ctx.arc(coord.cx, coord.cy, bubbleRadius + 4, 0, Math.PI * 2);
+            ctx.stroke();
+          } else if (estado === 'INCORRECTA') {
+            // Círculo Rojo en la opción marcada incorrecta
+            if (maxIdx >= 0) {
+              const coord = optCoords[maxIdx];
+              ctx.strokeStyle = '#EF4444';
+              ctx.lineWidth = Math.max(Math.floor(img.width / 400), 2.5);
+              ctx.beginPath();
+              ctx.arc(coord.cx, coord.cy, bubbleRadius + 4, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            // Círculo Azul en la clave del patrón oficial
+            if (patronIdx >= 0) {
+              const coordPatron = optCoords[patronIdx];
+              ctx.strokeStyle = '#3B82F6';
+              ctx.lineWidth = Math.max(Math.floor(img.width / 500), 2);
+              ctx.beginPath();
+              ctx.arc(coordPatron.cx, coordPatron.cy, bubbleRadius + 4, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+          }
+        }
+
+        const nota100 = Math.round((aciertos / 30.0) * 1000) / 10;
+
+        // Dibujar banner OMR superior
+        const bannerH = Math.max(Math.floor(img.height * 0.022), 26);
+        ctx.fillStyle = nota100 >= 51 ? '#10B981' : '#EF4444';
+        ctx.fillRect(rx, ry - bannerH - 4, rw, bannerH);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = `bold ${Math.floor(bannerH * 0.55)}px sans-serif`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`OMR SCORE: ${nota100}/100 pts (${aciertos}/30 Aciertos) - ${nota100 >= 51 ? 'APROBADO' : 'REPROBADO'}`, rx + 10, ry - bannerH / 2 - 4);
+
+        resolve({
+          aciertos,
+          fallos,
+          blancos,
+          dobles,
+          nota100,
+          detalles,
+          imagenAnotada: canvas.toDataURL('image/png')
+        });
+      };
+      img.onerror = () => {
+        resolve({
+          aciertos: 0,
+          fallos: 30,
+          blancos: 30,
+          dobles: 0,
+          nota100: 0,
+          detalles: this._generarDetallesEstudiante(1, {}),
+          imagenAnotada: imgDataUrl
+        });
+      };
+      img.src = imgDataUrl;
+    });
   }
 
   public seleccionarEstudiante(idx: number): void {
