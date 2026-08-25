@@ -756,11 +756,11 @@ export class CalificacionOmrComponent implements OnInit {
   public zoomAlineacion = signal<number>(0.85);
   public rotacionAlineacion = signal<number>(0);
 
-  // Coordenadas dinámicas del marco de calibración OMR (%) - Hoja Oficio (8.5 x 13 in)
-  public boxTop = signal<number>(22.5);
-  public boxLeft = signal<number>(6.0);
-  public boxWidth = signal<number>(88.0);
-  public boxHeight = signal<number>(27.0);
+  // Coordenadas dinámicas del marco de calibración OMR (%) - Hoja 1 OMR (Margen 2.0 cm)
+  public boxTop = signal<number>(34.5);
+  public boxLeft = signal<number>(7.8);
+  public boxWidth = signal<number>(84.4);
+  public boxHeight = signal<number>(52.5);
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
@@ -848,17 +848,17 @@ export class CalificacionOmrComponent implements OnInit {
   }
 
   public aplicarPresetEscaneoFisico(): void {
-    this.boxTop.set(22.5);
-    this.boxLeft.set(6.0);
-    this.boxWidth.set(88.0);
-    this.boxHeight.set(27.0);
+    this.boxTop.set(34.5);
+    this.boxLeft.set(7.8);
+    this.boxWidth.set(84.4);
+    this.boxHeight.set(52.5);
   }
 
   public aplicarPresetDigital(): void {
-    this.boxTop.set(23.6);
-    this.boxLeft.set(6.9);
-    this.boxWidth.set(86.2);
-    this.boxHeight.set(25.9);
+    this.boxTop.set(34.5);
+    this.boxLeft.set(7.8);
+    this.boxWidth.set(84.4);
+    this.boxHeight.set(52.5);
   }
 
   public autoCalibrarCartilla(): void {
@@ -1099,12 +1099,12 @@ export class CalificacionOmrComponent implements OnInit {
       return { rx: leftBorderX, ry: topBorderY, rw, rh };
     }
 
-    // Fallback de alta precisión para Cartilla en Hoja Oficio (8.5 x 13 in)
+    // Fallback de alta precisión para Cartilla en Hoja 1 OMR (Margen 2.0 cm)
     return {
-      rx: Math.floor(width * 0.060),
-      ry: Math.floor(height * 0.225),
-      rw: Math.floor(width * 0.880),
-      rh: Math.floor(height * 0.270)
+      rx: Math.floor(width * 0.078),
+      ry: Math.floor(height * 0.345),
+      rw: Math.floor(width * 0.844),
+      rh: Math.floor(height * 0.525)
     };
   }
 

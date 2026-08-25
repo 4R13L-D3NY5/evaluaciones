@@ -371,7 +371,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 
     # =========================================================================
     # CARTILLA HORIZONTAL (4 COLUMNAS DE 15 PREGUNTAS = 60 PREGUNTAS)
-    # Burbujas ergonómicas (+30% radio = 4.0pt) y espaciado compacto
+    # Burbujas ergonómicas (+35% radio = 4.2pt) y espaciado vertical amplio
     # =========================================================================
     grid_cols = []
     for col_idx in range(4):
@@ -379,19 +379,19 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
         end_q = start_q + 15
         table_rows = []
         for num in range(start_q, end_q):
-            table_rows.append(f"""        [#text(size: 7.8pt, weight: "bold")[{num}.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]]""")
+            table_rows.append(f"""        [#text(size: 8pt, weight: "bold")[{num}.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]]""")
         
         rows_str = ",\n".join(table_rows)
         grid_cols.append(f"""    [
       #table(
         columns: (16%, 16.8%, 16.8%, 16.8%, 16.8%, 16.8%),
         stroke: none,
-        inset: (x: 0pt, y: 2.2pt),
+        inset: (x: 0pt, y: 5.2pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
 {rows_str}
       )
@@ -400,7 +400,8 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     cartilla_grid_joined = ",\n".join(grid_cols)
 
     # =========================================================================
-    # HOJA 1 (OFICIO 8.5 x 13 in): Cabecera + Datos + Cartilla con Marcadores en Esquinas + Preguntas 1 a 6
+    # HOJA 1: HOJA DE RESPUESTAS OFICIAL OMR (OFICIO 8.5 x 13 in - MARGEN 2.0 CM)
+    # Cabecera + Datos + Cartilla Gran Formato 4 Col x 15 Filas
     # =========================================================================
     content = f"""
 // ============================================================================
@@ -411,16 +412,27 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 #set page(
   width: 8.5in,
   height: 13in,
-  margin: (x: 1.2cm, top: 0.8cm, bottom: 0.8cm),
-  footer: context {{
-    let p = counter(page).get().first()
-    align(left)[
-      #text(size: 7.5pt, fill: luma(80))[
-        {estudiante_nombre.upper()} ({estudiante_codigo}) · Pág. #p
+  margin: 2.0cm,
+  footer: context [
+    #grid(
+      columns: (1fr, 1fr),
+      align: (left + horizon, right + horizon),
+      [
+        #text(size: 8pt, fill: luma(80))[
+          {estudiante_nombre.upper()} \\
+          {estudiante_codigo}
+        ]
+      ],
+      [
+        #text(size: 8pt, fill: luma(80))[
+          Pág. #counter(page).display()
+        ]
       ]
-    ]
-  }}
+    )
+  ]
 )
+
+#counter(page).update(1)
 
 #set text(font: ("Arial", "Liberation Sans", "Helvetica"), size: 9pt)
 
@@ -429,7 +441,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   columns: (22%, 78%),
   stroke: 0.75pt + black,
   fill: none,
-  inset: (x: 5pt, y: 3.5pt),
+  inset: (x: 6pt, y: 4pt),
   align: (center + horizon, center + horizon),
   [
     #image("logo_unitepc_clean.png", width: 85%)
@@ -444,14 +456,14 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   ]
 )
 
-#v(-4pt)
+#v(-3pt)
 
-// Datos del Estudiante (Sin fondos, código destacado y firma en la misma fila)
+// Datos del Estudiante (Sin fondos, código destacado en 16pt y firma en la misma fila)
 #table(
   columns: (58%, 42%),
   stroke: 0.5pt + black,
   fill: none,
-  inset: (x: 5pt, y: 1.8pt),
+  inset: (x: 6pt, y: 3pt),
   [*NOMBRE:* {estudiante_nombre.upper()}],
   [*CARRERA:* AUDITORÍA / CONTADURÍA],
   [*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA],
@@ -462,7 +474,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   [*HORA:* 08:15:00 - 09:45:00],
   [
     *FIRMA DEL ESTUDIANTE:* \\
-    #v(9pt)
+    #v(12pt)
     #line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt))
   ],
   [
@@ -472,52 +484,56 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
   ]
 )
 
-#v(0.5pt)
-#text(size: 8pt)[*INSTRUCCIÓN DE COMPLETADO DE CARTILLA:* Rellene con cuidado la opción correcta con bolígrafo AZUL o NEGRO. Ejemplos: [● Correcto]  [X Incorrecto]  [- Incorrecto]  [O Incorrecto]]
-#v(0.5pt)
+#v(3pt)
+#text(size: 8.5pt)[*INSTRUCCIÓN DE COMPLETADO DE CARTILLA:* Rellene con cuidado la opción correcta con bolígrafo AZUL o NEGRO. Ejemplos: [● Correcto]  [X Incorrecto]  [- Incorrecto]  [O Incorrecto]]
+#v(3pt)
 
 // CARTILLA DE RESPUESTAS CON MARCADORES FIDUCIALES NEGROS EN SUS 4 ESQUINAS
-#rect(width: 100%, stroke: 0.85pt + black, fill: none, inset: (x: 5pt, y: 3pt), radius: 0pt)[
-  #place(top + left, dx: -5pt, dy: -3pt)[#rect(width: 9pt, height: 9pt, fill: black)]
-  #place(top + right, dx: 5pt, dy: -3pt)[#rect(width: 9pt, height: 9pt, fill: black)]
-  #place(bottom + left, dx: -5pt, dy: 3pt)[#rect(width: 9pt, height: 9pt, fill: black)]
-  #place(bottom + right, dx: 5pt, dy: 3pt)[#rect(width: 9pt, height: 9pt, fill: black)]
+#rect(width: 100%, stroke: 0.85pt + black, fill: none, inset: (x: 6pt, y: 5pt), radius: 0pt)[
+  #place(top + left, dx: -6pt, dy: -5pt)[#rect(width: 10pt, height: 10pt, fill: black)]
+  #place(top + right, dx: 6pt, dy: -5pt)[#rect(width: 10pt, height: 10pt, fill: black)]
+  #place(bottom + left, dx: -6pt, dy: 5pt)[#rect(width: 10pt, height: 10pt, fill: black)]
+  #place(bottom + right, dx: 6pt, dy: 5pt)[#rect(width: 10pt, height: 10pt, fill: black)]
 
   #align(center)[
-    #text(weight: "bold", size: 8.5pt)[CARTILLA DE RESPUESTAS (1 A 60) — VARIANTE {variante_letra}]
+    #text(weight: "bold", size: 9.5pt)[CARTILLA DE RESPUESTAS (1 A 60) — VARIANTE {variante_letra}]
   ]
-  #v(-4pt)
+  #v(-3pt)
   #grid(
     columns: (1fr, 1fr, 1fr, 1fr),
-    column-gutter: 5pt,
+    column-gutter: 6pt,
 {cartilla_grid_joined}
   )
 ]
 
-#v(1.5pt)
+#pagebreak()
 
-// TÍTULO GENERAL DE PREGUNTAS
+// ============================================================================
+// HOJA 2: CUESTIONARIO DE PREGUNTAS (1 A 30)
+// ============================================================================
+
 #align(center)[
-  #text(size: 9.5pt, weight: "bold")[CUESTIONARIO DE PREGUNTAS]
+  #text(size: 11pt, weight: "bold")[CUESTIONARIO DE PREGUNTAS (30 REACTIVOS)]\\
+  #text(size: 9pt, fill: luma(80))[[CPEC18] AUDITORÍA TRIBUTARIA · EVALUACIÓN TEÓRICA 1ER PARCIAL · VARIANTE {variante_letra}]
 ]
-#v(-3.5pt)
-#line(length: 100%, stroke: 0.5pt + black)
-#v(1pt)
+#v(-2pt)
+#line(length: 100%, stroke: 0.65pt + black)
+#v(4pt)
 
-// SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA (Preguntas 1 a 6 en Hoja 1)
-#text(weight: "bold", size: 8.5pt)[SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 6)]\\
-#v(-4.5pt)
-#text(size: 8pt)[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
-#v(0.5pt)
+// SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA (Preguntas 1 a 6)
+#text(weight: "bold")[SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 6)]\\
+#v(-4pt)
+#text(size: 8.5pt)[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
+#v(2pt)
 """
 
-    # Preguntas 1 a 6 de Sección 1
+    # Preguntas 1 a 6 de Sección 1 (Con espaciado vertical holgado)
     for p in p_sec1:
         content += f"""
-#block(breakable: false, spacing: 1.4pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *{p['numero']}.*  {p['enunciado']}
-  #v(0.2pt)
-  #pad(left: 10pt)[
+  #v(0.6pt)
+  #pad(left: 12pt)[
 """
         for l, text in p["opciones"]:
             text_clean = text.replace("$", "\\$")
@@ -658,12 +674,7 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
 def generar_documento_typst_completo(estudiantes_lista, output_typ_path):
     variantes_disponibles = ['A', 'B']
     
-    typ_header = """#set page(
-  paper: "us-legal", // Hoja Oficio (8.5 x 13 in)
-  margin: 2cm,
-  header: none
-)
-#set text(font: "Times New Roman", size: 11pt, lang: "es")
+    typ_header = """#set text(font: ("Arial", "Liberation Sans", "Helvetica"), size: 9pt, lang: "es")
 #set par(leading: 0.52em, justify: true)
 """
     body_content = ""

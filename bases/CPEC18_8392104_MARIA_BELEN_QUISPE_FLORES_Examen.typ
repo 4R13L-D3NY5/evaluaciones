@@ -1,9 +1,4 @@
-#set page(
-  paper: "us-legal", // Hoja Oficio (8.5 x 13 in)
-  margin: 2cm,
-  header: none
-)
-#set text(font: "Times New Roman", size: 11pt, lang: "es")
+#set text(font: ("Arial", "Liberation Sans", "Helvetica"), size: 9pt, lang: "es")
 #set par(leading: 0.52em, justify: true)
 
 // ============================================================================
@@ -14,16 +9,27 @@
 #set page(
   width: 8.5in,
   height: 13in,
-  margin: (x: 1.2cm, top: 0.8cm, bottom: 0.8cm),
-  footer: context {
-    let p = counter(page).get().first()
-    align(left)[
-      #text(size: 7.5pt, fill: luma(80))[
-        MARÍA BELÉN QUISPE FLORES (8392104) · Pág. #p
+  margin: 2.0cm,
+  footer: context [
+    #grid(
+      columns: (1fr, 1fr),
+      align: (left + horizon, right + horizon),
+      [
+        #text(size: 8pt, fill: luma(80))[
+          MARÍA BELÉN QUISPE FLORES \
+          8392104
+        ]
+      ],
+      [
+        #text(size: 8pt, fill: luma(80))[
+          Pág. #counter(page).display()
+        ]
       ]
-    ]
-  }
+    )
+  ]
 )
+
+#counter(page).update(1)
 
 #set text(font: ("Arial", "Liberation Sans", "Helvetica"), size: 9pt)
 
@@ -32,7 +38,7 @@
   columns: (22%, 78%),
   stroke: 0.75pt + black,
   fill: none,
-  inset: (x: 5pt, y: 3.5pt),
+  inset: (x: 6pt, y: 4pt),
   align: (center + horizon, center + horizon),
   [
     #image("logo_unitepc_clean.png", width: 85%)
@@ -47,14 +53,14 @@
   ]
 )
 
-#v(-4pt)
+#v(-3pt)
 
-// Datos del Estudiante (Sin fondos, código destacado y firma en la misma fila)
+// Datos del Estudiante (Sin fondos, código destacado en 16pt y firma en la misma fila)
 #table(
   columns: (58%, 42%),
   stroke: 0.5pt + black,
   fill: none,
-  inset: (x: 5pt, y: 1.8pt),
+  inset: (x: 6pt, y: 3pt),
   [*NOMBRE:* MARÍA BELÉN QUISPE FLORES],
   [*CARRERA:* AUDITORÍA / CONTADURÍA],
   [*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA],
@@ -65,7 +71,7 @@
   [*HORA:* 08:15:00 - 09:45:00],
   [
     *FIRMA DEL ESTUDIANTE:* \
-    #v(9pt)
+    #v(12pt)
     #line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt))
   ],
   [
@@ -75,439 +81,443 @@
   ]
 )
 
-#v(0.5pt)
-#text(size: 8pt)[*INSTRUCCIÓN DE COMPLETADO DE CARTILLA:* Rellene con cuidado la opción correcta con bolígrafo AZUL o NEGRO. Ejemplos: [● Correcto]  [X Incorrecto]  [- Incorrecto]  [O Incorrecto]]
-#v(0.5pt)
+#v(3pt)
+#text(size: 8.5pt)[*INSTRUCCIÓN DE COMPLETADO DE CARTILLA:* Rellene con cuidado la opción correcta con bolígrafo AZUL o NEGRO. Ejemplos: [● Correcto]  [X Incorrecto]  [- Incorrecto]  [O Incorrecto]]
+#v(3pt)
 
 // CARTILLA DE RESPUESTAS CON MARCADORES FIDUCIALES NEGROS EN SUS 4 ESQUINAS
-#rect(width: 100%, stroke: 0.85pt + black, fill: none, inset: (x: 5pt, y: 3pt), radius: 0pt)[
-  #place(top + left, dx: -5pt, dy: -3pt)[#rect(width: 9pt, height: 9pt, fill: black)]
-  #place(top + right, dx: 5pt, dy: -3pt)[#rect(width: 9pt, height: 9pt, fill: black)]
-  #place(bottom + left, dx: -5pt, dy: 3pt)[#rect(width: 9pt, height: 9pt, fill: black)]
-  #place(bottom + right, dx: 5pt, dy: 3pt)[#rect(width: 9pt, height: 9pt, fill: black)]
+#rect(width: 100%, stroke: 0.85pt + black, fill: none, inset: (x: 6pt, y: 5pt), radius: 0pt)[
+  #place(top + left, dx: -6pt, dy: -5pt)[#rect(width: 10pt, height: 10pt, fill: black)]
+  #place(top + right, dx: 6pt, dy: -5pt)[#rect(width: 10pt, height: 10pt, fill: black)]
+  #place(bottom + left, dx: -6pt, dy: 5pt)[#rect(width: 10pt, height: 10pt, fill: black)]
+  #place(bottom + right, dx: 6pt, dy: 5pt)[#rect(width: 10pt, height: 10pt, fill: black)]
 
   #align(center)[
-    #text(weight: "bold", size: 8.5pt)[CARTILLA DE RESPUESTAS (1 A 60) — VARIANTE A]
+    #text(weight: "bold", size: 9.5pt)[CARTILLA DE RESPUESTAS (1 A 60) — VARIANTE A]
   ]
-  #v(-4pt)
+  #v(-3pt)
   #grid(
     columns: (1fr, 1fr, 1fr, 1fr),
-    column-gutter: 5pt,
+    column-gutter: 6pt,
     [
       #table(
         columns: (16%, 16.8%, 16.8%, 16.8%, 16.8%, 16.8%),
         stroke: none,
-        inset: (x: 0pt, y: 2.2pt),
+        inset: (x: 0pt, y: 5.2pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
-        [#text(size: 7.8pt, weight: "bold")[1.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[2.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[3.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[4.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[5.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[6.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[7.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[8.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[9.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[10.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[11.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[12.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[13.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[14.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[15.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]]
+        [#text(size: 8pt, weight: "bold")[1.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[2.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[3.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[4.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[5.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[6.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[7.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[8.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[9.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[10.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[11.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[12.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[13.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[14.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[15.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]]
       )
     ],
     [
       #table(
         columns: (16%, 16.8%, 16.8%, 16.8%, 16.8%, 16.8%),
         stroke: none,
-        inset: (x: 0pt, y: 2.2pt),
+        inset: (x: 0pt, y: 5.2pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
-        [#text(size: 7.8pt, weight: "bold")[16.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[17.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[18.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[19.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[20.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[21.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[22.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[23.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[24.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[25.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[26.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[27.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[28.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[29.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[30.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]]
+        [#text(size: 8pt, weight: "bold")[16.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[17.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[18.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[19.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[20.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[21.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[22.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[23.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[24.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[25.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[26.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[27.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[28.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[29.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[30.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]]
       )
     ],
     [
       #table(
         columns: (16%, 16.8%, 16.8%, 16.8%, 16.8%, 16.8%),
         stroke: none,
-        inset: (x: 0pt, y: 2.2pt),
+        inset: (x: 0pt, y: 5.2pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
-        [#text(size: 7.8pt, weight: "bold")[31.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[32.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[33.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[34.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[35.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[36.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[37.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[38.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[39.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[40.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[41.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[42.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[43.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[44.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[45.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]]
+        [#text(size: 8pt, weight: "bold")[31.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[32.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[33.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[34.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[35.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[36.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[37.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[38.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[39.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[40.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[41.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[42.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[43.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[44.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[45.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]]
       )
     ],
     [
       #table(
         columns: (16%, 16.8%, 16.8%, 16.8%, 16.8%, 16.8%),
         stroke: none,
-        inset: (x: 0pt, y: 2.2pt),
+        inset: (x: 0pt, y: 5.2pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
-        [#text(size: 7.8pt, weight: "bold")[46.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[47.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[48.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[49.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[50.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[51.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[52.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[53.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[54.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[55.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[56.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[57.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[58.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[59.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]],
-        [#text(size: 7.8pt, weight: "bold")[60.]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[A]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[B]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[C]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[D]]]],
-        [#circle(radius: 4.0pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.2pt, weight: "bold")[E]]]]
+        [#text(size: 8pt, weight: "bold")[46.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[47.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[48.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[49.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[50.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[51.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[52.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[53.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[54.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[55.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[56.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[57.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[58.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[59.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]],
+        [#text(size: 8pt, weight: "bold")[60.]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[A]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[B]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[C]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[D]]]],
+        [#circle(radius: 4.2pt, stroke: 0.5pt + black)[#align(center + horizon)[#text(size: 5.5pt, weight: "bold")[E]]]]
       )
     ]
   )
 ]
 
-#v(1.5pt)
+#pagebreak()
 
-// TÍTULO GENERAL DE PREGUNTAS
+// ============================================================================
+// HOJA 2: CUESTIONARIO DE PREGUNTAS (1 A 30)
+// ============================================================================
+
 #align(center)[
-  #text(size: 9.5pt, weight: "bold")[CUESTIONARIO DE PREGUNTAS]
+  #text(size: 11pt, weight: "bold")[CUESTIONARIO DE PREGUNTAS (30 REACTIVOS)]\
+  #text(size: 9pt, fill: luma(80))[[CPEC18] AUDITORÍA TRIBUTARIA · EVALUACIÓN TEÓRICA 1ER PARCIAL · VARIANTE A]
 ]
-#v(-3.5pt)
-#line(length: 100%, stroke: 0.5pt + black)
-#v(1pt)
+#v(-2pt)
+#line(length: 100%, stroke: 0.65pt + black)
+#v(4pt)
 
-// SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA (Preguntas 1 a 6 en Hoja 1)
-#text(weight: "bold", size: 8.5pt)[SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 6)]\
-#v(-4.5pt)
-#text(size: 8pt)[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
-#v(0.5pt)
+// SECCIÓN 1: SELECCION DE LA MEJOR RESPUESTA (Preguntas 1 a 6)
+#text(weight: "bold")[SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 6)]\
+#v(-4pt)
+#text(size: 8.5pt)[*Instrucciones:* Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.]
+#v(2pt)
 
-#block(breakable: false, spacing: 1.4pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *1.*  Al final de cada proceso de auditoría tributaria para determinar la base imponible del IUE se debe:
-  #v(0.2pt)
-  #pad(left: 10pt)[
+  #v(0.6pt)
+  #pad(left: 12pt)[
     A) Excluir los gastos personales sin respaldo de factura legal \
     B) Ninguna de las anteriores \
     C) Deducir únicamente las compras vinculadas a la actividad gravada \
@@ -516,10 +526,10 @@
   ]
 ]
 
-#block(breakable: false, spacing: 1.4pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *2.*  Según el Código Tributario Boliviano (Ley 2492), el término de prescripción de las facultades de fiscalización es de:
-  #v(0.2pt)
-  #pad(left: 10pt)[
+  #v(0.6pt)
+  #pad(left: 12pt)[
     A) 2 años calendario continuos \
     B) Ninguna de las anteriores \
     C) Todas las anteriores \
@@ -528,10 +538,10 @@
   ]
 ]
 
-#block(breakable: false, spacing: 1.4pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *3.*  Para el cómputo del Crédito Fiscal IVA en compras de bienes y servicios, el documento fiscal debe:
-  #v(0.2pt)
-  #pad(left: 10pt)[
+  #v(0.6pt)
+  #pad(left: 12pt)[
     A) Todas las anteriores \
     B) Ninguna de las anteriores \
     C) Ser cancelado únicamente en efectivo \
@@ -540,10 +550,10 @@
   ]
 ]
 
-#block(breakable: false, spacing: 1.4pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *4.*  En una auditoría tributaria, la técnica de confirmación de saldos con terceros verifica principalmente:
-  #v(0.2pt)
-  #pad(left: 10pt)[
+  #v(0.6pt)
+  #pad(left: 12pt)[
     A) Estructura societaria y tenencia accionaria \
     B) Todas las anteriores \
     C) Capacidad de pago futura de la entidad \
@@ -552,10 +562,10 @@
   ]
 ]
 
-#block(breakable: false, spacing: 1.4pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *5.*  El método de determinación de la base imponible sobre base presunta procede cuando:
-  #v(0.2pt)
-  #pad(left: 10pt)[
+  #v(0.6pt)
+  #pad(left: 12pt)[
     A) Se cuenta con estados financieros auditados limpios \
     B) El sujeto pasivo no presenta libros ni documentación fidedigna \
     C) Ninguna de las anteriores \
@@ -564,10 +574,10 @@
   ]
 ]
 
-#block(breakable: false, spacing: 1.4pt)[
+#block(breakable: false, spacing: 3.5pt)[
   *6.*  La alícuota general del Impuesto a las Transacciones (IT) según la Ley 843 es del:
-  #v(0.2pt)
-  #pad(left: 10pt)[
+  #v(0.6pt)
+  #pad(left: 12pt)[
     A) Ninguna de las anteriores \
     B) 3% sobre los ingresos brutos devengados o percibidos \
     C) Todas las anteriores \
