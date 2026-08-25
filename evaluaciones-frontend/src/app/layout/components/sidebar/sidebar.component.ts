@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { UnitepcGatewayService } from '../../../core/services/unitepc-gateway.service';
 
 export interface MenuItem {
   label: string;
@@ -36,7 +37,31 @@ export interface MenuItem {
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between">
                     <span class="truncate">{{ item.label }}</span>
-                    @if (item.badge) {
+                    @if (item.route === '/catalogo-academico') {
+                      @if (seaStatus() === 'online') {
+                        <span 
+                          (click)="forzarChequeoSea($event)"
+                          title="Gateway SEA Conectado (Último chequeo: {{ getHoraChequeo() }}). Clic para re-verificar."
+                          class="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs hover:scale-105 transition-transform cursor-pointer">
+                          <i class="pi pi-arrow-up text-[9px] text-emerald-600 dark:text-emerald-400 font-black"></i>
+                          <span>Live</span>
+                        </span>
+                      } @else if (seaStatus() === 'offline') {
+                        <span 
+                          (click)="forzarChequeoSea($event)"
+                          title="Gateway SEA Desconectado/Caído (Último chequeo: {{ getHoraChequeo() }}). Clic para re-verificar."
+                          class="bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700 text-[10px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs hover:scale-105 transition-transform cursor-pointer animate-pulse">
+                          <i class="pi pi-arrow-down text-[9px] text-rose-600 dark:text-rose-400 font-black"></i>
+                          <span>Offline</span>
+                        </span>
+                      } @else {
+                        <span 
+                          class="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                          <i class="pi pi-spin pi-spinner text-[9px] text-amber-600"></i>
+                          <span>Sync</span>
+                        </span>
+                      }
+                    } @else if (item.badge) {
                       <span class="bg-indigo-100 text-primary text-[10px] font-black px-1.5 py-0.5 rounded-md">
                         {{ item.badge }}
                       </span>
@@ -77,7 +102,10 @@ export interface MenuItem {
     </aside>
   `
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit {
+  public readonly gatewayService = inject(UnitepcGatewayService);
+  public readonly seaStatus = this.gatewayService.seaStatus;
+
   public readonly menuItems: MenuItem[] = [
     {
       label: 'Dashboard',
@@ -89,7 +117,7 @@ export class SidebarComponent {
       label: 'Servicios SEA',
       route: '/catalogo-academico',
       icon: 'pi pi-building-columns',
-      badge: 'API Live',
+      badge: 'Live',
       description: 'Sedes, Carreras, Materias, Grupos, Horarios y Campus sincronizados del SEA'
     },
     {
@@ -137,4 +165,22 @@ export class SidebarComponent {
       description: 'Seguimiento de accesos, terminales MAC, IPs públicas y trazabilidad'
     }
   ];
+
+  public ngOnInit(): void {
+    // Chequeo inicial inteligente (con caché mínima de 2 minutos para evitar saturación)
+    this.gatewayService.checkSeaHealth();
+  }
+
+  public forzarChequeoSea(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.gatewayService.checkSeaHealth(true);
+  }
+
+  public getHoraChequeo(): string {
+    const u = this.gatewayService.ultimoChequeo();
+    if (!u) return 'Verificando...';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(u.getHours())}:${pad(u.getMinutes())}:${pad(u.getSeconds())}`;
+  }
 }

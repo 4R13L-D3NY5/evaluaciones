@@ -1,7 +1,7 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
-import { map, switchMap, tap, catchError, shareReplay } from 'rxjs/operators';
+import { map, switchMap, tap, catchError, shareReplay, timeout } from 'rxjs/operators';
 import { 
   TokenResponse, 
   BranchOffice, 
@@ -37,6 +37,49 @@ export class UnitepcGatewayService {
   // Token Cache en memoria
   private _cachedToken: TokenResponse | null = null;
   private _tokenExpiresAt: number = 0; // Timestamp en ms
+
+  // Estado del Servicio SEA (Health Check con Cache Inteligente para no saturar el Gateway)
+  public readonly seaStatus = signal<'online' | 'offline' | 'checking'>('checking');
+  public readonly ultimoChequeo = signal<Date | null>(null);
+  private _lastCheckTimestamp = 0;
+  private _isChecking = false;
+
+  /**
+   * Health Check ultra ligero al Gateway SEA con caché mínima de 2 minutos (120s)
+   */
+  public checkSeaHealth(force = false): void {
+    const now = Date.now();
+    if (!force && this.seaStatus() !== 'checking' && (now - this._lastCheckTimestamp) < 120000) {
+      return;
+    }
+    if (this._isChecking) return;
+
+    this._isChecking = true;
+    this.seaStatus.set('checking');
+
+    this.getAccessToken().pipe(
+      timeout(3500),
+      switchMap(token => {
+        const headers = this._buildHeaders(token);
+        return this._http.get<BranchOffice[]>(`${this._universityBaseUrl}/branchOffices`, { headers }).pipe(
+          timeout(3500)
+        );
+      })
+    ).subscribe({
+      next: (res) => {
+        this.seaStatus.set(res && res.length > 0 ? 'online' : 'offline');
+        this.ultimoChequeo.set(new Date());
+        this._lastCheckTimestamp = Date.now();
+        this._isChecking = false;
+      },
+      error: () => {
+        this.seaStatus.set('offline');
+        this.ultimoChequeo.set(new Date());
+        this._lastCheckTimestamp = Date.now();
+        this._isChecking = false;
+      }
+    });
+  }
 
   /**
    * Obtiene el token de acceso activo, renovándolo automáticamente si expiró o está próximo a expirar.
