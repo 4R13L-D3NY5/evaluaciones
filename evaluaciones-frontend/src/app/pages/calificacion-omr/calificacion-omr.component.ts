@@ -2,7 +2,12 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
+
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs`;
+}
 
 export interface DetallePreguntaOmr {
   pregunta: number;
@@ -198,12 +203,12 @@ export interface EstudianteOmrItem {
               <div class="flex items-center gap-2">
                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Página del PDF:</span>
                 <div class="flex items-center gap-1">
-                  @for (est of estudiantes(); track est.codigo; let idx = $index) {
+                  @for (pIdx of listaBotonesPagina(); track pIdx) {
                     <button 
-                      (click)="paginaAlineacionIdx.set(idx)"
-                      [class]="paginaAlineacionIdx() === idx ? 'bg-purple-700 text-white font-bold' : 'bg-card border border-border text-foreground font-medium hover:bg-muted'"
+                      (click)="paginaAlineacionIdx.set(pIdx)"
+                      [class]="paginaAlineacionIdx() === pIdx ? 'bg-purple-700 text-white font-bold' : 'bg-card border border-border text-foreground font-medium hover:bg-muted'"
                       class="px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer">
-                      Pág {{ idx + 1 }}
+                      Pág {{ pIdx + 1 }}
                     </button>
                   }
                 </div>
@@ -241,46 +246,52 @@ export interface EstudianteOmrItem {
 
             <!-- Canvas del Visor de Alineación -->
             <div class="relative bg-slate-950/90 overflow-auto min-h-[600px] max-h-[750px] flex items-center justify-center p-6 select-none">
-              @if (estudiantePaginaActiva(); as est) {
-                <div 
-                  class="relative transition-transform duration-200 origin-center shadow-2xl rounded-md overflow-hidden bg-white max-w-[700px]"
-                  [style.transform]="'scale(' + zoomAlineacion() + ') rotate(' + rotacionAlineacion() + 'deg)'">
-                  
-                  <img 
-                    [src]="'assets/omr/' + est.imagenEscaneada"
-                    alt="Escaneo Página"
-                    class="w-full h-auto object-contain block pointer-events-none" />
-
-                  <!-- Guías de Alineación Superpuestas (Bounding Box Verde Neón y Puntos de Calibración) -->
-                  @if (mostrarGuiasAlineacion()) {
-                    <div class="absolute inset-0 pointer-events-none">
-                      <!-- Rectángulo de Cartilla Detectado -->
-                      <div class="absolute border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_15px_rgba(52,211,153,0.5)] rounded"
-                           style="top: 23.6%; left: 6.9%; width: 86.2%; height: 25.9%;">
-                        
-                        <div class="absolute top-1 left-2 bg-emerald-700 text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-black">
-                          ÁREA OMR DETECTADA · 4 COLUMNAS · 15 FILAS · ALINEACIÓN 100% OK
-                        </div>
-
-                        <!-- 4 Columnas Virtuales -->
-                        <div class="grid grid-cols-4 h-full w-full divide-x divide-emerald-400/40">
-                          <div class="p-1"></div>
-                          <div class="p-1"></div>
-                          <div class="p-1"></div>
-                          <div class="p-1"></div>
-                        </div>
-                      </div>
-
-                      <!-- Marcadores de Esquina (Fiducials) -->
-                      <div class="absolute top-4 left-4 h-5 w-5 border-t-2 border-l-2 border-emerald-400"></div>
-                      <div class="absolute top-4 right-4 h-5 w-5 border-t-2 border-r-2 border-emerald-400"></div>
-                      <div class="absolute bottom-4 left-4 h-5 w-5 border-b-2 border-l-2 border-emerald-400"></div>
-                      <div class="absolute bottom-4 right-4 h-5 w-5 border-b-2 border-r-2 border-emerald-400"></div>
-                    </div>
-                  }
-
+              
+              @if (cargandoPdf()) {
+                <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 z-20">
+                  <i class="pi pi-spin pi-spinner text-3xl text-purple-400"></i>
+                  <span class="text-xs font-bold font-mono">Renderizando páginas del PDF escaneado en alta resolución...</span>
                 </div>
               }
+
+              <div 
+                class="relative transition-transform duration-200 origin-center shadow-2xl rounded-md overflow-hidden bg-white max-w-[700px]"
+                [style.transform]="'scale(' + zoomAlineacion() + ') rotate(' + rotacionAlineacion() + 'deg)'">
+                
+                <img 
+                  [src]="imagenActivaAlineacion()"
+                  alt="Escaneo Página"
+                  class="w-full h-auto object-contain block pointer-events-none" />
+
+                <!-- Guías de Alineación Superpuestas (Bounding Box Verde Neón y Puntos de Calibración) -->
+                @if (mostrarGuiasAlineacion()) {
+                  <div class="absolute inset-0 pointer-events-none">
+                    <!-- Rectángulo de Cartilla Detectado -->
+                    <div class="absolute border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_15px_rgba(52,211,153,0.5)] rounded"
+                         style="top: 23.6%; left: 6.9%; width: 86.2%; height: 25.9%;">
+                      
+                      <div class="absolute top-1 left-2 bg-emerald-700 text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-black">
+                        ÁREA OMR DETECTADA · 4 COLUMNAS · 15 FILAS · ALINEACIÓN 100% OK
+                      </div>
+
+                      <!-- 4 Columnas Virtuales -->
+                      <div class="grid grid-cols-4 h-full w-full divide-x divide-emerald-400/40">
+                        <div class="p-1"></div>
+                        <div class="p-1"></div>
+                        <div class="p-1"></div>
+                        <div class="p-1"></div>
+                      </div>
+                    </div>
+
+                    <!-- Marcadores de Esquina (Fiducials) -->
+                    <div class="absolute top-4 left-4 h-5 w-5 border-t-2 border-l-2 border-emerald-400"></div>
+                    <div class="absolute top-4 right-4 h-5 w-5 border-t-2 border-r-2 border-emerald-400"></div>
+                    <div class="absolute bottom-4 left-4 h-5 w-5 border-b-2 border-l-2 border-emerald-400"></div>
+                    <div class="absolute bottom-4 right-4 h-5 w-5 border-b-2 border-r-2 border-emerald-400"></div>
+                  </div>
+                }
+
+              </div>
             </div>
 
             <!-- Diagnóstico de Calibración en la Barra Inferior -->
@@ -717,6 +728,27 @@ export class CalificacionOmrComponent implements OnInit {
     { q: 26, ans: 'A' }, { q: 27, ans: 'A' }, { q: 28, ans: 'A' }, { q: 29, ans: 'A' }, { q: 30, ans: 'A' }
   ];
 
+  public paginasRenderizadas = signal<string[]>([]);
+  public cargandoPdf = signal<boolean>(false);
+
+  public listaBotonesPagina = computed(() => {
+    const custom = this.paginasRenderizadas();
+    if (custom.length > 0) {
+      return Array.from({ length: custom.length }, (_, i) => i);
+    }
+    return this.estudiantes().map((_, i) => i);
+  });
+
+  public imagenActivaAlineacion = computed(() => {
+    const custom = this.paginasRenderizadas();
+    const idx = this.paginaAlineacionIdx();
+    if (custom.length > 0) {
+      return custom[idx] || custom[0];
+    }
+    const est = this.estudiantePaginaActiva();
+    return est ? ('assets/omr/' + est.imagenEscaneada) : 'assets/omr/cartilla_simulada_estudiante_1_7849102.png';
+  });
+
   public estudiantePaginaActiva = computed(() => {
     const list = this.estudiantes();
     const idx = this.paginaAlineacionIdx();
@@ -751,7 +783,7 @@ export class CalificacionOmrComponent implements OnInit {
     this._cargarResultadosOmr();
   }
 
-  public onFileSelected(event: Event): void {
+  public async onFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       const file = input.files[0];
@@ -761,6 +793,45 @@ export class CalificacionOmrComponent implements OnInit {
       this.zoomAlineacion.set(0.85);
       this.rotacionAlineacion.set(0);
       this.mostrarGuiasAlineacion.set(true);
+
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        this.cargandoPdf.set(true);
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+          const pdfDoc = await loadingTask.promise;
+          const renderedPages: string[] = [];
+
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            if (context) {
+              await page.render({ canvasContext: context, viewport, canvas: canvas }).promise;
+              renderedPages.push(canvas.toDataURL('image/png'));
+            }
+          }
+
+          this.paginasRenderizadas.set(renderedPages);
+        } catch (err) {
+          console.error('Error renderizando PDF escaneado:', err);
+        } finally {
+          this.cargandoPdf.set(false);
+        }
+      } else if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string;
+          if (dataUrl) {
+            this.paginasRenderizadas.set([dataUrl]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
     }
   }
 
