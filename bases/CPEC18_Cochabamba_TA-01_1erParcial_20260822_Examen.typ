@@ -66,7 +66,11 @@
     #v(10pt)
     #line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt))
   ],
-  [#align(center + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[7849102]]]
+  [
+    *CODIGO:* \
+    #v(-2pt)
+    #align(center)[#text(size: 18pt, weight: "bold")[7849102]]
+  ]
 )
 
 #v(1.5pt)
@@ -876,7 +880,11 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
     #v(10pt)
     #line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt))
   ],
-  [#align(center + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[8392104]]]
+  [
+    *CODIGO:* \
+    #v(-2pt)
+    #align(center)[#text(size: 18pt, weight: "bold")[8392104]]
+  ]
 )
 
 #v(1.5pt)
@@ -1686,7 +1694,11 @@ La empresa "Comercializadora del Valle S.R.L." fue objeto de fiscalización exte
     #v(10pt)
     #line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt))
   ],
-  [#align(center + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[6928103]]]
+  [
+    *CODIGO:* \
+    #v(-2pt)
+    #align(center)[#text(size: 18pt, weight: "bold")[6928103]]
+  ]
 )
 
 #v(1.5pt)

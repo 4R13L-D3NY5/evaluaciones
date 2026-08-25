@@ -463,7 +463,11 @@ def construir_bloque_examen_30(estudiante_nombre, estudiante_codigo, variante_le
     #v(10pt)
     #line(length: 100%, stroke: (dash: "dotted", thickness: 0.85pt))
   ],
-  [#align(center + horizon)[*CODIGO:* #h(6pt) #text(size: 18pt, weight: "bold")[{estudiante_codigo}]]]
+  [
+    *CODIGO:* \\
+    #v(-2pt)
+    #align(center)[#text(size: 18pt, weight: "bold")[{estudiante_codigo}]]
+  ]
 )
 
 #v(1.5pt)
