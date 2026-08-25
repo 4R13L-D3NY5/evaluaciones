@@ -756,11 +756,11 @@ export class CalificacionOmrComponent implements OnInit {
   public zoomAlineacion = signal<number>(0.85);
   public rotacionAlineacion = signal<number>(0);
 
-  // Coordenadas dinámicas del marco de calibración OMR (%)
-  public boxTop = signal<number>(37.0);
-  public boxLeft = signal<number>(8.5);
-  public boxWidth = signal<number>(83.0);
-  public boxHeight = signal<number>(28.5);
+  // Coordenadas dinámicas del marco de calibración OMR (%) - Hoja 1 de Gran Formato
+  public boxTop = signal<number>(32.5);
+  public boxLeft = signal<number>(7.2);
+  public boxWidth = signal<number>(85.5);
+  public boxHeight = signal<number>(54.5);
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
@@ -848,10 +848,10 @@ export class CalificacionOmrComponent implements OnInit {
   }
 
   public aplicarPresetEscaneoFisico(): void {
-    this.boxTop.set(37.0);
-    this.boxLeft.set(8.5);
-    this.boxWidth.set(83.0);
-    this.boxHeight.set(28.5);
+    this.boxTop.set(32.5);
+    this.boxLeft.set(7.2);
+    this.boxWidth.set(85.5);
+    this.boxHeight.set(54.5);
   }
 
   public aplicarPresetDigital(): void {
@@ -1057,8 +1057,8 @@ export class CalificacionOmrComponent implements OnInit {
     width: number,
     height: number
   ): { rx: number; ry: number; rw: number; rh: number } {
-    const minY = Math.floor(height * 0.18);
-    const maxY = Math.floor(height * 0.65);
+    const minY = Math.floor(height * 0.20);
+    const maxY = Math.floor(height * 0.95);
     const minX = Math.floor(width * 0.05);
     const maxX = Math.floor(width * 0.95);
 
@@ -1082,7 +1082,8 @@ export class CalificacionOmrComponent implements OnInit {
         }
       }
 
-      if (darkCount > width * 0.60 && (lastDarkX - firstDarkX) > width * 0.68) {
+      // Si la línea horizontal continua cubre más del 60% del ancho
+      if (darkCount > width * 0.60 && (lastDarkX - firstDarkX) > width * 0.65) {
         if (topBorderY === -1) {
           topBorderY = y;
           leftBorderX = firstDarkX;
@@ -1092,18 +1093,18 @@ export class CalificacionOmrComponent implements OnInit {
       }
     }
 
-    if (topBorderY !== -1 && (bottomBorderY - topBorderY) > (height * 0.12)) {
+    if (topBorderY !== -1 && (bottomBorderY - topBorderY) > (height * 0.20)) {
       const rw = rightBorderX - leftBorderX;
       const rh = bottomBorderY - topBorderY;
       return { rx: leftBorderX, ry: topBorderY, rw, rh };
     }
 
-    // Fallback calibrado
+    // Fallback de alta precisión para Hoja 1 OMR
     return {
-      rx: Math.floor(width * 0.085),
-      ry: Math.floor(height * 0.370),
-      rw: Math.floor(width * 0.830),
-      rh: Math.floor(height * 0.285)
+      rx: Math.floor(width * 0.075),
+      ry: Math.floor(height * 0.330),
+      rw: Math.floor(width * 0.850),
+      rh: Math.floor(height * 0.540)
     };
   }
 
