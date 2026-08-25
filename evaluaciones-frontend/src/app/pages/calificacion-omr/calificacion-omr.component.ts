@@ -770,12 +770,12 @@ export class CalificacionOmrComponent implements OnInit {
   public dialogPatron = signal<boolean>(false);
 
   public patronArray = [
-    { q: 1, ans: 'D' }, { q: 2, ans: 'C' }, { q: 3, ans: 'B' }, { q: 4, ans: 'B' }, { q: 5, ans: 'C' },
-    { q: 6, ans: 'A' }, { q: 7, ans: 'A' }, { q: 8, ans: 'A' }, { q: 9, ans: 'A' }, { q: 10, ans: 'A' },
-    { q: 11, ans: 'A' }, { q: 12, ans: 'A' }, { q: 13, ans: 'A' }, { q: 14, ans: 'A' }, { q: 15, ans: 'A' },
-    { q: 16, ans: 'A' }, { q: 17, ans: 'A' }, { q: 18, ans: 'A' }, { q: 19, ans: 'A' }, { q: 20, ans: 'A' },
-    { q: 21, ans: 'A' }, { q: 22, ans: 'A' }, { q: 23, ans: 'A' }, { q: 24, ans: 'A' }, { q: 25, ans: 'A' },
-    { q: 26, ans: 'A' }, { q: 27, ans: 'A' }, { q: 28, ans: 'A' }, { q: 29, ans: 'A' }, { q: 30, ans: 'A' }
+    { q: 1, ans: 'A' }, { q: 2, ans: 'E' }, { q: 3, ans: 'D' }, { q: 4, ans: 'E' }, { q: 5, ans: 'B' },
+    { q: 6, ans: 'B' }, { q: 7, ans: 'B' }, { q: 8, ans: 'A' }, { q: 9, ans: 'A' }, { q: 10, ans: 'B' },
+    { q: 11, ans: 'A' }, { q: 12, ans: 'A' }, { q: 13, ans: 'E' }, { q: 14, ans: 'B' }, { q: 15, ans: 'A' },
+    { q: 16, ans: 'C' }, { q: 17, ans: 'E' }, { q: 18, ans: 'A' }, { q: 19, ans: 'C' }, { q: 20, ans: 'B' },
+    { q: 21, ans: 'C' }, { q: 22, ans: 'D' }, { q: 23, ans: 'A' }, { q: 24, ans: 'B' }, { q: 25, ans: 'D' },
+    { q: 26, ans: 'C' }, { q: 27, ans: 'C' }, { q: 28, ans: 'B' }, { q: 29, ans: 'A' }, { q: 30, ans: 'E' }
   ];
 
   public paginasRenderizadas = signal<string[]>([]);
@@ -1186,18 +1186,8 @@ export class CalificacionOmrComponent implements OnInit {
         const rh = detected.rh;
 
         const col_w = rw / 4.0;
-        const title_h = rh * 0.11;
-        const grid_y = ry + title_h;
-        const row_h = (rh - title_h) / 15.0;
-
+        const opt_pcts = [0.244, 0.412, 0.580, 0.748, 0.916];
         const opciones = ['A', 'B', 'C', 'D', 'E'];
-        const centers_rel: number[] = [];
-        let accum = 0.18 * col_w;
-        for (let i = 0; i < 5; i++) {
-          const w_opt = 0.164 * col_w;
-          centers_rel.push(accum + 0.5 * w_opt);
-          accum += w_opt;
-        }
 
         const detalles: DetallePreguntaOmr[] = [];
         let aciertos = 0;
@@ -1205,20 +1195,20 @@ export class CalificacionOmrComponent implements OnInit {
         let blancos = 0;
         let dobles = 0;
 
-        const bubbleRadius = Math.max(Math.floor(row_h * 0.28), 4);
+        const bubbleRadius = Math.max(Math.floor(rh * 0.019), 5);
 
-        // Evaluar las 30 preguntas
+        // Evaluar las 30 preguntas con coordenadas exactas de cada fila (1 a 15)
         for (let q = 1; q <= 30; q++) {
           const c_idx = Math.floor((q - 1) / 15);
           const r_idx = (q - 1) % 15;
           const col_start = rx + c_idx * col_w;
-          const cy = Math.floor(grid_y + (r_idx + 0.5) * row_h);
+          const cy = Math.floor(ry + rh * (0.094 + r_idx * 0.0632));
 
           const densidades: number[] = [];
           const optCoords: { cx: number; cy: number }[] = [];
 
           for (let optIdx = 0; optIdx < 5; optIdx++) {
-            const cx = Math.floor(col_start + centers_rel[optIdx]);
+            const cx = Math.floor(col_start + opt_pcts[optIdx] * col_w);
             optCoords.push({ cx, cy });
 
             // Muestreo de píxeles oscuros en la burbuja
