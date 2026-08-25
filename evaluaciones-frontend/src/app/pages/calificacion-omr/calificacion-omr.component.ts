@@ -756,11 +756,11 @@ export class CalificacionOmrComponent implements OnInit {
   public zoomAlineacion = signal<number>(0.85);
   public rotacionAlineacion = signal<number>(0);
 
-  // Coordenadas dinámicas del marco de calibración OMR (%) - Hoja 1 OMR (Margen 2.0 cm)
-  public boxTop = signal<number>(34.5);
-  public boxLeft = signal<number>(7.8);
-  public boxWidth = signal<number>(84.4);
-  public boxHeight = signal<number>(52.5);
+  // Coordenadas dinámicas del marco de calibración OMR (%) - Cartilla en Hoja 1 (Margen 2.0 cm)
+  public boxTop = signal<number>(26.7);
+  public boxLeft = signal<number>(9.5);
+  public boxWidth = signal<number>(80.0);
+  public boxHeight = signal<number>(32.0);
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
@@ -848,17 +848,17 @@ export class CalificacionOmrComponent implements OnInit {
   }
 
   public aplicarPresetEscaneoFisico(): void {
-    this.boxTop.set(34.5);
-    this.boxLeft.set(7.8);
-    this.boxWidth.set(84.4);
-    this.boxHeight.set(52.5);
+    this.boxTop.set(26.7);
+    this.boxLeft.set(9.5);
+    this.boxWidth.set(80.0);
+    this.boxHeight.set(32.0);
   }
 
   public aplicarPresetDigital(): void {
-    this.boxTop.set(34.5);
-    this.boxLeft.set(7.8);
-    this.boxWidth.set(84.4);
-    this.boxHeight.set(52.5);
+    this.boxTop.set(26.7);
+    this.boxLeft.set(9.5);
+    this.boxWidth.set(80.0);
+    this.boxHeight.set(32.0);
   }
 
   public autoCalibrarCartilla(): void {
@@ -882,35 +882,21 @@ export class CalificacionOmrComponent implements OnInit {
         ctx.drawImage(img, 0, 0);
 
         const imgData = ctx.getImageData(0, 0, img.width, img.height);
-        const data = imgData.data;
-
-        let topY = -1;
-        let bottomY = -1;
-
-        const startY = Math.floor(img.height * 0.20);
-        const endY = Math.floor(img.height * 0.65);
-
-        for (let y = startY; y < endY; y++) {
-          let darkCount = 0;
-          for (let x = Math.floor(img.width * 0.1); x < Math.floor(img.width * 0.9); x++) {
-            const idx = (y * img.width + x) * 4;
-            const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-            if (brightness < 90) darkCount++;
-          }
-          if (darkCount > img.width * 0.45) {
-            if (topY === -1) topY = y;
-            bottomY = y;
-          }
+        const markerResult = this._detectarEsquinasFiducialesEnImageData(imgData.data, img.width, img.height);
+        if (markerResult) {
+          this.boxTop.set(markerResult.boxTop);
+          this.boxLeft.set(markerResult.boxLeft);
+          this.boxWidth.set(markerResult.boxWidth);
+          this.boxHeight.set(markerResult.boxHeight);
+          return;
         }
 
-        if (topY !== -1 && (bottomY - topY) > (img.height * 0.15)) {
-          const pctTop = (topY / img.height) * 100;
-          const pctHeight = ((bottomY - topY) / img.height) * 100;
-          this.boxTop.set(Math.round(pctTop * 10) / 10);
-          this.boxHeight.set(Math.round(pctHeight * 10) / 10);
-        } else {
-          this.aplicarPresetEscaneoFisico();
-        }
+        // Fallback al contorno de la cartilla
+        const contorno = this._detectarContornoCartillaEnCanvas(imgData.data, img.width, img.height);
+        this.boxTop.set(Math.round((contorno.ry / img.height) * 1000) / 10);
+        this.boxLeft.set(Math.round((contorno.rx / img.width) * 1000) / 10);
+        this.boxWidth.set(Math.round((contorno.rw / img.width) * 1000) / 10);
+        this.boxHeight.set(Math.round((contorno.rh / img.height) * 1000) / 10);
       } catch (e) {
         this.aplicarPresetEscaneoFisico();
       }
@@ -1052,59 +1038,102 @@ export class CalificacionOmrComponent implements OnInit {
     }
   }
 
+  private _detectarEsquinasFiducialesEnImageData(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number
+  ): { rx: number; ry: number; rw: number; rh: number; boxTop: number; boxLeft: number; boxWidth: number; boxHeight: number } | null {
+    // Busca el centro de masa del bloque negro ■ en una región ROI
+    const findMarkerInRoi = (x1Pct: number, y1Pct: number, x2Pct: number, y2Pct: number): { x: number; y: number; minVal: number } | null => {
+      const minX = Math.floor(width * x1Pct);
+      const maxX = Math.floor(width * x2Pct);
+      const minY = Math.floor(height * y1Pct);
+      const maxY = Math.floor(height * y2Pct);
+      const blockSize = Math.max(4, Math.floor(width * 0.012)); // ~12-16px tamaño del marcador
+
+      let minAvg = 255;
+      let bestX = -1;
+      let bestY = -1;
+
+      for (let y = minY; y <= maxY - blockSize; y += 2) {
+        for (let x = minX; x <= maxX - blockSize; x += 2) {
+          let sum = 0;
+          let count = 0;
+          for (let dy = 0; dy < blockSize; dy += 2) {
+            for (let dx = 0; dx < blockSize; dx += 2) {
+              const idx = ((y + dy) * width + (x + dx)) * 4;
+              sum += (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+              count++;
+            }
+          }
+          const avg = sum / count;
+          if (avg < minAvg) {
+            minAvg = avg;
+            bestX = x + Math.floor(blockSize / 2);
+            bestY = y + Math.floor(blockSize / 2);
+          }
+        }
+      }
+
+      if (bestX !== -1 && minAvg < 140) {
+        return { x: bestX, y: bestY, minVal: minAvg };
+      }
+      return null;
+    };
+
+    // Cuadrantes de búsqueda de las 4 esquinas ■ de la cartilla OMR
+    const tl = findMarkerInRoi(0.04, 0.20, 0.18, 0.36); // Superior Izquierda
+    const tr = findMarkerInRoi(0.82, 0.20, 0.96, 0.36); // Superior Derecha
+    const bl = findMarkerInRoi(0.04, 0.50, 0.18, 0.68); // Inferior Izquierda
+    const br = findMarkerInRoi(0.82, 0.50, 0.96, 0.68); // Inferior Derecha
+
+    if (tl && tr && bl && br) {
+      const rx = Math.min(tl.x, bl.x);
+      const ry = Math.min(tl.y, tr.y);
+      const rightX = Math.max(tr.x, br.x);
+      const bottomY = Math.max(bl.y, br.y);
+      const rw = rightX - rx;
+      const rh = bottomY - ry;
+
+      if (rw > width * 0.65 && rh > height * 0.20) {
+        return {
+          rx,
+          ry,
+          rw,
+          rh,
+          boxTop: Math.round((ry / height) * 1000) / 10,
+          boxLeft: Math.round((rx / width) * 1000) / 10,
+          boxWidth: Math.round((rw / width) * 1000) / 10,
+          boxHeight: Math.round((rh / height) * 1000) / 10
+        };
+      }
+    }
+
+    return null;
+  }
+
   private _detectarContornoCartillaEnCanvas(
     data: Uint8ClampedArray,
     width: number,
     height: number
   ): { rx: number; ry: number; rw: number; rh: number } {
-    const minY = Math.floor(height * 0.20);
-    const maxY = Math.floor(height * 0.95);
-    const minX = Math.floor(width * 0.05);
-    const maxX = Math.floor(width * 0.95);
-
-    let topBorderY = -1;
-    let bottomBorderY = -1;
-    let leftBorderX = -1;
-    let rightBorderX = -1;
-
-    for (let y = minY; y < maxY; y++) {
-      let darkCount = 0;
-      let firstDarkX = -1;
-      let lastDarkX = -1;
-
-      for (let x = minX; x < maxX; x++) {
-        const idx = (y * width + x) * 4;
-        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-        if (brightness < 125) {
-          darkCount++;
-          if (firstDarkX === -1) firstDarkX = x;
-          lastDarkX = x;
-        }
-      }
-
-      // Si la línea horizontal continua cubre más del 60% del ancho
-      if (darkCount > width * 0.60 && (lastDarkX - firstDarkX) > width * 0.65) {
-        if (topBorderY === -1) {
-          topBorderY = y;
-          leftBorderX = firstDarkX;
-          rightBorderX = lastDarkX;
-        }
-        bottomBorderY = y;
-      }
+    // 1. Intentar anclaje exacto por las 4 esquinas fiduciales ■
+    const markerResult = this._detectarEsquinasFiducialesEnImageData(data, width, height);
+    if (markerResult) {
+      return {
+        rx: markerResult.rx,
+        ry: markerResult.ry,
+        rw: markerResult.rw,
+        rh: markerResult.rh
+      };
     }
 
-    if (topBorderY !== -1 && (bottomBorderY - topBorderY) > (height * 0.20)) {
-      const rw = rightBorderX - leftBorderX;
-      const rh = bottomBorderY - topBorderY;
-      return { rx: leftBorderX, ry: topBorderY, rw, rh };
-    }
-
-    // Fallback de alta precisión para Cartilla en Hoja 1 OMR (Margen 2.0 cm)
+    // 2. Fallback de alta precisión para Cartilla en Hoja 1 OMR (Margen 2.0 cm)
     return {
-      rx: Math.floor(width * 0.078),
-      ry: Math.floor(height * 0.345),
-      rw: Math.floor(width * 0.844),
-      rh: Math.floor(height * 0.525)
+      rx: Math.floor(width * 0.095),
+      ry: Math.floor(height * 0.267),
+      rw: Math.floor(width * 0.800),
+      rh: Math.floor(height * 0.320)
     };
   }
 
