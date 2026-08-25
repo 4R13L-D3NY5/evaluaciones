@@ -6,7 +6,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
 export interface DetallePreguntaOmr {
@@ -138,7 +138,7 @@ export interface EstudianteOmrItem {
 
         <div class="hidden sm:flex items-center gap-2 text-xs font-bold text-muted-foreground">
           <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Archivo Cargado: <strong>{{ archivoCargadoNombre() }}</strong> (5 Páginas)</span>
+          <span>Archivo Cargado: <strong>{{ archivoCargadoNombre() }}</strong> ({{ totalPaginas() }} Páginas)</span>
         </div>
       </div>
 
@@ -159,11 +159,11 @@ export interface EstudianteOmrItem {
                   Lote de Exámenes Escaneados Listo para Calificación
                 </h4>
                 <p class="text-xs text-muted-foreground mt-0.5">
-                  Archivo activo: <span class="font-mono font-bold text-purple-700">{{ archivoCargadoNombre() }}</span> (5 Estudiantes · 30 Reactivos).
+                  Archivo activo: <span class="font-mono font-bold text-purple-700">{{ archivoCargadoNombre() }}</span> ({{ totalPaginas() }} Páginas Escaneadas).
                 </p>
                 <div class="flex items-center gap-2 mt-2">
                   <span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">
-                    ✓ 5 Páginas Detectadas
+                    ✓ {{ totalPaginas() }} Páginas Detectadas
                   </span>
                   <span class="bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded text-[10px]">
                     ✓ Resolución 300 DPI
@@ -188,7 +188,7 @@ export interface EstudianteOmrItem {
                 (click)="ejecutarProcesamientoOmrEnVivo()"
                 class="bg-gradient-to-r from-purple-700 via-indigo-600 to-blue-600 hover:from-purple-800 hover:to-blue-700 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/25 transition-transform hover:scale-105 cursor-pointer">
                 <i class="pi pi-bolt text-amber-300"></i>
-                <span>Ejecutar Calificación OMR (5 Páginas)</span>
+                <span>Ejecutar Calificación OMR ({{ totalPaginas() }} Páginas)</span>
               </button>
             </div>
           </div>
@@ -730,6 +730,10 @@ export class CalificacionOmrComponent implements OnInit {
 
   public paginasRenderizadas = signal<string[]>([]);
   public cargandoPdf = signal<boolean>(false);
+
+  public totalPaginas = computed(() => {
+    return this.paginasRenderizadas().length || 5;
+  });
 
   public listaBotonesPagina = computed(() => {
     const custom = this.paginasRenderizadas();
