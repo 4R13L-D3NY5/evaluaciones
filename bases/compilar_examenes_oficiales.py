@@ -762,7 +762,18 @@ def generar_preguntas_30_variante(seed=100):
 # =============================================================================
 # GENERADOR DE CÓDIGO TYPST CON CARTILLA OMR CONSERVANDO MATRIZ EXACTA
 # =============================================================================
-def generar_typst_examen_30(estudiante, variante_letra, seed=100):
+def generar_typst_examen_30(estudiante, variante_letra, seed=100, materia_info=None):
+    if materia_info is None:
+        materia_info = {
+            "codigo": "CPEC18",
+            "materia": "AUDITORÍA TRIBUTARIA",
+            "carrera": "AUDITORÍA / CONTADURÍA",
+            "docente": "MAURICIO QUIROZ LAFUENTE",
+            "grupo": "TA-01",
+            "semestre": 3,
+            "hora": "08:15:00 - 09:45:00"
+        }
+
     nombre_completo = f"{estudiante['nombres']} {estudiante['apellido1']} {estudiante['apellido2']}".upper()
     codigo_est = estudiante['codigo']
     
@@ -776,7 +787,7 @@ def generar_typst_examen_30(estudiante, variante_letra, seed=100):
         end_q = start_q + 15
         table_rows = []
         for num in range(start_q, end_q):
-            row_items = f"""        [#text(size: 7.2pt, weight: "bold")[{num}.]],
+            row_items = f"""        [#text(size: 7.0pt, weight: "bold")[{num}.]],
         [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[A]]]],
         [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[B]]]],
         [#circle(radius: 3.4pt, stroke: 0.4pt + black)[#align(center + horizon)[#text(size: 5.0pt, weight: "bold")[C]]]],
@@ -857,13 +868,13 @@ def generar_typst_examen_30(estudiante, variante_letra, seed=100):
   fill: none,
   inset: (x: 5pt, y: 2.2pt),
   [*NOMBRE:* {nombre_completo}],
-  [*CARRERA:* AUDITORÍA / CONTADURÍA],
-  [*MATERIA:* [CPEC18] AUDITORÍA TRIBUTARIA],
-  [*GRUPO:* TA-01 #h(10pt) *SEMESTRE:* 3],
-  [*DOCENTE:* MAURICIO QUIROZ LAFUENTE],
+  [*CARRERA:* {materia_info['carrera']}],
+  [*MATERIA:* [{materia_info['codigo']}] {materia_info['materia']}],
+  [*GRUPO:* {materia_info['grupo']} #h(10pt) *SEMESTRE:* {materia_info['semestre']}],
+  [*DOCENTE:* {materia_info['docente']}],
   [*EXAMEN:* 1er Parcial · VARIANTE {variante_letra}],
   [*FECHA:* 22/08/2026],
-  [*HORA:* 08:15:00 - 09:45:00],
+  [*HORA:* {materia_info['hora']}],
   [
     *FIRMA DEL ESTUDIANTE:* \\
     #v(10pt)
@@ -901,7 +912,7 @@ def generar_typst_examen_30(estudiante, variante_letra, seed=100):
 
 #align(center)[
   #text(size: 11pt, weight: "bold")[CUESTIONARIO DE PREGUNTAS (30 REACTIVOS)]\\
-  #text(size: 9pt, weight: "bold", fill: luma(60))[[CPEC18] AUDITORÍA TRIBUTARIA · EVALUACIÓN TEÓRICA 1ER PARCIAL · VARIANTE {variante_letra}]
+  #text(size: 9pt, weight: "bold", fill: luma(60))[[{materia_info['codigo']}] {materia_info['materia']} · EVALUACIÓN TEÓRICA 1ER PARCIAL · VARIANTE {variante_letra}]
 ]
 
 #v(-3pt)
@@ -952,7 +963,7 @@ def generar_typst_examen_30(estudiante, variante_letra, seed=100):
 #v(4pt)
 #text(weight: "bold", size: 9.5pt)[CASOS PRÁCTICOS Y PROBLEMAS APLICADOS]\\
 #rect(width: 100%, stroke: 0.5pt + luma(100), fill: rgb("#f8fafc"), inset: 3.5pt)[
-  #text(size: 8.5pt)[*CASO PRÁCTICO (Auditoría Tributaria Integral):* En la fiscalización a 'Comercial Andina S.R.L.', se detectaron compras no bancarizadas por Bs 150.000 y retenciones de servicios no declaradas.]
+  #text(size: 8.5pt)[*CASO PRÁCTICO (Auditoría Tributaria / Casos Técnicos):* En la fiscalización a 'Comercial Andina S.R.L.', se detectaron compras no bancarizadas por Bs 150.000 y retenciones de servicios no declaradas.]
 ]
 #v(1.5pt)
 """
@@ -986,62 +997,110 @@ def main():
     bases_dir = r"C:\laragon\www\evaluaciones\bases"
     assets_dir = r"C:\laragon\www\evaluaciones\evaluaciones-frontend\src\assets\examenes"
     dist_dir = r"C:\laragon\www\evaluaciones\evaluaciones-frontend\dist\sea-evaluaciones-ui\browser\assets\examenes"
+    public_dir = r"C:\laragon\www\evaluaciones\evaluaciones-frontend\public\assets\examenes"
 
-    os.makedirs(assets_dir, exist_ok=True)
-    if os.path.exists(r"C:\laragon\www\evaluaciones\evaluaciones-frontend\dist\sea-evaluaciones-ui"):
-        os.makedirs(dist_dir, exist_ok=True)
+    for d in [bases_dir, assets_dir, dist_dir, public_dir]:
+        os.makedirs(d, exist_ok=True)
 
     print("--- COMPILANDO EXÁMENES OFICIALES (30 REACTIVOS: 7F + 16M + 7D) CON MATRIZ OMR EXACTA ---")
 
-    # 1. Compilar Variantes A, B, C
-    variantes = [("VarA", "A", 100), ("VarB", "B", 153), ("VarC", "C", 206)]
-    for var_slug, letra, seed in variantes:
-        est_default = ESTUDIANTES[0]
-        typ_text = generar_typst_examen_30(est_default, letra, seed)
-        
-        typ_file = os.path.join(bases_dir, f"CPEC18_Cochabamba_TA-01_1erParcial_{var_slug}_20260822_Examen.typ")
-        pdf_file = os.path.join(bases_dir, f"CPEC18_Cochabamba_TA-01_1erParcial_{var_slug}_20260822_Examen.pdf")
-        
-        with open(typ_file, "w", encoding="utf-8") as f:
-            f.write(typ_text)
-        
-        print(f"Compilando {var_slug} (30 Reactivos)...")
-        typst.compile(typ_file, output=pdf_file)
-        
-        shutil.copy2(pdf_file, os.path.join(assets_dir, os.path.basename(pdf_file)))
-        if os.path.exists(dist_dir):
-            shutil.copy2(pdf_file, os.path.join(dist_dir, os.path.basename(pdf_file)))
+    materias = [
+        {
+            "codigo": "CPEC18",
+            "cod_clean": "CPEC18",
+            "materia": "AUDITORÍA TRIBUTARIA",
+            "carrera": "AUDITORÍA / CONTADURÍA",
+            "docente": "MAURICIO QUIROZ LAFUENTE",
+            "grupo": "TA-01",
+            "semestre": 3,
+            "hora": "08:15:00 - 09:45:00"
+        },
+        {
+            "codigo": "SIS-125",
+            "cod_clean": "SIS125",
+            "materia": "INGLÉS TÉCNICO II",
+            "carrera": "INGENIERÍA DE SISTEMAS",
+            "docente": "LIC. PATRICIA VARGAS",
+            "grupo": "TA-01",
+            "semestre": 2,
+            "hora": "10:00:00 - 11:30:00"
+        },
+        {
+            "codigo": "SIS-211",
+            "cod_clean": "SIS211",
+            "materia": "INGLÉS TÉCNICO II",
+            "carrera": "INGENIERÍA DE SISTEMAS",
+            "docente": "LIC. PATRICIA VARGAS",
+            "grupo": "TA-01",
+            "semestre": 2,
+            "hora": "10:00:00 - 11:30:00"
+        },
+        {
+            "codigo": "SIS-413",
+            "cod_clean": "SIS413",
+            "materia": "TELECOMUNICACIONES",
+            "carrera": "INGENIERÍA DE SISTEMAS",
+            "docente": "ING. JORGE CLAROS",
+            "grupo": "TA-01",
+            "semestre": 4,
+            "hora": "11:45:00 - 13:15:00"
+        }
+    ]
 
-    # 2. Compilar Master Consolidado
-    master_typ = os.path.join(bases_dir, "CPEC18_Cochabamba_TA-01_1erParcial_20260822_Examen.typ")
-    master_pdf = os.path.join(bases_dir, "CPEC18_Cochabamba_TA-01_1erParcial_20260822_Examen.pdf")
-    with open(master_typ, "w", encoding="utf-8") as f:
-        f.write(generar_typst_examen_30(ESTUDIANTES[0], "A", 100))
-    typst.compile(master_typ, output=master_pdf)
-    shutil.copy2(master_pdf, os.path.join(assets_dir, os.path.basename(master_pdf)))
-    if os.path.exists(dist_dir):
-        shutil.copy2(master_pdf, os.path.join(dist_dir, os.path.basename(master_pdf)))
+    for mat in materias:
+        cod = mat["cod_clean"]
+        print(f"\n>> Procesando Asignatura [{mat['codigo']}] {mat['materia']}...")
+        
+        # 1. Variantes A, B, C
+        variantes = [("VarA", "A", 100), ("VarB", "B", 153), ("VarC", "C", 206)]
+        for var_slug, letra, seed in variantes:
+            est_default = ESTUDIANTES[0]
+            typ_text = generar_typst_examen_30(est_default, letra, seed, mat)
+            
+            typ_file = os.path.join(bases_dir, f"{cod}_Cochabamba_TA-01_1erParcial_{var_slug}_20260822_Examen.typ")
+            pdf_file = os.path.join(bases_dir, f"{cod}_Cochabamba_TA-01_1erParcial_{var_slug}_20260822_Examen.pdf")
+            
+            with open(typ_file, "w", encoding="utf-8") as f:
+                f.write(typ_text)
+            
+            typst.compile(typ_file, output=pdf_file)
+            
+            for dest in [assets_dir, dist_dir, public_dir]:
+                if os.path.exists(dest):
+                    shutil.copy2(pdf_file, os.path.join(dest, os.path.basename(pdf_file)))
+            print(f"  [OK PDF] {os.path.basename(pdf_file)}")
 
-    # 3. Compilar los 12 Cuadernillos de Estudiantes Individuales
-    for i, est in enumerate(ESTUDIANTES):
-        letra_var = ["A", "B", "C"][i % 3]
-        nom_slug = f"{est['nombres']}_{est['apellido1']}_{est['apellido2']}".upper().replace(" ", "_")
-        for char, repl in [("É", "E"), ("Í", "I"), ("Ó", "O"), ("Á", "A"), ("Ú", "U"), ("Ñ", "N")]:
-            nom_slug = nom_slug.replace(char, repl)
-        
-        est_typ = os.path.join(bases_dir, f"CPEC18_{est['codigo']}_{nom_slug}_Examen.typ")
-        est_pdf = os.path.join(bases_dir, f"CPEC18_{est['codigo']}_{nom_slug}_Examen.pdf")
-        
-        with open(est_typ, "w", encoding="utf-8") as f:
-            f.write(generar_typst_examen_30(est, letra_var, (i + 1) * 73))
-        
-        typst.compile(est_typ, output=est_pdf)
-        shutil.copy2(est_pdf, os.path.join(assets_dir, os.path.basename(est_pdf)))
-        if os.path.exists(dist_dir):
-            shutil.copy2(est_pdf, os.path.join(dist_dir, os.path.basename(est_pdf)))
-        print(f"  [OK] Estudiante {est['codigo']} ({letra_var}) -> {os.path.basename(est_pdf)}")
+        # 2. Master Consolidado
+        master_typ = os.path.join(bases_dir, f"{cod}_Cochabamba_TA-01_1erParcial_20260822_Examen.typ")
+        master_pdf = os.path.join(bases_dir, f"{cod}_Cochabamba_TA-01_1erParcial_20260822_Examen.pdf")
+        with open(master_typ, "w", encoding="utf-8") as f:
+            f.write(generar_typst_examen_30(ESTUDIANTES[0], "A", 100, mat))
+        typst.compile(master_typ, output=master_pdf)
+        for dest in [assets_dir, dist_dir, public_dir]:
+            if os.path.exists(dest):
+                shutil.copy2(master_pdf, os.path.join(dest, os.path.basename(master_pdf)))
 
-    print("¡TODOS LOS EXÁMENES COMPILADOS EXITOSAMENTE CON 30 PREGUNTAS Y MATRIZ OMR EXACTA!")
+        # 3. Cuadernillos de los 3 Estudiantes
+        for i in range(3):
+            est = ESTUDIANTES[i]
+            letra_var = ["A", "B", "C"][i % 3]
+            nom_slug = f"{est['nombres']}_{est['apellido1']}_{est['apellido2']}".upper().replace(" ", "_")
+            for char, repl in [("É", "E"), ("Í", "I"), ("Ó", "O"), ("Á", "A"), ("Ú", "U"), ("Ñ", "N")]:
+                nom_slug = nom_slug.replace(char, repl)
+            
+            est_typ = os.path.join(bases_dir, f"{cod}_{est['codigo']}_{nom_slug}_Examen.typ")
+            est_pdf = os.path.join(bases_dir, f"{cod}_{est['codigo']}_{nom_slug}_Examen.pdf")
+            
+            with open(est_typ, "w", encoding="utf-8") as f:
+                f.write(generar_typst_examen_30(est, letra_var, (i + 1) * 73, mat))
+            
+            typst.compile(est_typ, output=est_pdf)
+            for dest in [assets_dir, dist_dir, public_dir]:
+                if os.path.exists(dest):
+                    shutil.copy2(est_pdf, os.path.join(dest, os.path.basename(est_pdf)))
+            print(f"  [OK EST] {est['codigo']} ({letra_var}) -> {os.path.basename(est_pdf)}")
+
+    print("\n¡TODOS LOS EXÁMENES COMPILADOS EXITOSAMENTE PARA TODAS LAS MATERIAS!")
 
 if __name__ == "__main__":
     main()

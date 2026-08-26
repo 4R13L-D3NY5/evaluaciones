@@ -1861,6 +1861,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   public abrirPdfTypstOficial(): void {
     const item = this.evaluacionActivaVisor();
     const est = this.getEstudianteActivo();
+    const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
     if (est && this._codigosPdfEstudiantes.has(est.codigo)) {
       const nomSlug = `${est.nombres}_${est.apellido1}_${est.apellido2}`
         .toUpperCase()
@@ -1871,10 +1872,9 @@ export class EvaluacionesDiaComponent implements OnInit {
         .replace(/Á/g, 'A')
         .replace(/Ú/g, 'U')
         .replace(/Ñ/g, 'N');
-      const filename = `CPEC18_${est.codigo}_${nomSlug}_Examen.pdf`;
+      const filename = `${cod}_${est.codigo}_${nomSlug}_Examen.pdf`;
       window.open(`assets/examenes/${filename}`, '_blank');
     } else {
-      const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
       const filename = `${cod}_Cochabamba_TA-01_1erParcial_VarA_20260822_Examen.pdf`;
       window.open(`assets/examenes/${filename}`, '_blank');
     }
