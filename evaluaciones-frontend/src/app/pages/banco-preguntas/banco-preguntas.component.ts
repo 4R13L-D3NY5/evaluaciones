@@ -1318,7 +1318,7 @@ export interface DiaCalendario {
             </div>
 
             <!-- Área de Visualización: Hoja de Examen en Tamaño Real (Estilo Papel Académico) -->
-            <div class="p-4 sm:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 space-y-6">
+            <div id="area-scroll-banco-pdf" (scroll)="onScrollDocumentoPdf($event)" class="p-4 sm:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 space-y-6 max-h-[72vh]">
               
               <!-- Hoja de Examen Impresa Oficial (Renderizado Typst) -->
               <div class="bg-white text-slate-900 border border-slate-300 rounded-2xl shadow-xl p-6 sm:p-10 max-w-4xl mx-auto space-y-6 font-serif text-xs leading-relaxed">
@@ -1569,25 +1569,35 @@ export interface DiaCalendario {
 
             </div>
 
-            <!-- Pie del Modal con Acción de Aprobación de Diagramación Requerida -->
+            <!-- Pie del Modal con Acción de Aprobación de Banco Requerida -->
             <div class="bg-card border-t border-border p-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs shrink-0">
-              <div class="flex items-center gap-2 text-muted-foreground font-medium text-center sm:text-left">
-                <i class="pi pi-shield text-purple-700 text-sm"></i>
-                <span>Has revisado el 100% de las <strong>{{ preguntasValidasParaPdf().length }} preguntas</strong> del banco oficial.</span>
+              <div class="flex items-center gap-2 text-center sm:text-left">
+                @if (!documentoRecorridoCompleto()) {
+                  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 font-bold">
+                    <i class="pi pi-arrow-down animate-bounce text-xs"></i>
+                    <span>Desplázate hasta el final para revisar los <strong>{{ preguntasValidasParaPdf().length }} reactivos</strong> y habilitar la aprobación.</span>
+                  </div>
+                } @else {
+                  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 font-bold">
+                    <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                    <span>Revisión completa de los <strong>{{ preguntasValidasParaPdf().length }} reactivos</strong> realizada con éxito.</span>
+                  </div>
+                }
               </div>
 
               <div class="flex items-center gap-2.5">
                 <button 
                   (click)="cerrarModalPrevisualizacionPdf()"
                   class="px-4 py-2.5 bg-muted hover:bg-border text-foreground rounded-xl font-bold transition-colors cursor-pointer">
-                  Cerrar sin Aprobar
+                  Cerrar
                 </button>
 
                 <button 
+                  [disabled]="!documentoRecorridoCompleto()"
                   (click)="aprobarDiagramacionPdf()"
-                  class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all hover:scale-105 flex items-center gap-2 cursor-pointer">
+                  class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                   <i class="pi pi-check-circle text-sm"></i>
-                  <span>Aprobar Diagramación y Desbloquear Encriptado</span>
+                  <span>Aprobar y Guardar Banco de Preguntas</span>
                 </button>
               </div>
             </div>
@@ -2464,6 +2474,7 @@ export class BancoPreguntasComponent implements OnInit {
   public dialogEjemplos = signal<boolean>(false);
   public filtroGuiaTipo = signal<string>('TODOS');
   public dialogPrevisualizacionPdf = signal<boolean>(false);
+  public documentoRecorridoCompleto = signal<boolean>(false);
   public pdfPrevisualizadoYConforme = signal<boolean>(false);
   public dialogPrevisualizacionPkg = signal<boolean>(false);
   public tabPrevisualizacionPkg = signal<'cifrado' | 'desencriptado'>('cifrado');
@@ -3428,7 +3439,17 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
   // Previsualización PDF
   public abrirModalPrevisualizacionPdf(): void {
+    this.documentoRecorridoCompleto.set(false);
     this.dialogPrevisualizacionPdf.set(true);
+  }
+
+  public onScrollDocumentoPdf(event: Event): void {
+    const element = event.target as HTMLElement;
+    if (!element) return;
+    // Comprobar si el scroll llegó al final o está a menos de 80px del final
+    if (element.scrollTop + element.clientHeight >= element.scrollHeight - 80) {
+      this.documentoRecorridoCompleto.set(true);
+    }
   }
 
   public cerrarModalPrevisualizacionPdf(): void {

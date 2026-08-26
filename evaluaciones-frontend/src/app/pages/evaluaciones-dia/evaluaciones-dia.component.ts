@@ -1776,24 +1776,14 @@ export class EvaluacionesDiaComponent implements OnInit {
     window.open(`assets/examenes/${filename}`, '_blank');
   }
 
+  private readonly _codigosPdfEstudiantes = new Set([
+    '6549812', '6839201', '6928103', '7194820', '7391028', '7482910', 
+    '7849102', '7928104', '8102938', '8291047', '8392104', '8401928'
+  ]);
+
   public abrirPdfTypstOficialDirecto(item: EvaluacionItemUI): void {
     const est = this.estudiantesInscritos()[0] || { codigo: '7849102', nombres: 'JUAN CARLOS', apellido1: 'PEREZ', apellido2: 'MAMANI' };
-    const nomSlug = `${est.nombres}_${est.apellido1}_${est.apellido2}`
-      .toUpperCase()
-      .replace(/\s+/g, '_')
-      .replace(/É/g, 'E')
-      .replace(/Í/g, 'I')
-      .replace(/Ó/g, 'O')
-      .replace(/Á/g, 'A')
-      .replace(/Ú/g, 'U')
-      .replace(/Ñ/g, 'N');
-    const filename = `CPEC18_${est.codigo}_${nomSlug}_Examen.pdf`;
-    window.open(`assets/examenes/${filename}`, '_blank');
-  }
-
-  public abrirPdfTypstOficial(): void {
-    const est = this.getEstudianteActivo();
-    if (est) {
+    if (this._codigosPdfEstudiantes.has(est.codigo)) {
       const nomSlug = `${est.nombres}_${est.apellido1}_${est.apellido2}`
         .toUpperCase()
         .replace(/\s+/g, '_')
@@ -1806,7 +1796,27 @@ export class EvaluacionesDiaComponent implements OnInit {
       const filename = `CPEC18_${est.codigo}_${nomSlug}_Examen.pdf`;
       window.open(`assets/examenes/${filename}`, '_blank');
     } else {
-      const filename = `CPEC18_7849102_JUAN_CARLOS_PEREZ_MAMANI_Examen.pdf`;
+      const filename = `CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Examen.pdf`;
+      window.open(`assets/examenes/${filename}`, '_blank');
+    }
+  }
+
+  public abrirPdfTypstOficial(): void {
+    const est = this.getEstudianteActivo();
+    if (est && this._codigosPdfEstudiantes.has(est.codigo)) {
+      const nomSlug = `${est.nombres}_${est.apellido1}_${est.apellido2}`
+        .toUpperCase()
+        .replace(/\s+/g, '_')
+        .replace(/É/g, 'E')
+        .replace(/Í/g, 'I')
+        .replace(/Ó/g, 'O')
+        .replace(/Á/g, 'A')
+        .replace(/Ú/g, 'U')
+        .replace(/Ñ/g, 'N');
+      const filename = `CPEC18_${est.codigo}_${nomSlug}_Examen.pdf`;
+      window.open(`assets/examenes/${filename}`, '_blank');
+    } else {
+      const filename = `CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Examen.pdf`;
       window.open(`assets/examenes/${filename}`, '_blank');
     }
   }
