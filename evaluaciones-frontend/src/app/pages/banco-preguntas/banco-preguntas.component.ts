@@ -1427,127 +1427,117 @@ export interface DiaCalendario {
                 </div>
 
                 <!-- 4. Cuerpo Completo de Preguntas del Banco (100% de los reactivos) -->
-                <div class="pt-2 border-t border-slate-300">
-                  <div class="text-center font-sans font-black text-xs uppercase tracking-widest text-slate-700 mb-4 pb-1 border-b border-slate-200">
-                    — CUESTIONARIO OFICIAL DE PREGUNTAS (TOTAL: {{ preguntasValidasParaPdf().length }} REACTIVOS) —
+                <!-- 4. Cuerpo Completo de Preguntas del Banco (100% de los reactivos con fidelidad exacta a Typst) -->
+                <div class="pt-2 border-t-2 border-slate-900 font-serif">
+                  <div class="text-center font-sans font-black text-sm uppercase tracking-widest text-slate-950">
+                    CUESTIONARIO DE PREGUNTAS ({{ preguntasValidasParaPdf().length }} REACTIVOS)
+                  </div>
+                  <div class="text-center font-sans font-bold text-[11px] uppercase text-slate-600 mb-3 pb-2">
+                    {{ asignaturaNombreCompleto() }} · EVALUACIÓN TEÓRICA {{ parcialActivo() | uppercase }} · VARIANTE A
                   </div>
 
-                  <!-- Grilla de Preguntas (2 Columnas o 1 Columna) -->
-                  <div [class]="vistaPdfColumnas() === '2' ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6' : 'space-y-6'">
+                  <hr class="border-t-2 border-slate-900 mb-6" />
+
+                  <!-- Lista de Preguntas Formateadas Idénticas a la Impresión de Examen -->
+                  <div [class]="vistaPdfColumnas() === '2' ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5' : 'space-y-5'">
                     
                     @for (pregunta of preguntasValidasParaPdf(); track pregunta.fila; let i = $index) {
-                      <div class="space-y-2 p-3 rounded-xl border border-slate-200 bg-slate-50/40 hover:bg-slate-50 transition-colors break-inside-avoid">
-                        
-                        <!-- Encabezado de la Pregunta: Número, Dificultad, Tipo y Clave -->
-                        <div class="flex items-start justify-between gap-2 border-b border-slate-200 pb-1.5">
-                          <div class="font-sans font-black text-slate-900 text-xs flex items-center gap-1.5">
-                            <span class="h-5 w-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] shrink-0">
-                              {{ i + 1 }}
-                            </span>
-                            <span class="font-bold text-[10px] text-slate-600 uppercase font-mono">
-                              Fila Excel {{ pregunta.fila }}
-                            </span>
+                      
+                      <!-- Renderizado de Encabezado de Sección si corresponde -->
+                      @if (i === 0) {
+                        <div class="col-span-full border-b border-slate-300 pb-1 mb-2 font-sans">
+                          <div class="font-black text-xs uppercase text-slate-950">
+                            SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 15)
                           </div>
-
-                          <div class="flex items-center gap-1 font-mono text-[9px]">
-                            <!-- Badge Dificultad -->
-                            <span [class]="pregunta.dificultad === '1' ? 'bg-emerald-100 text-emerald-800' : (pregunta.dificultad === '2' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800')" class="px-1.5 py-0.2 rounded font-bold uppercase">
-                              {{ getDificultadNombre(pregunta.dificultad) }}
-                            </span>
-                            
-                            <!-- Clave Correcta -->
-                            <span class="bg-purple-100 text-purple-900 font-black px-1.5 py-0.2 rounded border border-purple-200">
-                              Clave: {{ pregunta.respuesta_correcta }}
-                            </span>
+                          <div class="text-[10px] text-slate-700 italic">
+                            <strong>Instrucciones:</strong> Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.
                           </div>
                         </div>
+                      } @else if (i === 15) {
+                        <div class="col-span-full border-b border-slate-300 pb-1 my-3 font-sans">
+                          <div class="font-black text-xs uppercase text-slate-950">
+                            FALSO O VERDADERO (Preguntas 16 a 25)
+                          </div>
+                          <div class="text-[10px] text-slate-700 italic">
+                            <strong>Instrucciones:</strong> Determine si cada afirmación es verdadera (A) o falsa (B).
+                          </div>
+                        </div>
+                      } @else if (i === 25) {
+                        <div class="col-span-full border-b border-slate-300 pb-1 my-3 font-sans">
+                          <div class="font-black text-xs uppercase text-slate-950">
+                            PREMISAS A / B / AMBAS / NINGUNA (Preguntas 26 a 35)
+                          </div>
+                          <div class="text-[10px] text-slate-700 italic">
+                            <strong>Instrucciones:</strong> Analice las dos premisas y elija la opción de relación correcta.
+                          </div>
+                        </div>
+                      } @else if (i === 35) {
+                        <div class="col-span-full border-b border-slate-300 pb-1 my-3 font-sans">
+                          <div class="font-black text-xs uppercase text-slate-950">
+                            PREGUNTAS CON CLAVE DE RESPUESTA (Preguntas 36 a 45)
+                          </div>
+                          <div class="text-[10px] text-slate-700 italic">
+                            <strong>Instrucciones:</strong> Marque A si 1, 2 y 3 son correctas; B si 1 y 3; C si 2 y 4; D si solo 4; E si todas son correctas.
+                          </div>
+                        </div>
+                      } @else if (i === 45) {
+                        <div class="col-span-full border-b border-slate-300 pb-1 my-3 font-sans">
+                          <div class="font-black text-xs uppercase text-slate-950">
+                            CASOS PRÁCTICOS Y PROBLEMAS APLICADOS (Preguntas 46 a 55)
+                          </div>
+                          <div class="p-2 bg-slate-100 rounded-lg border border-slate-300 text-[10.5px] mt-1 text-slate-800">
+                            <strong>CASO PRÁCTICO N° 1 (Comercial Andina S.R.L.):</strong> En la fiscalización integral se detectaron compras no bancarizadas por Bs 150.000 y retenciones de servicios no declaradas.
+                          </div>
+                        </div>
+                      } @else if (i === 55) {
+                        <div class="col-span-full border-b border-slate-300 pb-1 my-3 font-sans">
+                          <div class="font-black text-xs uppercase text-slate-950">
+                            EMPAREJAMIENTO DE CONCEPTOS (Preguntas 56 a 60)
+                          </div>
+                          <div class="p-2.5 bg-slate-100 rounded-lg border border-slate-300 text-[10.5px] mt-1 space-y-1">
+                            <div class="font-bold text-slate-900">OPCIONES DE REFERENCIA:</div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[10px] text-slate-800 pl-2">
+                              <div><strong>A)</strong> Determinación sobre Base Presunta</div>
+                              <div><strong>B)</strong> Crédito Fiscal IVA Trasladable</div>
+                              <div><strong>C)</strong> Alícuota Adicional IUE Financiero</div>
+                              <div><strong>D)</strong> Exención Tributaria Subjetiva</div>
+                              <div><strong>E)</strong> Determinación sobre Base Cierta</div>
+                            </div>
+                            <div class="text-[9.5px] text-slate-600 italic pt-1">Relacione cada uno de los siguientes enunciados con la opción correspondiente:</div>
+                          </div>
+                        </div>
+                      }
 
+                      <!-- Reactivo Individual Formateado Idéntico a Captura 2 -->
+                      <div class="space-y-1.5 break-inside-avoid">
+                        
                         <!-- Enunciado de la Pregunta -->
-                        <p class="font-bold text-slate-950 text-xs leading-snug font-sans">
-                          {{ pregunta.enunciado }}
-                        </p>
+                        <div class="text-slate-950 text-[11.5px] leading-snug font-sans">
+                          <strong>{{ i + 1 }}.</strong> {{ pregunta.enunciado }}
+                        </div>
 
                         <!-- Renderizado de Fórmulas Typst si existen -->
                         @if (pregunta.formulaTypst) {
-                          <div class="bg-slate-950 text-emerald-400 font-mono text-[10.5px] p-2.5 rounded-lg border border-slate-800 my-1 overflow-x-auto">
+                          <div class="bg-slate-950 text-emerald-400 font-mono text-[10px] p-2 rounded border border-slate-800 my-1 overflow-x-auto">
                             {{ pregunta.formulaTypst }}
                           </div>
                         }
 
-                        <!-- Opciones de Respuesta según tipo de reactivo -->
-                        @if (pregunta.tipo === 'FALSO_VERDADERO') {
-                          <div class="grid grid-cols-2 gap-2 pl-2 font-sans text-[11px] pt-1">
-                            <div class="flex items-center gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'A'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'A'">
-                              <strong class="h-4 w-4 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-[9px]">A</strong>
-                              <span>Verdadero</span>
-                            </div>
-                            <div class="flex items-center gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'B'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'B'">
-                              <strong class="h-4 w-4 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-[9px]">B</strong>
-                              <span>Falso</span>
-                            </div>
-                          </div>
-                        } @else if (pregunta.tipo === 'RESPUESTA_COMPUESTA') {
-                          <div class="space-y-1.5 pl-2 font-sans text-[11px] pt-1">
-                            @if (pregunta.opcion_a) {
-                              <div class="flex items-start gap-1.5 p-1 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'A'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'A'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">A</strong>
-                                <span>{{ pregunta.opcion_a }}</span>
-                              </div>
-                            }
-                            @if (pregunta.opcion_b) {
-                              <div class="flex items-start gap-1.5 p-1 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'B'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'B'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">B</strong>
-                                <span>{{ pregunta.opcion_b }}</span>
-                              </div>
-                            }
-                            @if (pregunta.opcion_c) {
-                              <div class="flex items-start gap-1.5 p-1 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'C'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'C'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">C</strong>
-                                <span>{{ pregunta.opcion_c }}</span>
-                              </div>
-                            }
-                            @if (pregunta.opcion_d) {
-                              <div class="flex items-start gap-1.5 p-1 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'D'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'D'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">D</strong>
-                                <span>{{ pregunta.opcion_d }}</span>
-                              </div>
-                            }
-                          </div>
-                        } @else {
-                          <!-- SELECCIÓN SIMPLE / PREGUNTA CON CLAVE / PROBLEMAS -->
-                          <div class="grid grid-cols-1 gap-1.5 pl-2 font-sans text-[11px] pt-1">
-                            @if (pregunta.opcion_a) {
-                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'A'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'A'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">A</strong>
-                                <span>{{ pregunta.opcion_a }}</span>
-                              </div>
-                            }
-                            @if (pregunta.opcion_b) {
-                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'B'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'B'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">B</strong>
-                                <span>{{ pregunta.opcion_b }}</span>
-                              </div>
-                            }
-                            @if (pregunta.opcion_c) {
-                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'C'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'C'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">C</strong>
-                                <span>{{ pregunta.opcion_c }}</span>
-                              </div>
-                            }
-                            @if (pregunta.opcion_d) {
-                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'D'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'D'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">D</strong>
-                                <span>{{ pregunta.opcion_d }}</span>
-                              </div>
-                            }
-                            @if (pregunta.opcion_e) {
-                              <div class="flex items-start gap-1.5 p-1.5 rounded border border-slate-200 bg-white" [class.ring-2]="pregunta.respuesta_correcta === 'E'" [class.ring-emerald-500]="pregunta.respuesta_correcta === 'E'">
-                                <strong class="h-4 w-4 rounded bg-slate-200 text-slate-800 flex items-center justify-center text-[9px] shrink-0 mt-0.5">E</strong>
-                                <span>{{ pregunta.opcion_e }}</span>
-                              </div>
-                            }
-                          </div>
-                        }
+                        <!-- Opciones de Respuesta en Texto Puro Formato A) B) C) D) E) -->
+                        <div class="pl-4 space-y-0.5 text-slate-900 font-sans text-[11px]">
+                          @if (pregunta.tipo === 'VERDADERO_O_FALSO_SIMPLE') {
+                            <div>A) Verdadero</div>
+                            <div>B) Falso</div>
+                          } @else if (pregunta.tipo === 'OPCION_EMPAREJAMIENTO') {
+                            <div class="text-[10px] text-slate-600 font-mono italic">[Opción de Relación A–E]</div>
+                          } @else {
+                            @if (pregunta.opcion_a) { <div>A) {{ pregunta.opcion_a }}</div> }
+                            @if (pregunta.opcion_b) { <div>B) {{ pregunta.opcion_b }}</div> }
+                            @if (pregunta.opcion_c) { <div>C) {{ pregunta.opcion_c }}</div> }
+                            @if (pregunta.opcion_d) { <div>D) {{ pregunta.opcion_d }}</div> }
+                            @if (pregunta.opcion_e) { <div>E) {{ pregunta.opcion_e }}</div> }
+                          }
+                        </div>
 
                       </div>
                     }
@@ -3085,93 +3075,30 @@ export class BancoPreguntasComponent implements OnInit {
     ];
 
     const dataBanco: any[][] = [headers];
-    const preguntasParsed: PreguntaValidada[] = [];
+    const preguntas60 = this._generarPreguntasMockValidas();
 
-    // 15 Fáciles (Nivel 1): V/F Simple, Selección, Emparejamiento
-    for (let i = 1; i <= 15; i++) {
-      let tipo = 'Verdadero o Falso Simple';
-      let grupo = '';
-      let enun = `Pregunta Fácil ${i}: El principio de devengado tributario reconoce ingresos y gastos cuando se generan legalmente, con independencia del cobro o pago.`;
-      let opA = 'Verdadero';
-      let opB = 'Falso';
-      let opC = '';
-      let opD = '';
-      let opE = '';
-      let resp = 'A';
-      let dif = '1';
+    for (const p of preguntas60) {
+      let tipoStr = 'Selección de la mejor respuesta';
+      if (p.tipo === 'VERDADERO_O_FALSO_SIMPLE') tipoStr = 'Verdadero o Falso Simple';
+      else if (p.tipo === 'RESPUESTA_PREMISAS_ABCD') tipoStr = 'Respuesta A/B/Ambas/Ninguna';
+      else if (p.tipo === 'VERDADERO_O_FALSO_COMPLEJAS') tipoStr = 'Verdadero o Falso Complejas';
+      else if (p.tipo === 'SUBITEM_CASO') tipoStr = 'Subítem de caso o problema';
+      else if (p.tipo === 'OPCION_EMPAREJAMIENTO') tipoStr = 'Opción de Emparejamiento Ampliado';
 
-      if (i > 5 && i <= 10) {
-        tipo = 'Selección de la mejor respuesta';
-        enun = `Pregunta Fácil ${i}: ¿Cuál es el plazo reglamentario para la presentación de descargos ante una Orden de Verificación del SIN?`;
-        opA = '20 días hábiles computables a partir de la notificación legal';
-        opB = '5 días calendario improrrogables';
-        opC = '60 días hábiles administrativos';
-        opD = '15 días continuos según código tributario';
-        opE = 'No existe plazo formal establecido';
-        resp = 'A';
-      } else if (i > 10) {
-        tipo = 'Opción de Emparejamiento Ampliado';
-        grupo = 'EMP-TRIB1';
-        enun = `Concepto ${i}: Base imponible presunta calculada sobre ventas brutas declaradas en el periodo fiscal.`;
-        opA = ''; opB = ''; opC = ''; opD = ''; opE = '';
-        resp = 'B';
-      }
-
-      dataBanco.push([tipo, grupo, enun, opA, opB, opC, opD, opE, resp, dif, '1P', 'OK']);
-    }
-
-    // 30 Medias (Nivel 2): Premisas A/B/Ambas/Ninguna, V/F Complejas
-    for (let i = 1; i <= 30; i++) {
-      let tipo = 'Respuesta A/B/Ambas/Ninguna';
-      let grupo = '';
-      let enun = `Pregunta Media ${i}: I. El crédito fiscal IVA respaldado por compras vinculadas a la actividad gravada es computable.\nII. Las retenciones tributarias no liberan al sujeto pasivo de su obligación formal.`;
-      let opA = 'A. Si la primera es verdadera';
-      let opB = 'B. Si la segunda es verdadera';
-      let opC = 'C. Si ambas son verdaderas';
-      let opD = 'D. Si ninguna es verdadera';
-      let opE = '';
-      let resp = 'C';
-      let dif = '2';
-
-      if (i > 15) {
-        tipo = 'Verdadero o Falso Complejas';
-        enun = `Pregunta Media ${i}: Respecto a los reparos tributarios en auditoría fiscal determine la validez: 1. Omisión de ingresos, 2. Falta de bancarización, 3. Crédito fiscal indebido, 4. Errores aritméticos.`;
-        opA = '1. Omisión de ingresos reales en estados financieros auditados.';
-        opB = '2. Gastos no deducibles por falta de documento de bancarización.';
-        opC = '3. Crédito fiscal computado sin factura original o electrónica.';
-        opD = '4. Errores aritméticos en libros de compras y ventas IVA.';
-        resp = 'A';
-      }
-
-      dataBanco.push([tipo, grupo, enun, opA, opB, opC, opD, opE, resp, dif, '1P', 'OK']);
-    }
-
-    // 15 Difíciles (Nivel 3): Casos Clínicos / Problemas y Selección Avanzada
-    for (let i = 1; i <= 15; i++) {
-      let tipo = 'Subítem de caso o problema';
-      let grupo = 'CASO-TRIB1';
-      let enun = `Problema Tributario ${i}: En la fiscalización a 'Comercial Andina S.R.L.', se detectaron facturas sin medio fehaciente de pago por Bs 150.000. Calcule el reparo impositivo aplicable por IUE no deducible (25%).`;
-      let opA = 'Reparo IUE Bs 37.500 (25%) + Sanción formal 500 UFV';
-      let opB = 'Reparo IUE Bs 19.500 (13%) + Sanción formal 200 UFV';
-      let opC = 'Reparo IUE Bs 45.000 (30%) + Sanción formal 1.000 UFV';
-      let opD = 'No procede reparo si la factura tiene código de autorización vigente';
-      let opE = 'Reparo total acumulado de Bs 75.000';
-      let resp = 'A';
-      let dif = '3';
-
-      if (i > 5) {
-        tipo = 'Selección de la mejor respuesta';
-        grupo = '';
-        enun = `Pregunta Difícil ${i}: En una fiscalización externa, ¿cuál es el efecto jurídico del vencimiento del término probatorio sin emisión de Resolución Determinativa dentro del plazo de 60 días?`;
-        opA = 'No opera la prescripción pero suspende el cómputo de intereses moratorios';
-        opB = 'Caducidad automática de pleno derecho de la facultad fiscalizadora';
-        opC = 'Anulación de la Vista de Cargo emitida previamente';
-        opD = 'Extinción de la deuda tributaria y costas procesales';
-        opE = 'Imposibilidad de recurrir a la Autoridad de Impugnación Tributaria';
-        resp = 'A';
-      }
-
-      dataBanco.push([tipo, grupo, enun, opA, opB, opC, opD, opE, resp, dif, '1P', 'OK']);
+      dataBanco.push([
+        tipoStr,
+        p.grupo || '',
+        p.enunciado,
+        p.opcion_a || '',
+        p.opcion_b || '',
+        p.opcion_c || '',
+        p.opcion_d || '',
+        p.opcion_e || '',
+        p.respuesta_correcta,
+        p.dificultad,
+        '1P',
+        'OK'
+      ]);
     }
 
     const dataEj = [
@@ -3204,8 +3131,8 @@ export class BancoPreguntasComponent implements OnInit {
     // Cargar directamente en memoria para inspección visual instantánea
     this.nombreArchivoCargado.set(fileName);
     this.pdfPrevisualizadoYConforme.set(false);
-    this.preguntasCargadas.set(this._generarPreguntasMockValidas());
-    this._mostrarToast(`Descargado y cargado en vivo: ${fileName} (100% Conforme).`);
+    this.preguntasCargadas.set(preguntas60);
+    this._mostrarToast(`Descargado y cargado en vivo: ${fileName} (60 reactivos válidos con los 6 tipos de preguntas).`);
   }
 
   public descargarEjemploInvalido(): void {
@@ -3639,147 +3566,757 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   private _generarPreguntasMockValidas(): PreguntaValidada[] {
     const list: PreguntaValidada[] = [];
 
-    // 15 Fáciles (1) - V/F Simple, Selección Mejor Respuesta, Emparejamiento
-    for (let i = 1; i <= 15; i++) {
-      if (i <= 5) {
-        list.push({
-          fila: i + 1,
-          tipo: 'VERDADERO_O_FALSO_SIMPLE',
-          grupo: '',
-          enunciado: `Pregunta Fácil ${i}: El principio de devengado tributario reconoce ingresos y gastos cuando se generan legalmente, con independencia del cobro o pago.`,
-          opcion_a: 'Verdadero',
-          opcion_b: 'Falso',
-          opcion_c: '',
-          opcion_d: '',
-          opcion_e: '',
-          respuesta_correcta: 'A',
-          dificultad: '1',
-          peso: 5,
-          observaciones: 'OK',
-          valido: true,
-          errores: []
-        });
-      } else if (i <= 10) {
-        list.push({
-          fila: i + 1,
-          tipo: 'SELECCION_MEJOR_RESPUESTA',
-          grupo: '',
-          enunciado: `Pregunta Fácil ${i}: ¿Cuál es el plazo reglamentario para la presentación de descargos ante una Orden de Verificación del SIN?`,
-          opcion_a: '20 días hábiles computables a partir de la notificación legal',
-          opcion_b: '5 días calendario improrrogables',
-          opcion_c: '60 días hábiles administrativos',
-          opcion_d: '15 días continuos según código tributario',
-          opcion_e: 'No existe plazo formal establecido',
-          respuesta_correcta: 'A',
-          dificultad: '1',
-          peso: 5,
-          observaciones: 'OK',
-          valido: true,
-          errores: []
-        });
+    // =========================================================================
+    // 1. SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 15)
+    // =========================================================================
+    // Fáciles (1..10)
+    list.push({
+      fila: 2,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'En la auditoría tributaria para determinar la base imponible del IUE se debe considerar como gasto no deducible:',
+      opcion_a: 'Excluir los gastos personales de los socios sin respaldo de factura legal',
+      opcion_b: 'Deducir únicamente las compras vinculadas a la actividad gravada',
+      opcion_c: 'Depreciar conforme a la tabla oficial del D.S. 24051',
+      opcion_d: 'Registrar contablemente los sueldos del personal de planta',
+      opcion_e: 'Computar los aportes patronales devengados en el ejercicio',
+      respuesta_correcta: 'A',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 3,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'Según el Código Tributario Boliviano (Ley 2492), el término de prescripción de las facultades de fiscalización es de:',
+      opcion_a: '2 años calendario continuos',
+      opcion_b: '4 años improrrogables',
+      opcion_c: '5 años para personas naturales únicamente',
+      opcion_d: '20 años en materia de contravenciones aduaneras',
+      opcion_e: '8 años para tributos de periodicidad anual y contravenciones',
+      respuesta_correcta: 'E',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 4,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'Para el cómputo del Crédito Fiscal IVA en compras de bienes y servicios, el documento fiscal debe:',
+      opcion_a: 'Ser emitido exclusivamente en moneda extranjera',
+      opcion_b: 'Ser cancelado únicamente en efectivo al momento de la entrega',
+      opcion_c: 'Contar con autorización del Ministerio de Economía',
+      opcion_d: 'Estar vinculado a la actividad gravada, a nombre y NIT del sujeto pasivo y respaldado',
+      opcion_e: 'Tener una antigüedad mayor a 180 días calendario',
+      respuesta_correcta: 'D',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 5,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'En una auditoría tributaria, la técnica de confirmación de saldos con terceros verifica principalmente:',
+      opcion_a: 'Estructura societaria y tenencia accionaria',
+      opcion_b: 'Existencia, integridad y exactitud de cuentas por cobrar y pagar comerciales',
+      opcion_c: 'Capacidad de pago futura y solvencia de la entidad',
+      opcion_d: 'Coeficiente de liquidez ácida del período',
+      opcion_e: 'Depreciación acumulada de activos intangibles',
+      respuesta_correcta: 'B',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 6,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'El método de determinación de la base imponible sobre base presunta procede cuando:',
+      opcion_a: 'Se cuenta con estados financieros auditados con dictamen limpio',
+      opcion_b: 'El sujeto pasivo no presenta libros contables ni documentación fidedigna',
+      opcion_c: 'Las ventas superan los límites del régimen simplificado',
+      opcion_d: 'Se solicita una prórroga para el pago de la deuda',
+      opcion_e: 'El contribuyente presenta todos sus libros notariados',
+      respuesta_correcta: 'B',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 7,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'La alícuota general del Impuesto a las Transacciones (IT) según la Ley 843 es del:',
+      opcion_a: '3% sobre los ingresos brutos devengados o percibidos',
+      opcion_b: '13% sobre el valor neto de la factura',
+      opcion_c: '25% sobre la utilidad neta imponible',
+      opcion_d: '1.5% sobre transacciones comerciales al por mayor',
+      opcion_e: '0.30% aplicable al débito y crédito bancario',
+      respuesta_correcta: 'A',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 8,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'Las compensaciones del IUE efectivamente pagado contra el IT operan:',
+      opcion_a: 'A partir del mes siguiente al pago del IUE hasta su total agotamiento o nuevo vencimiento',
+      opcion_b: 'De manera retroactiva a los períodos del año anterior',
+      opcion_c: 'Únicamente contra el débito fiscal IVA compras',
+      opcion_d: 'Hasta un máximo del 50% de las ventas brutas declaradas',
+      opcion_e: 'Exclusivamente en empresas del sector minero y petrolero',
+      respuesta_correcta: 'A',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 9,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'El plazo reglamentario para la presentación de descargos ante una Vista de Cargo emitida por el SIN es de:',
+      opcion_a: '30 días calendario improrrogables computables a partir de su notificación',
+      opcion_b: '10 días hábiles administrativos',
+      opcion_c: '60 días calendario continuos',
+      opcion_d: '15 días hábiles según Ley 2492',
+      opcion_e: '5 días hábiles a partir de la publicación en prensa',
+      respuesta_correcta: 'A',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 10,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'La bancarización obligatoria establecida por el SIN es exigible para transacciones iguales o mayores a:',
+      opcion_a: 'Bs 10.000',
+      opcion_b: 'Bs 50.000',
+      opcion_c: 'Bs 100.000',
+      opcion_d: 'Bs 25.000',
+      opcion_e: 'Bs 5.000',
+      respuesta_correcta: 'B',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 11,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'La no emisión de factura en una venta de bienes o servicios constituye una contravención tributaria sancionada con:',
+      opcion_a: 'Clausura del establecimiento comercial de acuerdo a la reincidencia',
+      opcion_b: 'Pérdida automática de la personería jurídica',
+      opcion_c: 'Decomiso definitivo de la mercadería sin reclamo',
+      opcion_d: 'Prisión de 1 a 3 años para el representante legal',
+      opcion_e: 'Suspensión definitiva del Registro Tributario (NIT)',
+      respuesta_correcta: 'A',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    // Medias (11..15)
+    list.push({
+      fila: 12,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'En el Régimen Complementario al IVA (RC-IVA) para dependientes, el Formulario 110 admite facturas de hasta:',
+      opcion_a: '120 días anteriores a la fecha de presentación al empleador',
+      opcion_b: '30 días anteriores a la fecha de presentación',
+      opcion_c: '60 días calendario improrrogables',
+      opcion_d: '180 días del año fiscal',
+      opcion_e: 'Exclusivamente del mes en curso',
+      respuesta_correcta: 'A',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 13,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'El ajuste por inflación y tenencia de bienes (AITB) de los activos fijos según la NC 3 tiene efecto fiscal de:',
+      opcion_a: 'Ingreso o gasto gravable/deducible en la determinación del IUE',
+      opcion_b: 'No deducible en un 100% bajo ninguna circunstancia',
+      opcion_c: 'Exento de todo tributo de dominio nacional',
+      opcion_d: 'Compensable directamente contra el IVA compras',
+      opcion_e: 'Gravado exclusivamente por el Impuesto a las Grandes Fortunas',
+      respuesta_correcta: 'A',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 14,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'La alícuota por remesas de utilidades a beneficiarios del exterior por servicios prestados desde el extranjero es del:',
+      opcion_a: '25% sobre el 50% presunto (Tasa efectiva 12.5%)',
+      opcion_b: '13% sobre el total remesado',
+      opcion_c: '3% por concepto de retención IT',
+      opcion_d: '25% sobre el 10% presunto (Tasa efectiva 2.5%)',
+      opcion_e: 'Exención total por tratados de doble tributación',
+      respuesta_correcta: 'A',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 15,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'En auditoría fiscal, las previsiones para incobrables no admitidas por el D.S. 24051 generan:',
+      opcion_a: 'Un activo por impuesto diferido',
+      opcion_b: 'Un pasivo por impuesto diferido',
+      opcion_c: 'La nulidad de los estados financieros',
+      opcion_d: 'Un crédito fiscal trasladable al IT',
+      opcion_e: 'Una contingencia penal tributaria',
+      respuesta_correcta: 'A',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 16,
+      tipo: 'SELECCION_MEJOR_RESPUESTA',
+      grupo: '',
+      enunciado: 'El recurso de alzada ante la Autoridad Regional de Impugnación Tributaria (ARIT) debe interponerse en el plazo perentorio de:',
+      opcion_a: '20 días improrrogables computables a partir de la notificación legal',
+      opcion_b: '15 días hábiles administrativos',
+      opcion_c: '30 días calendario continuos',
+      opcion_d: '45 días hábiles procesales',
+      opcion_e: '60 días calendario según Ley 2492',
+      respuesta_correcta: 'A',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    // =========================================================================
+    // 2. FALSO O VERDADERO SIMPLE (Preguntas 16 a 25)
+    // =========================================================================
+    // Fáciles (16..20)
+    list.push({
+      fila: 17,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'El principio de devengado tributario reconoce ingresos y gastos cuando se generan legalmente, con independencia del cobro o pago.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'A',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 18,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'Las donaciones a instituciones no lucrativas autorizadas son deducibles del IUE hasta el límite del 10% de la utilidad imponible.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'A',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 19,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'Las multas pagadas por contravenciones tributarias al SIN son consideradas gastos deducibles en la liquidación del IUE.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'B',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 20,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'El débito fiscal IVA se genera en la venta de bienes muebles en el momento de la entrega del bien o emisión de factura, lo que ocurra primero.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'A',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 21,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'Los contribuyentes del Régimen Tributario Simplificado (RTS) están obligados a emitir facturas oficiales y llevar libros de compras.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'B',
+      dificultad: '1',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    // Medias (21..25)
+    list.push({
+      fila: 22,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'La depreciación de inmuebles bajo el método de línea recta tiene un coeficiente anual del 2.5% según el D.S. 24051.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'A',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 23,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'El Impuesto a las Grandes Fortunas (IGF) aplica a personas naturales con patrimonio superior a Bs 30 millones en territorio nacional y extranjero.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'A',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 24,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'Las pérdidas tributarias acumuladas en el IUE pueden compensarse de manera indefinida sin límite temporal en empresas no productivas.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'B',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 25,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'La rectificatoria de una declaración jurada que incrementa el saldo a favor del contribuyente requiere aprobación previa mediante Resolución Administrativa del SIN.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'A',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 26,
+      tipo: 'VERDADERO_O_FALSO_SIMPLE',
+      grupo: '',
+      enunciado: 'El crédito fiscal generado en compras de combustible (gasolina y diésel) es computable al 100% del valor total de la factura.',
+      opcion_a: 'Verdadero',
+      opcion_b: 'Falso',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'B',
+      dificultad: '2',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    // =========================================================================
+    // 3. PREMISAS A / B / AMBAS / NINGUNA (Preguntas 26 a 35)
+    // =========================================================================
+    for (let i = 1; i <= 10; i++) {
+      let enun = '';
+      let resp = 'C';
+      if (i === 1) {
+        enun = 'I. El crédito fiscal IVA respaldado por compras vinculadas a la actividad gravada es computable.\nII. Las retenciones tributarias no liberan al sujeto pasivo de su obligación formal.';
+        resp = 'C';
+      } else if (i === 2) {
+        enun = 'I. Los profesionales independientes liquidan el IUE mediante el Formulario 510 aplicando la alícuota del 25% sobre el 50% presunto.\nII. El IT pagado por profesionales independientes es acreditable al 100% contra el IVA débito.';
+        resp = 'A';
+      } else if (i === 3) {
+        enun = 'I. Los gastos de representación con respaldo de factura son 100% deducibles en el IUE sin ningún tope reglamentario.\nII. Los sueldos pagados a socios que no trabajan efectivamente en la empresa son deducibles.';
+        resp = 'D';
+      } else if (i === 4) {
+        enun = 'I. La prescripción tributaria se interrumpe con la notificación de la Resolución Determinativa.\nII. El pago parcial de la deuda tributaria suspende el cómputo de la prescripción.';
+        resp = 'C';
+      } else if (i === 5) {
+        enun = 'I. Las exportaciones definitivas de bienes están gravadas con tasa cero en el IVA.\nII. Los exportadores pueden solicitar la devolución del crédito fiscal mediante CEDEIMs.';
+        resp = 'C';
+      } else if (i === 6) {
+        enun = 'I. Las compras de servicios a personas naturales no inscritas generan retención del 12.5% por IUE y 3% por IT.\nII. Las retenciones por compra de bienes son del 5% por IUE y 3% por IT.';
+        resp = 'C';
+      } else if (i === 7) {
+        enun = 'I. El valor residual de los activos fijos totalmente depreciados se mantiene contablemente en Bs 1.\nII. La revalorización técnica de activos fijos genera crédito fiscal IVA automático.';
+        resp = 'A';
+      } else if (i === 8) {
+        enun = 'I. Las notas fiscales emitidas por el Sistema Electrónico no requieren impresión física para su validez.\nII. El código QR impreso en facturas contiene información fiscal validada por el SIN.';
+        resp = 'C';
+      } else if (i === 9) {
+        enun = 'I. La Vista de Cargo fija la liquidación previa de la deuda tributaria y abre el período probatorio.\nII. La Resolución Determinativa es el acto definitivo que pone fin al procedimiento de fiscalización.';
+        resp = 'C';
       } else {
-        list.push({
-          fila: i + 1,
-          tipo: 'OPCION_EMPAREJAMIENTO',
-          grupo: 'EMP-GEN1',
-          enunciado: `Concepto ${i}: Base imponible presunta calculada sobre ventas brutas declaradas en el periodo fiscal.`,
-          opcion_a: '',
-          opcion_b: '',
-          opcion_c: '',
-          opcion_d: '',
-          opcion_e: '',
-          respuesta_correcta: 'B',
-          dificultad: '1',
-          peso: 5,
-          observaciones: 'OK',
-          valido: true,
-          errores: []
-        });
+        enun = 'I. La alícuota del ICE es idéntica para bebidas alcohólicas y vehículos automotores.\nII. El ICE pagado en importaciones es computable como crédito fiscal IVA.';
+        resp = 'D';
       }
+
+      list.push({
+        fila: 26 + i,
+        tipo: 'RESPUESTA_PREMISAS_ABCD',
+        grupo: '',
+        enunciado: enun,
+        opcion_a: 'Si la primera premisa es verdadera',
+        opcion_b: 'Si la segunda premisa es verdadera',
+        opcion_c: 'Si ambas premisas son verdaderas',
+        opcion_d: 'Si ninguna de las premisas es verdadera',
+        opcion_e: '',
+        respuesta_correcta: resp,
+        dificultad: '2',
+        peso: 5,
+        observaciones: 'OK',
+        valido: true,
+        errores: []
+      });
     }
 
-    // 30 Medias (2) - Premisas A/B/Ambas/Ninguna, V/F Complejas, Subítems
-    for (let i = 1; i <= 30; i++) {
-      if (i <= 15) {
-        list.push({
-          fila: i + 16,
-          tipo: 'RESPUESTA_PREMISAS_ABCD',
-          grupo: '',
-          enunciado: `Pregunta Media ${i}: I. El crédito fiscal IVA respaldado por compras vinculadas a la actividad gravada es computable.\nII. Las retenciones tributarias no liberan al sujeto pasivo de su obligación formal.`,
-          opcion_a: 'A. Si la primera es verdadera',
-          opcion_b: 'B. Si la segunda es verdadera',
-          opcion_c: 'C. Si ambas son verdaderas',
-          opcion_d: 'D. Si ninguna es verdadera',
-          opcion_e: '',
-          respuesta_correcta: 'C',
-          dificultad: '2',
-          peso: 5,
-          observaciones: 'OK',
-          valido: true,
-          errores: []
-        });
+    // =========================================================================
+    // 4. PREGUNTAS CON CLAVE DE RESPUESTA / F-V COMPLEJAS (Preguntas 36 a 45)
+    // =========================================================================
+    for (let i = 1; i <= 10; i++) {
+      let enun = '';
+      let resp = 'A';
+      if (i === 1) {
+        enun = 'En una auditoría fiscal determine los reparos aplicables por incumplimiento a la normativa tributaria:';
+        resp = 'A';
+      } else if (i === 2) {
+        enun = 'Son condiciones formales para la deducción de sueldos y salarios en la liquidación del IUE:';
+        resp = 'B';
+      } else if (i === 3) {
+        enun = 'Constituyen hechos generadores del Impuesto a las Transacciones (IT):';
+        resp = 'E';
+      } else if (i === 4) {
+        enun = 'Respecto a los métodos de depreciación admitidos por el D.S. 24051 determine su validez:';
+        resp = 'A';
+      } else if (i === 5) {
+        enun = 'Son facultades específicas de la Administración Tributaria según la Ley 2492:';
+        resp = 'E';
+      } else if (i === 6) {
+        enun = 'Constituyen causales de nulidad absoluta en los actos administrativos tributarios:';
+        resp = 'B';
+      } else if (i === 7) {
+        enun = 'Son elementos que componen la Deuda Tributaria (DT) según el Artículo 47 del CTB:';
+        resp = 'E';
+      } else if (i === 8) {
+        enun = 'Tratamiento de las mermas y desmedros en la auditoría de inventarios para el IUE:';
+        resp = 'C';
+      } else if (i === 9) {
+        enun = 'Requisitos para la deducibilidad de intereses por deudas financieras contraídas en el exterior:';
+        resp = 'A';
       } else {
-        list.push({
-          fila: i + 16,
-          tipo: 'VERDADERO_O_FALSO_COMPLEJAS',
-          grupo: '',
-          enunciado: `Pregunta Media ${i}: Respecto a los reparos tributarios en auditoría fiscal determine la validez: 1. Omisión de ingresos, 2. Gastos no deducibles por falta de bancarización, 3. Crédito fiscal indebido, 4. Errores aritméticos en libros de ventas.`,
-          opcion_a: '1. Omisión de ingresos reales en estados financieros auditados.',
-          opcion_b: '2. Gastos no deducibles por falta de documento de bancarización.',
-          opcion_c: '3. Crédito fiscal computado sin factura original o electrónica.',
-          opcion_d: '4. Errores aritméticos en libros de compras y ventas IVA.',
-          opcion_e: '',
-          respuesta_correcta: 'A',
-          dificultad: '2',
-          peso: 5,
-          observaciones: 'OK',
-          valido: true,
-          errores: []
-        });
+        enun = 'Son documentos soporte indispensables en el legajo de auditoría tributaria permanente:';
+        resp = 'E';
       }
+
+      list.push({
+        fila: 36 + i,
+        tipo: 'VERDADERO_O_FALSO_COMPLEJAS',
+        grupo: '',
+        enunciado: enun,
+        opcion_a: '1. Omisión de ingresos reales en estados financieros auditados.',
+        opcion_b: '2. Gastos no deducibles por falta de documento de bancarización fehaciente.',
+        opcion_c: '3. Crédito fiscal computado sin factura original o electrónica autorizada.',
+        opcion_d: '4. Errores aritméticos en libros de compras y ventas IVA del período.',
+        opcion_e: '',
+        respuesta_correcta: resp,
+        dificultad: '2',
+        peso: 5,
+        observaciones: 'OK',
+        valido: true,
+        errores: []
+      });
     }
 
-    // 15 Difíciles (3) - Casos Clínicos / Problemas Financieros
-    for (let i = 1; i <= 15; i++) {
-      if (i <= 5) {
-        list.push({
-          fila: i + 46,
-          tipo: 'SUBITEM_CASO',
-          grupo: 'CASO-TRIB1',
-          enunciado: `Problema Tributario ${i}: En la auditoría fiscal a la empresa 'Comercial Andina S.R.L.', se detectaron facturas sin medio fehaciente de pago por un monto de Bs 150.000. Calcule el reparo impositivo aplicable por IUE no deducible y multa por incumplimiento a deberes formales.`,
-          opcion_a: 'Reparo IUE Bs 37.500 (25%) + Sanción formal 500 UFV',
-          opcion_b: 'Reparo IUE Bs 19.500 (13%) + Sanción formal 200 UFV',
-          opcion_c: 'Reparo IUE Bs 45.000 (30%) + Sanción formal 1.000 UFV',
-          opcion_d: 'No procede reparo si la factura tiene código de autorización vigente',
-          opcion_e: 'Reparo total acumulado de Bs 75.000',
-          respuesta_correcta: 'A',
-          dificultad: '3',
-          peso: 5,
-          observaciones: 'OK',
-          formulaTypst: '$ "Reparo IUE" = 150.000 times 25% = 37.500 " Bs" $',
-          valido: true,
-          errores: []
-        });
+    // =========================================================================
+    // 5. CASOS PRÁCTICOS / PROBLEMAS FINANCIEROS (Preguntas 46 a 55)
+    // =========================================================================
+    // CASO-TRIB1 (46..50)
+    for (let i = 1; i <= 5; i++) {
+      let enun = '';
+      let resp = 'A';
+      if (i === 1) {
+        enun = 'Calcule el reparo impositivo aplicable por IUE no deducible al detectarse facturas sin bancarización por Bs 150.000:';
+        resp = 'A';
+      } else if (i === 2) {
+        enun = 'Al no haber bancarizado las compras de Bs 150.000, ¿cuál es el Crédito Fiscal IVA indebidamente apropiado a reintegrar?';
+        resp = 'C';
+      } else if (i === 3) {
+        enun = 'Determine la sanción por omisión de pago si la empresa no rectifica voluntariamente antes de la Vista de Cargo:';
+        resp = 'A';
+      } else if (i === 4) {
+        enun = 'Calcule el interés moratorio generado si transcurrieron 500 días con una tasa de interés del 4% anual:';
+        resp = 'B';
       } else {
-        list.push({
-          fila: i + 46,
-          tipo: 'SELECCION_MEJOR_RESPUESTA',
-          grupo: '',
-          enunciado: `Pregunta Difícil ${i}: En una fiscalización externa, ¿cuál es el efecto jurídico del vencimiento del término probatorio sin emisión de Resolución Determinativa dentro del plazo de 60 días?`,
-          opcion_a: 'No opera la prescripción pero suspende el cómputo de intereses moratorios',
-          opcion_b: 'Caducidad automática de pleno derecho de la facultad fiscalizadora',
-          opcion_c: 'Anulación de la Vista de Cargo emitida previamente',
-          opcion_d: 'Extinción de la deuda tributaria y costas procesales',
-          opcion_e: 'Imposibilidad de recurrir a la Autoridad de Impugnación Tributaria',
-          respuesta_correcta: 'A',
-          dificultad: '3',
-          peso: 5,
-          observaciones: 'OK',
-          valido: true,
-          errores: []
-        });
+        enun = 'Determine la Deuda Tributaria consolidada total expresada en Unidades de Fomento de Vivienda (UFV):';
+        resp = 'A';
       }
+
+      list.push({
+        fila: 46 + i,
+        tipo: 'SUBITEM_CASO',
+        grupo: 'CASO-TRIB1',
+        enunciado: enun,
+        opcion_a: 'Reparo IUE Bs 37.500 (25%) + Sanción formal 500 UFV',
+        opcion_b: 'Reparo IUE Bs 19.500 (13%) + Sanción formal 200 UFV',
+        opcion_c: 'Crédito Fiscal IVA a reintegrar de Bs 19.500 (13%)',
+        opcion_d: 'No procede reparo si la factura tiene código de autorización vigente',
+        opcion_e: 'Reparo total acumulado consolidado de Bs 75.000',
+        respuesta_correcta: resp,
+        dificultad: '3',
+        peso: 5,
+        observaciones: 'OK',
+        formulaTypst: '$ "Reparo IUE" = 150.000 times 25% = 37.500 " Bs" $',
+        valido: true,
+        errores: []
+      });
     }
+
+    // CASO-TRIB2 (51..55)
+    for (let i = 1; i <= 5; i++) {
+      let enun = '';
+      let resp = 'A';
+      if (i === 1) {
+        enun = 'En una constructora con contrato de Bs 2.000.000 y 60% de avance físico certificado, ¿cuál es el ingreso gravado devengado en el IUE?';
+        resp = 'A';
+      } else if (i === 2) {
+        enun = 'Si los costos reales acumulados fueron de Bs 800.000, determine la Utilidad Bruta Imponible devengada en el ejercicio:';
+        resp = 'B';
+      } else if (i === 3) {
+        enun = 'Tratamiento tributario de la retención de garantía del 7% efectuada por el contratante en planillas de avance:';
+        resp = 'C';
+      } else if (i === 4) {
+        enun = 'Cálculo del Impuesto a las Transacciones (IT) generado sobre la planilla certificada de Bs 1.200.000:';
+        resp = 'A';
+      } else {
+        enun = 'Efecto de la provisión por garantías de post-construcción en la liquidación del IUE:';
+        resp = 'D';
+      }
+
+      list.push({
+        fila: 51 + i,
+        tipo: 'SUBITEM_CASO',
+        grupo: 'CASO-TRIB2',
+        enunciado: enun,
+        opcion_a: 'Ingreso devengado de Bs 1.200.000 sujeto a facturación y cómputo de IUE',
+        opcion_b: 'Utilidad Bruta Imponible de Bs 400.000 (Bs 1.200.000 - Bs 800.000)',
+        opcion_c: 'No reduce la base imponible del IVA ni del IT y se factura sobre el monto total',
+        opcion_d: 'Constituye gasto no deducible hasta que se ejecute el desembolso efectivo',
+        opcion_e: 'Deducción automática al 100% en el ejercicio de suscripción',
+        respuesta_correcta: resp,
+        dificultad: '3',
+        peso: 5,
+        observaciones: 'OK',
+        formulaTypst: '$ "Ingreso IUE" = 2.000.000 times 60% = 1.200.000 " Bs" $',
+        valido: true,
+        errores: []
+      });
+    }
+
+    // =========================================================================
+    // 6. EMPAREJAMIENTO DE CONCEPTOS (Preguntas 56 a 60)
+    // =========================================================================
+    list.push({
+      fila: 57,
+      tipo: 'OPCION_EMPAREJAMIENTO',
+      grupo: 'EMP-TRIB1',
+      enunciado: 'Procedimiento de fiscalización directa con libros contables y documentos de respaldo fidedignos.',
+      opcion_a: '',
+      opcion_b: '',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'E',
+      dificultad: '3',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 58,
+      tipo: 'OPCION_EMPAREJAMIENTO',
+      grupo: 'EMP-TRIB1',
+      enunciado: 'Tratamiento fiscal del saldo a favor del contribuyente que se actualiza con la variación de la UFV.',
+      opcion_a: '',
+      opcion_b: '',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'B',
+      dificultad: '3',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 59,
+      tipo: 'OPCION_EMPAREJAMIENTO',
+      grupo: 'EMP-TRIB1',
+      enunciado: 'Método de liquidación tributaria aplicable cuando el contribuyente oculta ventas y no tiene registros contables.',
+      opcion_a: '',
+      opcion_b: '',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'A',
+      dificultad: '3',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 60,
+      tipo: 'OPCION_EMPAREJAMIENTO',
+      grupo: 'EMP-TRIB1',
+      enunciado: 'Beneficio tributario otorgado a fundaciones y asociaciones civiles sin fines de lucro debidamente registradas.',
+      opcion_a: '',
+      opcion_b: '',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'D',
+      dificultad: '3',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
+
+    list.push({
+      fila: 61,
+      tipo: 'OPCION_EMPAREJAMIENTO',
+      grupo: 'EMP-TRIB1',
+      enunciado: 'Sobretasa impositiva del 25% aplicada a entidades de intermediación financiera con rentabilidad superior al 6%.',
+      opcion_a: '',
+      opcion_b: '',
+      opcion_c: '',
+      opcion_d: '',
+      opcion_e: '',
+      respuesta_correcta: 'C',
+      dificultad: '3',
+      peso: 5,
+      observaciones: 'OK',
+      valido: true,
+      errores: []
+    });
 
     return list;
   }
