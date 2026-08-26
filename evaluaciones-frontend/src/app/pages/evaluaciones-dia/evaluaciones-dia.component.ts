@@ -978,14 +978,8 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           <strong>INSTRUCCIÓN DE COMPLETADO DE CARTILLA:</strong> Rellene con cuidado la opción correcta con bolígrafo <strong>AZUL</strong> o <strong>NEGRO</strong>. Ejemplos: [• Correcto] [X Incorrecto] [- Incorrecto] [O Incorrecto]
                         </div>
 
-                        <!-- 4. CARTILLA HORIZONTAL OMR DE 60 PREGUNTAS (4 COLUMNAS DE 15 FILAS) -->
-                        <div class="relative border-2 border-slate-900 bg-white p-3 rounded shadow-xs">
-                          <!-- Marcadores Fiduciales Cuadrados en las 4 esquinas -->
-                          <div class="absolute -top-1 -left-1 w-3 h-3 bg-black"></div>
-                          <div class="absolute -top-1 -right-1 w-3 h-3 bg-black"></div>
-                          <div class="absolute -bottom-1 -left-1 w-3 h-3 bg-black"></div>
-                          <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-black"></div>
-
+                        <!-- 4. CARTILLA HORIZONTAL OMR DE 60 PREGUNTAS (4 COLUMNAS DE 15 FILAS) - MATRIZ EXACTA -->
+                        <div class="border-2 border-slate-900 bg-white p-3 rounded shadow-xs">
                           <div class="text-center font-black text-xs uppercase tracking-wider text-slate-950 pb-2 border-b border-slate-300">
                             CARTILLA DE RESPUESTAS (1 A 60) — VARIANTE {{ varComp.letraVariante }}
                           </div>
@@ -1062,7 +1056,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       </div>
 
                       <!-- ========================================== -->
-                      <!-- PÁGINA 2 EN ADELANTE: CUESTIONARIO OFICIAL (60 REACTIVOS) -->
+                      <!-- PÁGINA 2 EN ADELANTE: CUESTIONARIO OFICIAL (30 REACTIVOS: 7F + 16M + 7D) -->
                       <!-- ========================================== -->
                       <div class="space-y-5 pt-2">
                         
@@ -1076,7 +1070,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 
                         <div class="text-center space-y-1 pt-2">
                           <h2 class="text-sm font-black uppercase text-slate-950 tracking-wide">
-                            CUESTIONARIO DE PREGUNTAS (60 REACTIVOS)
+                            CUESTIONARIO DE PREGUNTAS (30 REACTIVOS)
                           </h2>
                           <p class="text-xs font-bold text-slate-700 uppercase">
                             [{{ evaluacionActivaVisor()?.codigo }}] {{ evaluacionActivaVisor()?.materia }} · EVALUACIÓN TEÓRICA {{ evaluacionActivaVisor()?.tipo | uppercase }} · VARIANTE {{ varComp.letraVariante }}
@@ -1084,164 +1078,22 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           <hr class="border-t-2 border-slate-900 mt-2" />
                         </div>
 
-                        <!-- SECCIÓN 1: SELECCIÓN DE LA MEJOR RESPUESTA (1 a 15) -->
-                        <div class="space-y-3">
+                        <!-- Cuestionario de 30 Reactivos -->
+                        <div class="space-y-4">
                           <div>
-                            <h3 class="font-black text-xs uppercase text-slate-950">SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 15)</h3>
+                            <h3 class="font-black text-xs uppercase text-slate-950">SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 30)</h3>
                             <p class="text-[11px] italic text-slate-600">Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.</p>
                           </div>
 
                           <div class="space-y-3">
-                            @for (preg of varComp.todasLasPreguntas.slice(0, 15); track preg.numero) {
-                              <div class="space-y-1">
+                            @for (preg of varComp.todasLasPreguntas.slice(0, 30); track preg.numero) {
+                              <div class="space-y-1 p-2 bg-slate-50/50 rounded border border-slate-100">
                                 <div class="font-bold text-slate-950 text-xs leading-snug">
                                   {{ preg.numero }}. {{ preg.enunciado }}
                                 </div>
                                 <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
                                   @for (op of preg.opciones; track op.letra) {
                                     <div class="leading-tight">
-                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
-                                    </div>
-                                  }
-                                </div>
-                              </div>
-                            }
-                          </div>
-                        </div>
-
-                        <!-- SECCIÓN 2: FALSO O VERDADERO SIMPLE (16 a 25) -->
-                        <div class="space-y-3 pt-3 border-t border-slate-200">
-                          <div>
-                            <h3 class="font-black text-xs uppercase text-slate-950">FALSO O VERDADERO (Preguntas 16 a 25)</h3>
-                            <p class="text-[11px] italic text-slate-600">Determine si cada afirmación es verdadera (A) o falsa (B).</p>
-                          </div>
-
-                          <div class="space-y-3">
-                            @for (preg of varComp.todasLasPreguntas.slice(15, 25); track preg.numero) {
-                              <div class="space-y-1">
-                                <div class="font-bold text-slate-950 text-xs leading-snug">
-                                  {{ preg.numero }}. {{ preg.enunciado }}
-                                </div>
-                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
-                                  @for (op of preg.opciones; track op.letra) {
-                                    <div class="leading-tight">
-                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
-                                    </div>
-                                  }
-                                </div>
-                              </div>
-                            }
-                          </div>
-                        </div>
-
-                        <!-- SECCIÓN 3: PREMISAS A / B / AMBAS / NINGUNA (26 a 35) -->
-                        <div class="space-y-3 pt-3 border-t border-slate-200">
-                          <div>
-                            <h3 class="font-black text-xs uppercase text-slate-950">PREMISAS A / B / AMBAS / NINGUNA (Preguntas 26 a 35)</h3>
-                            <p class="text-[11px] italic text-slate-600">Analice las dos premisas planteadas y elija la opción correcta.</p>
-                          </div>
-
-                          <div class="space-y-3">
-                            @for (preg of varComp.todasLasPreguntas.slice(25, 35); track preg.numero) {
-                              <div class="space-y-1">
-                                <div class="font-bold text-slate-950 text-xs leading-snug whitespace-pre-line">
-                                  {{ preg.numero }}. {{ preg.enunciado }}
-                                </div>
-                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
-                                  @for (op of preg.opciones; track op.letra) {
-                                    <div class="leading-tight">
-                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
-                                    </div>
-                                  }
-                                </div>
-                              </div>
-                            }
-                          </div>
-                        </div>
-
-                        <!-- SECCIÓN 4: PREGUNTAS CON CLAVE DE RESPUESTA (36 a 45) -->
-                        <div class="space-y-3 pt-3 border-t border-slate-200">
-                          <div>
-                            <h3 class="font-black text-xs uppercase text-slate-950">PREGUNTAS CON CLAVE DE RESPUESTA (Preguntas 36 a 45)</h3>
-                            <p class="text-[11px] italic text-slate-600">Marque: A si 1, 2 y 3 son correctas; B si 1 y 3; C si 2 y 4; D si solo 4; E si todas son correctas.</p>
-                          </div>
-
-                          <div class="space-y-3">
-                            @for (preg of varComp.todasLasPreguntas.slice(35, 45); track preg.numero) {
-                              <div class="space-y-1">
-                                <div class="font-bold text-slate-950 text-xs leading-snug whitespace-pre-line">
-                                  {{ preg.numero }}. {{ preg.enunciado }}
-                                </div>
-                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
-                                  @for (op of preg.opciones; track op.letra) {
-                                    <div class="leading-tight">
-                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
-                                    </div>
-                                  }
-                                </div>
-                              </div>
-                            }
-                          </div>
-                        </div>
-
-                        <!-- SECCIÓN 5: CASOS PRÁCTICOS Y PROBLEMAS (46 a 55) -->
-                        <div class="space-y-3 pt-3 border-t border-slate-200">
-                          <div>
-                            <h3 class="font-black text-xs uppercase text-slate-950">CASOS PRÁCTICOS Y PROBLEMAS APLICADOS (Preguntas 46 a 55)</h3>
-                            <div class="p-2.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 mt-1">
-                              <strong>CASO PRÁCTICO N° 1 (Comercial Andina S.R.L.):</strong> En la fiscalización integral se detectaron compras no bancarizadas por Bs 150.000 y retenciones de servicios no declaradas.
-                            </div>
-                          </div>
-
-                          <div class="space-y-3">
-                            @for (preg of varComp.todasLasPreguntas.slice(45, 55); track preg.numero) {
-                              @if (preg.numero === 51) {
-                                <div class="p-2.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 mt-2">
-                                  <strong>CASO PRÁCTICO N° 2 (Constructora del Valle S.A.):</strong> Contrato de obra pública de Bs 2.000.000 con 60% de avance físico certificado y retención del 7% de garantía.
-                                </div>
-                              }
-                              <div class="space-y-1">
-                                <div class="font-bold text-slate-950 text-xs leading-snug">
-                                  {{ preg.numero }}. {{ preg.enunciado }}
-                                </div>
-                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
-                                  @for (op of preg.opciones; track op.letra) {
-                                    <div class="leading-tight">
-                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
-                                    </div>
-                                  }
-                                </div>
-                              </div>
-                            }
-                          </div>
-                        </div>
-
-                        <!-- SECCIÓN 6: EMPAREJAMIENTO DE CONCEPTOS (56 a 60) -->
-                        <div class="space-y-3 pt-3 border-t border-slate-200">
-                          <div>
-                            <h3 class="font-black text-xs uppercase text-slate-950">EMPAREJAMIENTO DE CONCEPTOS (Preguntas 56 a 60)</h3>
-                            <div class="p-2.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 mt-1 space-y-1">
-                              <div><strong>OPCIONES DE REFERENCIA:</strong></div>
-                              <div class="grid grid-cols-2 gap-1 text-[11px]">
-                                <div><strong>A)</strong> Determinación sobre Base Presunta</div>
-                                <div><strong>B)</strong> Crédito Fiscal IVA Trasladable</div>
-                                <div><strong>C)</strong> Alícuota Adicional IUE Financiero</div>
-                                <div><strong>D)</strong> Exención Tributaria Subjetiva</div>
-                                <div><strong>E)</strong> Determinación sobre Base Cierta</div>
-                              </div>
-                              <p class="text-[10px] italic text-slate-600 pt-1">Relacione cada uno de los siguientes enunciados con la opción correspondiente:</p>
-                            </div>
-                          </div>
-
-                          <div class="space-y-3">
-                            @for (preg of varComp.todasLasPreguntas.slice(55, 60); track preg.numero) {
-                              <div class="space-y-1">
-                                <div class="font-bold text-slate-950 text-xs leading-snug">
-                                  {{ preg.numero }}. {{ preg.enunciado }}
-                                </div>
-                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-1 text-slate-800 text-[11px] pl-4">
-                                  @for (op of preg.opciones; track op.letra) {
-                                    <div>
                                       <strong>{{ op.letra }})</strong> {{ op.texto }}
                                     </div>
                                   }
@@ -1253,10 +1105,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 
                         <div class="mt-8 p-3 border-2 border-dashed border-slate-400 rounded-lg text-center bg-slate-50 space-y-1">
                           <div class="font-black text-xs uppercase text-slate-900">
-                            *** FIN DE LA EVALUACIÓN OFICIAL (60 PREGUNTAS) ***
+                            *** FIN DE LA EVALUACIÓN OFICIAL (30 PREGUNTAS) ***
                           </div>
                           <p class="text-[10px] text-slate-600">
-                            Verifique que todas sus 60 respuestas se encuentren correctamente rellenadas en la <strong>Cartilla OMR</strong> de la primera página.
+                            Verifique que todas sus 30 respuestas se encuentren correctamente rellenadas en la <strong>Cartilla OMR</strong> de la primera página.
                           </p>
                         </div>
                       </div>

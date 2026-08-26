@@ -275,7 +275,8 @@ export class ExamenMacroGeneratorService {
   }
 
   /**
-   * Genera el conjunto completo de variantes (A, B, C, D, E) con 60 reactivos de 5 opciones cada uno
+   * Genera el conjunto completo de variantes (A, B, C, D, E) con 30 reactivos oficiales
+   * Distribución: 7 Fáciles (Dif 1) + 16 Medias (Dif 2) + 7 Difíciles (Dif 3) = 30 Reactivos
    */
   public generarVariantesCompletas(cantidadVariantes: number = 3): VarianteCompilada[] {
     const tipos: ('TIPO A' | 'TIPO B' | 'TIPO C' | 'TIPO D' | 'TIPO E')[] = [
@@ -283,20 +284,28 @@ export class ExamenMacroGeneratorService {
     ];
     const letras: ('A' | 'B' | 'C' | 'D' | 'E')[] = ['A', 'B', 'C', 'D', 'E'];
 
+    const facilesBanco = this._banco60Reactivos.filter(r => r.dificultad === 'Fácil');
+    const mediasBanco = this._banco60Reactivos.filter(r => r.dificultad === 'Medio');
+    const dificilesBanco = this._banco60Reactivos.filter(r => r.dificultad === 'Difícil');
+
     const variantesResult: VarianteCompilada[] = [];
     let cursorPagina = 1;
-    const paginasPorVariante = 5;
+    const paginasPorVariante = 3;
 
     for (let v = 0; v < Math.min(cantidadVariantes, 5); v++) {
       const tipo = tipos[v];
       const letraVar = letras[v];
       const semilla = (v + 1) * 53;
 
-      // Permutar los 60 reactivos
-      const bancoMezclado = this._permutarArray([...this._banco60Reactivos], semilla);
+      // 1. Extraer cuotas exactas: 7 Fáciles, 16 Medias, 7 Difíciles = 30 preguntas
+      const facilesSel = this._permutarArray(facilesBanco, semilla + 11).slice(0, 7);
+      const mediasSel = this._permutarArray(mediasBanco, semilla + 23).slice(0, 16);
+      const dificilesSel = this._permutarArray(dificilesBanco, semilla + 37).slice(0, 7);
+
+      const seleccion30 = [...facilesSel, ...mediasSel, ...dificilesSel];
       const patronClaves: { [numeroPregunta: number]: 'A' | 'B' | 'C' | 'D' | 'E' } = {};
 
-      const todasLasPreguntas: ReactivoExamen[] = bancoMezclado.map((base, idx) => {
+      const todasLasPreguntas: ReactivoExamen[] = seleccion30.map((base, idx) => {
         const num = idx + 1;
         const seedOp = semilla + num * 19;
         const opcionesMezcladas = this._permutarArray([...base.opciones], seedOp);
@@ -341,11 +350,11 @@ export class ExamenMacroGeneratorService {
         paginaInicio,
         totalPaginas: paginasPorVariante,
         todasLasPreguntas,
-        preguntasPagina1: todasLasPreguntas.slice(0, 10),  // 1 a 10 (Hoja 1 con cartilla 15%)
-        preguntasPagina2: todasLasPreguntas.slice(10, 22), // 11 a 22 (Hoja 2)
-        preguntasPagina3: todasLasPreguntas.slice(22, 34), // 23 a 34 (Hoja 3)
-        preguntasPagina4: todasLasPreguntas.slice(34, 46), // 35 a 46 (Hoja 4)
-        preguntasPagina5: todasLasPreguntas.slice(46, 60), // 47 a 60 (Hoja 5)
+        preguntasPagina1: todasLasPreguntas.slice(0, 10),
+        preguntasPagina2: todasLasPreguntas.slice(10, 20),
+        preguntasPagina3: todasLasPreguntas.slice(20, 30),
+        preguntasPagina4: [],
+        preguntasPagina5: [],
         patronClaves
       });
     }
