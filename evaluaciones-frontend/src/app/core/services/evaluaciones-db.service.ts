@@ -48,7 +48,22 @@ export interface RolExamenPersistedItem {
   mapeoEstudiantes?: MapeoEstudianteExamen[];
 }
 
+export interface BancoPreguntasPersisted {
+  id: string;
+  sede: string;
+  carrera: string;
+  materiaCodigo: string;
+  materiaNombre: string;
+  grupo: string;
+  parcial: string;
+  totalPreguntas: number;
+  preguntas: any[];
+  fechaValidacion: string;
+  estado: 'VALIDADO' | 'BORRADOR';
+}
+
 const DB_KEY_ROLES = 'xf_sistema_evaluaciones_roles_db';
+const DB_KEY_BANCOS = 'xf_sistema_evaluaciones_bancos_preguntas_db';
 const DB_KEY_CONFIG_VARIANTE_RATIO = 'xf_config_estudiantes_por_variante';
 
 /**
@@ -235,6 +250,53 @@ export class EvaluacionesDbService {
       this.saveRolesExamenes(remaining);
     } else {
       localStorage.removeItem(DB_KEY_ROLES);
+    }
+  }
+
+  /**
+   * Guarda o actualiza un banco de preguntas validado en la base de datos
+   */
+  public guardarBancoPreguntas(banco: BancoPreguntasPersisted): void {
+    try {
+      const all = this.obtenerTodosBancosPreguntas();
+      const idx = all.findIndex(b => b.id === banco.id || (b.materiaCodigo === banco.materiaCodigo && b.parcial === banco.parcial && b.grupo === banco.grupo));
+      if (idx >= 0) {
+        all[idx] = banco;
+      } else {
+        all.unshift(banco);
+      }
+      localStorage.setItem(DB_KEY_BANCOS, JSON.stringify(all));
+    } catch (err) {
+      console.error('Error al guardar banco de preguntas en base de datos:', err);
+    }
+  }
+
+  /**
+   * Obtiene un banco de preguntas específico
+   */
+  public obtenerBancoPreguntas(materiaCodigo: string, parcial: string, grupo?: string): BancoPreguntasPersisted | null {
+    const all = this.obtenerTodosBancosPreguntas();
+    const cleanCod = materiaCodigo.replace(/[\[\]]/g, '').trim().toUpperCase();
+    return all.find(b => {
+      const bCod = b.materiaCodigo.replace(/[\[\]]/g, '').trim().toUpperCase();
+      const matchCod = bCod === cleanCod || b.id.includes(cleanCod);
+      const matchParcial = b.parcial.toLowerCase().includes(parcial.toLowerCase()) || parcial.toLowerCase().includes(b.parcial.toLowerCase());
+      const matchGrupo = !grupo || b.grupo === grupo;
+      return matchCod && matchParcial && matchGrupo;
+    }) || null;
+  }
+
+  /**
+   * Obtiene todos los bancos de preguntas persistidos
+   */
+  public obtenerTodosBancosPreguntas(): BancoPreguntasPersisted[] {
+    try {
+      const raw = localStorage.getItem(DB_KEY_BANCOS);
+      if (!raw) return [];
+      const list = JSON.parse(raw);
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
     }
   }
 

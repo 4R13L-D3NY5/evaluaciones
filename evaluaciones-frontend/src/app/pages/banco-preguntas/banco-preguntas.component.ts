@@ -2348,7 +2348,9 @@ export class BancoPreguntasComponent {
     'Santa Cruz',
     'Guayaramerín',
     'Cobija',
-    'Ivirgarzama'
+    'Riberalta',
+    'Ivirgarzama',
+    'Puerto Quijarro'
   ];
 
   public carrerasPorSede: Record<string, string[]> = {
@@ -2357,73 +2359,175 @@ export class BancoPreguntasComponent {
       'Auditoría Financiera',
       'Medicina',
       'Odontología',
+      'Bioquímica y Farmacia',
+      'Enfermería',
+      'Fisioterapia y Kinesiología',
       'Ingeniería de Sistemas',
       'Derecho',
-      'Fisioterapia y Kinesiología',
-      'Bioquímica y Farmacia',
-      'Enfermería'
+      'Veterinaria y Zootecnia',
+      'Agronomía'
     ],
     'La Paz': [
       'Medicina',
       'Odontología',
-      'Fisioterapia y Kinesiología',
       'Bioquímica y Farmacia',
-      'Derecho'
+      'Enfermería',
+      'Fisioterapia y Kinesiología',
+      'Derecho',
+      'Ingeniería de Sistemas'
     ],
     'El Alto': [
       'Medicina',
       'Odontología',
+      'Bioquímica y Farmacia',
       'Enfermería',
-      'Fisioterapia y Kinesiología'
+      'Fisioterapia y Kinesiología',
+      'Derecho'
     ],
     'Santa Cruz': [
       'Medicina',
       'Odontología',
       'Bioquímica y Farmacia',
+      'Enfermería',
       'Fisioterapia y Kinesiología',
-      'Veterinaria y Zootecnia'
+      'Veterinaria y Zootecnia',
+      'Derecho',
+      'Ingeniería de Sistemas'
     ],
     'Guayaramerín': [
       'Medicina',
       'Enfermería',
       'Fisioterapia y Kinesiología',
-      'Derecho'
+      'Derecho',
+      'Bioquímica y Farmacia'
     ],
     'Cobija': [
       'Medicina',
       'Odontología',
-      'Enfermería'
+      'Enfermería',
+      'Fisioterapia y Kinesiología',
+      'Derecho'
+    ],
+    'Riberalta': [
+      'Medicina',
+      'Enfermería',
+      'Fisioterapia y Kinesiología',
+      'Derecho'
     ],
     'Ivirgarzama': [
       'Medicina',
       'Enfermería',
       'Agronomía',
-      'Veterinaria y Zootecnia'
+      'Veterinaria y Zootecnia',
+      'Fisioterapia y Kinesiología'
+    ],
+    'Puerto Quijarro': [
+      'Medicina',
+      'Enfermería',
+      'Derecho',
+      'Fisioterapia y Kinesiología'
     ]
   };
 
   public asignaturasPorCarrera: Record<string, string[]> = {
-    'Complementaria Contaduría Pública': ['[CPEC18] AUDITORÍA TRIBUTARIA', '[CPEC12] CONTABILIDAD GUBERNAMENTAL', '[CPEC15] GABINETE DE AUDITORÍA'],
-    'Auditoría Financiera': ['[AUD-201] AUDITORÍA FINANCIERA I', '[AUD-305] AUDITORÍA FORENSE'],
-    'Medicina': ['[MED-101] ANATOMÍA HUMANA I', '[MED-204] FARMACOLOGÍA GENERAL', '[MED-301] FISIOPATOLOGÍA'],
-    'Odontología': ['[ODO-102] ANATOMÍA DENTAL', '[ODO-201] CIRUGÍA BUCAL I'],
-    'Ingeniería de Sistemas': ['[SIS-413] TELECOMUNICACIONES', '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA', '[SIS-210] ESTRUCTURA DE DATOS'],
-    'Derecho': ['[DER-301] DERECHO TRIBUTARIO', '[DER-205] DERECHO PROCESAL PENAL'],
-    'Fisioterapia y Kinesiología': ['[FIS-101] KINESIOLOGÍA APLICADA', '[FIS-203] BIOMECÁNICA'],
-    'Bioquímica y Farmacia': ['[BQ-201] BIOQUÍMICA CLÍNICA', '[BQ-305] TOXICOLOGÍA'],
-    'Enfermería': ['[ENF-101] ENFERMERÍA GENERAL', '[ENF-202] FARMACOLOGÍA ENFERMERÍA'],
-    'Veterinaria y Zootecnia': ['[VET-101] ANATOMÍA VETERINARIA', '[VET-205] PATOLOGÍA ANIMAL'],
-    'Agronomía': ['[AGR-101] EDAFOLOGÍA Y SUELOS', '[AGR-202] FITOPATOLOGÍA']
+    'Complementaria Contaduría Pública': [
+      '[CPEC18] AUDITORÍA TRIBUTARIA',
+      '[CPEC12] CONTABILIDAD GUBERNAMENTAL',
+      '[CPEC15] GABINETE DE AUDITORÍA',
+      '[CPEC11] CONTABILIDAD TRIBUTARIA'
+    ],
+    'Auditoría Financiera': [
+      '[AUD-201] AUDITORÍA FINANCIERA I',
+      '[AUD-305] AUDITORÍA FORENSE',
+      '[AUD-101] PRINCIPIOS DE CONTABILIDAD',
+      '[AUD-204] COSTOS Y PRESUPUESTOS'
+    ],
+    'Medicina': [
+      '[MED-101] ANATOMÍA HUMANA I',
+      '[MED-204] FARMACOLOGÍA GENERAL',
+      '[MED-301] FISIOPATOLOGÍA',
+      '[MED-405] MEDICINA INTERNA I',
+      '[MED-202] HISTOLOGÍA Y EMBRIOLOGÍA'
+    ],
+    'Odontología': [
+      '[ODO-102] ANATOMÍA DENTAL',
+      '[ODO-201] CIRUGÍA BUCAL I',
+      '[ODO-304] ENDODONCIA',
+      '[ODO-205] PERIODONCIA'
+    ],
+    'Bioquímica y Farmacia': [
+      '[BQ-201] BIOQUÍMICA CLÍNICA',
+      '[BQ-305] TOXICOLOGÍA',
+      '[BQ-102] QUÍMICA ORGÁNICA',
+      '[BQ-204] MICROBIOLOGÍA GENERAL'
+    ],
+    'Enfermería': [
+      '[ENF-101] ENFERMERÍA GENERAL',
+      '[ENF-202] FARMACOLOGÍA ENFERMERÍA',
+      '[ENF-304] SALUD PÚBLICA',
+      '[ENF-205] ENFERMERÍA MÉDICO QUIRÚRGICA'
+    ],
+    'Fisioterapia y Kinesiología': [
+      '[FIS-101] KINESIOLOGÍA APLICADA',
+      '[FIS-203] BIOMECÁNICA',
+      '[FIS-302] FISIOTERAPIA RESPIRATORIA',
+      '[FIS-205] CINESITERAPIA'
+    ],
+    'Ingeniería de Sistemas': [
+      '[SIS-413] TELECOMUNICACIONES',
+      '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA',
+      '[SIS-210] ESTRUCTURA DE DATOS',
+      '[SIS-101] PROGRAMACIÓN I',
+      '[SIS-304] BASE DE DATOS I'
+    ],
+    'Derecho': [
+      '[DER-301] DERECHO TRIBUTARIO',
+      '[DER-205] DERECHO PROCESAL PENAL',
+      '[DER-102] DERECHO CONSTITUCIONAL',
+      '[DER-201] DERECHO CIVIL PERSONAS'
+    ],
+    'Veterinaria y Zootecnia': [
+      '[VET-101] ANATOMÍA VETERINARIA',
+      '[VET-205] PATOLOGÍA ANIMAL',
+      '[VET-302] FARMACOLOGÍA VETERINARIA',
+      '[VET-201] NUTRICIÓN ANIMAL'
+    ],
+    'Agronomía': [
+      '[AGR-101] EDAFOLOGÍA Y SUELOS',
+      '[AGR-202] FITOPATOLOGÍA',
+      '[AGR-305] RIEGOS Y DRENAJES',
+      '[AGR-204] PRODUCCIÓN VEGETAL'
+    ]
   };
 
   public gruposPorAsignatura: Record<string, string[]> = {
     '[CPEC18] AUDITORÍA TRIBUTARIA': ['TA-01', 'TA-02', 'TB-01'],
     '[CPEC12] CONTABILIDAD GUBERNAMENTAL': ['TA-01', 'TA-02'],
-    '[CPEC15] GABINETE DE AUDITORÍA': ['TA-01'],
+    '[CPEC15] GABINETE DE AUDITORÍA': ['TA-01', 'TB-01'],
+    '[CPEC11] CONTABILIDAD TRIBUTARIA': ['TA-01', 'TA-02'],
     '[SIS-413] TELECOMUNICACIONES': ['Grupo 1', 'Grupo 2'],
     '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA': ['Grupo 1', 'Grupo 2'],
-    '[MED-101] ANATOMÍA HUMANA I': ['M1', 'M2', 'M3'],
-    '[MED-204] FARMACOLOGÍA GENERAL': ['M1', 'M2']
+    '[SIS-210] ESTRUCTURA DE DATOS': ['Grupo 1', 'Grupo 2'],
+    '[SIS-101] PROGRAMACIÓN I': ['Grupo 1', 'Grupo 2', 'Grupo 3'],
+    '[SIS-304] BASE DE DATOS I': ['Grupo 1', 'Grupo 2'],
+    '[MED-101] ANATOMÍA HUMANA I': ['M1', 'M2', 'M3', 'M4'],
+    '[MED-204] FARMACOLOGÍA GENERAL': ['M1', 'M2', 'M3'],
+    '[MED-301] FISIOPATOLOGÍA': ['M1', 'M2'],
+    '[MED-405] MEDICINA INTERNA I': ['M1', 'M2'],
+    '[MED-202] HISTOLOGÍA Y EMBRIOLOGÍA': ['M1', 'M2', 'M3'],
+    '[ODO-102] ANATOMÍA DENTAL': ['OD-1', 'OD-2'],
+    '[ODO-201] CIRUGÍA BUCAL I': ['OD-1', 'OD-2'],
+    '[ODO-304] ENDODONCIA': ['OD-1', 'OD-2'],
+    '[BQ-201] BIOQUÍMICA CLÍNICA': ['BQ-1', 'BQ-2'],
+    '[BQ-305] TOXICOLOGÍA': ['BQ-1', 'BQ-2'],
+    '[ENF-101] ENFERMERÍA GENERAL': ['ENF-1', 'ENF-2'],
+    '[ENF-202] FARMACOLOGÍA ENFERMERÍA': ['ENF-1', 'ENF-2'],
+    '[FIS-101] KINESIOLOGÍA APLICADA': ['FIS-1', 'FIS-2'],
+    '[FIS-203] BIOMECÁNICA': ['FIS-1', 'FIS-2'],
+    '[DER-301] DERECHO TRIBUTARIO': ['DER-1', 'DER-2'],
+    '[DER-205] DERECHO PROCESAL PENAL': ['DER-1', 'DER-2'],
+    '[VET-101] ANATOMÍA VETERINARIA': ['VET-1', 'VET-2'],
+    '[AGR-101] EDAFOLOGÍA Y SUELOS': ['AGR-1', 'AGR-2']
   };
 
   public sedeSeleccionada = signal<string>('Cochabamba');
@@ -3486,17 +3590,33 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     this.pdfPrevisualizadoYConforme.set(true);
     this.dialogPrevisualizacionPdf.set(false);
 
-    // Sincronizar automáticamente el estado VALIDADO con la Base de Datos de Evaluaciones
+    // Sincronizar automáticamente el banco y el estado VALIDADO con la Base de Datos de Evaluaciones
     const asigRaw = this.asignaturaSeleccionada();
     const matchCod = asigRaw.match(/\[([A-Za-z0-9\-]+)\]/);
     const codigo = matchCod ? matchCod[1] : 'CPEC18';
     const archivo = this.nombreArchivoCargado() || `BANCO_${codigo}_OFICIAL.xlsx`;
     const hash = 'SHA256-2FA-' + codigo + '-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
-    const totalValidas = this.preguntasCargadas().filter(p => p.valido).length || 60;
+    const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
+    const totalValidas = preguntasValidas.length || 60;
+
+    // Guardar el banco atómico completo en la base de datos
+    this._db.guardarBancoPreguntas({
+      id: `BANCO-${codigo}-${this.parcialActivo()}-${this.grupoSeleccionado()}`,
+      sede: this.sedeSeleccionada(),
+      carrera: this.carreraSeleccionada(),
+      materiaCodigo: codigo,
+      materiaNombre: asigRaw,
+      grupo: this.grupoSeleccionado(),
+      parcial: this.parcialActivo(),
+      totalPreguntas: totalValidas,
+      preguntas: preguntasValidas,
+      fechaValidacion: new Date().toLocaleString(),
+      estado: 'VALIDADO'
+    });
 
     this._db.actualizarEstadoPorBancoValidado(codigo, this.parcialActivo(), archivo, hash, totalValidas);
 
-    this._mostrarToast(`✅ ¡Doble Autenticación (2FA) exitosa! El banco de [${codigo}] ha sido sellado con SHA-256 y pasó a estado VALIDADO.`);
+    this._mostrarToast(`✅ ¡Banco de [${codigo}] guardado en Base de Datos y Certificado como VALIDADO!`);
   }
 
   public aprobarDiagramacionPdf(): void {
