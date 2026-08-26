@@ -2356,16 +2356,32 @@ export class BancoPreguntasComponent {
   public carrerasPorSede: Record<string, string[]> = {
     'Cochabamba': [
       'Complementaria Contaduría Pública',
+      'Contaduría Pública',
       'Auditoría Financiera',
+      'Administración de Empresas',
+      'Ingeniería Comercial',
+      'Comercio Internacional',
+      'Marketing y Publicidad',
       'Medicina',
       'Odontología',
       'Bioquímica y Farmacia',
       'Enfermería',
       'Fisioterapia y Kinesiología',
+      'Fonoaudiología',
+      'Nutrición y Dietética',
+      'Prótesis Dental',
       'Ingeniería de Sistemas',
+      'Ingeniería en Redes y Telecomunicaciones',
+      'Ingeniería Electrónica',
+      'Ingeniería Electromecánica',
+      'Ingeniería de Sonido',
+      'Ingeniería Industrial',
+      'Ingeniería Civil',
       'Derecho',
-      'Veterinaria y Zootecnia',
-      'Agronomía'
+      'Comunicación Social',
+      'Psicología',
+      'Medicina Veterinaria y Zootecnia',
+      'Ingeniería Agronómica'
     ],
     'La Paz': [
       'Medicina',
@@ -2374,7 +2390,10 @@ export class BancoPreguntasComponent {
       'Enfermería',
       'Fisioterapia y Kinesiología',
       'Derecho',
-      'Ingeniería de Sistemas'
+      'Administración de Empresas',
+      'Contaduría Pública',
+      'Ingeniería de Sistemas',
+      'Ingeniería Comercial'
     ],
     'El Alto': [
       'Medicina',
@@ -2382,7 +2401,8 @@ export class BancoPreguntasComponent {
       'Bioquímica y Farmacia',
       'Enfermería',
       'Fisioterapia y Kinesiología',
-      'Derecho'
+      'Derecho',
+      'Contaduría Pública'
     ],
     'Santa Cruz': [
       'Medicina',
@@ -2390,16 +2410,19 @@ export class BancoPreguntasComponent {
       'Bioquímica y Farmacia',
       'Enfermería',
       'Fisioterapia y Kinesiología',
-      'Veterinaria y Zootecnia',
+      'Medicina Veterinaria y Zootecnia',
       'Derecho',
-      'Ingeniería de Sistemas'
+      'Administración de Empresas',
+      'Ingeniería de Sistemas',
+      'Ingeniería Comercial'
     ],
     'Guayaramerín': [
       'Medicina',
       'Enfermería',
       'Fisioterapia y Kinesiología',
       'Derecho',
-      'Bioquímica y Farmacia'
+      'Bioquímica y Farmacia',
+      'Administración de Empresas'
     ],
     'Cobija': [
       'Medicina',
@@ -2417,8 +2440,8 @@ export class BancoPreguntasComponent {
     'Ivirgarzama': [
       'Medicina',
       'Enfermería',
-      'Agronomía',
-      'Veterinaria y Zootecnia',
+      'Ingeniería Agronómica',
+      'Medicina Veterinaria y Zootecnia',
       'Fisioterapia y Kinesiología'
     ],
     'Puerto Quijarro': [
@@ -2436,11 +2459,41 @@ export class BancoPreguntasComponent {
       '[CPEC15] GABINETE DE AUDITORÍA',
       '[CPEC11] CONTABILIDAD TRIBUTARIA'
     ],
+    'Contaduría Pública': [
+      '[CON-101] CONTABILIDAD BÁSICA I',
+      '[CON-202] CONTABILIDAD DE COSTOS',
+      '[CON-305] AUDITORÍA FINANCIERA',
+      '[CON-401] GABINETE TRIBUTARIO'
+    ],
     'Auditoría Financiera': [
       '[AUD-201] AUDITORÍA FINANCIERA I',
       '[AUD-305] AUDITORÍA FORENSE',
       '[AUD-101] PRINCIPIOS DE CONTABILIDAD',
       '[AUD-204] COSTOS Y PRESUPUESTOS'
+    ],
+    'Administración de Empresas': [
+      '[ADM-101] ADMINISTRACIÓN I',
+      '[ADM-204] GESTIÓN DEL TALENTO HUMANO',
+      '[ADM-302] ADMINISTRACIÓN FINANCIERA',
+      '[ADM-401] PLANIFICACIÓN ESTRATÉGICA'
+    ],
+    'Ingeniería Comercial': [
+      '[COM-101] FUNDAMENTOS DE MARKETING',
+      '[COM-202] INVESTIGACIÓN DE MERCADOS',
+      '[COM-304] FINANZAS CORPORATIVAS',
+      '[COM-401] COMERCIO EXTERIOR'
+    ],
+    'Comercio Internacional': [
+      '[CIN-101] COMERCIO INTERNACIONAL I',
+      '[CIN-202] LOGÍSTICA ADUANERA',
+      '[CIN-305] DERECHO ADUANERO',
+      '[CIN-402] NEGOCIACIÓN INTERNACIONAL'
+    ],
+    'Marketing y Publicidad': [
+      '[MKT-101] INTRODUCCIÓN AL MARKETING',
+      '[MKT-203] PUBLICIDAD Y MEDIOS',
+      '[MKT-302] MARKETING DIGITAL',
+      '[MKT-404] BRANDING Y POSICIONAMIENTO'
     ],
     'Medicina': [
       '[MED-101] ANATOMÍA HUMANA I',
@@ -2473,6 +2526,24 @@ export class BancoPreguntasComponent {
       '[FIS-302] FISIOTERAPIA RESPIRATORIA',
       '[FIS-205] CINESITERAPIA'
     ],
+    'Fonoaudiología': [
+      '[FON-101] ANATOMÍA DEL LENGUAJE Y AUDICIÓN',
+      '[FON-202] AUDIOLOGÍA CLÍNICA',
+      '[FON-303] TERAPIA DE LA VOZ',
+      '[FON-401] NEUROLINGÜÍSTICA'
+    ],
+    'Nutrición y Dietética': [
+      '[NUT-101] BROMATOLOGÍA Y ALIMENTOS',
+      '[NUT-202] DIETOTERAPIA DEL ADULTO',
+      '[NUT-304] EVALUACIÓN NUTRICIONAL',
+      '[NUT-401] SALUD PÚBLICA NUTRICIONAL'
+    ],
+    'Prótesis Dental': [
+      '[PRO-101] ANATOMÍA Y MODELADO DENTAL',
+      '[PRO-202] PRÓTESIS TOTAL',
+      '[PRO-303] PRÓTESIS PARCIAL REMOVIBLE',
+      '[PRO-401] ORTODONCIA DE LABORATORIO'
+    ],
     'Ingeniería de Sistemas': [
       '[SIS-413] TELECOMUNICACIONES',
       '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA',
@@ -2480,23 +2551,71 @@ export class BancoPreguntasComponent {
       '[SIS-101] PROGRAMACIÓN I',
       '[SIS-304] BASE DE DATOS I'
     ],
+    'Ingeniería en Redes y Telecomunicaciones': [
+      '[RED-101] REDES DE COMPUTADORAS I',
+      '[RED-202] PROTOCOLOS DE ENRUTAMIENTO',
+      '[RED-305] SEGURIDAD EN REDES',
+      '[RED-401] TELEFONÍA IP Y FIBRA ÓPTICA'
+    ],
+    'Ingeniería Electrónica': [
+      '[ELE-101] CIRCUITOS ELÉCTRICOS I',
+      '[ELE-202] ELECTRÓNICA ANALÓGICA',
+      '[ELE-304] SISTEMAS DIGITALES Y MICROCONTROLADORES',
+      '[ELE-401] CONTROL AUTOMÁTICO'
+    ],
+    'Ingeniería Electromecánica': [
+      '[ELM-101] MECÁNICA APLICADA',
+      '[ELM-203] MÁQUINAS ELÉCTRICAS',
+      '[ELM-302] TERMODINÁMICA Y FLUIDOS',
+      '[ELM-401] INSTALACIONES INDUSTRIALES'
+    ],
+    'Ingeniería de Sonido': [
+      '[SON-101] ACÚSTICA Y ELECTROACÚSTICA',
+      '[SON-202] GRABACIÓN EN ESTUDIO',
+      '[SON-304] MEZCLA Y MASTERIZACIÓN',
+      '[SON-401] SONIDO EN VIVO Y REFUERZO SONORO'
+    ],
+    'Ingeniería Industrial': [
+      '[IND-101] INGENIERÍA DE MÉTODOS',
+      '[IND-203] GESTIÓN DE LA CALIDAD',
+      '[IND-302] SEGURIDAD INDUSTRIAL Y SALUD OCUPACIONAL',
+      '[IND-401] INVESTIGACIÓN OPERATIVA'
+    ],
+    'Ingeniería Civil': [
+      '[CIV-101] TOPOGRAFÍA Y GEODESIA',
+      '[CIV-202] RESISTENCIA DE MATERIALES',
+      '[CIV-304] HORMIGÓN ARMADO',
+      '[CIV-401] HIDRÁULICA APLICADA'
+    ],
     'Derecho': [
       '[DER-301] DERECHO TRIBUTARIO',
       '[DER-205] DERECHO PROCESAL PENAL',
       '[DER-102] DERECHO CONSTITUCIONAL',
       '[DER-201] DERECHO CIVIL PERSONAS'
     ],
-    'Veterinaria y Zootecnia': [
+    'Comunicación Social': [
+      '[CS-101] TEORÍAS DE LA COMUNICACIÓN',
+      '[CS-202] PERIODISMO DIGITAL',
+      '[CS-304] PRODUCCIÓN AUDIOVISUAL',
+      '[CS-401] COMUNICACIÓN ESTRATÉGICA'
+    ],
+    'Psicología': [
+      '[PSI-101] PSICOLOGÍA GENERAL',
+      '[PSI-202] PSICOLOGÍA DEL DESARROLLO',
+      '[PSI-304] PSICOPATOLOGÍA CLÍNICA',
+      '[PSI-401] EVALUACIÓN PSICOMÉTRICA'
+    ],
+    'Medicina Veterinaria y Zootecnia': [
       '[VET-101] ANATOMÍA VETERINARIA',
       '[VET-205] PATOLOGÍA ANIMAL',
       '[VET-302] FARMACOLOGÍA VETERINARIA',
-      '[VET-201] NUTRICIÓN ANIMAL'
+      '[VET-401] CIRUGÍA VETERINARIA'
     ],
-    'Agronomía': [
+    'Ingeniería Agronómica': [
       '[AGR-101] EDAFOLOGÍA Y SUELOS',
       '[AGR-202] FITOPATOLOGÍA',
       '[AGR-305] RIEGOS Y DRENAJES',
-      '[AGR-204] PRODUCCIÓN VEGETAL'
+      '[AGR-401] MANEJO INTEGRADO DE PLAGAS'
     ]
   };
 
