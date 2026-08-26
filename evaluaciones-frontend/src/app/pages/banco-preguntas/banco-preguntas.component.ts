@@ -1,8 +1,10 @@
-import { Component, inject, signal, computed, ViewChild, ElementRef } from '@angular/core';
+import { Component, inject, signal, computed, ViewChild, ElementRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
 import { EvaluacionesDbService } from '../../core/services/evaluaciones-db.service';
+import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
+import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import * as XLSX from 'xlsx';
 
 export interface PreguntaValidada {
@@ -148,12 +150,12 @@ export interface DiaCalendario {
               <div class="flex items-center gap-2">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-900 border border-purple-200 rounded-full text-xs font-bold font-mono">
                   <i class="pi pi-check-circle text-purple-600 text-xs"></i>
-                  {{ asignaturaSeleccionada() }} · {{ grupoSeleccionado() }}
+                  {{ asignaturaNombreCompleto() }} · {{ grupoSeleccionado() }}
                 </span>
               </div>
             </div>
 
-            <!-- Grilla de 4 Selects Reactivos -->
+            <!-- Grilla de 4 Selects Reactivos Conectados al Gateway SEA -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <!-- Select 1: Sede -->
               <div class="space-y-1.5">
@@ -161,11 +163,12 @@ export interface DiaCalendario {
                   <i class="pi pi-building text-purple-700"></i> Sede
                 </label>
                 <select 
-                  [ngModel]="sedeSeleccionada()"
+                  [ngModel]="sedeSeleccionada()?.code"
                   (ngModelChange)="onSedeChange($event)"
-                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
-                  @for (s of sedesCatalogo; track s) {
-                    <option [value]="s">{{ s }}</option>
+                  [disabled]="cargandoSedes()"
+                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer disabled:opacity-50">
+                  @for (s of sedes(); track s.branchOfficeId) {
+                    <option [value]="s.code">{{ s.name }} ({{ s.code }})</option>
                   }
                 </select>
               </div>
@@ -176,11 +179,12 @@ export interface DiaCalendario {
                   <i class="pi pi-graduation-cap text-purple-700"></i> Carrera
                 </label>
                 <select 
-                  [ngModel]="carreraSeleccionada()"
+                  [ngModel]="carreraSeleccionada()?.careerCode"
                   (ngModelChange)="onCarreraChange($event)"
-                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
-                  @for (c of carrerasDisponibles(); track c) {
-                    <option [value]="c">{{ c }}</option>
+                  [disabled]="cargandoCarreras()"
+                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer disabled:opacity-50">
+                  @for (c of carreras(); track c.careerId) {
+                    <option [value]="c.careerCode">{{ c.careerName }} ({{ c.careerCode }})</option>
                   }
                 </select>
               </div>
@@ -191,11 +195,12 @@ export interface DiaCalendario {
                   <i class="pi pi-book text-purple-700"></i> Asignatura
                 </label>
                 <select 
-                  [ngModel]="asignaturaSeleccionada()"
+                  [ngModel]="asignaturaSeleccionada()?.courseCode"
                   (ngModelChange)="onAsignaturaChange($event)"
-                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
-                  @for (a of asignaturasDisponibles(); track a) {
-                    <option [value]="a">{{ a }}</option>
+                  [disabled]="cargandoAsignaturas()"
+                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer disabled:opacity-50">
+                  @for (a of asignaturas(); track a.syllabusCourseId) {
+                    <option [value]="a.courseCode">[{{ a.courseCode }}] {{ a.courseName }}</option>
                   }
                 </select>
               </div>
@@ -208,9 +213,18 @@ export interface DiaCalendario {
                 <select 
                   [ngModel]="grupoSeleccionado()"
                   (ngModelChange)="grupoSeleccionado.set($event)"
-                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer">
-                  @for (g of gruposDisponibles(); track g) {
-                    <option [value]="g">{{ g }}</option>
+                  [disabled]="cargandoGrupos()"
+                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer disabled:opacity-50">
+                  @if (grupos().length > 0) {
+                    @for (g of grupos(); track g.groupId) {
+                      <option [value]="g.code">{{ g.code }} — {{ g.teacherName || 'Docente SEA' }}</option>
+                    }
+                  } @else {
+                    <option value="TA-01">TA-01</option>
+                    <option value="TA-02">TA-02</option>
+                    <option value="TB-01">TB-01</option>
+                    <option value="Grupo 1">Grupo 1</option>
+                    <option value="Grupo 2">Grupo 2</option>
                   }
                 </select>
               </div>
@@ -1358,15 +1372,15 @@ export interface DiaCalendario {
                       <strong>NOMBRE:</strong> <span class="text-slate-800">JUAN CARLOS PÉREZ MAMANI</span>
                     </div>
                     <div class="col-span-5 p-1.5">
-                      <strong>CARRERA:</strong> <span class="text-slate-800">{{ carreraSeleccionada() | uppercase }}</span>
+                      <strong>CARRERA:</strong> <span class="text-slate-800">{{ carreraNombreCompleto() | uppercase }}</span>
                     </div>
                   </div>
                   <div class="grid grid-cols-12 border-b border-slate-400">
                     <div class="col-span-7 p-1.5 border-r border-slate-400">
-                      <strong>MATERIA:</strong> <span class="text-slate-800">{{ asignaturaSeleccionada() | uppercase }}</span>
+                      <strong>MATERIA:</strong> <span class="text-slate-800">{{ asignaturaNombreCompleto() | uppercase }}</span>
                     </div>
                     <div class="col-span-5 p-1.5">
-                      <strong>GRUPO:</strong> <span class="text-slate-800">{{ grupoSeleccionado() }}</span> <strong class="ml-2">SEMESTRE:</strong> 3
+                      <strong>GRUPO:</strong> <span class="text-slate-800">{{ grupoSeleccionado() }}</span> <strong class="ml-2">SEMESTRE:</strong> {{ asignaturaSeleccionada()?.semester || 3 }}
                     </div>
                   </div>
                   <div class="grid grid-cols-12 border-b border-slate-400">
@@ -2277,15 +2291,159 @@ export interface DiaCalendario {
     </div>
   `
 })
-export class BancoPreguntasComponent {
+export class BancoPreguntasComponent implements OnInit {
   public readonly storage = inject(EvaluacionesStorageService);
   private readonly _db = inject(EvaluacionesDbService);
+  private readonly _gateway = inject(UnitepcGatewayService);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
 
   // Pestaña activa: 'validador' (default) o 'calendario'
   public tabActiva = signal<'validador' | 'calendario'>('validador');
   public vistaCalendario = signal<'calendario' | 'lista'>('calendario');
+
+  // Estados de Datos Reales de SEA Gateway
+  public sedes = signal<BranchOffice[]>([]);
+  public sedeSeleccionada = signal<BranchOffice | null>(null);
+
+  public carreras = signal<Career[]>([]);
+  public carreraSeleccionada = signal<Career | null>(null);
+
+  public asignaturas = signal<Course[]>([]);
+  public asignaturaSeleccionada = signal<Course | null>(null);
+
+  public grupos = signal<GroupItem[]>([]);
+  public grupoSeleccionado = signal<string>('TA-01');
+
+  public cargandoSedes = signal<boolean>(false);
+  public cargandoCarreras = signal<boolean>(false);
+  public cargandoAsignaturas = signal<boolean>(false);
+  public cargandoGrupos = signal<boolean>(false);
+
+  public asignaturaNombreCompleto = computed(() => {
+    const asig = this.asignaturaSeleccionada();
+    if (!asig) return '[CPEC18] AUDITORÍA TRIBUTARIA';
+    return `[${asig.courseCode}] ${asig.courseName}`;
+  });
+
+  public carreraNombreCompleto = computed(() => {
+    return this.carreraSeleccionada()?.careerName || 'Complementaria Contaduría Pública';
+  });
+
+  public ngOnInit(): void {
+    this._cargarSedes();
+  }
+
+  private _cargarSedes(): void {
+    this.cargandoSedes.set(true);
+    this._gateway.getBranchOffices().subscribe({
+      next: data => {
+        this.sedes.set(data);
+        this.cargandoSedes.set(false);
+        if (data.length > 0) {
+          const cba = data.find(s => s.code === 'CBA') || data[0];
+          this.seleccionarSede(cba);
+        }
+      },
+      error: () => this.cargandoSedes.set(false)
+    });
+  }
+
+  public onSedeChange(sedeCode: string): void {
+    const sede = this.sedes().find(s => s.code === sedeCode);
+    if (sede) {
+      this.seleccionarSede(sede);
+    }
+  }
+
+  public seleccionarSede(sede: BranchOffice): void {
+    this.sedeSeleccionada.set(sede);
+    this.carreraSeleccionada.set(null);
+    this.asignaturas.set([]);
+    this.asignaturaSeleccionada.set(null);
+    this._cargarCarrerasDeSede(sede.code);
+  }
+
+  private _cargarCarrerasDeSede(branchCode: string): void {
+    this.cargandoCarreras.set(true);
+    this._gateway.getCareers(branchCode).subscribe({
+      next: data => {
+        this.carreras.set(data);
+        this.cargandoCarreras.set(false);
+        if (data.length > 0) {
+          const defaultCarrera = data.find(c => c.careerCode === 'CONT-COMPL' || c.careerName.includes('Contadur')) || data[0];
+          this.seleccionarCarrera(defaultCarrera);
+        }
+      },
+      error: () => this.cargandoCarreras.set(false)
+    });
+  }
+
+  public onCarreraChange(careerCode: string): void {
+    const carrera = this.carreras().find(c => c.careerCode === careerCode);
+    if (carrera) {
+      this.seleccionarCarrera(carrera);
+    }
+  }
+
+  public seleccionarCarrera(carrera: Career): void {
+    this.carreraSeleccionada.set(carrera);
+    const sede = this.sedeSeleccionada();
+    if (sede) {
+      this._cargarMateriasDeCarrera(sede.code, carrera.careerCode);
+    }
+  }
+
+  private _cargarMateriasDeCarrera(branchCode: string, careerCode: string): void {
+    this.cargandoAsignaturas.set(true);
+    this._gateway.getCourses(branchCode, careerCode).subscribe({
+      next: data => {
+        this.asignaturas.set(data);
+        this.cargandoAsignaturas.set(false);
+        if (data.length > 0) {
+          const defaultAsig = data.find(m => m.courseCode === 'CPEC18' || m.courseName.includes('TRIBUTARIA')) || data[0];
+          this.seleccionarAsignatura(defaultAsig);
+        }
+      },
+      error: () => this.cargandoAsignaturas.set(false)
+    });
+  }
+
+  public onAsignaturaChange(courseCode: string): void {
+    const asig = this.asignaturas().find(m => m.courseCode === courseCode);
+    if (asig) {
+      this.seleccionarAsignatura(asig);
+    }
+  }
+
+  public seleccionarAsignatura(asig: Course): void {
+    this.asignaturaSeleccionada.set(asig);
+    this.pdfPrevisualizadoYConforme.set(false);
+    this._cargarGruposDeMateria(asig.syllabusCourseId);
+  }
+
+  private _cargarGruposDeMateria(syllabusCourseId: string): void {
+    this.cargandoGrupos.set(true);
+    const sede = this.sedeSeleccionada();
+    const carrera = this.carreraSeleccionada();
+    this._gateway.getGroups('2-2026', sede?.branchOfficeId, carrera?.careerId, syllabusCourseId).subscribe({
+      next: data => {
+        this.grupos.set(data);
+        this.cargandoGrupos.set(false);
+        if (data.length > 0) {
+          this.grupoSeleccionado.set(data[0].code);
+        } else {
+          const rolesEnDb = this._db.getRolesExamenes(sede?.code, carrera?.careerCode);
+          const rol = rolesEnDb.find(r => r.codigo === this.asignaturaSeleccionada()?.courseCode);
+          this.grupoSeleccionado.set(rol?.grupo || 'TA-01');
+        }
+      },
+      error: () => {
+        this.cargandoGrupos.set(false);
+        this.grupoSeleccionado.set('TA-01');
+      }
+    });
+  }
 
   // Navegación de Calendario Mensual (Default: Marzo 2026 = mes 2)
   public mesActual = signal<number>(2); // 0 = Enero, 2 = Marzo, 4 = Mayo, 5 = Junio
@@ -2338,356 +2496,7 @@ export class BancoPreguntasComponent {
     { id: 'IVI-TRO', nombre: 'Ivirgarzama - Campus Trópico', ciudad: 'Ivirgarzama', correos: ['evaluaciones.ivirgarzama@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Trópico' }
   ];
 
-  // ============================================================
-  // SELECTS DE ASIGNACIÓN ACADÉMICA DEL EXAMEN (SEDE, CARRERA, ASIG, GRUPO)
-  // ============================================================
-  public sedesCatalogo: string[] = [
-    'Cochabamba',
-    'La Paz',
-    'El Alto',
-    'Santa Cruz',
-    'Guayaramerín',
-    'Cobija',
-    'Riberalta',
-    'Ivirgarzama',
-    'Puerto Quijarro'
-  ];
 
-  public carrerasPorSede: Record<string, string[]> = {
-    'Cochabamba': [
-      'Complementaria Contaduría Pública',
-      'Contaduría Pública',
-      'Auditoría Financiera',
-      'Administración de Empresas',
-      'Ingeniería Comercial',
-      'Comercio Internacional',
-      'Marketing y Publicidad',
-      'Medicina',
-      'Odontología',
-      'Bioquímica y Farmacia',
-      'Enfermería',
-      'Fisioterapia y Kinesiología',
-      'Fonoaudiología',
-      'Nutrición y Dietética',
-      'Prótesis Dental',
-      'Ingeniería de Sistemas',
-      'Ingeniería en Redes y Telecomunicaciones',
-      'Ingeniería Electrónica',
-      'Ingeniería Electromecánica',
-      'Ingeniería de Sonido',
-      'Ingeniería Industrial',
-      'Ingeniería Civil',
-      'Derecho',
-      'Comunicación Social',
-      'Psicología',
-      'Medicina Veterinaria y Zootecnia',
-      'Ingeniería Agronómica'
-    ],
-    'La Paz': [
-      'Medicina',
-      'Odontología',
-      'Bioquímica y Farmacia',
-      'Enfermería',
-      'Fisioterapia y Kinesiología',
-      'Derecho',
-      'Administración de Empresas',
-      'Contaduría Pública',
-      'Ingeniería de Sistemas',
-      'Ingeniería Comercial'
-    ],
-    'El Alto': [
-      'Medicina',
-      'Odontología',
-      'Bioquímica y Farmacia',
-      'Enfermería',
-      'Fisioterapia y Kinesiología',
-      'Derecho',
-      'Contaduría Pública'
-    ],
-    'Santa Cruz': [
-      'Medicina',
-      'Odontología',
-      'Bioquímica y Farmacia',
-      'Enfermería',
-      'Fisioterapia y Kinesiología',
-      'Medicina Veterinaria y Zootecnia',
-      'Derecho',
-      'Administración de Empresas',
-      'Ingeniería de Sistemas',
-      'Ingeniería Comercial'
-    ],
-    'Guayaramerín': [
-      'Medicina',
-      'Enfermería',
-      'Fisioterapia y Kinesiología',
-      'Derecho',
-      'Bioquímica y Farmacia',
-      'Administración de Empresas'
-    ],
-    'Cobija': [
-      'Medicina',
-      'Odontología',
-      'Enfermería',
-      'Fisioterapia y Kinesiología',
-      'Derecho'
-    ],
-    'Riberalta': [
-      'Medicina',
-      'Enfermería',
-      'Fisioterapia y Kinesiología',
-      'Derecho'
-    ],
-    'Ivirgarzama': [
-      'Medicina',
-      'Enfermería',
-      'Ingeniería Agronómica',
-      'Medicina Veterinaria y Zootecnia',
-      'Fisioterapia y Kinesiología'
-    ],
-    'Puerto Quijarro': [
-      'Medicina',
-      'Enfermería',
-      'Derecho',
-      'Fisioterapia y Kinesiología'
-    ]
-  };
-
-  public asignaturasPorCarrera: Record<string, string[]> = {
-    'Complementaria Contaduría Pública': [
-      '[CPEC18] AUDITORÍA TRIBUTARIA',
-      '[CPEC12] CONTABILIDAD GUBERNAMENTAL',
-      '[CPEC15] GABINETE DE AUDITORÍA',
-      '[CPEC11] CONTABILIDAD TRIBUTARIA'
-    ],
-    'Contaduría Pública': [
-      '[CON-101] CONTABILIDAD BÁSICA I',
-      '[CON-202] CONTABILIDAD DE COSTOS',
-      '[CON-305] AUDITORÍA FINANCIERA',
-      '[CON-401] GABINETE TRIBUTARIO'
-    ],
-    'Auditoría Financiera': [
-      '[AUD-201] AUDITORÍA FINANCIERA I',
-      '[AUD-305] AUDITORÍA FORENSE',
-      '[AUD-101] PRINCIPIOS DE CONTABILIDAD',
-      '[AUD-204] COSTOS Y PRESUPUESTOS'
-    ],
-    'Administración de Empresas': [
-      '[ADM-101] ADMINISTRACIÓN I',
-      '[ADM-204] GESTIÓN DEL TALENTO HUMANO',
-      '[ADM-302] ADMINISTRACIÓN FINANCIERA',
-      '[ADM-401] PLANIFICACIÓN ESTRATÉGICA'
-    ],
-    'Ingeniería Comercial': [
-      '[COM-101] FUNDAMENTOS DE MARKETING',
-      '[COM-202] INVESTIGACIÓN DE MERCADOS',
-      '[COM-304] FINANZAS CORPORATIVAS',
-      '[COM-401] COMERCIO EXTERIOR'
-    ],
-    'Comercio Internacional': [
-      '[CIN-101] COMERCIO INTERNACIONAL I',
-      '[CIN-202] LOGÍSTICA ADUANERA',
-      '[CIN-305] DERECHO ADUANERO',
-      '[CIN-402] NEGOCIACIÓN INTERNACIONAL'
-    ],
-    'Marketing y Publicidad': [
-      '[MKT-101] INTRODUCCIÓN AL MARKETING',
-      '[MKT-203] PUBLICIDAD Y MEDIOS',
-      '[MKT-302] MARKETING DIGITAL',
-      '[MKT-404] BRANDING Y POSICIONAMIENTO'
-    ],
-    'Medicina': [
-      '[MED-101] ANATOMÍA HUMANA I',
-      '[MED-204] FARMACOLOGÍA GENERAL',
-      '[MED-301] FISIOPATOLOGÍA',
-      '[MED-405] MEDICINA INTERNA I',
-      '[MED-202] HISTOLOGÍA Y EMBRIOLOGÍA'
-    ],
-    'Odontología': [
-      '[ODO-102] ANATOMÍA DENTAL',
-      '[ODO-201] CIRUGÍA BUCAL I',
-      '[ODO-304] ENDODONCIA',
-      '[ODO-205] PERIODONCIA'
-    ],
-    'Bioquímica y Farmacia': [
-      '[BQ-201] BIOQUÍMICA CLÍNICA',
-      '[BQ-305] TOXICOLOGÍA',
-      '[BQ-102] QUÍMICA ORGÁNICA',
-      '[BQ-204] MICROBIOLOGÍA GENERAL'
-    ],
-    'Enfermería': [
-      '[ENF-101] ENFERMERÍA GENERAL',
-      '[ENF-202] FARMACOLOGÍA ENFERMERÍA',
-      '[ENF-304] SALUD PÚBLICA',
-      '[ENF-205] ENFERMERÍA MÉDICO QUIRÚRGICA'
-    ],
-    'Fisioterapia y Kinesiología': [
-      '[FIS-101] KINESIOLOGÍA APLICADA',
-      '[FIS-203] BIOMECÁNICA',
-      '[FIS-302] FISIOTERAPIA RESPIRATORIA',
-      '[FIS-205] CINESITERAPIA'
-    ],
-    'Fonoaudiología': [
-      '[FON-101] ANATOMÍA DEL LENGUAJE Y AUDICIÓN',
-      '[FON-202] AUDIOLOGÍA CLÍNICA',
-      '[FON-303] TERAPIA DE LA VOZ',
-      '[FON-401] NEUROLINGÜÍSTICA'
-    ],
-    'Nutrición y Dietética': [
-      '[NUT-101] BROMATOLOGÍA Y ALIMENTOS',
-      '[NUT-202] DIETOTERAPIA DEL ADULTO',
-      '[NUT-304] EVALUACIÓN NUTRICIONAL',
-      '[NUT-401] SALUD PÚBLICA NUTRICIONAL'
-    ],
-    'Prótesis Dental': [
-      '[PRO-101] ANATOMÍA Y MODELADO DENTAL',
-      '[PRO-202] PRÓTESIS TOTAL',
-      '[PRO-303] PRÓTESIS PARCIAL REMOVIBLE',
-      '[PRO-401] ORTODONCIA DE LABORATORIO'
-    ],
-    'Ingeniería de Sistemas': [
-      '[SIS-413] TELECOMUNICACIONES',
-      '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA',
-      '[SIS-210] ESTRUCTURA DE DATOS',
-      '[SIS-101] PROGRAMACIÓN I',
-      '[SIS-304] BASE DE DATOS I'
-    ],
-    'Ingeniería en Redes y Telecomunicaciones': [
-      '[RED-101] REDES DE COMPUTADORAS I',
-      '[RED-202] PROTOCOLOS DE ENRUTAMIENTO',
-      '[RED-305] SEGURIDAD EN REDES',
-      '[RED-401] TELEFONÍA IP Y FIBRA ÓPTICA'
-    ],
-    'Ingeniería Electrónica': [
-      '[ELE-101] CIRCUITOS ELÉCTRICOS I',
-      '[ELE-202] ELECTRÓNICA ANALÓGICA',
-      '[ELE-304] SISTEMAS DIGITALES Y MICROCONTROLADORES',
-      '[ELE-401] CONTROL AUTOMÁTICO'
-    ],
-    'Ingeniería Electromecánica': [
-      '[ELM-101] MECÁNICA APLICADA',
-      '[ELM-203] MÁQUINAS ELÉCTRICAS',
-      '[ELM-302] TERMODINÁMICA Y FLUIDOS',
-      '[ELM-401] INSTALACIONES INDUSTRIALES'
-    ],
-    'Ingeniería de Sonido': [
-      '[SON-101] ACÚSTICA Y ELECTROACÚSTICA',
-      '[SON-202] GRABACIÓN EN ESTUDIO',
-      '[SON-304] MEZCLA Y MASTERIZACIÓN',
-      '[SON-401] SONIDO EN VIVO Y REFUERZO SONORO'
-    ],
-    'Ingeniería Industrial': [
-      '[IND-101] INGENIERÍA DE MÉTODOS',
-      '[IND-203] GESTIÓN DE LA CALIDAD',
-      '[IND-302] SEGURIDAD INDUSTRIAL Y SALUD OCUPACIONAL',
-      '[IND-401] INVESTIGACIÓN OPERATIVA'
-    ],
-    'Ingeniería Civil': [
-      '[CIV-101] TOPOGRAFÍA Y GEODESIA',
-      '[CIV-202] RESISTENCIA DE MATERIALES',
-      '[CIV-304] HORMIGÓN ARMADO',
-      '[CIV-401] HIDRÁULICA APLICADA'
-    ],
-    'Derecho': [
-      '[DER-301] DERECHO TRIBUTARIO',
-      '[DER-205] DERECHO PROCESAL PENAL',
-      '[DER-102] DERECHO CONSTITUCIONAL',
-      '[DER-201] DERECHO CIVIL PERSONAS'
-    ],
-    'Comunicación Social': [
-      '[CS-101] TEORÍAS DE LA COMUNICACIÓN',
-      '[CS-202] PERIODISMO DIGITAL',
-      '[CS-304] PRODUCCIÓN AUDIOVISUAL',
-      '[CS-401] COMUNICACIÓN ESTRATÉGICA'
-    ],
-    'Psicología': [
-      '[PSI-101] PSICOLOGÍA GENERAL',
-      '[PSI-202] PSICOLOGÍA DEL DESARROLLO',
-      '[PSI-304] PSICOPATOLOGÍA CLÍNICA',
-      '[PSI-401] EVALUACIÓN PSICOMÉTRICA'
-    ],
-    'Medicina Veterinaria y Zootecnia': [
-      '[VET-101] ANATOMÍA VETERINARIA',
-      '[VET-205] PATOLOGÍA ANIMAL',
-      '[VET-302] FARMACOLOGÍA VETERINARIA',
-      '[VET-401] CIRUGÍA VETERINARIA'
-    ],
-    'Ingeniería Agronómica': [
-      '[AGR-101] EDAFOLOGÍA Y SUELOS',
-      '[AGR-202] FITOPATOLOGÍA',
-      '[AGR-305] RIEGOS Y DRENAJES',
-      '[AGR-401] MANEJO INTEGRADO DE PLAGAS'
-    ]
-  };
-
-  public gruposPorAsignatura: Record<string, string[]> = {
-    '[CPEC18] AUDITORÍA TRIBUTARIA': ['TA-01', 'TA-02', 'TB-01'],
-    '[CPEC12] CONTABILIDAD GUBERNAMENTAL': ['TA-01', 'TA-02'],
-    '[CPEC15] GABINETE DE AUDITORÍA': ['TA-01', 'TB-01'],
-    '[CPEC11] CONTABILIDAD TRIBUTARIA': ['TA-01', 'TA-02'],
-    '[SIS-413] TELECOMUNICACIONES': ['Grupo 1', 'Grupo 2'],
-    '[SIS-322] INFRAESTRUCTURA TECNOLÓGICA': ['Grupo 1', 'Grupo 2'],
-    '[SIS-210] ESTRUCTURA DE DATOS': ['Grupo 1', 'Grupo 2'],
-    '[SIS-101] PROGRAMACIÓN I': ['Grupo 1', 'Grupo 2', 'Grupo 3'],
-    '[SIS-304] BASE DE DATOS I': ['Grupo 1', 'Grupo 2'],
-    '[MED-101] ANATOMÍA HUMANA I': ['M1', 'M2', 'M3', 'M4'],
-    '[MED-204] FARMACOLOGÍA GENERAL': ['M1', 'M2', 'M3'],
-    '[MED-301] FISIOPATOLOGÍA': ['M1', 'M2'],
-    '[MED-405] MEDICINA INTERNA I': ['M1', 'M2'],
-    '[MED-202] HISTOLOGÍA Y EMBRIOLOGÍA': ['M1', 'M2', 'M3'],
-    '[ODO-102] ANATOMÍA DENTAL': ['OD-1', 'OD-2'],
-    '[ODO-201] CIRUGÍA BUCAL I': ['OD-1', 'OD-2'],
-    '[ODO-304] ENDODONCIA': ['OD-1', 'OD-2'],
-    '[BQ-201] BIOQUÍMICA CLÍNICA': ['BQ-1', 'BQ-2'],
-    '[BQ-305] TOXICOLOGÍA': ['BQ-1', 'BQ-2'],
-    '[ENF-101] ENFERMERÍA GENERAL': ['ENF-1', 'ENF-2'],
-    '[ENF-202] FARMACOLOGÍA ENFERMERÍA': ['ENF-1', 'ENF-2'],
-    '[FIS-101] KINESIOLOGÍA APLICADA': ['FIS-1', 'FIS-2'],
-    '[FIS-203] BIOMECÁNICA': ['FIS-1', 'FIS-2'],
-    '[DER-301] DERECHO TRIBUTARIO': ['DER-1', 'DER-2'],
-    '[DER-205] DERECHO PROCESAL PENAL': ['DER-1', 'DER-2'],
-    '[VET-101] ANATOMÍA VETERINARIA': ['VET-1', 'VET-2'],
-    '[AGR-101] EDAFOLOGÍA Y SUELOS': ['AGR-1', 'AGR-2']
-  };
-
-  public sedeSeleccionada = signal<string>('Cochabamba');
-  public carreraSeleccionada = signal<string>('Complementaria Contaduría Pública');
-  public asignaturaSeleccionada = signal<string>('[CPEC18] AUDITORÍA TRIBUTARIA');
-  public grupoSeleccionado = signal<string>('TA-01');
-
-  public carrerasDisponibles = computed(() => {
-    return this.carrerasPorSede[this.sedeSeleccionada()] || ['Complementaria Contaduría Pública', 'Medicina'];
-  });
-
-  public asignaturasDisponibles = computed(() => {
-    return this.asignaturasPorCarrera[this.carreraSeleccionada()] || ['[CPEC18] AUDITORÍA TRIBUTARIA'];
-  });
-
-  public gruposDisponibles = computed(() => {
-    return this.gruposPorAsignatura[this.asignaturaSeleccionada()] || ['Grupo 1', 'Grupo 2', 'TA-01'];
-  });
-
-  public onSedeChange(sede: string): void {
-    this.sedeSeleccionada.set(sede);
-    const carreras = this.carrerasPorSede[sede] || [];
-    if (!carreras.includes(this.carreraSeleccionada())) {
-      this.onCarreraChange(carreras[0] || 'Medicina');
-    }
-  }
-
-  public onCarreraChange(carrera: string): void {
-    this.carreraSeleccionada.set(carrera);
-    const asigs = this.asignaturasPorCarrera[carrera] || [];
-    if (asigs.length > 0) {
-      this.onAsignaturaChange(asigs[0]);
-    }
-  }
-
-  public onAsignaturaChange(asig: string): void {
-    this.asignaturaSeleccionada.set(asig);
-    const grps = this.gruposPorAsignatura[asig] || ['Grupo 1', 'TA-01'];
-    this.grupoSeleccionado.set(grps[0]);
-    this.pdfPrevisualizadoYConforme.set(false);
-  }
 
   public campusSeleccionadoId = 'TEST-ARIEL';
   public examenRolSeleccionadoId = 2; // SIS-413 por defecto
@@ -3443,12 +3252,13 @@ export class BancoPreguntasComponent {
   // ============================================================
   public descargarExcelBaseMacro(): void {
     const filename = 'formato_banco_preguntas_asig_EF.xlsx';
-    const asigClean = this.asignaturaSeleccionada().replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+    const asigNombre = this.asignaturaNombreCompleto();
+    const asigClean = asigNombre.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
     const link = document.createElement('a');
     link.href = `assets/${filename}`;
     link.download = `PLANTILLA_BANCO_${asigClean}_${this.grupoSeleccionado()}_${this.parcialActivo().toUpperCase().replace(/\s+/g, '_')}_2026.xlsx`;
     link.click();
-    this._mostrarToast(`Plantilla oficial descargada para ${this.asignaturaSeleccionada()} (${this.grupoSeleccionado()}).`);
+    this._mostrarToast(`Plantilla oficial descargada para ${asigNombre} (${this.grupoSeleccionado()}).`);
   }
 
   // ============================================================
@@ -3710,9 +3520,11 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     this.dialogPrevisualizacionPdf.set(false);
 
     // Sincronizar automáticamente el banco y el estado VALIDADO con la Base de Datos de Evaluaciones
-    const asigRaw = this.asignaturaSeleccionada();
-    const matchCod = asigRaw.match(/\[([A-Za-z0-9\-]+)\]/);
-    const codigo = matchCod ? matchCod[1] : 'CPEC18';
+    const asig = this.asignaturaSeleccionada();
+    const codigo = asig?.courseCode || 'CPEC18';
+    const materiaNombre = asig?.courseName || 'AUDITORÍA TRIBUTARIA';
+    const sedeNombre = this.sedeSeleccionada()?.name || 'Cochabamba';
+    const carreraNombre = this.carreraSeleccionada()?.careerName || 'Complementaria Contaduría Pública';
     const archivo = this.nombreArchivoCargado() || `BANCO_${codigo}_OFICIAL.xlsx`;
     const hash = 'SHA256-2FA-' + codigo + '-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
     const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
@@ -3721,10 +3533,10 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     // Guardar el banco atómico completo en la base de datos
     this._db.guardarBancoPreguntas({
       id: `BANCO-${codigo}-${this.parcialActivo()}-${this.grupoSeleccionado()}`,
-      sede: this.sedeSeleccionada(),
-      carrera: this.carreraSeleccionada(),
+      sede: sedeNombre,
+      carrera: carreraNombre,
       materiaCodigo: codigo,
-      materiaNombre: asigRaw,
+      materiaNombre: materiaNombre,
       grupo: this.grupoSeleccionado(),
       parcial: this.parcialActivo(),
       totalPreguntas: totalValidas,
