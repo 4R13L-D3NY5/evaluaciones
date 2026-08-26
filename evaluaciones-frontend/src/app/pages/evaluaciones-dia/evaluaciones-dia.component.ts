@@ -881,92 +881,223 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       [style.font-family]="paramTipoFuente"
                       [style.font-size.pt]="paramTamanoFuente"
                       [style.line-height]="paramEspaciado"
-                      class="max-w-5xl mx-auto bg-white text-slate-950 p-6 rounded-xl shadow-lg border border-slate-300 mb-8 print:shadow-none print:border-none print:p-0 print:m-0 print:max-w-none">
+                      class="max-w-4xl mx-auto bg-white text-slate-950 p-6 sm:p-8 rounded-xl shadow-lg border border-slate-300 mb-8 print:shadow-none print:border-none print:p-0 print:m-0 print:max-w-none">
                       
-                      <!-- HOJA 1: CABECERA + CARTILLA OMR 15% DERECHA (1 A 60) -->
-                      <div class="grid grid-cols-12 gap-3 min-h-[980px] print:min-h-[1020px] print:break-after-page mb-6 pb-4 border-b border-slate-300 print:border-none">
+                      <!-- ========================================== -->
+                      <!-- PÁGINA 1: CABECERA + DATOS + CARTILLA OMR HORIZONTAL (1 A 60) -->
+                      <!-- ========================================== -->
+                      <div class="space-y-3 min-h-[920px] print:min-h-[1020px] print:break-after-page mb-8 pb-4 border-b-2 border-slate-300 print:border-none">
                         
-                        <!-- Columna Izquierda (85%): Cabecera e Instrucciones y Preguntas 1 a 6 -->
-                        <div class="col-span-10 space-y-3">
-                          
-                          <!-- Cabecera Oficial UNITEPC -->
-                          <div class="border-2 border-slate-900 text-xs">
-                            <div class="grid grid-cols-12 border-b-2 border-slate-900">
-                              <div class="col-span-2 border-r-2 border-slate-900 p-2 flex flex-col items-center justify-center bg-purple-950 text-white">
-                                <span class="text-amber-300 text-lg font-black">▲</span>
-                                <span class="font-mono text-[10px] font-bold tracking-widest">UNITEPC</span>
+                        <!-- 1. Cabecera Oficial UNITEPC -->
+                        <div class="border-2 border-slate-900 text-xs">
+                          <div class="grid grid-cols-12">
+                            <div class="col-span-3 border-r-2 border-slate-900 p-2 flex flex-col items-center justify-center bg-slate-50">
+                              <div class="flex items-center gap-1.5 font-black text-purple-950 text-sm">
+                                <span class="text-amber-500 text-lg">▲</span>
+                                <span>UNITEPC</span>
                               </div>
-                              <div class="col-span-8 border-r-2 border-slate-900 p-2 text-center flex flex-col justify-center">
-                                <h1 class="font-black uppercase text-slate-950 tracking-wider text-[12px]">
-                                  UNIVERSIDAD TÉCNICA PRIVADA COSMOS
-                                </h1>
-                                <p class="font-bold text-slate-800 uppercase mt-0.5 text-[10px]">
-                                  EVALUACIÓN OFICIAL DE {{ evaluacionActivaVisor()?.tipo }} · GESTIÓN 2-2026
-                                </p>
-                              </div>
-                              <div class="col-span-2 p-1.5 text-center flex flex-col justify-center bg-slate-50 font-mono">
-                                <span class="text-[8px] font-bold text-slate-500 uppercase">CÓDIGO CONTROL</span>
-                                <span class="text-[10px] font-black text-purple-900 leading-tight mt-0.5">
-                                  CTL-{{ estudianteItem.codigo.slice(-4) }}-{{ evaluacionActivaVisor()?.codigo }}
-                                </span>
-                              </div>
+                              <span class="text-[7.5px] font-bold text-slate-500 uppercase tracking-tighter">Universidad Privada</span>
                             </div>
-
-                            <!-- Datos del Estudiante (Sin variante visible) -->
-                            <div class="grid grid-cols-12 border-b border-slate-900 bg-slate-50/60 p-1.5 text-[10px] font-bold">
-                              <div class="col-span-8 border-r border-slate-900">
-                                <span class="text-slate-500 font-normal">ESTUDIANTE:</span> 
-                                <span class="text-slate-950 font-black ml-1 uppercase">
-                                  {{ estudianteItem.nombres }} {{ estudianteItem.apellido1 }} {{ estudianteItem.apellido2 }}
-                                </span>
-                              </div>
-                              <div class="col-span-4 pl-2">
-                                <span class="text-slate-500 font-normal">CÓDIGO:</span> 
-                                <span class="text-slate-950 font-black ml-1 font-mono">{{ estudianteItem.codigo }}</span>
-                              </div>
+                            <div class="col-span-9 p-2 text-center flex flex-col justify-center">
+                              <h1 class="font-black uppercase text-slate-950 tracking-wide text-xs">
+                                UNIVERSIDAD TÉCNICA PRIVADA COSMOS
+                              </h1>
+                              <p class="font-bold text-slate-700 uppercase text-[10px] mt-0.5">
+                                GESTIÓN 2-2026
+                              </p>
+                              <div class="w-full border-t border-slate-900 my-1"></div>
+                              <h2 class="font-black uppercase text-purple-950 text-[11px]">
+                                EVALUACIÓN TEÓRICA {{ evaluacionActivaVisor()?.tipo | uppercase }}
+                              </h2>
                             </div>
+                          </div>
+                        </div>
 
-                            <div class="grid grid-cols-12 border-b border-slate-900 p-1.5 text-[10px] font-bold">
-                              <div class="col-span-8 border-r border-slate-900">
-                                <span class="text-slate-500 font-normal">ASIGNATURA:</span> 
-                                <span class="text-slate-950 ml-1">[{{ evaluacionActivaVisor()?.codigo }}] {{ evaluacionActivaVisor()?.materia }}</span>
-                              </div>
-                              <div class="col-span-4 pl-2">
-                                <span class="text-slate-500 font-normal">GRUPO:</span> 
-                                <span class="text-slate-950 ml-1 font-mono">{{ evaluacionActivaVisor()?.grupo }}</span>
-                              </div>
+                        <!-- 2. Ficha de Datos del Estudiante -->
+                        <div class="border border-slate-900 text-[10px] font-sans">
+                          <div class="grid grid-cols-12 border-b border-slate-900 p-1.5 font-bold">
+                            <div class="col-span-7 border-r border-slate-900">
+                              <span class="text-slate-600 font-normal">NOMBRE:</span> 
+                              <span class="text-slate-950 font-black ml-1 uppercase">
+                                {{ estudianteItem.nombres }} {{ estudianteItem.apellido1 }} {{ estudianteItem.apellido2 }}
+                              </span>
                             </div>
-
-                            <div class="grid grid-cols-12 p-1.5 text-[10px] font-bold">
-                              <div class="col-span-8 border-r border-slate-900">
-                                <span class="text-slate-500 font-normal">DOCENTE:</span> 
-                                <span class="text-slate-950 ml-1">{{ evaluacionActivaVisor()?.docenteNombre }}</span>
-                              </div>
-                              <div class="col-span-4 pl-2">
-                                <span class="text-slate-500 font-normal">FECHA:</span> 
-                                <span class="text-slate-950 ml-1">{{ evaluacionActivaVisor()?.fechaDisplay || evaluacionActivaVisor()?.fecha }}</span>
-                              </div>
+                            <div class="col-span-5 pl-2">
+                              <span class="text-slate-600 font-normal">CARRERA:</span> 
+                              <span class="text-slate-950 font-black ml-1 uppercase">AUDITORÍA / CONTADURÍA</span>
                             </div>
                           </div>
 
-                          <!-- Instrucciones -->
-                          <div class="p-2 bg-slate-100 border border-slate-300 rounded text-[9px] text-slate-800 leading-snug">
-                            <strong>INSTRUCCIONES:</strong> Este examen consta de <strong>60 preguntas</strong> de opción múltiple (incisos A al E). Rellene con <strong>lápiz 2B</strong> el círculo de la opción correcta en la <strong>Cartilla OMR</strong> situada en la columna derecha de esta primera hoja. No marque en el texto del examen.
+                          <div class="grid grid-cols-12 border-b border-slate-900 p-1.5 font-bold">
+                            <div class="col-span-7 border-r border-slate-900">
+                              <span class="text-slate-600 font-normal">MATERIA:</span> 
+                              <span class="text-slate-950 ml-1">[{{ evaluacionActivaVisor()?.codigo }}] {{ evaluacionActivaVisor()?.materia }}</span>
+                            </div>
+                            <div class="col-span-5 pl-2 flex justify-between">
+                              <div><span class="text-slate-600 font-normal">GRUPO:</span> <span class="text-slate-950 ml-1 font-mono">{{ evaluacionActivaVisor()?.grupo }}</span></div>
+                              <div><span class="text-slate-600 font-normal">SEMESTRE:</span> <span class="text-slate-950 ml-1">3</span></div>
+                            </div>
                           </div>
 
-                          <!-- Preguntas de Hoja 1: 1 a 6 -->
-                          <div class="space-y-2">
-                            <div class="border-b-2 border-slate-800 pb-0.5 font-black text-slate-900 text-[11px] flex justify-between">
-                              <span>SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 6)</span>
-                              <span class="text-[9px] font-mono text-slate-600">Página 1</span>
+                          <div class="grid grid-cols-12 border-b border-slate-900 p-1.5 font-bold">
+                            <div class="col-span-7 border-r border-slate-900">
+                              <span class="text-slate-600 font-normal">DOCENTE:</span> 
+                              <span class="text-slate-950 ml-1">{{ evaluacionActivaVisor()?.docenteNombre }}</span>
+                            </div>
+                            <div class="col-span-5 pl-2">
+                              <span class="text-slate-600 font-normal">EXAMEN:</span> 
+                              <span class="text-purple-900 font-black ml-1">{{ evaluacionActivaVisor()?.tipo }} · VARIANTE {{ varComp.letraVariante }}</span>
+                            </div>
+                          </div>
+
+                          <div class="grid grid-cols-12 border-b border-slate-900 p-1.5 font-bold">
+                            <div class="col-span-7 border-r border-slate-900">
+                              <span class="text-slate-600 font-normal">FECHA:</span> 
+                              <span class="text-slate-950 ml-1">{{ evaluacionActivaVisor()?.fechaDisplay || evaluacionActivaVisor()?.fecha }}</span>
+                            </div>
+                            <div class="col-span-5 pl-2">
+                              <span class="text-slate-600 font-normal">HORA:</span> 
+                              <span class="text-slate-950 ml-1 font-mono">08:15:00 - 09:45:00</span>
+                            </div>
+                          </div>
+
+                          <div class="grid grid-cols-12 p-1.5 font-bold">
+                            <div class="col-span-7 border-r border-slate-900 flex items-end">
+                              <span class="text-slate-600 font-normal">FIRMA DEL ESTUDIANTE:</span>
+                              <div class="flex-1 border-b border-dotted border-slate-500 ml-2 mb-1"></div>
+                            </div>
+                            <div class="col-span-5 pl-2 text-center">
+                              <div class="text-[8px] text-slate-500 font-bold uppercase">CÓDIGO:</div>
+                              <div class="text-sm font-black font-mono text-slate-950">{{ estudianteItem.codigo }}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- 3. Instrucciones de llenado -->
+                        <div class="p-2 bg-slate-50 border border-slate-300 rounded text-[9.5px] text-slate-800 leading-tight font-sans">
+                          <strong>INSTRUCCIÓN DE COMPLETADO DE CARTILLA:</strong> Rellene con cuidado la opción correcta con bolígrafo <strong>AZUL</strong> o <strong>NEGRO</strong>. Ejemplos: [• Correcto] [X Incorrecto] [- Incorrecto] [O Incorrecto]
+                        </div>
+
+                        <!-- 4. CARTILLA HORIZONTAL OMR DE 60 PREGUNTAS (4 COLUMNAS DE 15 FILAS) -->
+                        <div class="relative border-2 border-slate-900 bg-white p-3 rounded shadow-xs">
+                          <!-- Marcadores Fiduciales Cuadrados en las 4 esquinas -->
+                          <div class="absolute -top-1 -left-1 w-3 h-3 bg-black"></div>
+                          <div class="absolute -top-1 -right-1 w-3 h-3 bg-black"></div>
+                          <div class="absolute -bottom-1 -left-1 w-3 h-3 bg-black"></div>
+                          <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-black"></div>
+
+                          <div class="text-center font-black text-xs uppercase tracking-wider text-slate-950 pb-2 border-b border-slate-300">
+                            CARTILLA DE RESPUESTAS (1 A 60) — VARIANTE {{ varComp.letraVariante }}
+                          </div>
+
+                          <div class="grid grid-cols-4 gap-3 pt-2 font-mono text-[9px]">
+                            
+                            <!-- Columna 1: Preguntas 1 a 15 -->
+                            <div class="space-y-1">
+                              @for (n of getNumerosRango(1, 15); track n) {
+                                <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
+                                  <span class="font-bold text-slate-800 w-5 text-right pr-1">{{ n }}.</span>
+                                  <div class="flex gap-1">
+                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
+                                      <span class="w-4 h-4 rounded-full border border-slate-800 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
+                                        {{ l }}
+                                      </span>
+                                    }
+                                  </div>
+                                </div>
+                              }
                             </div>
 
-                            @for (preg of varComp.todasLasPreguntas.slice(0, 6); track preg.numero) {
-                              <div class="space-y-0.5">
-                                <div class="font-bold text-slate-950 text-[11px] leading-tight">
+                            <!-- Columna 2: Preguntas 16 a 30 -->
+                            <div class="space-y-1">
+                              @for (n of getNumerosRango(16, 30); track n) {
+                                <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
+                                  <span class="font-bold text-slate-800 w-5 text-right pr-1">{{ n }}.</span>
+                                  <div class="flex gap-1">
+                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
+                                      <span class="w-4 h-4 rounded-full border border-slate-800 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
+                                        {{ l }}
+                                      </span>
+                                    }
+                                  </div>
+                                </div>
+                              }
+                            </div>
+
+                            <!-- Columna 3: Preguntas 31 a 45 -->
+                            <div class="space-y-1">
+                              @for (n of getNumerosRango(31, 45); track n) {
+                                <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
+                                  <span class="font-bold text-slate-800 w-5 text-right pr-1">{{ n }}.</span>
+                                  <div class="flex gap-1">
+                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
+                                      <span class="w-4 h-4 rounded-full border border-slate-800 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
+                                        {{ l }}
+                                      </span>
+                                    }
+                                  </div>
+                                </div>
+                              }
+                            </div>
+
+                            <!-- Columna 4: Preguntas 46 a 60 -->
+                            <div class="space-y-1">
+                              @for (n of getNumerosRango(46, 60); track n) {
+                                <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
+                                  <span class="font-bold text-slate-800 w-5 text-right pr-1">{{ n }}.</span>
+                                  <div class="flex gap-1">
+                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
+                                      <span class="w-4 h-4 rounded-full border border-slate-800 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
+                                        {{ l }}
+                                      </span>
+                                    }
+                                  </div>
+                                </div>
+                              }
+                            </div>
+
+                          </div>
+                        </div>
+
+                      </div>
+
+                      <!-- ========================================== -->
+                      <!-- PÁGINA 2 EN ADELANTE: CUESTIONARIO OFICIAL (60 REACTIVOS) -->
+                      <!-- ========================================== -->
+                      <div class="space-y-5 pt-2">
+                        
+                        <!-- Encabezado de Página 2 -->
+                        <div class="flex items-center justify-between text-xs text-slate-500 border-b border-slate-300 pb-1">
+                          <span class="font-black uppercase text-slate-700">
+                            {{ estudianteItem.nombres }} {{ estudianteItem.apellido1 }} {{ estudianteItem.apellido2 }} · {{ estudianteItem.codigo }}
+                          </span>
+                          <span class="font-mono">Pág. 1</span>
+                        </div>
+
+                        <div class="text-center space-y-1 pt-2">
+                          <h2 class="text-sm font-black uppercase text-slate-950 tracking-wide">
+                            CUESTIONARIO DE PREGUNTAS (60 REACTIVOS)
+                          </h2>
+                          <p class="text-xs font-bold text-slate-700 uppercase">
+                            [{{ evaluacionActivaVisor()?.codigo }}] {{ evaluacionActivaVisor()?.materia }} · EVALUACIÓN TEÓRICA {{ evaluacionActivaVisor()?.tipo | uppercase }} · VARIANTE {{ varComp.letraVariante }}
+                          </p>
+                          <hr class="border-t-2 border-slate-900 mt-2" />
+                        </div>
+
+                        <!-- SECCIÓN 1: SELECCIÓN DE LA MEJOR RESPUESTA (1 a 15) -->
+                        <div class="space-y-3">
+                          <div>
+                            <h3 class="font-black text-xs uppercase text-slate-950">SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 15)</h3>
+                            <p class="text-[11px] italic text-slate-600">Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.</p>
+                          </div>
+
+                          <div class="space-y-3">
+                            @for (preg of varComp.todasLasPreguntas.slice(0, 15); track preg.numero) {
+                              <div class="space-y-1">
+                                <div class="font-bold text-slate-950 text-xs leading-snug">
                                   {{ preg.numero }}. {{ preg.enunciado }}
                                 </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-0.5 text-slate-800 text-[10px] pl-3">
+                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
                                   @for (op of preg.opciones; track op.letra) {
                                     <div class="leading-tight">
                                       <strong>{{ op.letra }})</strong> {{ op.texto }}
@@ -976,74 +1107,155 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                               </div>
                             }
                           </div>
-
                         </div>
 
-                        <!-- Columna Derecha (15%): Cartilla OMR Completa de 60 Preguntas (Burbujas A, B, C, D, E) -->
-                        <div class="col-span-2 border-l-2 border-slate-900 pl-2 flex flex-col justify-between font-mono text-[8.5px] bg-slate-50/80 p-1.5 rounded-r border border-slate-200">
-                          
-                          <div class="space-y-1">
-                            <div class="text-center border-b-2 border-slate-900 pb-1">
-                              <div class="font-black text-[9px] text-slate-950 uppercase tracking-tighter">CARTILLA OMR</div>
-                              <div class="text-[7px] text-slate-600 font-sans leading-none">60 Preguntas (A-E)</div>
-                            </div>
+                        <!-- SECCIÓN 2: FALSO O VERDADERO SIMPLE (16 a 25) -->
+                        <div class="space-y-3 pt-3 border-t border-slate-200">
+                          <div>
+                            <h3 class="font-black text-xs uppercase text-slate-950">FALSO O VERDADERO (Preguntas 16 a 25)</h3>
+                            <p class="text-[11px] italic text-slate-600">Determine si cada afirmación es verdadera (A) o falsa (B).</p>
+                          </div>
 
-                            <div class="space-y-0.5">
-                              @for (n of getNumerosRango(1, 60); track n) {
-                                <div class="flex items-center justify-between border-b border-slate-200 py-[1.2px]">
-                                  <span class="font-bold text-[7px] text-slate-700 w-3">{{ n }}.</span>
-                                  <div class="flex gap-[2px]">
-                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-[11px] h-[11px] rounded-full border border-slate-800 flex items-center justify-center text-[6.5px] font-black bg-white hover:bg-slate-200">
-                                        {{ l }}
-                                      </span>
-                                    }
-                                  </div>
+                          <div class="space-y-3">
+                            @for (preg of varComp.todasLasPreguntas.slice(15, 25); track preg.numero) {
+                              <div class="space-y-1">
+                                <div class="font-bold text-slate-950 text-xs leading-snug">
+                                  {{ preg.numero }}. {{ preg.enunciado }}
+                                </div>
+                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
+                                  @for (op of preg.opciones; track op.letra) {
+                                    <div class="leading-tight">
+                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- SECCIÓN 3: PREMISAS A / B / AMBAS / NINGUNA (26 a 35) -->
+                        <div class="space-y-3 pt-3 border-t border-slate-200">
+                          <div>
+                            <h3 class="font-black text-xs uppercase text-slate-950">PREMISAS A / B / AMBAS / NINGUNA (Preguntas 26 a 35)</h3>
+                            <p class="text-[11px] italic text-slate-600">Analice las dos premisas planteadas y elija la opción correcta.</p>
+                          </div>
+
+                          <div class="space-y-3">
+                            @for (preg of varComp.todasLasPreguntas.slice(25, 35); track preg.numero) {
+                              <div class="space-y-1">
+                                <div class="font-bold text-slate-950 text-xs leading-snug whitespace-pre-line">
+                                  {{ preg.numero }}. {{ preg.enunciado }}
+                                </div>
+                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
+                                  @for (op of preg.opciones; track op.letra) {
+                                    <div class="leading-tight">
+                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- SECCIÓN 4: PREGUNTAS CON CLAVE DE RESPUESTA (36 a 45) -->
+                        <div class="space-y-3 pt-3 border-t border-slate-200">
+                          <div>
+                            <h3 class="font-black text-xs uppercase text-slate-950">PREGUNTAS CON CLAVE DE RESPUESTA (Preguntas 36 a 45)</h3>
+                            <p class="text-[11px] italic text-slate-600">Marque: A si 1, 2 y 3 son correctas; B si 1 y 3; C si 2 y 4; D si solo 4; E si todas son correctas.</p>
+                          </div>
+
+                          <div class="space-y-3">
+                            @for (preg of varComp.todasLasPreguntas.slice(35, 45); track preg.numero) {
+                              <div class="space-y-1">
+                                <div class="font-bold text-slate-950 text-xs leading-snug whitespace-pre-line">
+                                  {{ preg.numero }}. {{ preg.enunciado }}
+                                </div>
+                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
+                                  @for (op of preg.opciones; track op.letra) {
+                                    <div class="leading-tight">
+                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- SECCIÓN 5: CASOS PRÁCTICOS Y PROBLEMAS (46 a 55) -->
+                        <div class="space-y-3 pt-3 border-t border-slate-200">
+                          <div>
+                            <h3 class="font-black text-xs uppercase text-slate-950">CASOS PRÁCTICOS Y PROBLEMAS APLICADOS (Preguntas 46 a 55)</h3>
+                            <div class="p-2.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 mt-1">
+                              <strong>CASO PRÁCTICO N° 1 (Comercial Andina S.R.L.):</strong> En la fiscalización integral se detectaron compras no bancarizadas por Bs 150.000 y retenciones de servicios no declaradas.
+                            </div>
+                          </div>
+
+                          <div class="space-y-3">
+                            @for (preg of varComp.todasLasPreguntas.slice(45, 55); track preg.numero) {
+                              @if (preg.numero === 51) {
+                                <div class="p-2.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 mt-2">
+                                  <strong>CASO PRÁCTICO N° 2 (Constructora del Valle S.A.):</strong> Contrato de obra pública de Bs 2.000.000 con 60% de avance físico certificado y retención del 7% de garantía.
                                 </div>
                               }
+                              <div class="space-y-1">
+                                <div class="font-bold text-slate-950 text-xs leading-snug">
+                                  {{ preg.numero }}. {{ preg.enunciado }}
+                                </div>
+                                <div class="space-y-0.5 text-slate-800 text-[11px] pl-4">
+                                  @for (op of preg.opciones; track op.letra) {
+                                    <div class="leading-tight">
+                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- SECCIÓN 6: EMPAREJAMIENTO DE CONCEPTOS (56 a 60) -->
+                        <div class="space-y-3 pt-3 border-t border-slate-200">
+                          <div>
+                            <h3 class="font-black text-xs uppercase text-slate-950">EMPAREJAMIENTO DE CONCEPTOS (Preguntas 56 a 60)</h3>
+                            <div class="p-2.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 mt-1 space-y-1">
+                              <div><strong>OPCIONES DE REFERENCIA:</strong></div>
+                              <div class="grid grid-cols-2 gap-1 text-[11px]">
+                                <div><strong>A)</strong> Determinación sobre Base Presunta</div>
+                                <div><strong>B)</strong> Crédito Fiscal IVA Trasladable</div>
+                                <div><strong>C)</strong> Alícuota Adicional IUE Financiero</div>
+                                <div><strong>D)</strong> Exención Tributaria Subjetiva</div>
+                                <div><strong>E)</strong> Determinación sobre Base Cierta</div>
+                              </div>
+                              <p class="text-[10px] italic text-slate-600 pt-1">Relacione cada uno de los siguientes enunciados con la opción correspondiente:</p>
                             </div>
                           </div>
 
-                          <div class="border-t-2 border-slate-900 pt-1 text-center space-y-0.5 mt-1">
-                            <div class="border-b border-dashed border-slate-400 h-5"></div>
-                            <div class="text-[7px] font-sans font-bold uppercase text-slate-700">Firma Estudiante</div>
-                            <div class="text-[6.5px] font-mono text-slate-500">ID: {{ estudianteItem.codigo }}</div>
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                      <!-- PÁGINAS SUBSIGUIENTES: PREGUNTAS 7 A 60 EN 2 COLUMNAS -->
-                      <div class="space-y-4 pt-4">
-                        <div class="border-b-2 border-slate-800 pb-1 flex items-center justify-between">
-                          <div class="font-black text-xs uppercase text-slate-950">
-                            [{{ evaluacionActivaVisor()?.codigo }}] {{ evaluacionActivaVisor()?.materia }} · EVALUACIÓN OFICIAL (Preguntas 7 a 60)
-                          </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                          @for (preg of varComp.todasLasPreguntas.slice(6); track preg.numero) {
-                            <div class="space-y-0.5 p-1 border-b border-slate-100 pb-2">
-                              <div class="font-bold text-slate-950 text-[11px] leading-tight">
-                                {{ preg.numero }}. {{ preg.enunciado }}
+                          <div class="space-y-3">
+                            @for (preg of varComp.todasLasPreguntas.slice(55, 60); track preg.numero) {
+                              <div class="space-y-1">
+                                <div class="font-bold text-slate-950 text-xs leading-snug">
+                                  {{ preg.numero }}. {{ preg.enunciado }}
+                                </div>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-1 text-slate-800 text-[11px] pl-4">
+                                  @for (op of preg.opciones; track op.letra) {
+                                    <div>
+                                      <strong>{{ op.letra }})</strong> {{ op.texto }}
+                                    </div>
+                                  }
+                                </div>
                               </div>
-                              <div class="space-y-0.5 text-slate-800 text-[10px] pl-2">
-                                @for (op of preg.opciones; track op.letra) {
-                                  <div class="leading-tight">
-                                    <strong>{{ op.letra }})</strong> {{ op.texto }}
-                                  </div>
-                                }
-                              </div>
-                            </div>
-                          }
+                            }
+                          </div>
                         </div>
 
-                        <div class="mt-6 p-3 border-2 border-dashed border-slate-400 rounded-lg text-center bg-slate-50 space-y-1">
+                        <div class="mt-8 p-3 border-2 border-dashed border-slate-400 rounded-lg text-center bg-slate-50 space-y-1">
                           <div class="font-black text-xs uppercase text-slate-900">
                             *** FIN DE LA EVALUACIÓN OFICIAL (60 PREGUNTAS) ***
                           </div>
-                          <p class="text-[9px] text-slate-600">
+                          <p class="text-[10px] text-slate-600">
                             Verifique que todas sus 60 respuestas se encuentren correctamente rellenadas en la <strong>Cartilla OMR</strong> de la primera página.
                           </p>
                         </div>
