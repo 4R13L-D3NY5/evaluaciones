@@ -567,7 +567,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   <i class="pi pi-sliders-h"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-black text-foreground">Parametrización y Compilación Typst (60 Reactivos A-E)</h3>
+                  <h3 class="text-sm font-black text-foreground">Parametrización y Compilación Typst (30 Reactivos Oficiales)</h3>
                   <p class="text-xs text-muted-foreground">
                     [{{ evaluacionSeleccionadaParaParametrizar()?.codigo }}] {{ evaluacionSeleccionadaParaParametrizar()?.materia }} · Grupo {{ evaluacionSeleccionadaParaParametrizar()?.grupo }}
                   </p>
@@ -586,10 +586,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                 <div class="flex items-center justify-between text-foreground font-black text-xs border-b border-border pb-2">
                   <div class="flex items-center gap-2">
                     <i class="pi pi-palette text-primary"></i>
-                    <span>Motor Typst v0.11 · Parámetros de Diagramación</span>
+                    <span>Motor Typst v0.15 · Parámetros de Diagramación</span>
                   </div>
-                  <span class="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-bold">
-                    60 Preguntas (Inciso A al E)
+                  <span class="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-200">
+                    30 Preguntas (7 Fáciles, 16 Medias, 7 Difíciles)
                   </span>
                 </div>
 
@@ -601,8 +601,8 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       Formato Hoja
                     </label>
                     <select [(ngModel)]="paramTamanoHoja" class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">
+                      <option value="Carta">Carta (Letter - Oficial)</option>
                       <option value="Oficio">Oficio (Folio UNITEPC)</option>
-                      <option value="Carta">Carta (Letter)</option>
                     </select>
                   </div>
 
@@ -612,8 +612,9 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       Tipo de Letra (Fuente)
                     </label>
                     <select [(ngModel)]="paramTipoFuente" class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">
-                      <option value="Times New Roman">Times New Roman (Serif)</option>
+                      <option value="Liberation Sans">Liberation Sans (Oficial)</option>
                       <option value="Arial">Arial (Sans-Serif)</option>
+                      <option value="Times New Roman">Times New Roman (Serif)</option>
                       <option value="Calibri">Calibri (Moderna)</option>
                       <option value="Linux Libertine">Linux Libertine (Typst)</option>
                     </select>
@@ -625,7 +626,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       Tamaño de Letra
                     </label>
                     <select [(ngModel)]="paramTamanoFuente" class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">
-                      <option [ngValue]="8.5">8.5 pt (Ultra Compacto)</option>
+                      <option [ngValue]="8.5">8.5 pt (Oficial - Compacto)</option>
                       <option [ngValue]="9.5">9.5 pt (Recomendado)</option>
                       <option [ngValue]="10.0">10.0 pt (Estándar)</option>
                       <option [ngValue]="11.0">11.0 pt (Grande)</option>
@@ -638,9 +639,9 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       Espaciado (Leading)
                     </label>
                     <select [(ngModel)]="paramEspaciado" class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">
-                      <option value="0.65em">Compacto (0.65em)</option>
-                      <option value="0.80em">Estándar (0.80em)</option>
-                      <option value="1.00em">Holgado (1.00em)</option>
+                      <option value="0.45em">Compacto Oficial (0.45em)</option>
+                      <option value="0.65em">Estándar (0.65em)</option>
+                      <option value="0.80em">Amplio (0.80em)</option>
                     </select>
                   </div>
 
@@ -984,16 +985,16 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             CARTILLA DE RESPUESTAS (1 A 60) — VARIANTE {{ varComp.letraVariante }}
                           </div>
 
-                          <div class="grid grid-cols-4 gap-3 pt-2 font-mono text-[9px]">
+                          <div class="grid grid-cols-4 gap-4 pt-2 font-mono text-[9px]">
                             
                             <!-- Columna 1: Preguntas 1 a 15 -->
                             <div class="space-y-1">
                               @for (n of getNumerosRango(1, 15); track n) {
                                 <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
-                                  <span class="font-bold text-slate-800 w-5 text-right pr-1">{{ n }}.</span>
-                                  <div class="flex gap-1">
+                                  <span class="font-bold text-slate-700 w-6 text-right pr-2 select-none text-[8.5px]">{{ n }}.</span>
+                                  <div class="flex gap-1.5 pr-1">
                                     @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-4 h-4 rounded-full border border-slate-800 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
+                                      <span class="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
                                         {{ l }}
                                       </span>
                                     }
@@ -1006,10 +1007,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             <div class="space-y-1">
                               @for (n of getNumerosRango(16, 30); track n) {
                                 <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
-                                  <span class="font-bold text-slate-800 w-5 text-right pr-1">{{ n }}.</span>
-                                  <div class="flex gap-1">
+                                  <span class="font-bold text-slate-700 w-6 text-right pr-2 select-none text-[8.5px]">{{ n }}.</span>
+                                  <div class="flex gap-1.5 pr-1">
                                     @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-4 h-4 rounded-full border border-slate-800 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
+                                      <span class="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
                                         {{ l }}
                                       </span>
                                     }
@@ -1022,10 +1023,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             <div class="space-y-1">
                               @for (n of getNumerosRango(31, 45); track n) {
                                 <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
-                                  <span class="font-bold text-slate-800 w-5 text-right pr-1">{{ n }}.</span>
-                                  <div class="flex gap-1">
+                                  <span class="font-bold text-slate-700 w-6 text-right pr-2 select-none text-[8.5px]">{{ n }}.</span>
+                                  <div class="flex gap-1.5 pr-1">
                                     @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-4 h-4 rounded-full border border-slate-800 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
+                                      <span class="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
                                         {{ l }}
                                       </span>
                                     }
@@ -1038,10 +1039,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             <div class="space-y-1">
                               @for (n of getNumerosRango(46, 60); track n) {
                                 <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
-                                  <span class="font-bold text-slate-800 w-5 text-right pr-1">{{ n }}.</span>
-                                  <div class="flex gap-1">
+                                  <span class="font-bold text-slate-700 w-6 text-right pr-2 select-none text-[8.5px]">{{ n }}.</span>
+                                  <div class="flex gap-1.5 pr-1">
                                     @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-4 h-4 rounded-full border border-slate-800 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
+                                      <span class="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
                                         {{ l }}
                                       </span>
                                     }
@@ -1410,11 +1411,11 @@ export class EvaluacionesDiaComponent implements OnInit {
   public variantesCompiladas = signal<VarianteCompilada[]>([]);
   public modoUnificado = signal<boolean>(false);
 
-  // Parámetros de Hoja y Tipografía Typst
-  public paramTamanoHoja = 'Oficio';
-  public paramTipoFuente: string = 'Times New Roman';
-  public paramTamanoFuente: number = 11.0;
-  public paramEspaciado: string = '0.65em';
+  // Parámetros de Hoja y Tipografía Typst Oficiales
+  public paramTamanoHoja = 'Carta';
+  public paramTipoFuente: string = 'Liberation Sans';
+  public paramTamanoFuente: number = 8.5;
+  public paramEspaciado: string = '0.45em';
 
   public archivoExcelNombre = signal<string | null>(null);
   public toastMessage = signal<string | null>(null);
@@ -1422,12 +1423,16 @@ export class EvaluacionesDiaComponent implements OnInit {
   // Lista viva de evaluaciones
   public evaluaciones = signal<EvaluacionItemUI[]>([]);
 
-  // Cálculo Dinámico de Variantes: ceil(Estudiantes / Ratio)
+  // Cálculo Dinámico de Variantes: Si hay entre 2 y 5 alumnos, se generan variantes individuales (A, B, C...)
   public variantesCalculadas = computed(() => {
-    const totalEst = this.estudiantesInscritos().length || 1;
+    const totalEst = this.estudiantesInscritos().length;
+    if (totalEst <= 0) return 3;
+    if (totalEst <= 5) {
+      return Math.min(totalEst, 5);
+    }
     const ratio = this.ratioEstudiantesPorVariante() || 5;
     const num = Math.ceil(totalEst / ratio);
-    return Math.min(Math.max(num, 1), 5);
+    return Math.min(Math.max(num, 2), 5);
   });
 
   private _normalizar(texto: string): string {
@@ -1794,14 +1799,16 @@ export class EvaluacionesDiaComponent implements OnInit {
   public abrirVisorExamen(item: EvaluacionItemUI, tab: 'examen' | 'patron' = 'examen'): void {
     this.evaluacionActivaVisor.set(item);
 
-    // Cargar nómina de estudiantes
-    this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo).subscribe({
-      next: ests => this.estudiantesInscritos.set(ests)
+    // Cargar nómina de estudiantes de la materia y grupo actual
+    this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, item.seaGroupId).subscribe({
+      next: ests => {
+        this.estudiantesInscritos.set(ests);
+        const cant = this.variantesCalculadas();
+        this.variantesCompiladas.set(this.macroGenerator.generarVariantesCompletas(cant));
+        this.estudianteSeleccionadoIdx.set(0);
+      }
     });
 
-    if (this.variantesCompiladas().length === 0) {
-      this.variantesCompiladas.set(this.macroGenerator.generarVariantesCompletas(this.variantesCalculadas()));
-    }
     this.tabVisorActiva.set(tab);
     this.dialogVisorExamen.set(true);
   }
@@ -1836,7 +1843,9 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   // Apertura y Descarga de Archivos Typst Oficiales
   public abrirCuadernilloMasterTypst(): void {
-    const filename = `CPEC18_Cochabamba_TA-01_1erParcial_20260822_Examen.pdf`;
+    const item = this.evaluacionActivaVisor();
+    const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
+    const filename = `${cod}_Cochabamba_TA-01_1erParcial_20260822_Examen.pdf`;
     window.open(`assets/examenes/${filename}`, '_blank');
   }
 
@@ -1846,26 +1855,11 @@ export class EvaluacionesDiaComponent implements OnInit {
   ]);
 
   public abrirPdfTypstOficialDirecto(item: EvaluacionItemUI): void {
-    const est = this.estudiantesInscritos()[0] || { codigo: '7849102', nombres: 'JUAN CARLOS', apellido1: 'PEREZ', apellido2: 'MAMANI' };
-    if (this._codigosPdfEstudiantes.has(est.codigo)) {
-      const nomSlug = `${est.nombres}_${est.apellido1}_${est.apellido2}`
-        .toUpperCase()
-        .replace(/\s+/g, '_')
-        .replace(/É/g, 'E')
-        .replace(/Í/g, 'I')
-        .replace(/Ó/g, 'O')
-        .replace(/Á/g, 'A')
-        .replace(/Ú/g, 'U')
-        .replace(/Ñ/g, 'N');
-      const filename = `CPEC18_${est.codigo}_${nomSlug}_Examen.pdf`;
-      window.open(`assets/examenes/${filename}`, '_blank');
-    } else {
-      const filename = `CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Examen.pdf`;
-      window.open(`assets/examenes/${filename}`, '_blank');
-    }
+    this.abrirVisorExamen(item, 'examen');
   }
 
   public abrirPdfTypstOficial(): void {
+    const item = this.evaluacionActivaVisor();
     const est = this.getEstudianteActivo();
     if (est && this._codigosPdfEstudiantes.has(est.codigo)) {
       const nomSlug = `${est.nombres}_${est.apellido1}_${est.apellido2}`
@@ -1880,34 +1874,40 @@ export class EvaluacionesDiaComponent implements OnInit {
       const filename = `CPEC18_${est.codigo}_${nomSlug}_Examen.pdf`;
       window.open(`assets/examenes/${filename}`, '_blank');
     } else {
-      const filename = `CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Examen.pdf`;
+      const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
+      const filename = `${cod}_Cochabamba_TA-01_1erParcial_VarA_20260822_Examen.pdf`;
       window.open(`assets/examenes/${filename}`, '_blank');
     }
   }
 
   public abrirPatronPdfTypst(): void {
-    const filename = `CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Patron.pdf`;
+    const item = this.evaluacionActivaVisor();
+    const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
+    const filename = `${cod}_Cochabamba_TA-01_1erParcial_VarA_20260822_Patron.pdf`;
     window.open(`assets/examenes/${filename}`, '_blank');
   }
 
   public descargarRemarkExcelOficial(): void {
-    const filename = `CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Remark.xlsx`;
+    const item = this.evaluacionActivaVisor();
+    const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
+    const filename = `${cod}_Cochabamba_TA-01_1erParcial_VarA_20260822_Remark.xlsx`;
     const link = document.createElement('a');
     link.href = `assets/examenes/${filename}`;
     link.download = filename;
     link.click();
-    this._mostrarToast(`Descargando ${filename}...`);
+    this._mostrarToast(`Descargando matriz Remark OMR...`);
   }
 
   public abrirListaFirmasPdfTypst(item?: EvaluacionItemUI): void {
-    const filename = `CPEC18_Cochabamba_TA-01_1erParcial_20260822_Lista_Firmas.pdf`;
+    const evalItem = item || this.evaluacionActivaVisor();
+    const cod = evalItem?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
+    const filename = `${cod}_Cochabamba_TA-01_1erParcial_20260822_Lista_Firmas.pdf`;
     window.open(`assets/examenes/${filename}`, '_blank');
     this._mostrarToast(`Abriendo Planilla Oficial de Asistencia y Firmas...`);
   }
 
   public imprimirVentanaLimpia(): void {
-    // Abre directamente el PDF oficial compilado con Typst en una ventana limpia
-    this.abrirPdfTypstOficial();
+    window.print();
   }
 
   public abrirBitacora(item: EvaluacionItemUI): void {

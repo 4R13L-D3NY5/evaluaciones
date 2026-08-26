@@ -129,7 +129,7 @@ def generar_grid_cartilla_estudiante(respuestas_estudiante):
         rows_str = ",\n".join(table_rows)
         grid_cols.append(f"""    [
       #table(
-        columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
+        columns: (22%, 15.6%, 15.6%, 15.6%, 15.6%, 15.6%),
         stroke: none,
         inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),

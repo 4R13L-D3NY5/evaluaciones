@@ -92,7 +92,7 @@
     column-gutter: 3pt,
     [
       #table(
-        columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
+        columns: (22%, 15.6%, 15.6%, 15.6%, 15.6%, 15.6%),
         stroke: none,
         inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
@@ -190,7 +190,7 @@
     ],
     [
       #table(
-        columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
+        columns: (22%, 15.6%, 15.6%, 15.6%, 15.6%, 15.6%),
         stroke: none,
         inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
@@ -288,7 +288,7 @@
     ],
     [
       #table(
-        columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
+        columns: (22%, 15.6%, 15.6%, 15.6%, 15.6%, 15.6%),
         stroke: none,
         inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),
@@ -386,7 +386,7 @@
     ],
     [
       #table(
-        columns: (18%, 16.4%, 16.4%, 16.4%, 16.4%, 16.4%),
+        columns: (22%, 15.6%, 15.6%, 15.6%, 15.6%, 15.6%),
         stroke: none,
         inset: (x: 0pt, y: 2.8pt),
         align: (center + horizon, center + horizon, center + horizon, center + horizon, center + horizon, center + horizon),

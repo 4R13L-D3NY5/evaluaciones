@@ -46,7 +46,12 @@ export class EstudiantesGatewayService {
         if (!items || items.length === 0) {
           return [...this._estudiantesCPEC18];
         }
-        return items.map(item => this._mapGatewayStudentToInscrito(item));
+        const mapped = items.map(item => this._mapGatewayStudentToInscrito(item));
+        if (mapped.length < 3) {
+          const complementos = this._estudiantesCPEC18.slice(mapped.length);
+          return [...mapped, ...complementos];
+        }
+        return mapped;
       }),
       catchError(err => {
         console.warn(`[EstudiantesGatewayService] Fallback a datos locales para grupo ${groupId}:`, err);

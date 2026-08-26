@@ -66,11 +66,11 @@ def procesar_cartilla_omr(img_path, estudiante, patron_oficial, output_annotated
     grid_y = ry + 40
     row_h = (rh - 45) / 15.0
     
-    # Ancho relativo de subcolumnas (número 18%, opciones 16.4% c/u)
+    # Ancho relativo de subcolumnas (número 22% para máxima separación, opciones 15.6% c/u)
     centers_rel = []
-    accum = 0.18 * col_w
+    accum = 0.22 * col_w
     for i in range(5):
-        w_opt = 0.164 * col_w
+        w_opt = 0.156 * col_w
         c = accum + 0.5 * w_opt
         centers_rel.append(c)
         accum += w_opt
