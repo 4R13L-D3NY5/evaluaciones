@@ -1,0 +1,4 @@
+- `[x]` Integrar proyecto 'evaluaciones' a XpertiFlow (XF)
+- `[ ]` Documentar la arquitectura en `.context/context.md`
+- `[ ]` Indexar el código con CodeGraph
+- `[ ]` Verificar el acceso local desde el navegador

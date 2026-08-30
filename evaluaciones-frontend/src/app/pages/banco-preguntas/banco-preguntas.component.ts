@@ -1,11 +1,14 @@
 import { Component, inject, signal, computed, ViewChild, ElementRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
-import { EvaluacionesDbService } from '../../core/services/evaluaciones-db.service';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
+import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
+import { BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
 
 export interface PreguntaValidada {
   fila: number;
@@ -28,7 +31,7 @@ export interface PreguntaValidada {
 }
 
 export interface ExamenDocenteCronograma {
-  id: number;
+  id: string;
   codigo: string;
   materia: string;
   carrera: string;
@@ -39,7 +42,7 @@ export interface ExamenDocenteCronograma {
   horario: string;
   aula: string;
   conCartilla: boolean;
-  estado: 'Programado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Enviado';
+  estado: string;
 }
 
 export interface CampusEvaluacion {
@@ -220,15 +223,26 @@ export interface DiaCalendario {
                       <option [value]="g.code">{{ g.code }} — {{ g.teacherName || 'Docente SEA' }}</option>
                     }
                   } @else {
-                    <option value="TA-01">TA-01</option>
-                    <option value="TA-02">TA-02</option>
-                    <option value="TB-01">TB-01</option>
-                    <option value="Grupo 1">Grupo 1</option>
-                    <option value="Grupo 2">Grupo 2</option>
+                    <option value="">Sin grupos oficiales disponibles</option>
                   }
                 </select>
               </div>
             </div>
+
+            @if (rolExamenActivo(); as rol) {
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+                <div class="flex items-center gap-2">
+                  <i class="pi pi-database"></i>
+                  <span><strong>Rol oficial:</strong> {{ rol.id }} · {{ rol.fechaDisplay }}</span>
+                </div>
+                <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
+              </div>
+            } @else {
+              <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                <i class="pi pi-exclamation-triangle"></i>
+                <span>No existe un rol oficial para esta materia, grupo y parcial. Regístralo antes de cargar el banco.</span>
+              </div>
+            }
           </div>
           
           <!-- Barra Superior de Acciones y Recursos del Examen -->
@@ -381,7 +395,7 @@ export interface DiaCalendario {
                   <div class="space-y-1 flex-1">
                     <div class="flex items-center justify-between">
                       <h5 class="text-xs font-black text-amber-950 dark:text-amber-200 uppercase tracking-tight">
-                        Paso Obligatorio: Previsualización de Diagramación Typst Requerida
+                        Paso Obligatorio: Previsualización del formato oficial requerida
                       </h5>
                       <span class="bg-amber-200 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
                         Pendiente de Revisión
@@ -428,7 +442,7 @@ export interface DiaCalendario {
                   {{ nombreArchivoCargado() || 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' }}
                 </div>
                 <p class="text-xs text-muted-foreground mt-1">
-                  Validación instantánea de tipos de reactivos, cuotas de dificultad y fórmulas matemáticas/químicas Typst.
+                  Validación instantánea de tipos de reactivos, cuotas de dificultad y fórmulas matemáticas/químicas.
                 </p>
               </div>
             </div>
@@ -563,7 +577,7 @@ export interface DiaCalendario {
 
                 <div>
                   <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-purple-700">G3 (Casos / Fórmulas Typst + Emp.)</span>
+                    <span class="text-purple-700">G3 (Casos / Fórmulas + Emp.)</span>
                     <span class="font-mono text-foreground">{{ countG3() }}/{{ cuotasGrupos().g3 }}</span>
                   </div>
                   <div class="h-2.5 bg-muted rounded-full overflow-hidden">
@@ -640,7 +654,7 @@ export interface DiaCalendario {
                             <div class="line-clamp-2" [title]="p.enunciado">{{ p.enunciado }}</div>
                             @if (p.formulaTypst) {
                               <span class="text-[9px] font-mono text-purple-700 bg-purple-50 px-1 py-0.5 rounded border border-purple-200 mt-1 inline-block">
-                                Typst: {{ p.formulaTypst }}
+                                Fórmula: {{ p.formulaTypst }}
                               </span>
                             }
                           </td>
@@ -1246,7 +1260,7 @@ export interface DiaCalendario {
       }
 
       <!-- ================================================================= -->
-      <!-- MODAL: PREVISUALIZACIÓN DEL EXAMEN EN FORMATO PDF / CUADERNILLO TYPST -->
+      <!-- MODAL: PREVISUALIZACIÓN DEL EXAMEN EN FORMATO PDF OFICIAL -->
       <!-- ================================================================= -->
       @if (dialogPrevisualizacionPdf()) {
         <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
@@ -1260,67 +1274,44 @@ export interface DiaCalendario {
                 </div>
                 <div>
                   <div class="flex items-center gap-2">
-                    <h3 class="text-base font-black">Previsualización de Cuadernillo de Examen (Motor Typst)</h3>
+                    <h3 class="text-base font-black">Previsualización de Cuadernillo de Examen (Formato oficial)</h3>
                     <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
                       100% del Banco ({{ preguntasValidasParaPdf().length }} Reactivos)
                     </span>
                   </div>
                   <p class="text-xs text-slate-300 font-mono">
-                    {{ parcialActivo() }} · Variante Tipo A · UNITEPC Gestión II-2026
+                    {{ parcialActivo() | uppercase }} · UNITEPC GESTIÓN II-2026 · UNA COLUMNA
                   </p>
                 </div>
               </div>
 
-              <!-- Herramientas de Control del Visor: Filtro de Dificultad, Columnas e Impresión -->
+              <!-- El PDF de validación siempre se genera en una sola columna. -->
               <div class="flex flex-wrap items-center gap-2">
-                
-                <!-- Filtro de Dificultad Rápido -->
-                <div class="flex items-center bg-white/10 p-0.5 rounded-lg border border-white/15 text-[11px]">
-                  <button 
-                    (click)="filtroPdfDificultad.set('TODAS')"
-                    [class]="filtroPdfDificultad() === 'TODAS' ? 'bg-white text-slate-950 font-black shadow-xs' : 'text-slate-200 hover:text-white font-medium'"
-                    class="px-2.5 py-1 rounded-md transition-all cursor-pointer">
-                    Todas ({{ totalPreguntasValidas() }})
+                @if (pdfPreviewUrl()) {
+                  <button (click)="descargarPdfPrevisualizacion()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg border border-white/15 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer">
+                    <i class="pi pi-download"></i>
+                    <span>Descargar PDF</span>
                   </button>
-                  <button 
-                    (click)="filtroPdfDificultad.set('1')"
-                    [class]="filtroPdfDificultad() === '1' ? 'bg-emerald-500 text-white font-black shadow-xs' : 'text-slate-200 hover:text-white font-medium'"
-                    class="px-2 py-1 rounded-md transition-all cursor-pointer">
-                    Fáciles ({{ countFaciles() }})
-                  </button>
-                  <button 
-                    (click)="filtroPdfDificultad.set('2')"
-                    [class]="filtroPdfDificultad() === '2' ? 'bg-amber-500 text-white font-black shadow-xs' : 'text-slate-200 hover:text-white font-medium'"
-                    class="px-2 py-1 rounded-md transition-all cursor-pointer">
-                    Medias ({{ countMedias() }})
-                  </button>
-                  <button 
-                    (click)="filtroPdfDificultad.set('3')"
-                    [class]="filtroPdfDificultad() === '3' ? 'bg-rose-500 text-white font-black shadow-xs' : 'text-slate-200 hover:text-white font-medium'"
-                    class="px-2 py-1 rounded-md transition-all cursor-pointer">
-                    Difíciles ({{ countDificiles() }})
-                  </button>
-                </div>
-
-                <!-- Conmutador 2 Columnas / 1 Columna -->
-                <button 
-                  (click)="vistaPdfColumnas.set(vistaPdfColumnas() === '2' ? '1' : '2')"
-                  title="Cambiar entre 2 columnas (impreso Typst) y 1 columna"
-                  class="bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded-lg border border-white/15 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer">
-                  <i [class]="vistaPdfColumnas() === '2' ? 'pi pi-table' : 'pi pi-list'"></i>
-                  <span>{{ vistaPdfColumnas() === '2' ? '2 Columnas' : '1 Columna' }}</span>
-                </button>
-
+                }
                 <button (click)="cerrarModalPrevisualizacionPdf()" class="text-white/80 hover:text-white p-1 text-base cursor-pointer ml-1">
                   <i class="pi pi-times"></i>
                 </button>
               </div>
             </div>
 
-            <!-- Área de Visualización: Hoja de Examen en Tamaño Real (Estilo Papel Académico) -->
-            <div id="area-scroll-banco-pdf" (scroll)="onScrollDocumentoPdf($event)" class="p-4 sm:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 space-y-6 max-h-[72vh]">
+            <!-- PDF real generado con las reglas oficiales, no una maqueta HTML. -->
+            <div id="area-scroll-banco-pdf" (scroll)="onScrollDocumentoPdf($event)" class="p-4 sm:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 min-h-[65vh] max-h-[72vh]">
+              @if (pdfPreviewUrl(); as pdfUrl) {
+                <iframe [src]="pdfUrl" title="Previsualización PDF oficial del examen" class="w-full h-[65vh] rounded-xl bg-white border border-slate-300 shadow-xl"></iframe>
+              } @else {
+                <div class="h-[65vh] flex items-center justify-center text-slate-600">Generando PDF oficial...</div>
+              }
+            </div>
+
+            <!-- Maqueta histórica conservada únicamente como referencia de código; no se muestra. -->
+            <div class="hidden">
               
-              <!-- Hoja de Examen Impresa Oficial (Renderizado Typst) -->
+              <!-- Hoja de Examen Impresa Oficial -->
               <div class="bg-white text-slate-900 border border-slate-300 rounded-2xl shadow-xl p-6 sm:p-10 max-w-4xl mx-auto space-y-6 font-serif text-xs leading-relaxed">
                 
                 <!-- 1. Encabezado Institucional UNITEPC Oficial -->
@@ -1333,7 +1324,7 @@ export interface DiaCalendario {
 
                     <div class="text-right font-mono text-[9px] text-purple-900 font-black uppercase">
                       <div>SISTEMA DE EVALUACIONES (SEA)</div>
-                      <div>MOTOR DE DIAGRAMACIÓN TYPST v0.11</div>
+                      <div>MOTOR DE DIAGRAMACIÓN OFICIAL</div>
                     </div>
                   </div>
 
@@ -1365,7 +1356,7 @@ export interface DiaCalendario {
                   </div>
                 </div>
 
-                <!-- 2. Cuadro de Identificación y Firma del Estudiante (Espejo de Typst) -->
+                <!-- 2. Cuadro de Identificación y Firma del Estudiante -->
                 <div class="border border-slate-700 rounded-lg overflow-hidden text-[10px] font-sans bg-white">
                   <div class="grid grid-cols-12 border-b border-slate-400">
                     <div class="col-span-7 p-1.5 border-r border-slate-400">
@@ -1385,7 +1376,7 @@ export interface DiaCalendario {
                   </div>
                   <div class="grid grid-cols-12 border-b border-slate-400">
                     <div class="col-span-7 p-1.5 border-r border-slate-400">
-                      <strong>DOCENTE:</strong> <span class="text-slate-800">MAURICIO QUIROZ LAFUENTE</span>
+                      <strong>DOCENTE:</strong> <span class="text-slate-800">{{ docenteSesion.nombre }}</span>
                     </div>
                     <div class="col-span-5 p-1.5">
                       <strong>EXAMEN:</strong> <span class="text-slate-800">{{ parcialActivo() }}</span>
@@ -1427,7 +1418,7 @@ export interface DiaCalendario {
                 </div>
 
                 <!-- 4. Cuerpo Completo de Preguntas del Banco (100% de los reactivos) -->
-                <!-- 4. Cuerpo Completo de Preguntas del Banco (100% de los reactivos con fidelidad exacta a Typst) -->
+                <!-- 4. Cuerpo Completo de Preguntas del Banco en formato oficial -->
                 <div class="pt-2 border-t-2 border-slate-900 font-serif">
                   <div class="text-center font-sans font-black text-sm uppercase tracking-widest text-slate-950">
                     CUESTIONARIO DE PREGUNTAS ({{ preguntasValidasParaPdf().length }} REACTIVOS)
@@ -1516,7 +1507,7 @@ export interface DiaCalendario {
                           <strong>{{ i + 1 }}.</strong> {{ pregunta.enunciado }}
                         </div>
 
-                        <!-- Renderizado de Fórmulas Typst si existen -->
+                        <!-- Renderizado de fórmulas si existen -->
                         @if (pregunta.formulaTypst) {
                           <div class="bg-slate-950 text-emerald-400 font-mono text-[10px] p-2 rounded border border-slate-800 my-1 overflow-x-auto">
                             {{ pregunta.formulaTypst }}
@@ -1551,7 +1542,7 @@ export interface DiaCalendario {
                     UNIVERSIDAD TÉCNICA PRIVADA COSMOS · DEPARTAMENTO NACIONAL DE EVALUACIONES
                   </div>
                   <div class="font-mono text-[9px]">
-                    Certificación Criptográfica Typst v0.11 · Total {{ preguntasValidasParaPdf().length }} Reactivos Certificados
+                    Certificación del formato oficial · Total {{ preguntasValidasParaPdf().length }} Reactivos Certificados
                   </div>
                 </div>
 
@@ -1565,12 +1556,12 @@ export interface DiaCalendario {
                 @if (!documentoRecorridoCompleto()) {
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 font-bold">
                     <i class="pi pi-arrow-down animate-bounce text-xs"></i>
-                    <span>Desplázate hasta el final para revisar los <strong>{{ preguntasValidasParaPdf().length }} reactivos</strong> y habilitar la aprobación.</span>
+                    <span>Revisa el PDF oficial antes de habilitar la aprobación.</span>
                   </div>
                 } @else {
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 font-bold">
                     <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
-                    <span>Revisión completa de los <strong>{{ preguntasValidasParaPdf().length }} reactivos</strong> realizada con éxito.</span>
+                    <span>PDF oficial generado en una sola columna y listo para validar.</span>
                   </div>
                 }
               </div>
@@ -1583,11 +1574,11 @@ export interface DiaCalendario {
                 </button>
 
                 <button 
-                  [disabled]="!documentoRecorridoCompleto()"
+                  [disabled]="!documentoRecorridoCompleto() || !rolExamenActivo() || cargandoBanco()"
                   (click)="aprobarDiagramacionPdf()"
                   class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                   <i class="pi pi-check-circle text-sm"></i>
-                  <span>Aprobar y Guardar Banco de Preguntas</span>
+                  <span>{{ cargandoBanco() ? 'Guardando en PostgreSQL...' : 'Aprobar y Guardar Banco de Preguntas' }}</span>
                 </button>
               </div>
             </div>
@@ -1679,7 +1670,7 @@ export interface DiaCalendario {
               } @else {
                 <div class="space-y-2">
                   <div class="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>Contenido parseado y validado listo para la diagramación Typst:</span>
+                    <span>Contenido parseado y validado listo para la diagramación oficial:</span>
                     <button (click)="copiarContenidoPkg()" class="text-purple-700 dark:text-purple-300 hover:underline font-bold flex items-center gap-1 cursor-pointer">
                       <i class="pi pi-copy text-[10px]"></i> Copiar JSON
                     </button>
@@ -1710,7 +1701,7 @@ export interface DiaCalendario {
         </div>
       }
 
-      <!-- MODAL: GUÍA OFICIAL DE LINEAMIENTOS Y RENDERIZADO TYPST EN PDF -->
+      <!-- MODAL: GUÍA OFICIAL DE LINEAMIENTOS Y RENDERIZADO EN PDF -->
       @if (dialogEjemplos()) {
         <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
           <div class="bg-card border border-border rounded-2xl max-w-5xl w-full shadow-2xl overflow-hidden animate-scale-in my-6">
@@ -1722,7 +1713,7 @@ export interface DiaCalendario {
                   <i class="pi pi-book"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-black">Guía Oficial de Reactivos y Renderizado de Examen (Typst)</h3>
+                  <h3 class="text-base font-black">Guía Oficial de Reactivos y Renderizado de Examen</h3>
                   <p class="text-xs text-white/80 font-medium">
                     Lineamientos de llenado en Excel y previsualización exacta de cómo se imprimirá cada tipo de pregunta en el examen.
                   </p>
@@ -1782,7 +1773,7 @@ export interface DiaCalendario {
                 (click)="filtroGuiaTipo.set('TYPST')"
                 [class]="filtroGuiaTipo() === 'TYPST' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                7. Fórmulas Typst ($ ... $)
+                7. Fórmulas matemáticas ($ ... $)
               </button>
             </div>
 
@@ -1839,10 +1830,10 @@ export interface DiaCalendario {
                       </ul>
                     </div>
 
-                    <!-- Cómo se verá en el PDF Typst -->
+                    <!-- Cómo se verá en el PDF oficial -->
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso</span>
                         <span>Sección I</span>
                       </div>
                       <div class="font-serif text-xs space-y-2 pt-1">
@@ -1898,7 +1889,7 @@ export interface DiaCalendario {
 
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso</span>
                         <span>Sección II</span>
                       </div>
                       <div class="font-serif text-xs space-y-2 pt-1">
@@ -1955,7 +1946,7 @@ export interface DiaCalendario {
 
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso</span>
                         <span>Sección III</span>
                       </div>
                       <div class="font-serif text-xs space-y-2 pt-1">
@@ -2006,7 +1997,7 @@ export interface DiaCalendario {
 
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso</span>
                         <span>Sección IV</span>
                       </div>
                       <div class="font-serif text-xs space-y-2 pt-1">
@@ -2075,7 +2066,7 @@ export interface DiaCalendario {
 
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso</span>
                         <span>Sección V</span>
                       </div>
                       <div class="font-serif text-xs space-y-2.5 pt-1">
@@ -2127,7 +2118,7 @@ export interface DiaCalendario {
 
                     <div class="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-4 space-y-2 text-slate-900 shadow-xs">
                       <div class="flex items-center justify-between border-b border-slate-200 pb-1 text-[10px] font-mono text-slate-500">
-                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso (Typst)</span>
+                        <span class="font-bold uppercase text-purple-900"><i class="pi pi-file-pdf text-rose-500"></i> Vista en Cuadernillo Impreso</span>
                         <span>Sección VI</span>
                       </div>
                       <div class="font-serif text-xs space-y-2 pt-1">
@@ -2144,12 +2135,12 @@ export interface DiaCalendario {
                 </div>
               }
 
-              <!-- SECCIÓN 7: FÓRMULAS TYPST -->
+              <!-- SECCIÓN 7: FÓRMULAS MATEMÁTICAS -->
               @if (filtroGuiaTipo() === 'TODOS' || filtroGuiaTipo() === 'TYPST') {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-purple-700 text-white font-black px-2.5 py-1 rounded text-xs">MOTOR TYPST</span>
+                      <span class="bg-purple-700 text-white font-black px-2.5 py-1 rounded text-xs">MOTOR OFICIAL</span>
                       <h4 class="text-sm font-black text-foreground">Renderizado de Fórmulas Matemáticas y Químicas ($ ... $)</h4>
                     </div>
                     <span class="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
@@ -2208,78 +2199,6 @@ export interface DiaCalendario {
         </div>
       }
 
-      <!-- ================================================================= -->
-      <!-- MODAL: DOBLE AUTENTICACIÓN DOCENTE (2FA / OTP)                     -->
-      <!-- ================================================================= -->
-      @if (dialog2FA()) {
-        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div class="bg-card border border-border rounded-2xl max-w-md w-full shadow-2xl p-6 space-y-5 animate-scale-in text-foreground">
-            
-            <div class="text-center space-y-2">
-              <div class="h-14 w-14 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-2xl mx-auto border border-purple-300">
-                <i class="pi pi-shield"></i>
-              </div>
-              <h3 class="text-lg font-black text-foreground">Doble Autenticación Docente (2FA)</h3>
-              <p class="text-xs text-muted-foreground leading-relaxed">
-                Para autorizar formalmente, sellar con <strong>SHA-256</strong> y validar el banco de preguntas, ingresa el código OTP de seguridad de 6 dígitos.
-              </p>
-            </div>
-
-            <!-- Input de Código 2FA -->
-            <div class="space-y-2">
-              <div class="flex justify-center">
-                <input 
-                  type="text" 
-                  maxlength="6"
-                  [(ngModel)]="codigo2FAIngresado"
-                  placeholder="202688"
-                  class="w-48 text-center text-2xl font-mono font-black tracking-widest bg-muted/60 border-2 border-purple-600 rounded-xl py-2.5 text-foreground outline-none focus:ring-4 focus:ring-purple-400/30">
-              </div>
-              <div class="text-center">
-                <span class="text-[11px] text-muted-foreground font-mono">Código demo sugerido: <strong class="text-purple-700 font-bold">202688</strong></span>
-              </div>
-            </div>
-
-            <!-- Ficha de Seguridad del Docente -->
-            <div class="bg-muted/40 rounded-xl p-3.5 text-[11px] text-muted-foreground space-y-1.5 font-mono border border-border">
-              <div class="flex justify-between">
-                <span>Docente Titular:</span>
-                <strong class="text-foreground font-sans">{{ docenteSesion.nombre }}</strong>
-              </div>
-              <div class="flex justify-between">
-                <span>C.I. / Documento:</span>
-                <strong class="text-foreground">{{ docenteSesion.ci }}</strong>
-              </div>
-              <div class="flex justify-between">
-                <span>Asignatura:</span>
-                <strong class="text-purple-800">[CPEC18] AUDITORÍA TRIBUTARIA</strong>
-              </div>
-              <div class="flex justify-between">
-                <span>Algoritmo de Sello:</span>
-                <strong class="text-emerald-700">TOTP SHA-256 (RFC 6238)</strong>
-              </div>
-            </div>
-
-            <!-- Botones de Acción 2FA -->
-            <div class="flex gap-2 pt-2 border-t border-border">
-              <button 
-                (click)="cerrarModal2FA()" 
-                class="w-1/2 py-2.5 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-muted transition-colors cursor-pointer">
-                Cancelar
-              </button>
-              <button 
-                (click)="confirmarCodigo2FA()" 
-                [disabled]="!codigo2FAIngresado || codigo2FAIngresado.trim().length < 6"
-                class="w-1/2 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white text-xs font-black shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5">
-                <i class="pi pi-lock-open text-xs"></i>
-                <span>Validar y Sellar</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      }
-
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -2293,10 +2212,15 @@ export interface DiaCalendario {
 })
 export class BancoPreguntasComponent implements OnInit {
   public readonly storage = inject(EvaluacionesStorageService);
-  private readonly _db = inject(EvaluacionesDbService);
+  private readonly _sanitizer = inject(DomSanitizer);
   private readonly _gateway = inject(UnitepcGatewayService);
+  private readonly _rolService = inject(RolExamenService);
+  private readonly _bancoService = inject(BancoPreguntasService);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
+
+  // Archivo Excel original para subir al backend
+  public archivoExcelSeleccionado = signal<File | null>(null);
 
   // Pestaña activa: 'validador' (default) o 'calendario'
   public tabActiva = signal<'validador' | 'calendario'>('validador');
@@ -2313,7 +2237,8 @@ export class BancoPreguntasComponent implements OnInit {
   public asignaturaSeleccionada = signal<Course | null>(null);
 
   public grupos = signal<GroupItem[]>([]);
-  public grupoSeleccionado = signal<string>('TA-01');
+  public grupoSeleccionado = signal<string>('');
+  public rolesOficiales = signal<RolExamenResponse[]>([]);
 
   public cargandoSedes = signal<boolean>(false);
   public cargandoCarreras = signal<boolean>(false);
@@ -2322,12 +2247,23 @@ export class BancoPreguntasComponent implements OnInit {
 
   public asignaturaNombreCompleto = computed(() => {
     const asig = this.asignaturaSeleccionada();
-    if (!asig) return '[CPEC18] AUDITORÍA TRIBUTARIA';
+    if (!asig) return 'Selecciona una asignatura';
     return `[${asig.courseCode}] ${asig.courseName}`;
   });
 
   public carreraNombreCompleto = computed(() => {
-    return this.carreraSeleccionada()?.careerName || 'Complementaria Contaduría Pública';
+    return this.carreraSeleccionada()?.careerName || 'Selecciona una carrera';
+  });
+
+  public rolExamenActivo = computed(() => {
+    const materiaCodigo = this.asignaturaSeleccionada()?.courseCode;
+    const grupo = this.grupoSeleccionado();
+    const parcial = this._mapParcialBackend(this.parcialActivo());
+    return this.rolesOficiales().find(rol =>
+      rol.materiaCodigo === materiaCodigo &&
+      rol.grupo === grupo &&
+      rol.tipoParcial === parcial
+    ) || null;
   });
 
   public ngOnInit(): void {
@@ -2390,8 +2326,42 @@ export class BancoPreguntasComponent implements OnInit {
     this.carreraSeleccionada.set(carrera);
     const sede = this.sedeSeleccionada();
     if (sede) {
+      this._cargarRolesOficiales(sede.code, carrera.careerCode);
       this._cargarMateriasDeCarrera(sede.code, carrera.careerCode);
     }
+  }
+
+  private _cargarRolesOficiales(sedeCodigo: string, carreraCodigo: string): void {
+    this._rolService.listar(sedeCodigo, carreraCodigo).subscribe({
+      next: roles => {
+        this.rolesOficiales.set(roles);
+        this.listaExamenesDocente = roles.map(rol => this._mapearRolACronograma(rol));
+        if (roles.length > 0) {
+          this.examenRolSeleccionadoId = roles[0].id;
+          const fecha = new Date(`${roles[0].fecha}T00:00:00`);
+          if (!Number.isNaN(fecha.getTime())) {
+            this.mesActual.set(fecha.getMonth());
+            this.anioActual.set(fecha.getFullYear());
+          }
+
+          const materiaActual = this.asignaturaSeleccionada()?.courseCode;
+          const materiaActualTieneRol = roles.some(rol => rol.materiaCodigo === materiaActual);
+          if (!materiaActualTieneRol) {
+            const materiaConRol = this.asignaturas().find(materia =>
+              roles.some(rol => rol.materiaCodigo === materia.courseCode)
+            );
+            if (materiaConRol) this.seleccionarAsignatura(materiaConRol);
+          }
+        } else {
+          this.examenRolSeleccionadoId = null;
+        }
+      },
+      error: err => {
+        this.rolesOficiales.set([]);
+        this.listaExamenesDocente = [];
+        this._mostrarToast(err?.error?.error || 'No se pudieron cargar los roles oficiales.', 'error');
+      }
+    });
   }
 
   private _cargarMateriasDeCarrera(branchCode: string, careerCode: string): void {
@@ -2401,7 +2371,8 @@ export class BancoPreguntasComponent implements OnInit {
         this.asignaturas.set(data);
         this.cargandoAsignaturas.set(false);
         if (data.length > 0) {
-          const defaultAsig = data.find(m => m.courseCode === 'CPEC18' || m.courseName.includes('TRIBUTARIA')) || data[0];
+          const materiaConRol = data.find(m => this.rolesOficiales().some(rol => rol.materiaCodigo === m.courseCode));
+          const defaultAsig = materiaConRol || data[0];
           this.seleccionarAsignatura(defaultAsig);
         }
       },
@@ -2422,7 +2393,7 @@ export class BancoPreguntasComponent implements OnInit {
     this._cargarGruposDeMateria(asig.syllabusCourseId);
   }
 
-  private _cargarGruposDeMateria(syllabusCourseId: string): void {
+  private _cargarGruposDeMateria(syllabusCourseId: string, grupoPreferido?: string): void {
     this.cargandoGrupos.set(true);
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
@@ -2431,39 +2402,52 @@ export class BancoPreguntasComponent implements OnInit {
         this.grupos.set(data);
         this.cargandoGrupos.set(false);
         if (data.length > 0) {
-          this.grupoSeleccionado.set(data[0].code);
+          const rolDeSeleccion = this.rolesOficiales().find(rol =>
+            rol.materiaCodigo === this.asignaturaSeleccionada()?.courseCode &&
+            rol.tipoParcial === this._mapParcialBackend(this.parcialActivo()) &&
+            data.some(grupo => grupo.code === rol.grupo)
+          );
+          const codigoPreferido = grupoPreferido && data.some(grupo => grupo.code === grupoPreferido)
+            ? grupoPreferido
+            : rolDeSeleccion?.grupo;
+          this.grupoSeleccionado.set(codigoPreferido || data[0].code);
         } else {
-          const rolesEnDb = this._db.getRolesExamenes(sede?.code, carrera?.careerCode);
-          const rol = rolesEnDb.find(r => r.codigo === this.asignaturaSeleccionada()?.courseCode);
-          this.grupoSeleccionado.set(rol?.grupo || 'TA-01');
+          const rol = this.rolesOficiales().find(r =>
+            r.materiaCodigo === this.asignaturaSeleccionada()?.courseCode &&
+            r.tipoParcial === this._mapParcialBackend(this.parcialActivo())
+          );
+          this.grupoSeleccionado.set(grupoPreferido || rol?.grupo || '');
         }
       },
       error: () => {
         this.cargandoGrupos.set(false);
-        this.grupoSeleccionado.set('TA-01');
+        const rol = this.rolesOficiales().find(r =>
+          r.materiaCodigo === this.asignaturaSeleccionada()?.courseCode &&
+          r.tipoParcial === this._mapParcialBackend(this.parcialActivo())
+        );
+        this.grupoSeleccionado.set(grupoPreferido || rol?.grupo || '');
       }
     });
   }
 
-  // Navegación de Calendario Mensual (Default: Marzo 2026 = mes 2)
-  public mesActual = signal<number>(2); // 0 = Enero, 2 = Marzo, 4 = Mayo, 5 = Junio
-  public anioActual = signal<number>(2026);
+  public mesActual = signal<number>(new Date().getMonth());
+  public anioActual = signal<number>(new Date().getFullYear());
 
   public mesesSemestre = [
-    { label: 'Marzo', mesIndex: 2 },
-    { label: 'Abril', mesIndex: 3 },
-    { label: 'Mayo', mesIndex: 4 },
-    { label: 'Junio', mesIndex: 5 },
-    { label: 'Julio', mesIndex: 6 }
-  ];
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ].map((label, mesIndex) => ({ label, mesIndex }));
 
   public examenSeleccionadoModal = signal<ExamenDocenteCronograma | null>(null);
 
   public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>('1er Parcial');
-  public nombreArchivoCargado = signal<string | null>('BANCO_PRUEBA_VALIDO_60PREGUNTAS.xlsx');
+  public nombreArchivoCargado = signal<string | null>(null);
+  public cargandoBanco = signal<boolean>(false);
   public dialogEjemplos = signal<boolean>(false);
   public filtroGuiaTipo = signal<string>('TODOS');
   public dialogPrevisualizacionPdf = signal<boolean>(false);
+  public pdfPreviewUrl = signal<SafeResourceUrl | null>(null);
+  private pdfPreviewObjectUrl: string | null = null;
   public documentoRecorridoCompleto = signal<boolean>(false);
   public pdfPrevisualizadoYConforme = signal<boolean>(false);
   public dialogPrevisualizacionPkg = signal<boolean>(false);
@@ -2474,24 +2458,25 @@ export class BancoPreguntasComponent implements OnInit {
   public enviandoCorreo = signal<boolean>(false);
   public comprobanteGenerado = signal<ComprobanteEnvio | null>(null);
 
+  // Estado de generación Typst (Fase 3)
   public toastMessage = signal<string | null>(null);
   public toastType = signal<'success' | 'error'>('success');
 
   // Datos del Docente en Sesión Activa
+  // NOTA: Valores genéricos hasta que se integre autenticación real.
   public docenteSesion = {
-    nombre: 'Ing. Ariel Denys Quispe',
-    ci: '6849201 Cbba',
-    correo: 'a.quispe@unitepc.edu.bo'
+    nombre: 'Docente no identificado',
+    ci: '',
+    correo: ''
   };
 
   // Directorio Institucional de Oficinas de Evaluación por Campus (Múltiples correos por campus)
   public listaCampusEvaluacion: CampusEvaluacion[] = [
-    { id: 'TEST-ARIEL', nombre: '🧪 Modo Pruebas / QA — Ing. Ariel Cámara', ciudad: 'Pruebas Unitarias', correos: ['arielcamara@unitepc.edu.bo'], oficina: 'Buzón Directo de Validación' },
-    { id: 'CBBA-COL', nombre: 'Cochabamba - Campus Colonial (Central)', ciudad: 'Cochabamba', correos: ['evaluaciones.cochabamba@unitepc.edu.bo', 'arielcamara@unitepc.edu.bo'], oficina: 'Jefatura de Evaluaciones Bloque A' },
+    { id: 'CBBA-COL', nombre: 'Cochabamba - Campus Colonial (Central)', ciudad: 'Cochabamba', correos: ['evaluaciones.cochabamba@unitepc.edu.bo'], oficina: 'Jefatura de Evaluaciones Bloque A' },
     { id: 'CBBA-FLO', nombre: 'Cochabamba - Campus Florida (Salud)', ciudad: 'Cochabamba', correos: ['evaluaciones.florida@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Salud' },
     { id: 'LPZ-CEN', nombre: 'La Paz - Sede Central', ciudad: 'La Paz', correos: ['evaluaciones.lapaz@unitepc.edu.bo', 'evaluaciones.central@unitepc.edu.bo'], oficina: 'Evaluaciones Sede La Paz' },
     { id: 'EAL-SAT', nombre: 'El Alto - Campus Satélite', ciudad: 'El Alto', correos: ['evaluaciones.elalto@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones El Alto' },
-    { id: 'SCZ-NOR', nombre: 'Santa Cruz - Sede Norte', ciudad: 'Santa Cruz', correos: ['evaluaciones.santacruz@unitepc.edu.bo', 'arielcamara@unitepc.edu.bo'], oficina: 'Jefatura Evaluaciones Santa Cruz' },
+    { id: 'SCZ-NOR', nombre: 'Santa Cruz - Sede Norte', ciudad: 'Santa Cruz', correos: ['evaluaciones.santacruz@unitepc.edu.bo'], oficina: 'Jefatura Evaluaciones Santa Cruz' },
     { id: 'GYM-BEN', nombre: 'Guayaramerín - Sede Beni', ciudad: 'Guayaramerín', correos: ['evaluaciones.guayaramerin@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Beni' },
     { id: 'COB-PAN', nombre: 'Cobija - Sede Pando', ciudad: 'Cobija', correos: ['evaluaciones.cobija@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Pando' },
     { id: 'IVI-TRO', nombre: 'Ivirgarzama - Campus Trópico', ciudad: 'Ivirgarzama', correos: ['evaluaciones.ivirgarzama@unitepc.edu.bo'], oficina: 'Oficina Evaluaciones Trópico' }
@@ -2499,129 +2484,15 @@ export class BancoPreguntasComponent implements OnInit {
 
 
 
-  public campusSeleccionadoId = 'TEST-ARIEL';
-  public examenRolSeleccionadoId = 2; // SIS-413 por defecto
+  public campusSeleccionadoId = 'CBBA-COL';
+  public examenRolSeleccionadoId: string | null = null;
   public observacionesDocenteEnvio = '';
 
   public campusActivo = computed(() => {
     return this.listaCampusEvaluacion.find(c => c.id === this.campusSeleccionadoId) || this.listaCampusEvaluacion[0];
   });
 
-  // Lista Completa de Exámenes Programados para el Docente en el Semestre II-2026
-  public listaExamenesDocente: ExamenDocenteCronograma[] = [
-    { 
-      id: 1, 
-      codigo: 'SIS-322', 
-      materia: 'INFRAESTRUCTURA TECNOLÓGICA', 
-      carrera: 'INGENIERÍA DE SISTEMAS', 
-      semestre: 6, 
-      grupo: 'Grupo 1', 
-      tipo: '1er Parcial', 
-      fecha: '30/03/2026', 
-      horario: '09:45:00 - 11:15:00', 
-      aula: 'Lab Redes 2 (Bloque A)', 
-      conCartilla: true, 
-      estado: 'Devuelto' 
-    },
-    { 
-      id: 2, 
-      codigo: 'SIS-413', 
-      materia: 'TELECOMUNICACIONES', 
-      carrera: 'INGENIERÍA DE SISTEMAS', 
-      semestre: 7, 
-      grupo: 'Grupo 1', 
-      tipo: '1er Parcial', 
-      fecha: '31/03/2026', 
-      horario: '15:45:00 - 17:15:00', 
-      aula: 'Aula 402 (Bloque B)', 
-      conCartilla: true, 
-      estado: 'Devuelto' 
-    },
-    { 
-      id: 3, 
-      codigo: 'SIS-322', 
-      materia: 'INFRAESTRUCTURA TECNOLÓGICA', 
-      carrera: 'INGENIERÍA DE SISTEMAS', 
-      semestre: 6, 
-      grupo: 'Grupo 1', 
-      tipo: '2do Parcial', 
-      fecha: '25/05/2026', 
-      horario: '09:45:00 - 11:15:00', 
-      aula: 'Lab Redes 2 (Bloque A)', 
-      conCartilla: true, 
-      estado: 'Devuelto' 
-    },
-    { 
-      id: 4, 
-      codigo: 'SIS-413', 
-      materia: 'TELECOMUNICACIONES', 
-      carrera: 'INGENIERÍA DE SISTEMAS', 
-      semestre: 7, 
-      grupo: 'Grupo 1', 
-      tipo: '2do Parcial', 
-      fecha: '26/05/2026', 
-      horario: '15:45:00 - 17:15:00', 
-      aula: 'Aula 402 (Bloque B)', 
-      conCartilla: true, 
-      estado: 'Devuelto' 
-    },
-    { 
-      id: 5, 
-      codigo: 'SIS-322', 
-      materia: 'INFRAESTRUCTURA TECNOLÓGICA', 
-      carrera: 'INGENIERÍA DE SISTEMAS', 
-      semestre: 6, 
-      grupo: 'Grupo 1', 
-      tipo: 'Examen Final', 
-      fecha: '15/06/2026', 
-      horario: '09:45:00 - 11:15:00', 
-      aula: 'Lab Redes 2 (Bloque A)', 
-      conCartilla: false, 
-      estado: 'Programado' 
-    },
-    { 
-      id: 6, 
-      codigo: 'SIS-413', 
-      materia: 'TELECOMUNICACIONES', 
-      carrera: 'INGENIERÍA DE SISTEMAS', 
-      semestre: 7, 
-      grupo: 'Grupo 1', 
-      tipo: 'Examen Final', 
-      fecha: '16/06/2026', 
-      horario: '15:45:00 - 17:15:00', 
-      aula: 'Aula 402 (Bloque B)', 
-      conCartilla: true, 
-      estado: 'Programado' 
-    },
-    { 
-      id: 7, 
-      codigo: 'SIS-322', 
-      materia: 'INFRAESTRUCTURA TECNOLÓGICA', 
-      carrera: 'INGENIERÍA DE SISTEMAS', 
-      semestre: 6, 
-      grupo: 'Grupo 1', 
-      tipo: '2da Instancia', 
-      fecha: '29/06/2026', 
-      horario: '09:45:00 - 11:15:00', 
-      aula: 'Lab Redes 2 (Bloque A)', 
-      conCartilla: false, 
-      estado: 'Programado' 
-    },
-    { 
-      id: 8, 
-      codigo: 'SIS-413', 
-      materia: 'TELECOMUNICACIONES', 
-      carrera: 'INGENIERÍA DE SISTEMAS', 
-      semestre: 7, 
-      grupo: 'Grupo 1', 
-      tipo: '2da Instancia', 
-      fecha: '30/06/2026', 
-      horario: '15:45:00 - 17:15:00', 
-      aula: 'Aula 402 (Bloque B)', 
-      conCartilla: false, 
-      estado: 'Programado' 
-    }
-  ];
+  public listaExamenesDocente: ExamenDocenteCronograma[] = [];
 
   public nombreMesActual = computed(() => {
     const nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -2718,39 +2589,47 @@ export class BancoPreguntasComponent implements OnInit {
     this.examenSeleccionadoModal.set(null);
     this.parcialActivo.set(ex.tipo);
     this.examenRolSeleccionadoId = ex.id;
+    const asignatura = this.asignaturas().find(item => item.courseCode === ex.codigo);
+    if (asignatura) {
+      this.asignaturaSeleccionada.set(asignatura);
+      this._cargarGruposDeMateria(asignatura.syllabusCourseId, ex.grupo);
+    }
+    this.grupoSeleccionado.set(ex.grupo);
     this.tabActiva.set('validador');
     this._mostrarToast(`Redirigido al Validador para: ${ex.materia} (${ex.tipo}).`);
   }
 
+  private _mapearRolACronograma(rol: RolExamenResponse): ExamenDocenteCronograma {
+    const tipo = rol.tipoParcial === 'Final' ? 'Examen Final' : rol.tipoParcial;
+    const estado = rol.estadoFlujo.charAt(0) + rol.estadoFlujo.slice(1).toLowerCase();
+    return {
+      id: rol.id,
+      codigo: rol.materiaCodigo,
+      materia: rol.materiaNombre,
+      carrera: rol.carreraNombre,
+      semestre: rol.semestre,
+      grupo: rol.grupo,
+      tipo: tipo as ExamenDocenteCronograma['tipo'],
+      fecha: rol.fechaDisplay,
+      horario: rol.horario,
+      aula: `${rol.aula} (${rol.campus})`,
+      conCartilla: rol.modalidad === 'PRESENCIAL_CARTILLA',
+      estado
+    };
+  }
+
   // Cuotas Oficiales según parcial
   public cuotasDificultad = computed(() => {
-    switch (this.parcialActivo()) {
-      case '1er Parcial':
-      case '2do Parcial':
-        return { facil: 15, medio: 30, dificil: 15, total: 60 };
-      case 'Examen Final':
-        return { facil: 30, medio: 60, dificil: 30, total: 120 };
-      case '2da Instancia':
-        return { facil: 10, medio: 25, dificil: 15, total: 50 };
-    }
+    return { facil: 15, medio: 30, dificil: 15, total: 60 };
   });
 
   public cuotasGrupos = computed(() => {
-    switch (this.parcialActivo()) {
-      case '1er Parcial':
-      case '2do Parcial':
-        return { g1: 15, g2: 30, g3: 15 };
-      case 'Examen Final':
-        return { g1: 30, g2: 60, g3: 30 };
-      case '2da Instancia':
-        return { g1: 10, g2: 25, g3: 15 };
-    }
+    return { g1: 15, g2: 30, g3: 15 };
   });
 
   public totalPreguntasRequeridas = computed(() => this.cuotasDificultad().total);
 
-  // Inicialmente 60 preguntas válidas de muestra para 1er/2do parcial
-  public preguntasCargadas = signal<PreguntaValidada[]>(this._generarPreguntasMockValidas());
+  public preguntasCargadas = signal<PreguntaValidada[]>([]);
 
   // Conteos dinámicos calculados directamente sobre las preguntas cargadas
   public totalPreguntasValidas = computed(() => this.preguntasCargadas().filter(p => p.valido).length);
@@ -2775,10 +2654,6 @@ export class BancoPreguntasComponent implements OnInit {
     'OPCION_EMPAREJAMIENTO'
   ].includes(p.tipo)).length);
 
-  // Estado del Modal de Doble Autenticación Docente (2FA / OTP)
-  public dialog2FA = signal<boolean>(false);
-  public codigo2FAIngresado: string = '';
-
   public cuotaDificultadCumplida = computed(() => {
     const c = this.cuotasDificultad();
     return this.countFaciles() >= c.facil && this.countMedias() >= c.medio && this.countDificiles() >= c.dificil;
@@ -2793,7 +2668,9 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public filtroPdfDificultad = signal<'TODAS' | '1' | '2' | '3'>('TODAS');
-  public vistaPdfColumnas = signal<'2' | '1'>('2');
+  // Se conserva el tipo por compatibilidad con la maqueta histórica oculta;
+  // la previsualización operativa siempre se genera y muestra en una columna.
+  public vistaPdfColumnas = signal<'2' | '1'>('1');
 
   public preguntasValidasParaPdf = computed(() => {
     const todas = this.preguntasCargadas().filter(p => p.valido);
@@ -2808,20 +2685,14 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public nombreArchivoPaquete = computed(() => {
-    const ex = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId) || this.listaExamenesDocente[1];
-    const cod = ex.codigo.replace('-', '');
+    const ex = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId);
+    const cod = (ex?.codigo || this.asignaturaSeleccionada()?.courseCode || 'SIN_MATERIA').replace('-', '');
     const pCode = this.parcialActivo().toUpperCase().replace(' ', '_');
-    return `PAQUETE_EVAL_${cod}_${pCode}_2026.pkg`;
+    return `PAQUETE_EVAL_${cod}_${pCode}_${this.anioActual()}.pkg`;
   });
 
   public getResumenCuota(parcial: string): string {
-    switch (parcial) {
-      case '1er Parcial': return '60 preguntas';
-      case '2do Parcial': return '60 preguntas';
-      case 'Examen Final': return '120 preguntas';
-      case '2da Instancia': return '50 preguntas';
-      default: return '60 preguntas';
-    }
+    return '60 preguntas';
   }
 
   public cambiarParcial(parcial: string): void {
@@ -2871,6 +2742,7 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public async procesarArchivoExcelReal(file: File): Promise<void> {
+    this.archivoExcelSeleccionado.set(file);
     this.nombreArchivoCargado.set(file.name);
     this.pdfPrevisualizadoYConforme.set(false);
     try {
@@ -2922,6 +2794,8 @@ export class BancoPreguntasComponent implements OnInit {
 
         const tipoRaw = getVal(['tipo', 'TIPO']).trim();
         const tipoUpper = tipoRaw.toUpperCase();
+        const tipoClave = tipoUpper.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
         const enunciadoRaw = getVal(['enunciado', 'ENUNCIADO']);
         const grupoRaw = getVal(['grupo', 'GRUPO']);
         let opA = getVal(['opcion_a', 'opcion a', 'A', 'a']);
@@ -2937,21 +2811,21 @@ export class BancoPreguntasComponent implements OnInit {
 
         // Normalizar Tipo de Pregunta Oficial UNITEPC
         let tipoNorm = 'SELECCION_MEJOR_RESPUESTA';
-        if (tipoUpper.includes('VERDADERO O FALSO SIMPLE') || tipoUpper.includes('FALSO_VERDADERO') || tipoUpper === 'VF_SIMPLE') {
+        if (tipoClave.includes('VERDADERO_O_FALSO_SIMPLE') || tipoClave.includes('FALSO_VERDADERO') || tipoClave === 'VF_SIMPLE') {
           tipoNorm = 'VERDADERO_O_FALSO_SIMPLE';
-        } else if (tipoUpper.includes('VERDADERO O FALSO COMPLEJAS') || tipoUpper.includes('PREGUNTA_CON_CLAVE') || tipoUpper === 'VF_COMPLEJAS') {
+        } else if (tipoClave.includes('VERDADERO_O_FALSO_COMPLEJAS') || tipoClave.includes('PREGUNTA_CON_CLAVE') || tipoClave === 'VF_COMPLEJAS') {
           tipoNorm = 'VERDADERO_O_FALSO_COMPLEJAS';
-        } else if (tipoUpper.includes('RESPUESTA A/B/AMBAS/NINGUNA') || tipoUpper.includes('RESPUESTA_COMPUESTA') || tipoUpper.includes('PREMISAS')) {
+        } else if (tipoClave.includes('RESPUESTA_A_B_AMBAS_NINGUNA') || tipoClave.includes('RESPUESTA_COMPUESTA') || tipoClave.includes('PREMISAS')) {
           tipoNorm = 'RESPUESTA_PREMISAS_ABCD';
-        } else if (tipoUpper.includes('ÍTEMS AGRUPADOS') || tipoUpper.includes('ITEMS AGRUPADOS') || tipoUpper === 'PROBLEMA' || tipoUpper === 'CASO_CLINICO') {
+        } else if (tipoClave.includes('ITEMS_AGRUPADOS') || tipoClave === 'PROBLEMA' || tipoClave === 'CASO_CLINICO') {
           tipoNorm = 'CASO_CLINICO_TRONCO';
-        } else if (tipoUpper.includes('SUBÍTEM') || tipoUpper.includes('SUBITEM') || tipoUpper === 'SUBPROBLEMA') {
+        } else if (tipoClave.includes('SUBITEM') || tipoClave === 'SUBPROBLEMA') {
           tipoNorm = 'SUBITEM_CASO';
-        } else if (tipoUpper === 'EMPAREJAMIENTO AMPLIADO' || tipoUpper === 'EMPAREJAMIENTO') {
+        } else if (tipoClave === 'EMPAREJAMIENTO_AMPLIADO' || tipoClave === 'EMPAREJAMIENTO') {
           tipoNorm = 'EMPAREJAMIENTO_TRONCO';
-        } else if (tipoUpper.includes('OPCIÓN DE EMPAREJAMIENTO') || tipoUpper.includes('OPCION DE EMPAREJAMIENTO') || tipoUpper === 'OPCION_EMPAREJAMIENTO') {
+        } else if (tipoClave.includes('OPCION_DE_EMPAREJAMIENTO') || tipoClave === 'OPCION_EMPAREJAMIENTO') {
           tipoNorm = 'OPCION_EMPAREJAMIENTO';
-        } else if (tipoUpper.includes('SELECCIÓN') || tipoUpper.includes('SELECCION') || tipoUpper === 'SELECCION_SIMPLE' || tipoUpper === 'SELECCION_UNICA') {
+        } else if (tipoClave.includes('SELECCION') || tipoClave === 'SELECCION_SIMPLE' || tipoClave === 'SELECCION_UNICA') {
           tipoNorm = 'SELECCION_MEJOR_RESPUESTA';
         }
 
@@ -3064,6 +2938,8 @@ export class BancoPreguntasComponent implements OnInit {
   // DESCARGA Y CARGA DE EJEMPLOS OFICIALES (SheetJS - 4 Hojas)
   // ============================================================
   public descargarEjemploValido(): void {
+    const materia = this.asignaturaSeleccionada();
+    const codigoMateria = materia?.courseCode || 'MATERIA';
     const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'parcial', 'observaciones'];
     
     const dataInst = [
@@ -3071,11 +2947,11 @@ export class BancoPreguntasComponent implements OnInit {
       [],
       ['1. CÓDIGOS DE PREGUNTA OFICIALES', 'Verdadero o Falso Simple, Verdadero o Falso Complejas, Respuesta A/B/Ambas/Ninguna, Selección de la mejor respuesta, Ítems agrupados por caso clínico o problema, Subítem de caso o problema, Emparejamiento Ampliado, Opción de Emparejamiento Ampliado'],
       ['2. CUOTAS OFICIALES EXIGIDAS', '15 Fáciles (1), 30 Medias (2), 15 Difíciles (3) - Total: 60 preguntas para 1er/2do Parcial'],
-      ['3. MATERIA PILOTO', '[CPEC18] Auditoría Tributaria - Carrera Complementaria Contaduría Pública (Cochabamba)']
+      ['3. CONTEXTO SELECCIONADO', materia ? `[${materia.courseCode}] ${materia.courseName}` : 'Sin materia seleccionada']
     ];
 
     const dataBanco: any[][] = [headers];
-    const preguntas60 = this._generarPreguntasMockValidas();
+    const preguntas60 = this._generarPreguntasEjemplo();
 
     for (const p of preguntas60) {
       let tipoStr = 'Selección de la mejor respuesta';
@@ -3125,14 +3001,10 @@ export class BancoPreguntasComponent implements OnInit {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataEj), 'Ejemplo');
 
-    const fileName = `BANCO_OFICIAL_VALIDO_CPEC18_60PREGUNTAS.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    const fileName = `EJEMPLO_BANCO_${codigoMateria.replace(/[^a-zA-Z0-9]/g, '')}_60PREGUNTAS.xlsx`;
 
-    // Cargar directamente en memoria para inspección visual instantánea
-    this.nombreArchivoCargado.set(fileName);
-    this.pdfPrevisualizadoYConforme.set(false);
-    this.preguntasCargadas.set(preguntas60);
-    this._mostrarToast(`Descargado y cargado en vivo: ${fileName} (60 reactivos válidos con los 6 tipos de preguntas).`);
+    XLSX.writeFile(wb, fileName);
+    this._mostrarToast(`Ejemplo descargado: ${fileName}. Selecciona explícitamente el archivo que deseas registrar.`);
   }
 
   public descargarEjemploInvalido(): void {
@@ -3161,28 +3033,10 @@ export class BancoPreguntasComponent implements OnInit {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataInst), 'Instrucciones');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
 
-    const fileName = `BANCO_OFICIAL_CON_OBSERVACIONES_CPEC18.xlsx`;
+    const codigoMateria = this.asignaturaSeleccionada()?.courseCode || 'MATERIA';
+    const fileName = `EJEMPLO_CON_OBSERVACIONES_${codigoMateria.replace(/[^a-zA-Z0-9]/g, '')}.xlsx`;
     XLSX.writeFile(wb, fileName);
-
-    // Parsear y cargar directamente en el validador interactivo
-    const errList: PreguntaValidada[] = [
-      { fila: 2, tipo: 'VERDADERO_O_FALSO_SIMPLE', grupo: '', enunciado: 'Pregunta V/F con clave errónea (marcada C en vez de A/B)', opcion_a: 'Verdadero', opcion_b: 'Falso', opcion_c: '', opcion_d: '', opcion_e: '', respuesta_correcta: 'C', dificultad: '1', peso: 5, observaciones: 'Falta revisar: respuesta A-B', valido: false, errores: ['Respuesta en V/F debe ser A (Verdadero) o B (Falso)'] },
-      { fila: 3, tipo: 'SELECCION_MEJOR_RESPUESTA', grupo: '', enunciado: '', opcion_a: 'Distractor A', opcion_b: 'Distractor B', opcion_c: 'Distractor C', opcion_d: 'Distractor D', opcion_e: 'Distractor E', respuesta_correcta: 'A', dificultad: '1', peso: 5, observaciones: 'Falta revisar: enunciado', valido: false, errores: ['Falta enunciado de la pregunta'] },
-      { fila: 4, tipo: 'SELECCION_MEJOR_RESPUESTA', grupo: '', enunciado: 'Pregunta de selección incompleta con solo 3 opciones', opcion_a: 'Opción 1', opcion_b: 'Opción 2', opcion_c: 'Opción 3', opcion_d: '', opcion_e: '', respuesta_correcta: 'A', dificultad: '2', peso: 5, observaciones: 'Falta revisar: incisos A-E', valido: false, errores: ['Requiere 5 opciones completas (incisos A al E)'] },
-      { fila: 5, tipo: 'SUBITEM_CASO', grupo: '', enunciado: 'Subítem sin código de grupo identificador del caso padre', opcion_a: 'Opción A', opcion_b: 'Opción B', opcion_c: 'Opción C', opcion_d: 'Opción D', opcion_e: 'Opción E', respuesta_correcta: 'B', dificultad: '3', peso: 5, observaciones: 'Falta revisar: grupo', valido: false, errores: ['Falta código de grupo identificador (ej. CASO-01)'] },
-      { fila: 6, tipo: 'RESPUESTA_PREMISAS_ABCD', grupo: '', enunciado: 'I. Premisa tributaria 1.\nII. Premisa 2.', opcion_a: 'A. Primera verdadera', opcion_b: 'B. Segunda verdadera', opcion_c: 'C. Ambas', opcion_d: 'D. Ninguna', opcion_e: '', respuesta_correcta: 'Z', dificultad: '2', peso: 5, observaciones: 'Falta revisar: respuesta A-D', valido: false, errores: ['Respuesta en premisas debe ser A, B, C o D'] },
-      { fila: 7, tipo: 'EMPAREJAMIENTO_TRONCO', grupo: 'EMP-01', enunciado: 'Emparejamiento con solo 1 clave definida', opcion_a: 'Clave 1', opcion_b: '', opcion_c: '', opcion_d: '', opcion_e: '', respuesta_correcta: '', dificultad: '1', peso: 5, observaciones: 'Falta revisar: minimo 2 claves', valido: false, errores: ['Emparejamiento requiere al menos 2 claves/conceptos en opciones A y B'] },
-      { fila: 8, tipo: 'VERDADERO_O_FALSO_COMPLEJAS', grupo: '', enunciado: 'V/F compleja con proposición 3 vacía', opcion_a: '1. Premisa 1', opcion_b: '2. Premisa 2', opcion_c: '', opcion_d: '4. Premisa 4', opcion_e: '', respuesta_correcta: 'A', dificultad: '2', peso: 5, observaciones: 'Falta revisar: incisos 1-4', valido: false, errores: ['Requiere las 4 proposiciones (1 a 4) en incisos A-D'] }
-    ];
-
-    for (let i = 9; i <= 25; i++) {
-      errList.push({ fila: i, tipo: 'SELECCION_MEJOR_RESPUESTA', grupo: '', enunciado: `Pregunta sin completar cuota ${i}`, opcion_a: 'Opción A', opcion_b: 'Opción B', opcion_c: 'Opción C', opcion_d: 'Opción D', opcion_e: 'Opción E', respuesta_correcta: 'A', dificultad: '2', peso: 5, observaciones: 'OK', valido: true, errores: [] });
-    }
-
-    this.nombreArchivoCargado.set(fileName);
-    this.pdfPrevisualizadoYConforme.set(false);
-    this.preguntasCargadas.set(errList);
-    this._mostrarToast(`Descargado y analizado: ${fileName} (Se detectaron 7 observaciones).`, 'error');
+    this._mostrarToast(`Ejemplo con errores descargado: ${fileName}. No se cargó en el flujo oficial.`);
   }
 
   // ============================================================
@@ -3215,7 +3069,12 @@ export class BancoPreguntasComponent implements OnInit {
     this.enviandoCorreo.set(true);
 
     const campus = this.campusActivo();
-    const examenRol = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId) || this.listaExamenesDocente[1];
+    const examenRol = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId);
+    if (!examenRol) {
+      this.enviandoCorreo.set(false);
+      this._mostrarToast('Selecciona un rol oficial antes de preparar el envío.', 'error');
+      return;
+    }
     const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
 
     const now = new Date();
@@ -3237,7 +3096,7 @@ export class BancoPreguntasComponent implements OnInit {
       parcial: this.parcialActivo(),
       modalidad: examenRol.conCartilla ? 'Con Cartilla Óptica' : 'Sin Cartilla',
       totalPreguntas: preguntasValidas.length,
-      hashCriptografico: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
+      hashCriptografico: this.rolExamenActivo()?.hashEncriptacion || '',
       nombreArchivoPkg: this.nombreArchivoPaquete()
     };
 
@@ -3251,16 +3110,7 @@ export class BancoPreguntasComponent implements OnInit {
       // 2. Abrir la aplicación de correo del usuario (mailto)
       this.abrirClienteCorreo(comprobante);
 
-      // Actualizar estado en lista de exámenes del docente y en la BD de Evaluaciones
-      examenRol.estado = 'Enviado';
-      this._db.actualizarEstadoPorBancoValidado(
-        examenRol.codigo, 
-        this.parcialActivo(), 
-        this.nombreArchivoPaquete() || `BANCO_${examenRol.codigo}.xlsx`, 
-        comprobante.hashCriptografico, 
-        comprobante.totalPreguntas
-      );
-      this._mostrarToast(`Plantilla oficial lista y banco encriptado. El examen pasó a VALIDADO en la Lista de Evaluaciones.`);
+      this._mostrarToast('Plantilla y paquete preparados con los datos registrados del rol oficial.');
     }, 600);
   }
 
@@ -3364,10 +3214,261 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     this._mostrarToast(`Copia de respaldo encriptada (${this.nombreArchivoPaquete()}) descargada.`);
   }
 
-  // Previsualización PDF
-  public abrirModalPrevisualizacionPdf(): void {
-    this.documentoRecorridoCompleto.set(false);
-    this.dialogPrevisualizacionPdf.set(true);
+  // Previsualización PDF oficial: se genera como PDF real, en Oficio, una sola
+  // columna y sin identidad de estudiante. La aprobación continúa siendo la
+  // única operación que persiste el banco en PostgreSQL.
+  public async abrirModalPrevisualizacionPdf(): Promise<void> {
+    const preguntas = this.preguntasCargadas().filter(p => p.valido);
+    if (!preguntas.length) {
+      this._mostrarToast('No hay reactivos válidos para generar la previsualización PDF.', 'error');
+      return;
+    }
+
+    this._liberarPdfPreview();
+    try {
+      const pdf = await this._crearPdfPreviewOficial(preguntas);
+      this.pdfPreviewObjectUrl = URL.createObjectURL(pdf);
+      this.pdfPreviewUrl.set(this._sanitizer.bypassSecurityTrustResourceUrl(this.pdfPreviewObjectUrl));
+      this.documentoRecorridoCompleto.set(true);
+      this.dialogPrevisualizacionPdf.set(true);
+    } catch (error) {
+      console.error('[BancoPreguntasComponent] No se pudo generar la previsualización PDF:', error);
+      this._mostrarToast('No se pudo generar el PDF oficial de previsualización.', 'error');
+    }
+  }
+
+  public descargarPdfPrevisualizacion(): void {
+    if (!this.pdfPreviewObjectUrl) return;
+    const anchor = document.createElement('a');
+    anchor.href = this.pdfPreviewObjectUrl;
+    anchor.download = `PREVISUALIZACION_EXAMEN_${this.parcialActivo().toUpperCase().replace(/\s+/g, '_')}.pdf`;
+    anchor.click();
+  }
+
+  private async _crearPdfPreviewOficial(preguntas: PreguntaValidada[]): Promise<Blob> {
+    const ancho = 215.9;
+    const alto = 330.2;
+    const margen = 20;
+    const pieReservado = 18;
+    const interlineado = 11 * 0.8 * 0.352778;
+    const separacionPregunta = 11 * 1.2 * 0.352778;
+    const indentacion = 11 * 0.352778;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [ancho, alto], compress: true });
+    let pagina = 1;
+    let y = margen;
+
+    const cargarLogo = (): Promise<string | null> => new Promise(resolve => {
+      const imagen = new Image();
+      imagen.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = imagen.naturalWidth || 1;
+        canvas.height = imagen.naturalHeight || 1;
+        const contexto = canvas.getContext('2d');
+        if (!contexto) {
+          resolve(null);
+          return;
+        }
+        contexto.drawImage(imagen, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      imagen.onerror = () => resolve(null);
+      imagen.src = '/assets/logo_unitepc_clean.png';
+    });
+    const logoData = await cargarLogo();
+
+    const fuente = (estilo: 'normal' | 'bold' | 'italic' = 'normal', tamano = 11) => {
+      doc.setFont('times', estilo);
+      doc.setFontSize(tamano);
+      doc.setTextColor(0, 0, 0);
+    };
+
+    const nuevaPagina = () => {
+      doc.addPage([ancho, alto], 'portrait');
+      pagina++;
+      y = margen;
+    };
+
+    const escribir = (texto: string, x: number, anchoDisponible: number, estilo: 'normal' | 'bold' | 'italic' = 'normal', salto = interlineado): void => {
+      fuente(estilo);
+      // Mantener los saltos semánticos del Excel (premisas, claves y casos)
+      // mientras se ajusta cada línea al ancho de la hoja.
+      const lineas = (texto || '').split(/\r?\n/).flatMap(linea =>
+        doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), anchoDisponible) as string[]
+      );
+      const altoTexto = Math.max(1, lineas.length) * salto;
+      if (y + altoTexto > alto - margen - pieReservado) nuevaPagina();
+      doc.text(lineas.length ? lineas : [''], x, y);
+      y += altoTexto;
+    };
+
+    const tituloTipo = (tipo: string): string => {
+      const titulos: Record<string, string> = {
+        SELECCION_MEJOR_RESPUESTA: 'SELECCIÓN DE LA MEJOR RESPUESTA',
+        VERDADERO_O_FALSO_SIMPLE: 'VERDADERO O FALSO SIMPLE',
+        RESPUESTA_PREMISAS_ABCD: 'RESPUESTA A/B/AMBAS/NINGUNA',
+        VERDADERO_O_FALSO_COMPLEJAS: 'VERDADERO O FALSO COMPLEJAS',
+        CASO_CLINICO_TRONCO: 'ITEMS AGRUPADOS POR CASO CLINICO O PROBLEMA',
+        SUBITEM_CASO: 'ITEMS AGRUPADOS POR CASO CLINICO O PROBLEMA',
+        EMPAREJAMIENTO_TRONCO: 'EMPAREJAMIENTO AMPLIADO',
+        OPCION_EMPAREJAMIENTO: 'EMPAREJAMIENTO AMPLIADO'
+      };
+      return titulos[tipo] || '';
+    };
+
+    const instruccionTipo = (tipo: string): string => {
+      const instrucciones: Record<string, string> = {
+        SELECCION_MEJOR_RESPUESTA: 'INSTRUCCIONES: Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.',
+        VERDADERO_O_FALSO_SIMPLE: 'INSTRUCCIONES: Marque la respuesta correcta.',
+        RESPUESTA_PREMISAS_ABCD: 'INSTRUCCIONES: Las siguientes preguntas están compuestas por dos premisas.\nResponda con:\nA: Si solo la primera premisa es verdadera.\nB: Si solo la segunda premisa es verdadera.\nC: Si ambas premisas son verdaderas.\nD: Si ninguna premisa es verdadera.',
+        VERDADERO_O_FALSO_COMPLEJAS: 'INSTRUCCIONES: Seleccione la opción correcta de acuerdo con la siguiente clave:\nA: 1, 2 y 3 son verdaderas.\nB: 1 y 3 son verdaderas.\nC: 2 y 4 son verdaderas.\nD: Solo 4 es verdadera.\nE: Todas son verdaderas.',
+        CASO_CLINICO_TRONCO: 'INSTRUCCIONES: El siguiente caso clínico o problema tendrá varias preguntas.\nSeleccione la respuesta correcta en cada una.',
+        SUBITEM_CASO: 'INSTRUCCIONES: El siguiente caso clínico o problema tendrá varias preguntas.\nSeleccione la respuesta correcta en cada una.',
+        EMPAREJAMIENTO_TRONCO: 'INSTRUCCIONES: De la lista de opciones, seleccione la respuesta correcta\npara cada enunciado.',
+        OPCION_EMPAREJAMIENTO: 'INSTRUCCIONES: De la lista de opciones, seleccione la respuesta correcta\npara cada enunciado.'
+      };
+      return instrucciones[tipo] || '';
+    };
+
+    const dibujarSeccion = (tipo: string): void => {
+      const titulo = tituloTipo(tipo);
+      if (!titulo) return;
+      if (y + interlineado * 5 > alto - margen - pieReservado) nuevaPagina();
+      doc.setLineWidth(0.7);
+      doc.line(margen, y, ancho - margen, y);
+      y += interlineado;
+      escribir(titulo.toUpperCase(), margen, ancho - margen * 2, 'bold');
+      instruccionTipo(tipo).split('\n').forEach(linea => escribir(linea, margen, ancho - margen * 2, 'normal'));
+      y += interlineado * 0.35;
+      doc.setLineWidth(0.2);
+      doc.line(margen, y, ancho - margen, y);
+      y += interlineado;
+    };
+
+    const dibujarTarjeta = (lineas: string[]): void => {
+      const contenido = lineas.flatMap(linea => doc.splitTextToSize(linea, ancho - margen * 2 - 8) as string[]);
+      const altoTarjeta = Math.max(interlineado * 2, contenido.length * interlineado + 7);
+      if (y + altoTarjeta > alto - margen - pieReservado) nuevaPagina();
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.2);
+      doc.rect(margen, y - 3, ancho - margen * 2, altoTarjeta);
+      fuente('normal');
+      let tarjetaY = y + interlineado - 1;
+      contenido.forEach(linea => {
+        doc.text(linea, margen + 4, tarjetaY);
+        tarjetaY += interlineado;
+      });
+      y += altoTarjeta + interlineado;
+    };
+
+    const escribirPregunta = (numero: number, enunciado: string): void => {
+      const prefijo = `${numero}. ___`;
+      fuente('bold');
+      const anchoPrefijo = doc.getTextWidth(prefijo) + 1;
+      const lineasEnunciado = (enunciado || '').split(/\r?\n/).flatMap((linea, indice) =>
+        doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), indice === 0 ? ancho - margen * 2 - anchoPrefijo : ancho - margen * 2) as string[]
+      );
+      const altoPregunta = Math.max(1, lineasEnunciado.length) * interlineado;
+      if (y + altoPregunta > alto - margen - pieReservado) nuevaPagina();
+      doc.text(prefijo, margen, y);
+      fuente('normal');
+      doc.text(lineasEnunciado.length ? lineasEnunciado[0] : '', margen + anchoPrefijo, y);
+      y += interlineado;
+      lineasEnunciado.slice(1).forEach(linea => {
+        doc.text(linea, margen, y);
+        y += interlineado;
+      });
+    };
+
+    const piePagina = () => {
+      fuente('normal', 11);
+      doc.text('NOMBRE COMPLETO:', margen, alto - 12);
+      fuente('normal', 15);
+      doc.text('CÓDIGO:', margen, alto - 6);
+      fuente('normal', 11);
+      doc.text(`PÁG. ${pagina}`, ancho - margen, alto - 6, { align: 'right' });
+    };
+
+    const cabeceraAlto = 23;
+    const cabeceraMitad = 45;
+    doc.setLineWidth(0.25);
+    doc.rect(margen, y, ancho - margen * 2, cabeceraAlto);
+    doc.line(margen + cabeceraMitad, y, margen + cabeceraMitad, y + cabeceraAlto);
+    if (logoData) {
+      doc.addImage(logoData, 'PNG', margen + 7, y + 5, 31, 12);
+    } else {
+      fuente('bold');
+      doc.text('UNITEPC', margen + cabeceraMitad / 2, y + 11, { align: 'center' });
+    }
+    fuente('bold');
+    doc.text('UNIVERSIDAD TECNICA PRIVADA COSMOS', margen + cabeceraMitad + (ancho - margen * 2 - cabeceraMitad) / 2, y + 6, { align: 'center' });
+    doc.text('GESTION 2-2026', margen + cabeceraMitad + (ancho - margen * 2 - cabeceraMitad) / 2, y + 11, { align: 'center' });
+    doc.line(margen + cabeceraMitad + 8, y + 14, ancho - margen - 8, y + 14);
+    doc.text(`EVALUACION TEORICA ${this.parcialActivo().toUpperCase()}`, margen + cabeceraMitad + (ancho - margen * 2 - cabeceraMitad) / 2, y + 20, { align: 'center' });
+    y += cabeceraAlto + interlineado;
+
+    const fichaVaciaAlto = 34;
+    doc.setLineWidth(0.25);
+    doc.rect(margen, y, ancho - margen * 2, fichaVaciaAlto);
+    doc.line(ancho / 2, y, ancho / 2, y + fichaVaciaAlto);
+    for (let fila = 1; fila < 5; fila++) {
+      doc.line(margen, y + fila * (fichaVaciaAlto / 5), ancho - margen, y + fila * (fichaVaciaAlto / 5));
+    }
+    fuente('normal');
+    const col2 = ancho / 2 + 4;
+    const filasFicha = [
+      ['NOMBRE:', 'CARRERA:'],
+      ['ASIGNATURA:', 'GRUPO:'],
+      ['DOCENTE:', 'EXAMEN:'],
+      ['FECHA:', 'HORA:'],
+      ['FIRMA DEL ESTUDIANTE:', 'CODIGO:']
+    ];
+    filasFicha.forEach((fila, indiceFila) => {
+      const filaY = y + (indiceFila + 1) * (fichaVaciaAlto / 5) - 2;
+      doc.text(fila[0], margen + 3, filaY);
+      doc.text(fila[1], col2, filaY);
+    });
+    y += fichaVaciaAlto + interlineado;
+
+    fuente('bold');
+    doc.text(`CUESTIONARIO DE PREGUNTAS (${preguntas.length})`, ancho / 2, y, { align: 'center' });
+    y += interlineado;
+    doc.setLineWidth(0.35);
+    doc.line(margen, y, ancho - margen, y);
+    y += interlineado;
+
+    let tipoAnterior = '';
+    preguntas.forEach((pregunta, indice) => {
+      const tipo = tituloTipo(pregunta.tipo);
+      if (tipo && tipo !== tipoAnterior) {
+        dibujarSeccion(pregunta.tipo);
+        if (pregunta.tipo === 'SUBITEM_CASO' || pregunta.tipo === 'CASO_CLINICO_TRONCO') {
+          dibujarTarjeta(['CASO CLINICO O PROBLEMA:  RESPONDA LAS PREGUNTAS DEL GRUPO.']);
+        } else if (pregunta.tipo === 'OPCION_EMPAREJAMIENTO' || pregunta.tipo === 'EMPAREJAMIENTO_TRONCO') {
+          dibujarTarjeta(['RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:', 'A) ...', 'B) ...', 'C) ...', 'D) ...', 'E) ...']);
+        }
+        tipoAnterior = tipo;
+      }
+
+      escribirPregunta(indice + 1, pregunta.enunciado || '');
+
+      let opciones: Array<[string, string]> = pregunta.tipo === 'VERDADERO_O_FALSO_SIMPLE' ? [] : [
+        ['A', pregunta.opcion_a], ['B', pregunta.opcion_b], ['C', pregunta.opcion_c],
+        ['D', pregunta.opcion_d], ['E', pregunta.opcion_e]
+      ].filter(([, texto]) => !!texto?.trim()) as Array<[string, string]>;
+      opciones.forEach(([letra, texto]) => escribir(`${letra}) ${texto}`, margen + indentacion, ancho - margen * 2 - indentacion, 'normal'));
+      y += separacionPregunta;
+    });
+
+    for (let numeroPagina = 1; numeroPagina <= pagina; numeroPagina++) {
+      doc.setPage(numeroPagina);
+      const paginaActual = pagina;
+      pagina = numeroPagina;
+      piePagina();
+      pagina = paginaActual;
+    }
+
+    return doc.output('blob');
   }
 
   public onScrollDocumentoPdf(event: Event): void {
@@ -3381,6 +3482,15 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
   public cerrarModalPrevisualizacionPdf(): void {
     this.dialogPrevisualizacionPdf.set(false);
+    this._liberarPdfPreview();
+  }
+
+  private _liberarPdfPreview(): void {
+    if (this.pdfPreviewObjectUrl) {
+      URL.revokeObjectURL(this.pdfPreviewObjectUrl);
+      this.pdfPreviewObjectUrl = null;
+    }
+    this.pdfPreviewUrl.set(null);
   }
 
   public getTipoBadgeClass(tipo: string): string {
@@ -3447,60 +3557,49 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     }
   }
 
-  // Flujo 2FA Docente
-  public abrirModal2FA(): void {
-    this.dialog2FA.set(true);
-    this.codigo2FAIngresado = '';
-  }
-
-  public cerrarModal2FA(): void {
-    this.dialog2FA.set(false);
-  }
-
-  public confirmarCodigo2FA(): void {
-    if (!this.codigo2FAIngresado || this.codigo2FAIngresado.trim().length < 6) {
-      this._mostrarToast('Por favor ingresa un código de verificación de 6 dígitos.', 'error');
-      return;
-    }
-
-    this.dialog2FA.set(false);
-    this.pdfPrevisualizadoYConforme.set(true);
-    this.dialogPrevisualizacionPdf.set(false);
-
-    // Sincronizar automáticamente el banco y el estado VALIDADO con la Base de Datos de Evaluaciones
-    const asig = this.asignaturaSeleccionada();
-    const codigo = asig?.courseCode || 'CPEC18';
-    const materiaNombre = asig?.courseName || 'AUDITORÍA TRIBUTARIA';
-    const sedeNombre = this.sedeSeleccionada()?.name || 'Cochabamba';
-    const carreraNombre = this.carreraSeleccionada()?.careerName || 'Complementaria Contaduría Pública';
-    const archivo = this.nombreArchivoCargado() || `BANCO_${codigo}_OFICIAL.xlsx`;
-    const hash = 'SHA256-2FA-' + codigo + '-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
-    const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
-    const totalValidas = preguntasValidas.length || 60;
-
-    // Guardar el banco atómico completo en la base de datos
-    this._db.guardarBancoPreguntas({
-      id: `BANCO-${codigo}-${this.parcialActivo()}-${this.grupoSeleccionado()}`,
-      sede: sedeNombre,
-      carrera: carreraNombre,
-      materiaCodigo: codigo,
-      materiaNombre: materiaNombre,
-      grupo: this.grupoSeleccionado(),
-      parcial: this.parcialActivo(),
-      totalPreguntas: totalValidas,
-      preguntas: preguntasValidas,
-      fechaValidacion: new Date().toLocaleString(),
-      estado: 'VALIDADO'
-    });
-
-    this._db.actualizarEstadoPorBancoValidado(codigo, this.parcialActivo(), archivo, hash, totalValidas);
-
-    this._mostrarToast(`✅ ¡Banco de [${codigo}] guardado en Base de Datos y Certificado como VALIDADO!`);
+  private _mapParcialBackend(parcial: string): string {
+    if (parcial === 'Examen Final') return 'Final';
+    return parcial;
   }
 
   public aprobarDiagramacionPdf(): void {
-    // Abre el modal 2FA para certificar con doble factor antes de validar
-    this.abrirModal2FA();
+    const rol = this.rolExamenActivo();
+    const file = this.archivoExcelSeleccionado();
+    if (!rol) {
+      this._mostrarToast('No existe un rol oficial para la selección actual.', 'error');
+      return;
+    }
+    if (!file) {
+      this._mostrarToast('Selecciona el archivo Excel que se registrará en el servidor.', 'error');
+      return;
+    }
+    if (!this.esBancoTotalmenteValido()) {
+      this._mostrarToast('El banco todavía no cumple las 60 preguntas y las cuotas 15/30/15.', 'error');
+      return;
+    }
+
+    this.cargandoBanco.set(true);
+    this._bancoService.cargarPorRol(rol.id, file, rol.docenteNombre).subscribe({
+      next: resultado => {
+        this.cargandoBanco.set(false);
+        if (!resultado.exito) {
+          this._mostrarToast(resultado.erroresValidacion?.join(' · ') || resultado.mensaje, 'error');
+          return;
+        }
+
+        this.pdfPrevisualizadoYConforme.set(true);
+        this.dialogPrevisualizacionPdf.set(false);
+        const sede = this.sedeSeleccionada();
+        const carrera = this.carreraSeleccionada();
+        if (sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
+        this._mostrarToast(`Banco ${resultado.bancoPreguntasId} validado y registrado en PostgreSQL.`);
+      },
+      error: err => {
+        this.cargandoBanco.set(false);
+        const msg = err?.error?.error || err?.error?.message || err?.message || 'No se pudo registrar el banco.';
+        this._mostrarToast(msg, 'error');
+      }
+    });
   }
 
   // Previsualización Paquete Encriptado (.pkg)
@@ -3563,7 +3662,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     this.dialogEjemplos.set(false);
   }
 
-  private _generarPreguntasMockValidas(): PreguntaValidada[] {
+  private _generarPreguntasEjemplo(): PreguntaValidada[] {
     const list: PreguntaValidada[] = [];
 
     // =========================================================================

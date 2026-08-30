@@ -29,7 +29,7 @@ export interface RolExamenPersistedItem {
   docenteNombre: string;
   docenteCI: string;
   tipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia';
-  estado: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'REVISADO' | 'SUBIDO' | 'SUSPENDIDO' | 'PENDIENTE_FECHA';
+  estado: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'REVISADO' | 'SUBIDO' | 'RECIBIDO' | 'SUSPENDIDO' | 'PENDIENTE_FECHA';
   conCartilla: boolean;
   modalidad?: ModalidadExamen;
   semana: number;
@@ -123,37 +123,11 @@ export class EvaluacionesDbService {
   }
 
   /**
-   * Genera el registro inicial oficial de la materia piloto CPEC18 Auditoría Tributaria
+   * Registro inicial de materia piloto: desactivado para evitar datos ficticios.
+   * Los roles deben provenir del backend/gateway institucional.
    */
   public getPilotExamSeed(): RolExamenPersistedItem[] {
-    return [
-      {
-        id: 'ROL-CPEC18-TA01-1P',
-        seaGroupId: 'grp-cpec18-ta01',
-        seaSyllabusCourseId: 'syl-cpec18',
-        sedeCode: 'CBA',
-        careerCode: 'CONT-COMPL',
-        codigo: 'CPEC18',
-        materia: 'AUDITORÍA TRIBUTARIA',
-        semestre: 3,
-        grupo: 'TA-01',
-        tipoClase: 'TA',
-        docenteNombre: 'MAURICIO QUIROZ LAFUENTE',
-        docenteCI: '4529102',
-        tipo: '1er Parcial',
-        estado: 'PROGRAMADO',
-        conCartilla: true,
-        modalidad: 'PRESENCIAL_CARTILLA',
-        semana: 1,
-        dia: 'Sábado',
-        fecha: '2026-08-22',
-        fechaDisplay: '22/08/2026',
-        horario: '08:15 - 09:45',
-        aula: 'Aula 204',
-        campus: 'Campus Colonial',
-        estudiantesInscritosCount: 3
-      }
-    ];
+    return [];
   }
 
   /**

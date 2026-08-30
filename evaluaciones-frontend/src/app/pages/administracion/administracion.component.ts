@@ -455,6 +455,50 @@ export interface ParcialConfig {
                 </button>
               </div>
 
+              <!-- Parámetros vigentes para la generación oficial -->
+              <div class="bg-card border border-border rounded-xl p-4 shadow-xs space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-palette text-purple-700"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Motor de generación · Parámetros de diagramación</h4>
+                      <p class="text-[10px] text-muted-foreground">Valores por defecto aplicados por el worker a los nuevos exámenes.</p>
+                    </div>
+                  </div>
+                  <span class="bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2.5 py-1 text-[10px] font-mono font-black">30 Preguntas (7 Fáciles, 16 Medias, 7 Difíciles)</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-muted-foreground mb-1">Formato hoja</label>
+                    <select [(ngModel)]="typstFormatoHoja" class="w-full bg-muted border border-border rounded-lg px-2.5 py-2 text-xs font-bold">
+                      <option>Oficio (Folio UNITEPC)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-muted-foreground mb-1">Tipo de letra (fuente)</label>
+                    <select [(ngModel)]="typstFuente" class="w-full bg-muted border border-border rounded-lg px-2.5 py-2 text-xs font-bold">
+                      <option>Times New Roman</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-muted-foreground mb-1">Tamaño de letra</label>
+                    <select [(ngModel)]="typstTamanoFuente" class="w-full bg-muted border border-border rounded-lg px-2.5 py-2 text-xs font-bold">
+                      <option [ngValue]="11">11.0 pt (Grande)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-muted-foreground mb-1">Espaciado (leading)</label>
+                    <select [(ngModel)]="typstLeading" class="w-full bg-muted border border-border rounded-lg px-2.5 py-2 text-xs font-bold">
+                      <option>0.8em (línea) · 1.2em (pregunta)</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <i class="pi pi-info-circle"></i>
+                  <span>La hoja de respuestas institucional se entrega por separado; no se genera cartilla dentro del cuadernillo.</span>
+                </div>
+              </div>
+
               <!-- Selector de Nivel de Configuración -->
               <div class="bg-muted/40 border border-border rounded-xl p-5 space-y-3 shadow-2xs">
                 <div class="flex items-center gap-1.5 text-xs font-black text-foreground uppercase tracking-wider">
@@ -700,7 +744,7 @@ export interface ParcialConfig {
                       <label class="block text-xs font-black text-foreground">
                         Horas antes para mostrar opción Generar Examen
                       </label>
-                      <p class="text-[11px] text-muted-foreground">Ventana de tiempo previa para compilar los cuadernillos con Typst.</p>
+                      <p class="text-[11px] text-muted-foreground">Ventana de tiempo previa para generar los cuadernillos oficiales.</p>
                       <div class="flex items-center gap-2 pt-1 max-w-xs">
                         <input type="number" [(ngModel)]="tiempoHorasAntesGeneracion" class="w-full bg-card border border-border rounded-lg p-2 text-xs font-mono font-bold text-foreground">
                         <span class="text-xs font-bold text-muted-foreground font-mono">horas</span>
@@ -776,13 +820,13 @@ export interface ParcialConfig {
                     </div>
                   </div>
 
-                  <!-- Card Motor Typst -->
+                  <!-- Card Motor de generación -->
                   <div class="p-4 bg-card border border-border rounded-2xl flex items-start gap-3 shadow-2xs hover:border-purple-500/40 transition-colors">
                     <div class="text-purple-600 text-lg mt-0.5 shrink-0">
                       <i class="pi pi-bolt"></i>
                     </div>
                     <div class="space-y-1">
-                      <h5 class="text-xs font-black text-foreground">Compilación Anticipada Typst:</h5>
+                      <h5 class="text-xs font-black text-foreground">Generación anticipada:</h5>
                       <p class="text-xs text-muted-foreground leading-relaxed">
                         Los cuadernillos se compilan {{ tiempoHorasAntesGeneracion }}h antes para permitir la revisión de variantes e impresión controlada en sobre cerrado.
                       </p>
@@ -859,7 +903,7 @@ export interface ParcialConfig {
                     type="email" 
                     [(ngModel)]="nuevoCorreoInput" 
                     (keydown.enter)="agregarCorreoCampusForm()"
-                    placeholder="ej: evaluaciones.cbba@unitepc.edu.bo o arielcamara@unitepc.edu.bo"
+                    placeholder="ej: evaluaciones.cbba@unitepc.edu.bo"
                     class="w-full bg-muted border border-border rounded-lg p-2 text-xs font-mono text-foreground outline-none focus:border-purple-600">
                   
                   <button 
@@ -1001,7 +1045,7 @@ export class AdministracionEvaluacionesComponent {
   // TAB 1: Campus por Sede
   public filtroSedeCampus = 'Todos';
   public listaCampus: CampusItem[] = [
-    { id: 1, nombre: 'COLONIAL', sede: 'Cochabamba', direccion: 'Av. Heroínas esq. Ayacucho', correos: ['evaluaciones.cochabamba@unitepc.edu.bo', 'arielcamara@unitepc.edu.bo'], carrerasCount: 15, activo: true },
+    { id: 1, nombre: 'COLONIAL', sede: 'Cochabamba', direccion: 'Av. Heroínas esq. Ayacucho', correos: ['evaluaciones.cochabamba@unitepc.edu.bo'], carrerasCount: 15, activo: true },
     { id: 2, nombre: 'JUAN PABLO II', sede: 'Cochabamba', direccion: 'Campus Juan Pablo II', correos: ['evaluaciones.juanpablo@unitepc.edu.bo'], carrerasCount: 8, activo: true },
     { id: 3, nombre: 'FLORIDA NORTE', sede: 'Cochabamba', direccion: 'Zona Norte', correos: ['evaluaciones.florida@unitepc.edu.bo'], carrerasCount: 3, activo: true },
     { id: 4, nombre: 'Campus Cobija', sede: 'Cobija', direccion: 'Campus Principal en Pando', correos: ['evaluaciones.cobija@unitepc.edu.bo'], carrerasCount: 5, activo: true },
@@ -1009,7 +1053,7 @@ export class AdministracionEvaluacionesComponent {
     { id: 6, nombre: 'Campus Miragavina', sede: 'Cochabamba', direccion: 'Campus Principal en Cochabamba', correos: ['evaluaciones.miragavina@unitepc.edu.bo'], carrerasCount: 6, activo: true },
     { id: 7, nombre: 'Campus La Paz', sede: 'La Paz', direccion: 'Campus Principal en La Paz', correos: ['evaluaciones.lapaz@unitepc.edu.bo'], carrerasCount: 14, activo: true },
     { id: 8, nombre: 'Campus Puerto Quijarro', sede: 'Puerto Quijarro', direccion: 'Campus Principal en Santa Cruz', correos: ['evaluaciones.puertoquijarro@unitepc.edu.bo'], carrerasCount: 16, activo: true },
-    { id: 9, nombre: 'Campus Santa Cruz', sede: 'Santa Cruz', direccion: 'Campus Principal en Santa Cruz', correos: ['evaluaciones.santacruz@unitepc.edu.bo', 'arielcamara@unitepc.edu.bo'], carrerasCount: 10, activo: true },
+    { id: 9, nombre: 'Campus Santa Cruz', sede: 'Santa Cruz', direccion: 'Campus Principal en Santa Cruz', correos: ['evaluaciones.santacruz@unitepc.edu.bo'], carrerasCount: 10, activo: true },
     { id: 10, nombre: 'Campus Guayaramerin', sede: 'Guayaramerin', direccion: 'Campus Principal en Beni', correos: ['evaluaciones.guayaramerin@unitepc.edu.bo'], carrerasCount: 5, activo: true }
   ];
 
@@ -1112,6 +1156,10 @@ export class AdministracionEvaluacionesComponent {
   public nivelConfig = signal<'nacional' | 'sede' | 'carrera'>('nacional');
   public configSede = 'Cochabamba';
   public configCarrera = 'Ingeniería de Sistemas';
+  public typstFormatoHoja = 'Oficio (Folio UNITEPC)';
+  public typstFuente = 'Times New Roman';
+  public typstTamanoFuente = 11;
+  public typstLeading = '0.8em (línea) · 1.2em (pregunta)';
 
   public parcialesConfig = signal<ParcialConfig[]>([
     { nombre: '1º Parcial', totalPreguntas: 30, distribucion: { facil: 7, medio: 16, dificil: 7 } },

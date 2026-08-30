@@ -292,7 +292,7 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
           <div class="p-6 border-t border-border grid grid-cols-1 sm:grid-cols-3 gap-6 text-center text-xs">
             <div class="space-y-2">
               <div class="h-14 border-b border-foreground/30 flex items-end justify-center pb-1">
-                <span class="font-bold text-foreground">Ing. Ariel Denys Cámara Arze</span>
+                <span class="font-bold text-foreground">Responsable no identificado</span>
               </div>
               <p class="text-[11px] text-muted-foreground font-bold uppercase">Jefatura de Evaluaciones SEA</p>
             </div>
@@ -327,7 +327,7 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
 
             <div class="flex items-center gap-2">
               <span class="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-lg border border-emerald-200">
-                100% Bancos Validados con Typst
+                100% Bancos Validados para generación
               </span>
             </div>
           </div>
@@ -345,7 +345,7 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
                   <th class="p-3 text-center">Medio (50%)</th>
                   <th class="p-3 text-center">Difícil (20%)</th>
                   <th class="p-3 text-center">% Cobertura</th>
-                  <th class="p-3 text-center">Compilación Typst</th>
+                  <th class="p-3 text-center">Generación del examen</th>
                   <th class="p-3 text-center">Estado</th>
                 </tr>
               </thead>
@@ -479,7 +479,7 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
               <h3 class="text-sm font-black text-foreground uppercase tracking-wide">
                 Bitácora Institucional de Auditoría y Trazabilidad Digital
               </h3>
-              <p class="text-xs text-muted-foreground">Registro inmutable de transiciones, compilaciones Typst, restablecimientos y restauraciones.</p>
+              <p class="text-xs text-muted-foreground">Registro inmutable de transiciones, generaciones, restablecimientos y restauraciones.</p>
             </div>
             <span class="bg-purple-100 text-purple-800 text-xs font-black px-3 py-1 rounded-lg border border-purple-200">
               Auditoría Criptográfica Activa

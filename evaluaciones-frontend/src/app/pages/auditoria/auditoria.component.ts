@@ -83,7 +83,7 @@ import {
             <span class="text-[10px] font-mono font-bold uppercase text-muted-foreground tracking-wider block mb-1">Operaciones Críticas</span>
             <div class="text-2xl font-black text-rose-600 font-mono">{{ operacionesCriticas() }}</div>
             <span class="text-[10px] text-rose-600 font-bold mt-1 inline-flex items-center gap-1">
-              <i class="pi pi-bolt text-[9px]"></i> Generaciones Typst
+              <i class="pi pi-bolt text-[9px]"></i> Generaciones de exámenes
             </span>
           </div>
           <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl">
@@ -138,7 +138,7 @@ import {
               <option value="TODOS">Todos los Módulos</option>
               <option value="Autenticación">Autenticación</option>
               <option value="Evaluaciones">Evaluaciones</option>
-              <option value="Generación Typst">Generación Typst</option>
+              <option value="Generación Typst">Generación de exámenes</option>
               <option value="Banco de Preguntas">Banco de Preguntas</option>
               <option value="Administración">Administración</option>
               <option value="Seguridad">Seguridad</option>

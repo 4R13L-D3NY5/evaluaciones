@@ -3,8 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
-import { EvaluacionesDbService, RolExamenPersistedItem } from '../../core/services/evaluaciones-db.service';
+import { RolExamenPersistedItem } from '../../core/services/evaluaciones-db.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
+import {
+  RolExamenCreateRequest,
+  RolExamenResponse,
+  RolExamenService
+} from '../../core/services/rol-examen.service';
+import { catchError, forkJoin, map, of } from 'rxjs';
 
 export type RolExamenItem = RolExamenPersistedItem;
 
@@ -134,8 +140,7 @@ export type RolExamenItem = RolExamenPersistedItem;
               (ngModelChange)="filtroModalidad.set($event)"
               class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
               <option value="Todos">Todas las Modalidades</option>
-              <option value="PRESENCIAL_CARTILLA">Con Cartilla OMR</option>
-              <option value="PRESENCIAL_SIN_CARTILLA">Sin Cartilla (Físico)</option>
+              <option value="PRESENCIAL_SIN_CARTILLA">Presencial · Hoja externa</option>
               <option value="VIRTUAL">Virtual Online</option>
             </select>
           </div>
@@ -304,7 +309,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                       </span>
                     </td>
 
-                    <!-- Modalidad (Cartilla OMR, Físico o Virtual) -->
+                    <!-- Modalidad -->
                     <td class="p-3.5 text-center">
                       @if (row.modalidad === 'VIRTUAL') {
                         <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
@@ -312,11 +317,11 @@ export type RolExamenItem = RolExamenPersistedItem;
                         </span>
                       } @else if (row.modalidad === 'PRESENCIAL_SIN_CARTILLA' || !row.conCartilla) {
                         <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-file-edit text-[9px]"></i> Físico / Sin Cartilla
+                          <i class="pi pi-file-edit text-[9px]"></i> Presencial · Hoja externa
                         </span>
                       } @else {
                         <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-check-circle text-[9px]"></i> Con Cartilla OMR
+                          <i class="pi pi-file-edit text-[9px]"></i> Presencial · Hoja externa
                         </span>
                       }
                     </td>
@@ -362,15 +367,17 @@ export type RolExamenItem = RolExamenPersistedItem;
                       <div class="inline-flex items-center gap-1.5">
                         <button 
                           (click)="abrirModalEditar(row)"
+                          [disabled]="row.estado !== 'PROGRAMADO'"
                           title="Editar parámetros del examen"
-                          class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors cursor-pointer">
+                          class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                           <i class="pi pi-pencil text-xs"></i>
                         </button>
                         
                         <button 
                           (click)="eliminarExamen(row)"
+                          [disabled]="row.estado !== 'PROGRAMADO'"
                           title="Eliminar del Rol"
-                          class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer">
+                          class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                           <i class="pi pi-trash text-xs"></i>
                         </button>
                       </div>
@@ -437,10 +444,21 @@ export type RolExamenItem = RolExamenPersistedItem;
               }
             </label>
 
+            @if (excelErroresImportacion().length > 0) {
+              <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-800">
+                <div class="font-black mb-1">Registros rechazados por no coincidir con datos oficiales:</div>
+                <ul class="list-disc pl-4 space-y-0.5 max-h-32 overflow-y-auto">
+                  @for (error of excelErroresImportacion(); track error) {
+                    <li>{{ error }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
             <div class="flex justify-end gap-2 pt-2 border-t border-border">
               <button (click)="cerrarModalSubirExcel()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
               <button 
-                [disabled]="excelItemsImportados().length === 0"
+                [disabled]="excelItemsImportados().length === 0 || cargando()"
                 (click)="procesarImportacionExcel()"
                 class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
                 Importar al Rol
@@ -565,12 +583,11 @@ export type RolExamenItem = RolExamenPersistedItem;
                     class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
                 </div>
 
-                <!-- Modalidad de Evaluación (3 Opciones) -->
+                <!-- Modalidad de Evaluación -->
                 <div class="col-span-2">
                   <label class="block font-bold text-muted-foreground mb-1">Modalidad de Examen</label>
                   <select [(ngModel)]="formModalidad" class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary cursor-pointer">
-                    <option value="PRESENCIAL_CARTILLA">🟦 Presencial con Cartilla (Digital Typst + OMR Óptico)</option>
-                    <option value="PRESENCIAL_SIN_CARTILLA">🟩 Presencial sin Cartilla (Físico / Cuadernillo de Desarrollo)</option>
+                    <option value="PRESENCIAL_SIN_CARTILLA">🟩 Presencial (cuadernillo + hoja externa)</option>
                     <option value="VIRTUAL">🟪 Virtual Online (Resolución Web Sincrónica)</option>
                   </select>
                 </div>
@@ -581,8 +598,8 @@ export type RolExamenItem = RolExamenPersistedItem;
             <!-- Botones de Acción -->
             <div class="flex justify-end gap-2 pt-2 border-t border-border">
               <button (click)="cerrarModalFormulario()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
-              <button (click)="guardarExamenModal()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black cursor-pointer shadow-xs">
-                Guardar Examen en BD
+              <button (click)="guardarExamenModal()" [disabled]="cargando()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                {{ cargando() ? 'Guardando...' : 'Guardar Examen en BD' }}
               </button>
             </div>
 
@@ -603,7 +620,7 @@ export type RolExamenItem = RolExamenPersistedItem;
 })
 export class RolExamenesComponent implements OnInit {
   private readonly _gateway = inject(UnitepcGatewayService);
-  private readonly _db = inject(EvaluacionesDbService);
+  private readonly _rolService = inject(RolExamenService);
 
   // Estados de Datos Reales de SEA
   public sedes = signal<BranchOffice[]>([]);
@@ -633,6 +650,7 @@ export class RolExamenesComponent implements OnInit {
   public dialogSubirExcel = signal<boolean>(false);
   public excelCargadoNombre = signal<string | null>(null);
   public excelItemsImportados = signal<RolExamenItem[]>([]);
+  public excelErroresImportacion = signal<string[]>([]);
 
   public dialogFormulario = signal<boolean>(false);
   public itemEditando = signal<RolExamenItem | null>(null);
@@ -643,7 +661,7 @@ export class RolExamenesComponent implements OnInit {
 
   public formTipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' = '1er Parcial';
   public formFecha = '';
-  public formModalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'PRESENCIAL_CARTILLA';
+  public formModalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'PRESENCIAL_SIN_CARTILLA';
 
   // Lista de Exámenes del Rol (Cargada desde la BD persistente)
   public examenes = signal<RolExamenItem[]>([]);
@@ -789,11 +807,30 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public vaciarRol(): void {
-    const sede = this.sedeSeleccionada();
-    const carrera = this.carreraSeleccionada();
-    this._db.clearRolesExamenes(sede?.code, carrera?.careerCode);
-    this.examenes.set([]);
-    this._mostrarToast('El rol de exámenes ha sido vaciado de la BD.');
+    const programados = this.examenes().filter(item => item.estado === 'PROGRAMADO');
+    const protegidos = this.examenes().length - programados.length;
+    if (programados.length === 0) {
+      this._mostrarToast('No existen exámenes PROGRAMADOS que puedan eliminarse.');
+      return;
+    }
+    if (!window.confirm(`Se eliminarán ${programados.length} exámenes PROGRAMADOS del servidor. ¿Deseas continuar?`)) {
+      return;
+    }
+
+    this.cargando.set(true);
+    forkJoin(programados.map(item => this._rolService.eliminar(item.id))).subscribe({
+      next: () => {
+        this.cargando.set(false);
+        this._cargarRolesOficiales();
+        const detalle = protegidos > 0 ? ` ${protegidos} exámenes avanzados se conservaron.` : '';
+        this._mostrarToast(`Se eliminaron ${programados.length} exámenes del servidor.${detalle}`);
+      },
+      error: err => {
+        this.cargando.set(false);
+        this._mostrarToast(this._mensajeError(err, 'No se pudo vaciar el rol oficial.'));
+        this._cargarRolesOficiales();
+      }
+    });
   }
 
   private _cargarSedes(): void {
@@ -840,9 +877,7 @@ export class RolExamenesComponent implements OnInit {
 
     this.cargando.set(true);
 
-    // Cargar exámenes previamente persistidos en BD para esta sede y carrera
-    const persistidos = this._db.getRolesExamenes(sede.code, carrera.careerCode);
-    this.examenes.set(persistidos);
+    this._cargarRolesOficiales();
 
     this._gateway.getCourses(sede.code, carrera.careerCode).subscribe({
       next: materias => {
@@ -867,6 +902,20 @@ export class RolExamenesComponent implements OnInit {
         });
       },
       error: () => this.cargando.set(false)
+    });
+  }
+
+  private _cargarRolesOficiales(): void {
+    const sede = this.sedeSeleccionada();
+    const carrera = this.carreraSeleccionada();
+    if (!sede || !carrera) return;
+
+    this._rolService.listar(sede.code, carrera.careerCode).subscribe({
+      next: roles => this.examenes.set(roles.map(rol => this._mapearRolResponse(rol))),
+      error: err => {
+        this.examenes.set([]);
+        this._mostrarToast(this._mensajeError(err, 'No se pudo cargar el rol de exámenes desde el servidor.'));
+      }
     });
   }
 
@@ -901,6 +950,7 @@ export class RolExamenesComponent implements OnInit {
   public abrirModalSubirExcel(): void {
     this.excelCargadoNombre.set(null);
     this.excelItemsImportados.set([]);
+    this.excelErroresImportacion.set([]);
     this.dialogSubirExcel.set(true);
   }
 
@@ -925,8 +975,14 @@ export class RolExamenesComponent implements OnInit {
         const worksheet = workbook.Sheets[firstSheetName];
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-        const items: RolExamenItem[] = jsonData.map((row, idx) => {
-          const rawFecha = row['Fecha'] || row['FECHA'] || row['fecha'] || '';
+        const items: RolExamenItem[] = [];
+        const errores: string[] = [];
+
+        jsonData.forEach((row, idx) => {
+          const fila = idx + 2;
+          const codigo = String(row['Codigo'] || row['CÓDIGO'] || row['codigo'] || '').trim();
+          const grupoCodigo = String(row['Grupo'] || row['GRUPO'] || '').trim();
+          const rawFecha = String(row['Fecha'] || row['FECHA'] || row['fecha'] || '').trim();
           let fechaIso = '';
           let fechaDisp = 'Por Programar';
           if (rawFecha) {
@@ -943,34 +999,50 @@ export class RolExamenesComponent implements OnInit {
             }
           }
 
-          return {
-            id: `EXCEL-${Date.now()}-${idx}`,
-            seaGroupId: `EXCEL-${idx}`,
-            seaSyllabusCourseId: `EXCEL-${idx}`,
-            sedeCode: sede?.code || 'CBA',
-            careerCode: carrera?.careerCode || 'CARSIS',
-            codigo: row['Codigo'] || row['CÓDIGO'] || row['codigo'] || `MAT-${idx + 1}`,
-            materia: row['Materia'] || row['MATERIA'] || row['materia'] || row['Nombre'] || 'Asignatura Importada',
-            semestre: Number(row['Semestre'] || row['SEMESTRE'] || 1),
-            grupo: row['Grupo'] || row['GRUPO'] || 'TA-01',
-            tipoClase: 'TA',
-            docenteNombre: row['Docente'] || row['DOCENTE'] || 'Docente Titular',
-            docenteCI: row['CI'] || '',
-            tipo: row['Tipo'] || row['TIPO'] || '1er Parcial',
-            estado: fechaIso ? 'PROGRAMADO' : 'PENDIENTE_FECHA',
-            conCartilla: true,
-            semana: Number(row['Semana'] || 8),
-            dia: row['Dia'] || 'Lunes',
+          const materia = this.materias().find(item => this._normalizar(item.courseCode) === this._normalizar(codigo));
+          const grupo = materia
+            ? this.grupos().find(item => item.syllabusCourseId === materia.syllabusCourseId && this._normalizar(item.code) === this._normalizar(grupoCodigo))
+            : undefined;
+          const tipo = this._normalizarTipoParcial(String(row['Tipo'] || row['TIPO'] || '1er Parcial'));
+
+          if (!materia) errores.push(`Fila ${fila}: la materia '${codigo || '(vacía)'}' no existe en la carrera seleccionada.`);
+          if (materia && !grupo) errores.push(`Fila ${fila}: el grupo '${grupoCodigo || '(vacío)'}' no existe en SEA para ${materia.courseCode}.`);
+          if (!fechaIso) errores.push(`Fila ${fila}: la fecha es obligatoria y debe usar DD/MM/AAAA o AAAA-MM-DD.`);
+          if (!tipo) errores.push(`Fila ${fila}: el tipo de evaluación no es válido.`);
+          if (!materia || !grupo || !fechaIso || !tipo) return;
+
+          const schedule = grupo.schedules?.[0];
+          const modalidad = this._normalizarModalidad(String(row['Modalidad'] || row['MODALIDAD'] || 'PRESENCIAL_SIN_CARTILLA'));
+          items.push({
+            id: this._crearRolId(grupo.groupId, tipo, fechaIso),
+            seaGroupId: grupo.groupId,
+            seaSyllabusCourseId: materia.syllabusCourseId,
+            sedeCode: sede?.code,
+            careerCode: carrera?.careerCode,
+            codigo: materia.courseCode,
+            materia: materia.courseName,
+            semestre: materia.semester || 1,
+            grupo: grupo.code,
+            tipoClase: grupo.classType || 'TA',
+            docenteNombre: grupo.teacherName || String(row['Docente'] || row['DOCENTE'] || this._nombreDocenteOficial(grupo)),
+            docenteCI: grupo.teacherIdentityNumber || String(row['CI'] || ''),
+            tipo,
+            estado: 'PROGRAMADO',
+            modalidad,
+            conCartilla: modalidad === 'PRESENCIAL_CARTILLA',
+            semana: Number(row['Semana'] || 1),
+            dia: schedule ? this._obtenerNombreDia(schedule.day) : String(row['Dia'] || 'Lunes'),
             fecha: fechaIso,
             fechaDisplay: fechaDisp,
-            horario: row['Horario'] || '08:15 - 09:45',
-            aula: row['Aula'] || 'Aula 101',
-            campus: 'Campus Central'
-          };
+            horario: schedule ? `${schedule.startTime} - ${schedule.endTime}` : String(row['Horario'] || '08:15 - 09:45'),
+            aula: schedule?.classroom || String(row['Aula'] || 'Por definir'),
+            campus: schedule?.campus || String(row['Campus'] || 'Por definir')
+          });
         });
 
         this.excelItemsImportados.set(items);
-        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} exámenes listos.`);
+        this.excelErroresImportacion.set(errores);
+        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} registros oficiales listos y ${errores.length} observaciones.`);
       } catch (err) {
         console.error('Error al procesar archivo Excel:', err);
         this._mostrarToast('Error al leer el archivo Excel.');
@@ -981,14 +1053,24 @@ export class RolExamenesComponent implements OnInit {
 
   public procesarImportacionExcel(): void {
     const importados = this.excelItemsImportados();
-    if (importados.length > 0) {
-      for (const item of importados) {
-        this._db.upsertRolExamen(item);
+    if (importados.length === 0) return;
+
+    this.cargando.set(true);
+    forkJoin(importados.map(item => this._rolService.crear(this._toRequest(item)).pipe(
+      map(rol => ({ rol, error: null as unknown })),
+      catchError(error => of({ rol: null as RolExamenResponse | null, error }))
+    ))).subscribe(resultados => {
+      const creados = resultados.filter(resultado => resultado.rol).map(resultado => resultado.rol!);
+      const fallidos = resultados.filter(resultado => resultado.error);
+      this.cargando.set(false);
+      this.cerrarModalSubirExcel();
+      this._cargarRolesOficiales();
+      if (fallidos.length > 0) {
+        this._mostrarToast(`${creados.length} exámenes registrados y ${fallidos.length} rechazados por el servidor.`);
+      } else {
+        this._mostrarToast(`${creados.length} exámenes registrados correctamente en PostgreSQL.`);
       }
-      this.examenes.update(current => [...importados, ...current]);
-      this._mostrarToast(`${importados.length} exámenes guardados en BD exitosamente.`);
-    }
-    this.cerrarModalSubirExcel();
+    });
   }
 
   public abrirModalAnadirManual(): void {
@@ -1002,7 +1084,7 @@ export class RolExamenesComponent implements OnInit {
     }
     this.formTipo = '1er Parcial';
     this.formFecha = '';
-    this.formModalidad = 'PRESENCIAL_CARTILLA';
+    this.formModalidad = 'PRESENCIAL_SIN_CARTILLA';
     this.dialogFormulario.set(true);
   }
 
@@ -1014,7 +1096,7 @@ export class RolExamenesComponent implements OnInit {
     this.formGrupoObj.set(grp);
     this.formTipo = item.tipo;
     this.formFecha = item.fecha;
-    this.formModalidad = item.modalidad || (item.conCartilla ? 'PRESENCIAL_CARTILLA' : 'PRESENCIAL_SIN_CARTILLA');
+    this.formModalidad = item.modalidad === 'VIRTUAL' ? 'VIRTUAL' : 'PRESENCIAL_SIN_CARTILLA';
     this.dialogFormulario.set(true);
   }
 
@@ -1032,6 +1114,18 @@ export class RolExamenesComponent implements OnInit {
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
     const grp = this.formGrupoObj();
+    if (!sede || !carrera) {
+      this._mostrarToast('Selecciona una sede y una carrera oficiales.');
+      return;
+    }
+    if (!grp) {
+      this._mostrarToast('Selecciona un grupo oficial de SEA para la materia.');
+      return;
+    }
+    if (!this.formFecha) {
+      this._mostrarToast('La fecha del examen es obligatoria.');
+      return;
+    }
     const sch = grp && grp.schedules && grp.schedules.length > 0 ? grp.schedules[0] : null;
 
     let fechaDisp = 'Por Programar';
@@ -1042,72 +1136,173 @@ export class RolExamenesComponent implements OnInit {
       }
     }
 
-    const conCartilla = this.formModalidad === 'PRESENCIAL_CARTILLA';
+    const conCartilla = false;
     const edit = this.itemEditando();
-    if (edit) {
-      edit.codigo = mat.courseCode;
-      edit.materia = mat.courseName;
-      edit.semestre = mat.semester;
-      edit.seaSyllabusCourseId = mat.syllabusCourseId;
-      edit.sedeCode = sede?.code || edit.sedeCode;
-      edit.careerCode = carrera?.careerCode || edit.careerCode;
-      edit.grupo = grp?.code || edit.grupo || 'TA-01';
-      edit.docenteNombre = grp?.teacherName || edit.docenteNombre;
-      edit.docenteCI = grp?.teacherIdentityNumber || edit.docenteCI;
-      edit.tipo = this.formTipo;
-      edit.fecha = this.formFecha;
-      edit.fechaDisplay = fechaDisp;
-      if (sch) {
-        edit.horario = `${sch.startTime} - ${sch.endTime}`;
-        edit.aula = sch.classroom || edit.aula;
-        edit.campus = sch.campus || edit.campus;
-        edit.dia = this._obtenerNombreDia(sch.day);
-      }
-      edit.modalidad = this.formModalidad;
-      edit.conCartilla = conCartilla;
-      edit.estado = this.formFecha ? 'PROGRAMADO' : 'PENDIENTE_FECHA';
-      
-      this._db.upsertRolExamen(edit);
-      this.examenes.update(items => [...items]);
-      this._mostrarToast(`Examen '${edit.codigo}' actualizado y guardado en BD.`);
-    } else {
-      const nuevo: RolExamenItem = {
-        id: `ROL-${grp?.groupId || Date.now()}`,
-        seaGroupId: grp?.groupId || `SEA-G-${Date.now()}`,
-        seaSyllabusCourseId: mat.syllabusCourseId,
-        sedeCode: sede?.code || 'CBA',
-        careerCode: carrera?.careerCode || 'CARSIS',
-        codigo: mat.courseCode,
-        materia: mat.courseName,
-        semestre: mat.semester || 1,
-        grupo: grp?.code || 'TA-01',
-        tipoClase: grp?.classType || 'TA',
-        docenteNombre: grp?.teacherName || 'Por Designar',
-        docenteCI: grp?.teacherIdentityNumber || '',
-        tipo: this.formTipo,
-        estado: this.formFecha ? 'PROGRAMADO' : 'PENDIENTE_FECHA',
-        modalidad: this.formModalidad,
-        conCartilla: conCartilla,
-        semana: 8,
-        dia: sch ? this._obtenerNombreDia(sch.day) : 'Lunes',
-        fecha: this.formFecha,
-        fechaDisplay: fechaDisp,
-        horario: sch ? `${sch.startTime} - ${sch.endTime}` : '08:15 - 09:45',
-        aula: sch ? sch.classroom : 'Aula Central',
-        campus: sch ? sch.campus : 'Campus Central'
-      };
+    const item: RolExamenItem = {
+      id: edit?.id || this._crearRolId(grp.groupId, this.formTipo, this.formFecha),
+      seaGroupId: grp.groupId,
+      seaSyllabusCourseId: mat.syllabusCourseId,
+      sedeCode: sede.code,
+      careerCode: carrera.careerCode,
+      codigo: mat.courseCode,
+      materia: mat.courseName,
+      semestre: mat.semester || 1,
+      grupo: grp.code,
+      tipoClase: grp.classType || 'TA',
+      docenteNombre: grp.teacherName || this._nombreDocenteOficial(grp),
+      docenteCI: grp.teacherIdentityNumber || '',
+      tipo: this.formTipo,
+      estado: 'PROGRAMADO',
+      modalidad: this.formModalidad,
+      conCartilla,
+      semana: edit?.semana || 1,
+      dia: sch ? this._obtenerNombreDia(sch.day) : edit?.dia || 'Lunes',
+      fecha: this.formFecha,
+      fechaDisplay: fechaDisp,
+      horario: sch ? `${sch.startTime} - ${sch.endTime}` : edit?.horario || '08:15 - 09:45',
+      aula: sch?.classroom || edit?.aula || 'Por definir',
+      campus: sch?.campus || edit?.campus || 'Por definir'
+    };
 
-      this._db.upsertRolExamen(nuevo);
-      this.examenes.update(items => [nuevo, ...items]);
-      this._mostrarToast(`Examen '${nuevo.codigo} - ${nuevo.materia}' registrado y persistido en BD.`);
-    }
-    this.cerrarModalFormulario();
+    const request = this._toRequest(item);
+    const operacion = edit
+      ? this._rolService.actualizar(edit.id, request)
+      : this._rolService.crear(request);
+
+    this.cargando.set(true);
+    operacion.subscribe({
+      next: rol => {
+        const persistido = this._mapearRolResponse(rol);
+        this.examenes.update(items => edit
+          ? items.map(actual => actual.id === persistido.id ? persistido : actual)
+          : [persistido, ...items]);
+        this.cargando.set(false);
+        this.cerrarModalFormulario();
+        this._mostrarToast(edit
+          ? `Examen '${persistido.codigo}' actualizado en PostgreSQL.`
+          : `Examen '${persistido.codigo} - ${persistido.materia}' registrado en PostgreSQL.`);
+      },
+      error: err => {
+        this.cargando.set(false);
+        this._mostrarToast(this._mensajeError(err, 'No se pudo guardar el examen en el servidor.'));
+      }
+    });
   }
 
   public eliminarExamen(item: RolExamenItem): void {
-    this._db.deleteRolExamen(item.id);
-    this.examenes.update(items => items.filter(e => e.id !== item.id));
-    this._mostrarToast(`Examen '${item.codigo}' eliminado de la BD.`);
+    if (item.estado !== 'PROGRAMADO') {
+      this._mostrarToast('Solo se pueden eliminar exámenes en estado PROGRAMADO.');
+      return;
+    }
+    if (!window.confirm(`¿Deseas eliminar el examen ${item.codigo} del rol oficial?`)) return;
+
+    this._rolService.eliminar(item.id).subscribe({
+      next: () => {
+        this.examenes.update(items => items.filter(e => e.id !== item.id));
+        this._mostrarToast(`Examen '${item.codigo}' eliminado de PostgreSQL.`);
+      },
+      error: err => this._mostrarToast(this._mensajeError(err, 'No se pudo eliminar el examen.'))
+    });
+  }
+
+  private _toRequest(item: RolExamenItem): RolExamenCreateRequest {
+    const sede = this.sedeSeleccionada();
+    const carrera = this.carreraSeleccionada();
+    if (!sede || !carrera) {
+      throw new Error('No existe contexto académico seleccionado.');
+    }
+
+    return {
+      id: item.id,
+      seaGroupId: item.seaGroupId,
+      seaSyllabusCourseId: item.seaSyllabusCourseId,
+      sedeCodigo: sede.code,
+      sedeNombre: sede.name,
+      carreraCodigo: carrera.careerCode,
+      carreraNombre: carrera.careerName,
+      materiaCodigo: item.codigo,
+      materiaNombre: item.materia,
+      semestre: item.semestre,
+      grupo: item.grupo,
+      tipoClase: item.tipoClase,
+      docenteNombre: item.docenteNombre,
+      docenteCi: item.docenteCI,
+      tipoParcial: item.tipo,
+      modalidad: item.modalidad || (item.conCartilla ? 'PRESENCIAL_CARTILLA' : 'PRESENCIAL_SIN_CARTILLA'),
+      semana: item.semana,
+      dia: item.dia,
+      fecha: item.fecha,
+      fechaDisplay: item.fechaDisplay,
+      horario: item.horario,
+      aula: item.aula,
+      campus: item.campus
+    };
+  }
+
+  private _mapearRolResponse(rol: RolExamenResponse): RolExamenItem {
+    return {
+      id: rol.id,
+      seaGroupId: rol.seaGroupId,
+      seaSyllabusCourseId: rol.seaSyllabusCourseId,
+      sedeCode: rol.sedeCodigo,
+      careerCode: rol.carreraCodigo,
+      codigo: rol.materiaCodigo,
+      materia: rol.materiaNombre,
+      semestre: rol.semestre,
+      grupo: rol.grupo,
+      tipoClase: rol.tipoClase,
+      docenteNombre: rol.docenteNombre,
+      docenteCI: rol.docenteCi,
+      tipo: rol.tipoParcial as RolExamenItem['tipo'],
+      estado: rol.estadoFlujo as RolExamenItem['estado'],
+      modalidad: rol.modalidad,
+      conCartilla: rol.modalidad === 'PRESENCIAL_CARTILLA',
+      semana: rol.semana,
+      dia: rol.dia,
+      fecha: rol.fecha,
+      fechaDisplay: rol.fechaDisplay,
+      horario: rol.horario,
+      aula: rol.aula,
+      campus: rol.campus,
+      hashEncriptacion: rol.hashEncriptacion,
+      fechaValidacion: rol.fechaValidacion,
+      estudiantesInscritosCount: rol.estudiantesInscritosCount
+    };
+  }
+
+  private _normalizarTipoParcial(valor: string): RolExamenItem['tipo'] | null {
+    const normalizado = this._normalizar(valor);
+    if (normalizado === '1er parcial' || normalizado === 'primer parcial') return '1er Parcial';
+    if (normalizado === '2do parcial' || normalizado === 'segundo parcial') return '2do Parcial';
+    if (normalizado === 'final' || normalizado === 'examen final') return 'Final';
+    if (normalizado === '2da instancia' || normalizado === 'segunda instancia') return '2da Instancia';
+    return null;
+  }
+
+  private _normalizarModalidad(valor: string): RolExamenCreateRequest['modalidad'] {
+    const normalizado = this._normalizar(valor).replace(/\s+/g, '_');
+    if (normalizado === 'virtual') return 'VIRTUAL';
+    if (normalizado === 'presencial_cartilla' || normalizado === 'con_cartilla') return 'PRESENCIAL_SIN_CARTILLA';
+    if (normalizado === 'presencial_sin_cartilla' || normalizado === 'sin_cartilla' || normalizado === 'presencial') return 'PRESENCIAL_SIN_CARTILLA';
+    return 'PRESENCIAL_SIN_CARTILLA';
+  }
+
+  private _crearRolId(groupId: string, tipo: RolExamenItem['tipo'], fecha: string): string {
+    const tipoCodigo = tipo === '1er Parcial' ? '1P'
+      : tipo === '2do Parcial' ? '2P'
+      : tipo === 'Final' ? 'FIN'
+      : '2I';
+    return `ROL-${groupId}-${tipoCodigo}-${fecha}`;
+  }
+
+  private _nombreDocenteOficial(grupo: GroupItem): string {
+    return grupo.teacherIdentityNumber
+      ? `Docente SEA (CI ${grupo.teacherIdentityNumber})`
+      : 'Docente por designar';
+  }
+
+  private _mensajeError(error: any, fallback: string): string {
+    return error?.error?.error || error?.error?.message || error?.message || fallback;
   }
 
   private _mostrarToast(msg: string): void {

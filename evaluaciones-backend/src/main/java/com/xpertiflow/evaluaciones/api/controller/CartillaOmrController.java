@@ -1,0 +1,47 @@
+package com.xpertiflow.evaluaciones.api.controller;
+
+import com.xpertiflow.evaluaciones.api.dto.GenerarCartillasOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.LoteCartillasOmrResponseDto;
+import com.xpertiflow.evaluaciones.application.CartillaOmrService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/roles-examen/{rolExamenId}/cartillas")
+@RequiredArgsConstructor
+@Tag(name = "Cartillas OMR", description = "Lotes de cartillas OMR con datos preimpresos")
+public class CartillaOmrController {
+
+    private final CartillaOmrService cartillaOmrService;
+
+    @GetMapping("/ultimo")
+    @Operation(summary = "Obtener el último lote de cartillas del rol")
+    public ResponseEntity<LoteCartillasOmrResponseDto> obtenerUltimo(@PathVariable String rolExamenId) {
+        return cartillaOmrService.obtenerUltimo(rolExamenId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @PostMapping("/generar")
+    @Operation(summary = "Generar un lote de cartillas OMR preimpresas")
+    public ResponseEntity<LoteCartillasOmrResponseDto> generar(
+            @PathVariable String rolExamenId,
+            @RequestBody(required = false) GenerarCartillasOmrRequestDto request) {
+        String usuario = request == null ? null : request.usuario();
+        return ResponseEntity.status(HttpStatus.CREATED).body(cartillaOmrService.generar(rolExamenId, usuario));
+    }
+
+    @PostMapping("/lotes/{loteId}/marcar-impreso")
+    @Operation(summary = "Confirmar la impresión de todo un lote de cartillas")
+    public ResponseEntity<LoteCartillasOmrResponseDto> marcarImpreso(
+            @PathVariable String rolExamenId,
+            @PathVariable String loteId,
+            @RequestBody(required = false) GenerarCartillasOmrRequestDto request) {
+        String usuario = request == null ? null : request.usuario();
+        return ResponseEntity.ok(cartillaOmrService.marcarImpreso(rolExamenId, loteId, usuario));
+    }
+}

@@ -14,6 +14,9 @@
 **/build/
 **/*.class
 
+# Herramientas locales descargadas (JDK, Maven y utilidades de desarrollo)
+.tools/
+
 # Ejecutables y Binarios pesados
 typst.exe
 typst-bin/

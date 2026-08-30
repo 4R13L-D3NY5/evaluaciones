@@ -18,6 +18,25 @@ import {
   VarianteCompilada,
   ReactivoExamen 
 } from '../../core/services/examen-macro-generator.service';
+import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
+import { BancoPreguntasService, BancoPreguntasResponse } from '../../core/services/banco-preguntas.service';
+import {
+  RolExamenService,
+  RolExamenResponse
+} from '../../core/services/rol-examen.service';
+import { CartillasOmrService, LoteCartillasOmr } from '../../core/services/cartillas-omr.service';
+import {
+  GeneracionTypstRequest,
+  GeneracionTypstResultado,
+  GeneracionColaResponse
+} from '../../core/models/generacion-typst.model';
+
+function fechaIsoLocal(fecha: Date = new Date()): string {
+  const anio = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+}
 
 export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Revisado' | 'Subido' | 'Recibido';
 
@@ -48,8 +67,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 }
 
 /**
- * Componente: Lista de Evaluaciones con Typst Engine, 60 Reactivos (5 Opciones A-E),
- * Cartilla OMR 15% y Archivos Oficiales en Carpeta 'bases'
+ * Componente: Lista de Evaluaciones con generación y archivos oficiales.
  * @author Ariel Camara / XpertiFlow
  */
 @Component({
@@ -71,11 +89,18 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             </div>
           </div>
           <p class="text-xs text-muted-foreground mt-1">
-            Gestión y seguimiento de exámenes: Typst Compiler Engine, 60 preguntas con 5 opciones (A-E), cartilla OMR al 15% y exportación oficial.
+            Gestión y seguimiento de exámenes: 30 preguntas (7 fáciles, 16 medias y 7 difíciles) y exportación oficial.
           </p>
         </div>
 
         <div class="flex items-center gap-2">
+          <button
+            (click)="abrirSupervisionCola()"
+            title="Supervisar cola de generación"
+            aria-label="Supervisar cola de generación"
+            class="h-10 w-10 rounded-xl bg-card border border-purple-200 text-purple-700 hover:bg-purple-50 flex items-center justify-center shadow-xs transition-colors cursor-pointer">
+            <i class="pi pi-list-check text-base"></i>
+          </button>
           <button 
             (click)="abrirModalReporteDiario()"
             class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
@@ -137,17 +162,16 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             </select>
           </div>
 
-          <!-- Modalidad (Con Cartilla, Sin Cartilla o Virtual) -->
+          <!-- Modalidad (Presencial o Virtual) -->
           <div>
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
               <i class="pi pi-desktop text-primary text-[10px]"></i> Modalidad
             </label>
             <select 
-              [(ngModel)]="filtroCartilla"
+              [(ngModel)]="filtroModalidad"
               class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
               <option value="Todos">Todas</option>
-              <option value="Con Cartilla">Con Cartilla OMR</option>
-              <option value="Sin Cartilla">Sin Cartilla (Físico)</option>
+              <option value="Presencial">Presencial · Hoja externa</option>
               <option value="Virtual">Virtual Online</option>
             </select>
           </div>
@@ -263,7 +287,8 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   <th class="p-3.5">Fecha / Hora</th>
                   <th class="p-3.5 text-center">Modalidad</th>
                   <th class="p-3.5 text-center min-w-[310px]">Flujo de Estados</th>
-                  <th class="p-3.5 text-center">Documentos Typst</th>
+                  <th class="p-3.5 text-center">Cartillas</th>
+                  <th class="p-3.5 text-center">Documentos</th>
                   <th class="p-3.5 text-center min-w-[110px]">Acciones</th>
                 </tr>
               </thead>
@@ -310,19 +335,19 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       </div>
                     </td>
 
-                    <!-- Modalidad (Cartilla OMR, Físico o Virtual) -->
+                    <!-- Modalidad -->
                     <td class="p-3.5 text-center">
                       @if (item.modalidad === 'VIRTUAL') {
                         <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
                           <i class="pi pi-desktop text-[9px]"></i> Virtual Online
                         </span>
-                      } @else if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA' || !item.conCartilla) {
+                      } @else if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA' || !item.modalidad) {
                         <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-file-edit text-[9px]"></i> Físico / Sin Cartilla
+                          <i class="pi pi-file-edit text-[9px]"></i> Presencial · Hoja externa
                         </span>
-                      } @else {
+                      } @else if (item.conCartilla) {
                         <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-check-circle text-[9px]"></i> Con Cartilla OMR
+                          <i class="pi pi-file-edit text-[9px]"></i> Presencial · Hoja externa
                         </span>
                       }
                     </td>
@@ -351,71 +376,44 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       </div>
                     </td>
 
-                    <!-- Documentos Typst / OMR -->
                     <td class="p-3.5 text-center">
-                      <div class="inline-flex items-center gap-1">
-                        
-                        <!-- 1. Cuadernillo Typst Personalizado con Cartilla 15% -->
-                        <div class="relative group/doc1">
-                          <button 
-                            (click)="abrirVisorExamen(item, 'examen')"
+                      <div class="relative inline-flex group/cartillas">
+                        <button
+                          (click)="abrirGestionCartillas(item)"
+                          [disabled]="!puedeGestionarCartillas(item)"
+                          title="Gestionar cartillas OMR"
+                          aria-label="Gestionar cartillas OMR"
+                          class="h-7 w-7 rounded-lg text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35">
+                          <i class="pi pi-id-card text-xs"></i>
+                        </button>
+                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/cartillas:flex flex-col items-center z-50 pointer-events-none">
+                          <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Sobreimpresión de datos OMR</span>
+                          <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <!-- Documento oficial -->
+                    <td class="p-3.5 text-center">
+                      @if (puedeMostrarDocumento(item)) {
+                        <div class="relative inline-flex group/documento">
+                          <button
+                            (click)="abrirPdfExamen(item)"
+                            title="Abrir examen PDF"
+                            aria-label="Abrir examen PDF"
                             class="h-7 w-7 rounded-lg text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 flex items-center justify-center transition-colors cursor-pointer">
                             <i class="pi pi-file-pdf text-xs"></i>
                           </button>
-                          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc1:flex flex-col items-center z-50 pointer-events-none">
+                          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/documento:flex flex-col items-center z-50 pointer-events-none">
                             <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
-                              Examen Typst 60 Preguntas (PDF)
+                              Examen PDF oficial
                             </span>
                             <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                           </div>
                         </div>
-
-                        <!-- 2. Patrón Oficial PDF -->
-                        <div class="relative group/doc2">
-                          <button 
-                            (click)="abrirVisorExamen(item, 'patron')"
-                            class="h-7 w-7 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 flex items-center justify-center transition-colors cursor-pointer">
-                            <i class="pi pi-check-square text-xs"></i>
-                          </button>
-                          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc2:flex flex-col items-center z-50 pointer-events-none">
-                            <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
-                              Patrón Oficial Typst (60 Claves A-E)
-                            </span>
-                            <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
-                          </div>
-                        </div>
-
-                        <!-- 3. Descarga Directa Typst PDF Oficial -->
-                        <div class="relative group/doc3">
-                          <button 
-                            (click)="abrirPdfTypstOficialDirecto(item)"
-                            class="h-7 w-7 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 flex items-center justify-center transition-colors cursor-pointer">
-                            <i class="pi pi-external-link text-xs"></i>
-                          </button>
-                          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc3:flex flex-col items-center z-50 pointer-events-none">
-                            <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
-                              Abrir Archivo PDF Oficial (bases/)
-                            </span>
-                            <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
-                          </div>
-                        </div>
-
-                        <!-- 4. Planilla Oficial de Asistencia y Firmas de Estudiantes (PDF) -->
-                        <div class="relative group/doc4">
-                          <button 
-                            (click)="abrirListaFirmasPdfTypst(item)"
-                            class="h-7 w-7 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 flex items-center justify-center transition-colors cursor-pointer">
-                            <i class="pi pi-users text-xs"></i>
-                          </button>
-                          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc4:flex flex-col items-center z-50 pointer-events-none">
-                            <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
-                              Planilla Oficial de Asistencia y Firmas (PDF)
-                            </span>
-                            <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
-                          </div>
-                        </div>
-
-                      </div>
+                      } @else {
+                        <span class="text-muted-foreground/50">—</span>
+                      }
                     </td>
 
                     <!-- Acciones -->
@@ -437,8 +435,8 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           </div>
                         </div>
 
-                        <!-- 2. Botón Reestablecer -->
-                        @if (item.etapa !== 'Programado') {
+                        <!-- 2. Botón Restablecer a Validado -->
+                        @if (puedeRestablecer(item)) {
                           <div class="relative group/reestablecer">
                             <button 
                               (click)="solicitarReestablecimiento(item)"
@@ -447,26 +445,9 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             </button>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/reestablecer:flex flex-col items-center z-50 pointer-events-none">
                               <span class="bg-rose-950 text-rose-100 text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
-                                Reestablecer a Programado (Obliga Motivo)
+                                Restablecer a Validado (Obliga Motivo)
                               </span>
                               <div class="w-2 h-2 bg-rose-950 rotate-45 -mt-1"></div>
-                            </div>
-                          </div>
-                        }
-
-                        <!-- 3. Botón Restaurar -->
-                        @if (item.fueRestablecido && item.estadoPrevioRestablecimiento) {
-                          <div class="relative group/restaurar">
-                            <button 
-                              (click)="solicitarRestauracion(item)"
-                              class="h-7 w-7 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 flex items-center justify-center cursor-pointer transition-colors shadow-2xs animate-pulse">
-                              <i class="pi pi-undo text-xs"></i>
-                            </button>
-                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/restaurar:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-amber-950 text-amber-100 text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
-                                Restaurar Estado Previo ({{ item.estadoPrevioRestablecimiento }})
-                              </span>
-                              <div class="w-2 h-2 bg-amber-950 rotate-45 -mt-1"></div>
                             </div>
                           </div>
                         }
@@ -529,7 +510,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                 </div>
                 <div class="flex justify-between">
                   <span class="text-muted-foreground">Total Reactivos:</span>
-                  <span class="font-bold text-emerald-600">60 Preguntas Verificadas con 5 Opciones (OK)</span>
+                  <span class="font-bold text-emerald-600">30 Preguntas Verificadas con 5 Opciones (OK)</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-muted-foreground">Cifrado de Seguridad:</span>
@@ -555,7 +536,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
         </div>
       }
 
-      <!-- MODAL 2: PARAMETRIZACIÓN CON ESTUDIANTES & COMPILACIÓN TYPST -->
+      <!-- MODAL 2: PARAMETRIZACIÓN CON ESTUDIANTES Y GENERACIÓN PDF -->
       @if (evaluacionSeleccionadaParaParametrizar()) {
         <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in overflow-y-auto">
           <div class="bg-card border border-border rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden animate-scale-in my-4 space-y-4 p-6">
@@ -567,7 +548,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   <i class="pi pi-sliders-h"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-black text-foreground">Parametrización y Compilación Typst (30 Reactivos Oficiales)</h3>
+                  <h3 class="text-sm font-black text-foreground">Parámetros y generación del examen PDF</h3>
                   <p class="text-xs text-muted-foreground">
                     [{{ evaluacionSeleccionadaParaParametrizar()?.codigo }}] {{ evaluacionSeleccionadaParaParametrizar()?.materia }} · Grupo {{ evaluacionSeleccionadaParaParametrizar()?.grupo }}
                   </p>
@@ -581,12 +562,12 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 
             <div class="space-y-4 text-xs">
               
-              <!-- 1. PARÁMETROS DE HOJA Y TIPOGRAFÍA TYPST -->
+              <!-- 1. PARÁMETROS OFICIALES DE DIAGRAMACIÓN -->
               <div class="bg-muted/40 border border-border rounded-xl p-4 space-y-3">
                 <div class="flex items-center justify-between text-foreground font-black text-xs border-b border-border pb-2">
                   <div class="flex items-center gap-2">
                     <i class="pi pi-palette text-primary"></i>
-                    <span>Motor Typst v0.15 · Parámetros de Diagramación</span>
+                    <span>Parámetros de Diagramación</span>
                   </div>
                   <span class="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-200">
                     30 Preguntas (7 Fáciles, 16 Medias, 7 Difíciles)
@@ -600,10 +581,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                     <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
                       Formato Hoja
                     </label>
-                    <select [(ngModel)]="paramTamanoHoja" class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">
-                      <option value="Carta">Carta (Letter - Oficial)</option>
-                      <option value="Oficio">Oficio (Folio UNITEPC)</option>
-                    </select>
+                    <div class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">Oficio (Folio UNITEPC)</div>
                   </div>
 
                   <!-- Tipo de Letra (Font Family) -->
@@ -611,13 +589,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                     <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
                       Tipo de Letra (Fuente)
                     </label>
-                    <select [(ngModel)]="paramTipoFuente" class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">
-                      <option value="Liberation Sans">Liberation Sans (Oficial)</option>
-                      <option value="Arial">Arial (Sans-Serif)</option>
-                      <option value="Times New Roman">Times New Roman (Serif)</option>
-                      <option value="Calibri">Calibri (Moderna)</option>
-                      <option value="Linux Libertine">Linux Libertine (Typst)</option>
-                    </select>
+                    <div class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">Times New Roman</div>
                   </div>
 
                   <!-- Tamaño de Fuente -->
@@ -625,12 +597,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                     <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
                       Tamaño de Letra
                     </label>
-                    <select [(ngModel)]="paramTamanoFuente" class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">
-                      <option [ngValue]="8.5">8.5 pt (Oficial - Compacto)</option>
-                      <option [ngValue]="9.5">9.5 pt (Recomendado)</option>
-                      <option [ngValue]="10.0">10.0 pt (Estándar)</option>
-                      <option [ngValue]="11.0">11.0 pt (Grande)</option>
-                    </select>
+                    <div class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">11.0 pt (Grande)</div>
                   </div>
 
                   <!-- Espaciado / Interlineado -->
@@ -638,11 +605,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                     <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
                       Espaciado (Leading)
                     </label>
-                    <select [(ngModel)]="paramEspaciado" class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">
-                      <option value="0.45em">Compacto Oficial (0.45em)</option>
-                      <option value="0.65em">Estándar (0.65em)</option>
-                      <option value="0.80em">Amplio (0.80em)</option>
-                    </select>
+                    <div class="w-full bg-card border border-border rounded-lg p-2 font-bold text-xs">1.0em (línea) · 1.5em (pregunta)</div>
                   </div>
 
                 </div>
@@ -674,13 +637,13 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   </div>
                 </div>
 
-                <!-- Banner Informativo: 60 Reactivos / 5 Opciones / Cartilla 15% -->
+                <!-- Banner informativo: configuración vigente -->
                 <div class="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between text-[11px] text-indigo-950">
                   <div class="flex items-center gap-2 font-bold">
-                    <i class="pi pi-id-card text-indigo-700"></i>
-                    <span>Cartilla OMR 15% Derecha (1 a 60 con 5 burbujas: A-E) · Variante confidencial en BD</span>
+                    <i class="pi pi-file-edit text-indigo-700"></i>
+                    <span>30 preguntas · 7 fáciles, 16 medias y 7 difíciles · hoja de respuestas externa</span>
                   </div>
-                  <span class="text-[10px] font-mono text-indigo-800 font-black">Typst Vector PDF</span>
+                  <span class="text-[10px] font-mono text-indigo-800 font-black">Oficio · Times New Roman 11 pt</span>
                 </div>
               </div>
 
@@ -698,7 +661,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                 (click)="ejecutarGeneracionVariantes()" 
                 class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-102">
                 <i class="pi pi-bolt"></i>
-                <span>Compilar Exámenes Typst (60 Reactivos A-E)</span>
+                <span>Generar examen PDF (30 preguntas A-E)</span>
               </button>
             </div>
 
@@ -706,7 +669,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
         </div>
       }
 
-      <!-- MODAL 3: WORKER ASÍNCRONO & COLA REDIS -->
+      <!-- MODAL 3: GENERACIÓN ASÍNCRONA -->
       @if (dialogQueueWorker()) {
         <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-border rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden animate-scale-in space-y-4">
@@ -714,10 +677,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             <div class="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-4 flex items-center justify-between border-b border-purple-900">
               <div class="flex items-center gap-2.5">
                 <i class="pi pi-spin pi-cog text-purple-400 text-lg"></i>
-                <h3 class="text-sm font-black">Typst Compilation Worker #{{ queueJobId }}</h3>
+                <h3 class="text-sm font-black">Generación de examen #{{ queueJobId }}</h3>
               </div>
               <span class="text-[10px] font-mono bg-purple-900/60 px-2 py-0.5 rounded text-purple-300 border border-purple-500/30">
-                REDIS QUEUE · ALTA PRIORIDAD
+                COLA DE GENERACIÓN · ALTA PRIORIDAD
               </span>
             </div>
 
@@ -740,21 +703,92 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             </div>
 
             <div class="bg-muted/40 border-t border-border p-4 flex justify-end gap-2">
-              @if (queueJobCompleted()) {
-                <button 
-                  (click)="abrirVisorExamenDirecto()"
-                  class="px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-102">
-                  <i class="pi pi-file-pdf"></i>
-                  <span>Ver Exámenes & Descargar Archivos Typst Oficiales</span>
-                </button>
-              }
+              <span class="text-[11px] font-bold text-muted-foreground">El PDF estará disponible en Documentos al completar la generación.</span>
             </div>
 
           </div>
         </div>
       }
 
-      <!-- MODAL 4: VISOR OFICIAL DE EXAMEN PERSONALIZADO CON CARTILLA AL 15% Y 60 PREGUNTAS (5 OPCIONES) -->
+      <!-- MODAL: SUPERVISIÓN DE COLA DE GENERACIÓN -->
+      @if (dialogSupervisionCola()) {
+        <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden animate-scale-in">
+            <div class="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-4 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center">
+                  <i class="pi pi-list-check text-purple-300"></i>
+                </div>
+                <div>
+                <h3 class="text-sm font-black">Supervisión de cola de generación</h3>
+                  <p class="text-[10px] text-white/70">Tareas conocidas por el backend y mensajes pendientes en RabbitMQ</p>
+                </div>
+              </div>
+              <button (click)="cerrarSupervisionCola()" aria-label="Cerrar supervisión de cola" title="Cerrar" class="h-8 w-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <div class="p-5 space-y-4">
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 text-xs font-bold text-foreground">
+                  <i class="pi pi-inbox text-purple-700"></i>
+                  <span>Mensajes pendientes en broker:</span>
+                  @if (colaGeneracion()?.mensajesPendientes === -1) {
+                    <span class="text-amber-600">No disponible</span>
+                  } @else {
+                    <span class="text-purple-700 font-black">{{ colaGeneracion()?.mensajesPendientes ?? 0 }}</span>
+                  }
+                </div>
+                <button (click)="refrescarCola()" [disabled]="cargandoCola()" title="Actualizar cola" aria-label="Actualizar cola" class="h-8 w-8 rounded-lg border border-border text-muted-foreground hover:text-purple-700 hover:bg-purple-50 flex items-center justify-center cursor-pointer disabled:opacity-50">
+                  <i class="pi pi-refresh" [class.pi-spin]="cargandoCola()"></i>
+                </button>
+              </div>
+
+              @if (errorCola()) {
+                <div class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                  <i class="pi pi-exclamation-triangle"></i>
+                  <span>{{ errorCola() }}</span>
+                </div>
+              } @else if (cargandoCola() && !colaGeneracion()) {
+                <div class="py-10 text-center text-xs text-muted-foreground">
+                  <i class="pi pi-spin pi-spinner text-purple-700 text-xl"></i>
+                  <p class="mt-2 font-bold">Consultando tareas...</p>
+                </div>
+              } @else if ((colaGeneracion()?.tareas?.length ?? 0) === 0) {
+                <div class="py-10 text-center text-xs text-muted-foreground border border-dashed border-border rounded-xl">
+                  <i class="pi pi-check-circle text-emerald-600 text-xl"></i>
+                  <p class="mt-2 font-bold">No hay tareas registradas en la cola del backend.</p>
+                </div>
+              } @else {
+                <div class="border border-border rounded-xl overflow-hidden">
+                  <div class="grid grid-cols-[1.5fr_1fr_0.8fr_2fr] gap-3 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    <span>Job</span><span>Rol</span><span>Estado</span><span>Detalle</span>
+                  </div>
+                  <div class="max-h-72 overflow-y-auto divide-y divide-border">
+                    @for (tarea of colaGeneracion()?.tareas ?? []; track tarea.jobId) {
+                      <div class="grid grid-cols-[1.5fr_1fr_0.8fr_2fr] gap-3 px-3 py-2.5 items-center text-[11px]">
+                        <span class="font-mono text-purple-700 truncate" [title]="tarea.jobId">{{ tarea.jobId }}</span>
+                        <span class="font-mono text-foreground truncate" [title]="tarea.rolExamenId">{{ tarea.rolExamenId }}</span>
+                        <span [class]="tarea.estado === 'ERROR' || tarea.estado === 'ERROR_PERSISTENCIA' ? 'bg-rose-50 text-rose-700 border-rose-200' : tarea.estado === 'COMPLETADO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'" class="border rounded-full px-2 py-0.5 text-[9px] font-black uppercase text-center">
+                          {{ tarea.estado }}
+                        </span>
+                        <span class="text-muted-foreground truncate" [title]="tarea.mensaje">{{ tarea.mensaje }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="bg-muted/40 border-t border-border p-4 flex justify-end">
+              <button (click)="cerrarSupervisionCola()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL 4: VISOR OFICIAL DE EXAMEN PERSONALIZADO -->
       @if (dialogVisorExamen()) {
         <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 animate-fade-in overflow-y-auto">
           <div class="bg-card border border-border rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden animate-scale-in my-4 max-h-[96vh] flex flex-col">
@@ -774,9 +808,9 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                     <span>·</span>
                     <span class="font-bold text-amber-300">{{ evaluacionActivaVisor()?.tipo }}</span>
                     <span>·</span>
-                    <span>60 Reactivos (5 Opciones A-E)</span>
+                <span>30 Preguntas (5 Opciones A-E)</span>
                     <span>·</span>
-                    <span class="font-mono text-purple-200">Typst v0.11</span>
+                    <span class="font-mono text-purple-200">PDF oficial</span>
                   </div>
                 </div>
               </div>
@@ -788,7 +822,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   [class]="tabVisorActiva() === 'examen' ? 'bg-purple-700 text-white font-black shadow-xs' : 'text-white/70 hover:text-white'"
                   class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
                   <i class="pi pi-book"></i>
-                  <span>Cuadernillo + Cartilla OMR 15%</span>
+                    <span>Cuadernillo de examen</span>
                 </button>
 
                 <button 
@@ -796,18 +830,18 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   [class]="tabVisorActiva() === 'patron' ? 'bg-purple-700 text-white font-black shadow-xs' : 'text-white/70 hover:text-white'"
                   class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
                   <i class="pi pi-check-square"></i>
-                  <span>Patrón Oficial Typst</span>
+                  <span>Patrón oficial</span>
                 </button>
               </div>
 
-              <!-- Botones de Acción PDF Oficiales de Typst -->
+              <!-- Acciones heredadas del visor; el flujo actual abre únicamente el PDF generado. -->
               <div class="flex items-center gap-2">
-                <!-- Botón 1: Abrir PDF Typst Nativo Oficial -->
+                <!-- Botón 1: Abrir PDF oficial -->
                 <button 
                   (click)="abrirPdfTypstOficial()"
                   class="bg-purple-600 hover:bg-purple-500 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-md transition-transform hover:scale-102 cursor-pointer">
                   <i class="pi pi-file-pdf"></i>
-                  <span>Abrir PDF Typst Oficial</span>
+                  <span>Abrir PDF oficial</span>
                 </button>
 
                 <!-- Botón 2: Imprimir Ventana Limpia -->
@@ -872,7 +906,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             <!-- Contenido del Visor de Examen -->
             <div id="area-impresion-examen" class="p-6 overflow-y-auto max-h-[72vh] space-y-6 bg-muted/20 print:p-0 print:bg-white print:overflow-visible print:max-h-none">
               
-              <!-- 1. VISTA CUADERNILLO PERSONALIZADO CON CARTILLA OMR AL 15% DERECHA -->
+              <!-- 1. VISTA DEL CUADERNILLO PERSONALIZADO -->
               @if (tabVisorActiva() === 'examen') {
                 @for (estudianteItem of (modoUnificado() ? estudiantesInscritos() : [getEstudianteActivo()]); track estudianteItem?.codigo; let i = $index) {
                   @if (estudianteItem) {
@@ -885,7 +919,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       class="max-w-4xl mx-auto bg-white text-slate-950 p-6 sm:p-8 rounded-xl shadow-lg border border-slate-300 mb-8 print:shadow-none print:border-none print:p-0 print:m-0 print:max-w-none">
                       
                       <!-- ========================================== -->
-                      <!-- PÁGINA 1: CABECERA + DATOS + CARTILLA OMR HORIZONTAL (1 A 60) -->
+                      <!-- PÁGINA 1: CABECERA + DATOS + CUESTIONARIO -->
                       <!-- ========================================== -->
                       <div class="space-y-3 min-h-[920px] print:min-h-[1020px] print:break-after-page mb-8 pb-4 border-b-2 border-slate-300 print:border-none">
                         
@@ -947,7 +981,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             </div>
                             <div class="col-span-5 pl-2">
                               <span class="text-slate-600 font-normal">EXAMEN:</span> 
-                              <span class="text-purple-900 font-black ml-1">{{ evaluacionActivaVisor()?.tipo }} · VARIANTE {{ varComp.letraVariante }}</span>
+                              <span class="text-purple-900 font-black ml-1 uppercase">{{ evaluacionActivaVisor()?.tipo }}</span>
                             </div>
                           </div>
 
@@ -974,84 +1008,9 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           </div>
                         </div>
 
-                        <!-- 3. Instrucciones de llenado -->
-                        <div class="p-2 bg-slate-50 border border-slate-300 rounded text-[9.5px] text-slate-800 leading-tight font-sans">
-                          <strong>INSTRUCCIÓN DE COMPLETADO DE CARTILLA:</strong> Rellene con cuidado la opción correcta con bolígrafo <strong>AZUL</strong> o <strong>NEGRO</strong>. Ejemplos: [• Correcto] [X Incorrecto] [- Incorrecto] [O Incorrecto]
-                        </div>
-
-                        <!-- 4. CARTILLA HORIZONTAL OMR DE 60 PREGUNTAS (4 COLUMNAS DE 15 FILAS) - MATRIZ EXACTA -->
-                        <div class="border-2 border-slate-900 bg-white p-3 rounded shadow-xs">
-                          <div class="text-center font-black text-xs uppercase tracking-wider text-slate-950 pb-2 border-b border-slate-300">
-                            CARTILLA DE RESPUESTAS (1 A 60) — VARIANTE {{ varComp.letraVariante }}
-                          </div>
-
-                          <div class="grid grid-cols-4 gap-4 pt-2 font-mono text-[9px]">
-                            
-                            <!-- Columna 1: Preguntas 1 a 15 -->
-                            <div class="space-y-1">
-                              @for (n of getNumerosRango(1, 15); track n) {
-                                <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
-                                  <span class="font-bold text-slate-700 w-6 text-right pr-2 select-none text-[8.5px]">{{ n }}.</span>
-                                  <div class="flex gap-1.5 pr-1">
-                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
-                                        {{ l }}
-                                      </span>
-                                    }
-                                  </div>
-                                </div>
-                              }
-                            </div>
-
-                            <!-- Columna 2: Preguntas 16 a 30 -->
-                            <div class="space-y-1">
-                              @for (n of getNumerosRango(16, 30); track n) {
-                                <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
-                                  <span class="font-bold text-slate-700 w-6 text-right pr-2 select-none text-[8.5px]">{{ n }}.</span>
-                                  <div class="flex gap-1.5 pr-1">
-                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
-                                        {{ l }}
-                                      </span>
-                                    }
-                                  </div>
-                                </div>
-                              }
-                            </div>
-
-                            <!-- Columna 3: Preguntas 31 a 45 -->
-                            <div class="space-y-1">
-                              @for (n of getNumerosRango(31, 45); track n) {
-                                <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
-                                  <span class="font-bold text-slate-700 w-6 text-right pr-2 select-none text-[8.5px]">{{ n }}.</span>
-                                  <div class="flex gap-1.5 pr-1">
-                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
-                                        {{ l }}
-                                      </span>
-                                    }
-                                  </div>
-                                </div>
-                              }
-                            </div>
-
-                            <!-- Columna 4: Preguntas 46 a 60 -->
-                            <div class="space-y-1">
-                              @for (n of getNumerosRango(46, 60); track n) {
-                                <div class="flex items-center justify-between border-b border-slate-100 py-0.5">
-                                  <span class="font-bold text-slate-700 w-6 text-right pr-2 select-none text-[8.5px]">{{ n }}.</span>
-                                  <div class="flex gap-1.5 pr-1">
-                                    @for (l of ['A', 'B', 'C', 'D', 'E']; track l) {
-                                      <span class="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[7.5px] font-black bg-white hover:bg-slate-200">
-                                        {{ l }}
-                                      </span>
-                                    }
-                                  </div>
-                                </div>
-                              }
-                            </div>
-
-                          </div>
+                        <!-- La hoja de respuestas se entrega por separado en el formato institucional preimpreso. -->
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-950 leading-tight font-sans">
+                          <strong>HOJA DE RESPUESTAS:</strong> Este cuadernillo no incluye una hoja de respuestas. Las respuestas se registran en la hoja individual institucional entregada por separado.
                         </div>
 
                       </div>
@@ -1073,9 +1032,6 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           <h2 class="text-sm font-black uppercase text-slate-950 tracking-wide">
                             CUESTIONARIO DE PREGUNTAS (30 REACTIVOS)
                           </h2>
-                          <p class="text-xs font-bold text-slate-700 uppercase">
-                            [{{ evaluacionActivaVisor()?.codigo }}] {{ evaluacionActivaVisor()?.materia }} · EVALUACIÓN TEÓRICA {{ evaluacionActivaVisor()?.tipo | uppercase }} · VARIANTE {{ varComp.letraVariante }}
-                          </p>
                           <hr class="border-t-2 border-slate-900 mt-2" />
                         </div>
 
@@ -1109,7 +1065,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             *** FIN DE LA EVALUACIÓN OFICIAL (30 PREGUNTAS) ***
                           </div>
                           <p class="text-[10px] text-slate-600">
-                            Verifique que todas sus 30 respuestas se encuentren correctamente rellenadas en la <strong>Cartilla OMR</strong> de la primera página.
+                            Verifique que todas sus 30 respuestas se encuentren registradas en la <strong>hoja individual de respuestas</strong> entregada por separado.
                           </p>
                         </div>
                       </div>
@@ -1126,11 +1082,8 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                     <div class="flex items-center justify-between border-b-4 border-purple-900 pb-2 mb-3">
                       <div>
                         <h1 class="text-sm font-black uppercase text-purple-950">UNIVERSIDAD TÉCNICA PRIVADA COSMOS</h1>
-                        <h2 class="text-xs font-bold text-slate-800">PATRÓN OFICIAL DE CORRECCIÓN OMR (60 REACTIVOS) · {{ evaluacionActivaVisor()?.tipo }}</h2>
+                        <h2 class="text-xs font-bold text-slate-800">PATRÓN OFICIAL DE RESPUESTAS (30 PREGUNTAS) · {{ evaluacionActivaVisor()?.tipo }}</h2>
                       </div>
-                      <span class="text-xs font-mono font-black bg-purple-100 text-purple-900 px-3 py-1 rounded-full">
-                        VARIANTE {{ patronItem.letraVariante }}
-                      </span>
                     </div>
 
                     <div class="grid grid-cols-12 gap-3 border-b-2 border-slate-800 pb-3 mb-4 text-xs font-bold">
@@ -1166,7 +1119,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                         (click)="abrirPatronPdfTypst()"
                         class="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs">
                         <i class="pi pi-file-pdf"></i>
-                        <span>Abrir Patrón Typst PDF Oficial</span>
+                        <span>Abrir patrón PDF oficial</span>
                       </button>
                       
                       <button 
@@ -1192,7 +1145,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   (click)="abrirPdfTypstOficial()"
                   class="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs">
                   <i class="pi pi-file-pdf"></i>
-                  <span>Abrir PDF Typst Oficial</span>
+                  <span>Abrir PDF oficial</span>
                 </button>
                 <button 
                   (click)="imprimirVentanaLimpia()"
@@ -1222,7 +1175,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   <i class="pi pi-refresh text-base"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-black text-foreground">Reestablecer Evaluación a 'Programado'</h3>
+                  <h3 class="text-sm font-black text-foreground">Restablecer Evaluación a 'Validado'</h3>
                   <p class="text-xs text-muted-foreground">[{{ evaluacionSeleccionadaParaReestablecer()?.codigo }}] {{ evaluacionSeleccionadaParaReestablecer()?.materia }}</p>
                 </div>
               </div>
@@ -1236,40 +1189,13 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 
             <div class="flex justify-end gap-2 pt-2 border-t border-border">
               <button (click)="cancelarReestablecimiento()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
-              <button [disabled]="!motivoReestablecimiento.trim()" (click)="confirmarReestablecimiento()" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-xs disabled:opacity-50 cursor-pointer">Confirmar Reestablecimiento</button>
+              <button [disabled]="!motivoReestablecimiento.trim() || restableciendo()" (click)="confirmarReestablecimiento()" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-xs disabled:opacity-50 cursor-pointer">{{ restableciendo() ? 'Restableciendo...' : 'Confirmar Restablecimiento a Validado' }}</button>
             </div>
           </div>
         </div>
       }
 
-      <!-- MODAL 6: RESTAURACIÓN -->
-      @if (evaluacionSeleccionadaParaRestaurar()) {
-        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div class="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-scale-in">
-            <div class="flex items-start justify-between border-b border-border pb-3">
-              <div class="flex items-center gap-2.5">
-                <div class="h-9 w-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-black">
-                  <i class="pi pi-undo text-base"></i>
-                </div>
-                <div>
-                  <h3 class="text-sm font-black text-foreground">Restaurar Estado Previo</h3>
-                  <p class="text-xs text-muted-foreground">[{{ evaluacionSeleccionadaParaRestaurar()?.codigo }}] {{ evaluacionSeleccionadaParaRestaurar()?.materia }}</p>
-                </div>
-              </div>
-              <button (click)="cancelarRestauracion()" class="text-muted-foreground hover:text-foreground text-sm cursor-pointer"><i class="pi pi-times"></i></button>
-            </div>
-
-            <p class="text-xs text-muted-foreground">¿Desea restaurar al estado <strong>'{{ evaluacionSeleccionadaParaRestaurar()?.estadoPrevioRestablecimiento }}'</strong>?</p>
-
-            <div class="flex justify-end gap-2 pt-2 border-t border-border">
-              <button (click)="cancelarRestauracion()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
-              <button (click)="confirmarRestauracion()" class="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-xs cursor-pointer">Confirmar Restauración</button>
-            </div>
-          </div>
-        </div>
-      }
-
-      <!-- MODAL 7: BITÁCORA -->
+      <!-- MODAL 6: BITÁCORA -->
       @if (evaluacionSeleccionadaParaBitacora()) {
         <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-scale-in">
@@ -1315,6 +1241,60 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
         </div>
       }
 
+      @if (evaluacionSeleccionadaCartillas(); as evaluacionCartillas) {
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center"><i class="pi pi-id-card text-lg"></i></div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Sobreimpresión de datos OMR</h3>
+                  <p class="text-xs text-muted-foreground">{{ evaluacionCartillas.codigo }} · {{ evaluacionCartillas.grupo }} · solo datos para imprimir sobre cartillas preimpresas.</p>
+                </div>
+              </div>
+              <button (click)="cerrarGestionCartillas()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+              @if (cargandoCartillas()) {
+                <div class="py-10 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spinner pi-spin text-primary mr-2"></i>Cargando lote de sobreimpresión...</div>
+              } @else {
+                @if (loteCartillasActual(); as lote) {
+                  <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Cartillas</span><strong class="text-lg text-foreground">{{ lote.totalCartillas }}</strong></div>
+                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Estado</span><strong class="text-sm" [class.text-emerald-700]="lote.estado === 'IMPRESO'" [class.text-teal-700]="lote.estado === 'GENERADO'">{{ lote.estado }}</strong></div>
+                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">1 por página A4</strong></div>
+                  </div>
+                  <div class="max-h-40 overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
+                    @for (cartilla of lote.cartillas; track cartilla.id) {
+                      <div class="grid grid-cols-[36px_90px_1fr_auto] gap-2 p-2.5 items-center">
+                        <span class="font-mono text-muted-foreground">{{ cartilla.numeroOrden }}</span>
+                        <span class="font-mono font-bold">{{ cartilla.codigoEstudiante }}</span>
+                        <span class="truncate font-medium">{{ cartilla.nombreCompleto }}</span>
+                        <span class="text-[10px] font-bold" [class.text-emerald-700]="cartilla.estado === 'IMPRESA'" [class.text-teal-700]="cartilla.estado === 'GENERADA'">{{ cartilla.estado }}</span>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <div class="rounded-xl border border-dashed border-teal-200 bg-teal-50/40 p-5 text-xs text-teal-900 leading-relaxed">
+                    No hay un lote generado. Se generará únicamente la capa de datos: N°, código de materia, grupo, código y nombre completo. No se dibuja la cartilla, la cabecera ni las respuestas.
+                  </div>
+                }
+              }
+            </div>
+            <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2">
+              <button (click)="cerrarGestionCartillas()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
+              @if (loteCartillasActual(); as lote) {
+                <button (click)="abrirPdfCartillas(lote)" class="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer"><i class="pi pi-file-pdf mr-1.5"></i>Abrir PDF de datos</button>
+                @if (lote.estado !== 'IMPRESO') {
+                  <button (click)="confirmarImpresionCartillas(lote)" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"><i class="pi pi-print mr-1.5"></i>Marcar como impreso</button>
+                }
+              }
+              <button (click)="generarCartillas()" [disabled]="generandoCartillas()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-plus]="!generandoCartillas()"></i> {{ loteCartillasActual() ? 'Generar nuevo lote' : 'Generar lote' }}</button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -1329,7 +1309,11 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 export class EvaluacionesDiaComponent implements OnInit {
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _db = inject(EvaluacionesDbService);
+  private readonly _rolService = inject(RolExamenService);
   private readonly _studentService = inject(EstudiantesGatewayService);
+  private readonly _generacionTypst = inject(GeneracionTypstService);
+  private readonly _bancoService = inject(BancoPreguntasService);
+  private readonly _cartillasOmr = inject(CartillasOmrService);
   public readonly macroGenerator = inject(ExamenMacroGeneratorService);
 
   // Sedes y Carreras desde SEA Gateway
@@ -1344,9 +1328,11 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   // Filtros Parametrizados
   public filtroParcial: string = '1er Parcial';
-  public filtroCartilla: 'Todos' | 'Con Cartilla' | 'Sin Cartilla' | 'Virtual' = 'Todos';
+  public filtroModalidad: 'Todos' | 'Presencial' | 'Virtual' = 'Todos';
   
-  public readonly hoyIso = new Date().toISOString().split('T')[0];
+  // No usar toISOString(): convierte la hora local a UTC y en Bolivia puede
+  // mover la fecha al día siguiente durante la noche.
+  public readonly hoyIso = fechaIsoLocal();
   public filtroFechaInicio: string = this.hoyIso;
   public filtroFechaFin: string = this.hoyIso;
 
@@ -1359,22 +1345,11 @@ export class EvaluacionesDiaComponent implements OnInit {
     'Programado', 'Validado', 'Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'
   ];
 
-  // Flujo Con Cartilla (9 Pasos)
-  public readonly flujoConCartilla: StepDef[] = [
+  // Flujo oficial único (9 pasos), independiente de la hoja de respuestas externa.
+  public readonly flujoOficial: StepDef[] = [
     { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
     { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
     { key: 'Generado', label: 'Generado', icon: 'pi pi-bolt' },
-    { key: 'Impreso', label: 'Impreso', icon: 'pi pi-print' },
-    { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
-    { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
-    { key: 'Revisado', label: 'Revisado', icon: 'pi pi-check' },
-    { key: 'Subido', label: 'Subido', icon: 'pi pi-upload' },
-    { key: 'Recibido', label: 'Recibido', icon: 'pi pi-inbox' }
-  ];
-
-  // Flujo Sin Cartilla
-  public readonly flujoSinCartilla: StepDef[] = [
-    { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
     { key: 'Impreso', label: 'Impreso', icon: 'pi pi-print' },
     { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
     { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
@@ -1389,14 +1364,21 @@ export class EvaluacionesDiaComponent implements OnInit {
   public evaluacionSeleccionadaParaParametrizar = signal<EvaluacionItemUI | null>(null);
   public evaluacionSeleccionadaParaBitacora = signal<EvaluacionItemUI | null>(null);
   public evaluacionSeleccionadaParaReestablecer = signal<EvaluacionItemUI | null>(null);
-  public evaluacionSeleccionadaParaRestaurar = signal<EvaluacionItemUI | null>(null);
   public motivoReestablecimiento = '';
+  public restableciendo = signal<boolean>(false);
 
   public dialogVisorExamen = signal<boolean>(false);
   public tabVisorActiva = signal<'examen' | 'patron'>('examen');
   public evaluacionActivaVisor = signal<EvaluacionItemUI | null>(null);
 
-  // Estados para Queue + Worker Typst
+  // Generación real vía backend
+  public bancoSeleccionado = signal<BancoPreguntasResponse | null>(null);
+  public generandoTypst = signal<boolean>(false);
+  public errorGeneracionTypst = signal<string | null>(null);
+  public resultadoGeneracionTypst = signal<GeneracionTypstResultado | null>(null);
+  public jobIdGeneracionTypst = signal<string | null>(null);
+
+  // Estados para cola + worker de generación
   public dialogQueueWorker = signal<boolean>(false);
   public queueProgress = signal<number>(0);
   public queuePasoActual = signal<string>('Iniciando encolado...');
@@ -1404,35 +1386,42 @@ export class EvaluacionesDiaComponent implements OnInit {
   public queueJobCompleted = signal<boolean>(false);
   public queueJobId = 84920;
 
+  // Supervisión administrativa de la cola RabbitMQ.
+  public dialogSupervisionCola = signal<boolean>(false);
+  public colaGeneracion = signal<GeneracionColaResponse | null>(null);
+  public cargandoCola = signal<boolean>(false);
+  public errorCola = signal<string | null>(null);
+
   // Estudiantes
   public estudiantesInscritos = signal<EstudianteInscrito[]>([]);
-  public ratioEstudiantesPorVariante = signal<number>(2);
+  public ratioEstudiantesPorVariante = signal<number>(5);
   public estudianteSeleccionadoIdx = signal<number>(0);
   public variantesCompiladas = signal<VarianteCompilada[]>([]);
   public modoUnificado = signal<boolean>(false);
 
-  // Parámetros de Hoja y Tipografía Typst Oficiales
-  public paramTamanoHoja = 'Carta';
-  public paramTipoFuente: string = 'Liberation Sans';
-  public paramTamanoFuente: number = 8.5;
-  public paramEspaciado: string = '0.45em';
+  // Parámetros oficiales de hoja y tipografía
+  public paramTamanoHoja = 'Oficio (Folio UNITEPC)';
+  public paramTipoFuente: string = 'Times New Roman';
+  public paramTamanoFuente: number = 11;
+  public paramEspaciado: string = '1em';
 
   public archivoExcelNombre = signal<string | null>(null);
   public toastMessage = signal<string | null>(null);
+  public evaluacionSeleccionadaCartillas = signal<EvaluacionItemUI | null>(null);
+  public loteCartillasActual = signal<LoteCartillasOmr | null>(null);
+  public cargandoCartillas = signal<boolean>(false);
+  public generandoCartillas = signal<boolean>(false);
 
   // Lista viva de evaluaciones
   public evaluaciones = signal<EvaluacionItemUI[]>([]);
 
-  // Cálculo Dinámico de Variantes: Si hay entre 2 y 5 alumnos, se generan variantes individuales (A, B, C...)
+  // La regla institucional vigente es una variante por cada cinco estudiantes.
   public variantesCalculadas = computed(() => {
     const totalEst = this.estudiantesInscritos().length;
-    if (totalEst <= 0) return 3;
-    if (totalEst <= 5) {
-      return Math.min(totalEst, 5);
-    }
     const ratio = this.ratioEstudiantesPorVariante() || 5;
+    if (totalEst <= 0) return 1;
     const num = Math.ceil(totalEst / ratio);
-    return Math.min(Math.max(num, 2), 5);
+    return Math.min(Math.max(num, 1), 5);
   });
 
   private _normalizar(texto: string): string {
@@ -1453,11 +1442,9 @@ export class EvaluacionesDiaComponent implements OnInit {
       list = list.filter(e => e.tipo === this.filtroParcial);
     }
 
-    if (this.filtroCartilla === 'Con Cartilla') {
-      list = list.filter(e => e.modalidad === 'PRESENCIAL_CARTILLA' || (e.conCartilla === true && e.modalidad !== 'VIRTUAL'));
-    } else if (this.filtroCartilla === 'Sin Cartilla') {
-      list = list.filter(e => e.modalidad === 'PRESENCIAL_SIN_CARTILLA' || (e.conCartilla === false && e.modalidad !== 'VIRTUAL'));
-    } else if (this.filtroCartilla === 'Virtual') {
+    if (this.filtroModalidad === 'Presencial') {
+      list = list.filter(e => e.modalidad !== 'VIRTUAL');
+    } else if (this.filtroModalidad === 'Virtual') {
       list = list.filter(e => e.modalidad === 'VIRTUAL');
     }
 
@@ -1488,6 +1475,30 @@ export class EvaluacionesDiaComponent implements OnInit {
   public ngOnInit(): void {
     this.ratioEstudiantesPorVariante.set(this._db.getEstudiantesPorVarianteParam());
     this._cargarSedes();
+  }
+
+  public abrirSupervisionCola(): void {
+    this.dialogSupervisionCola.set(true);
+    this.refrescarCola();
+  }
+
+  public cerrarSupervisionCola(): void {
+    this.dialogSupervisionCola.set(false);
+  }
+
+  public refrescarCola(): void {
+    this.cargandoCola.set(true);
+    this.errorCola.set(null);
+    this._generacionTypst.consultarCola().subscribe({
+      next: cola => {
+        this.colaGeneracion.set(cola);
+        this.cargandoCola.set(false);
+      },
+      error: err => {
+        this.cargandoCola.set(false);
+        this.errorCola.set(err?.error?.message || 'No se pudo consultar la cola de generación.');
+      }
+    });
   }
 
   public onSedeChange(sedeCode: string): void {
@@ -1550,15 +1561,55 @@ export class EvaluacionesDiaComponent implements OnInit {
 
     this.cargando.set(true);
 
-    const list = this._db.getRolesExamenes(sede.code, carrera.careerCode);
-    const uiList: EvaluacionItemUI[] = list.map(item => ({
-      ...item,
-      etapa: this._mapearEtapa(item.estado),
-      hora: item.horario.split('-')[0]?.trim() || '08:15'
-    }));
+    this._rolService.listar(sede.code, carrera.careerCode).subscribe({
+      next: roles => {
+        const uiList: EvaluacionItemUI[] = roles.map(rol => this._mapearRolResponseA_UI(rol));
+        this.evaluaciones.set(uiList);
+        this.cargando.set(false);
+      },
+      error: err => {
+        console.error('Error cargando evaluaciones desde backend:', err);
+        this._mostrarToast('Error al cargar evaluaciones desde el servidor.', 'error');
+        this.evaluaciones.set([]);
+        this.cargando.set(false);
+      }
+    });
+  }
 
-    this.evaluaciones.set(uiList);
-    this.cargando.set(false);
+  private _mapearRolResponseA_UI(rol: RolExamenResponse): EvaluacionItemUI {
+    const conCartilla = false;
+
+    return {
+      id: rol.id,
+      seaGroupId: rol.seaGroupId,
+      seaSyllabusCourseId: rol.seaSyllabusCourseId,
+      sedeCode: rol.sedeCodigo,
+      careerCode: rol.carreraCodigo,
+      codigo: rol.materiaCodigo,
+      materia: rol.materiaNombre,
+      semestre: rol.semestre,
+      grupo: rol.grupo,
+      tipoClase: rol.tipoClase,
+      docenteNombre: rol.docenteNombre,
+      docenteCI: rol.docenteCi,
+      tipo: rol.tipoParcial as RolExamenPersistedItem['tipo'],
+      estado: rol.estadoFlujo as RolExamenPersistedItem['estado'],
+      conCartilla,
+      modalidad: rol.modalidad,
+      semana: rol.semana,
+      dia: rol.dia,
+      fecha: rol.fecha,
+      fechaDisplay: rol.fechaDisplay,
+      horario: rol.horario,
+      aula: rol.aula,
+      campus: rol.campus,
+      estudiantesInscritosCount: rol.estudiantesInscritosCount,
+      hashEncriptacion: rol.hashEncriptacion,
+      fechaValidacion: rol.fechaValidacion,
+      etapa: this._mapearEtapa(rol.estadoFlujo),
+      hora: rol.horario.split('-')[0]?.trim() || '08:15',
+      variantesGeneradas: rol.variantesGeneradasCount
+    };
   }
 
   private _mapearEtapa(estado: string): EtapaEvaluacion {
@@ -1573,6 +1624,76 @@ export class EvaluacionesDiaComponent implements OnInit {
       case 'RECIBIDO': return 'Recibido';
       default: return 'Programado';
     }
+  }
+
+  public puedeRestablecer(item: EvaluacionItemUI): boolean {
+    return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido']
+      .includes(item.etapa);
+  }
+
+  public puedeMostrarDocumento(item: EvaluacionItemUI): boolean {
+    return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido']
+      .includes(item.etapa);
+  }
+
+  public puedeGestionarCartillas(item: EvaluacionItemUI): boolean {
+    return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'].includes(item.etapa);
+  }
+
+  public abrirGestionCartillas(item: EvaluacionItemUI): void {
+    if (!this.puedeGestionarCartillas(item)) return;
+    this.evaluacionSeleccionadaCartillas.set(item);
+    this.loteCartillasActual.set(null);
+    this.cargandoCartillas.set(true);
+    this._cartillasOmr.obtenerUltimo(item.id).subscribe({
+      next: lote => {
+        this.loteCartillasActual.set(lote);
+        this.cargandoCartillas.set(false);
+      },
+      error: () => {
+        this.cargandoCartillas.set(false);
+        this._mostrarToast('No se pudo consultar el lote de cartillas.', 'error');
+      }
+    });
+  }
+
+  public cerrarGestionCartillas(): void {
+    this.evaluacionSeleccionadaCartillas.set(null);
+    this.loteCartillasActual.set(null);
+  }
+
+  public generarCartillas(): void {
+    const item = this.evaluacionSeleccionadaCartillas();
+    if (!item || this.generandoCartillas()) return;
+    this.generandoCartillas.set(true);
+    this._cartillasOmr.generar(item.id).subscribe({
+      next: lote => {
+        this.loteCartillasActual.set(lote);
+        this.generandoCartillas.set(false);
+        this._mostrarToast(`${lote.totalCartillas} sobreimpresiones de datos generadas.`);
+      },
+        error: err => {
+          this.generandoCartillas.set(false);
+          this._mostrarToast(err?.error?.message || 'No se pudo generar la sobreimpresión de datos.', 'error');
+      }
+    });
+  }
+
+  public confirmarImpresionCartillas(lote: LoteCartillasOmr): void {
+    const item = this.evaluacionSeleccionadaCartillas();
+    if (!item) return;
+    this._cartillasOmr.marcarImpreso(item.id, lote.id).subscribe({
+      next: actualizado => {
+        this.loteCartillasActual.set(actualizado);
+        this._mostrarToast('Lote de cartillas marcado como impreso.');
+      },
+      error: () => this._mostrarToast('No se pudo confirmar la impresión del lote.', 'error')
+    });
+  }
+
+  public abrirPdfCartillas(lote: LoteCartillasOmr): void {
+    if (!lote.archivoPdfPath) return;
+    window.open(`/api/archivos?path=${encodeURIComponent(lote.archivoPdfPath)}`, '_blank', 'noopener');
   }
 
   public isEstadoSeleccionado(etapa: string): boolean {
@@ -1593,7 +1714,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public getPasosFlujo(item: EvaluacionItemUI): StepDef[] {
-    return item.conCartilla ? this.flujoConCartilla : this.flujoSinCartilla;
+    return this.flujoOficial;
   }
 
   public getPasoBotonClass(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): string {
@@ -1632,7 +1753,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     if (pasoIdx === currentIdx) return `Estado actual: ${st.label}`;
     if (pasoIdx === currentIdx + 1) {
       if (st.key === 'Validado') return 'Clic para Validar y Encriptar Examen de Docente';
-      if (st.key === 'Generado') return 'Clic para Parametrizar y Compilar Typst (60 Reactivos A-E)';
+      if (st.key === 'Generado') return 'Clic para generar el examen PDF (30 preguntas A-E)';
       return `Clic para avanzar a: ${st.label}`;
     }
     return `Pendiente: ${st.label}`;
@@ -1682,12 +1803,27 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public abrirModalParametrizacion(item: EvaluacionItemUI): void {
     this.evaluacionSeleccionadaParaParametrizar.set(item);
+    this.bancoSeleccionado.set(null);
+    this.errorGeneracionTypst.set(null);
+    this.resultadoGeneracionTypst.set(null);
+    this.jobIdGeneracionTypst.set(null);
     this.ratioEstudiantesPorVariante.set(this._db.getEstudiantesPorVarianteParam());
 
     // Cargar la nómina de estudiantes en vivo desde el Gateway por groupId
     this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, item.seaGroupId).subscribe({
       next: estudiantes => {
         this.estudiantesInscritos.set(estudiantes);
+      }
+    });
+
+    // Cargar el banco de preguntas desde el backend
+    this._bancoService.obtenerPorRol(item.id).subscribe({
+      next: banco => {
+        this.bancoSeleccionado.set(banco);
+      },
+      error: () => {
+        this.bancoSeleccionado.set(null);
+        this._mostrarToast('No se encontró un banco de preguntas validado para este rol en el servidor.', 'error');
       }
     });
 
@@ -1708,109 +1844,121 @@ export class EvaluacionesDiaComponent implements OnInit {
     const item = this.evaluacionSeleccionadaParaParametrizar();
     if (!item) return;
 
+    const banco = this.bancoSeleccionado();
+    if (!banco) {
+      this._mostrarToast('No hay un banco de preguntas validado cargado en el servidor para generar.', 'error');
+      return;
+    }
+
     const cantVariantes = this.variantesCalculadas();
     const estudiantes = this.estudiantesInscritos();
+    const letras: ('A' | 'B' | 'C' | 'D' | 'E')[] = ['A', 'B', 'C', 'D', 'E'];
+    const variantes = letras.slice(0, cantVariantes);
 
-    // 1. Generar 60 preguntas con 5 opciones (A-E)
-    const variantes = this.macroGenerator.generarVariantesCompletas(cantVariantes);
-    this.variantesCompiladas.set(variantes);
-    this.evaluacionActivaVisor.set(item);
-    this.estudianteSeleccionadoIdx.set(0);
+    const jobId = crypto.randomUUID();
+    const request: GeneracionTypstRequest = {
+      jobId,
+      rolExamenId: item.id,
+      bancoPreguntasId: banco.id,
+      variantes,
+      ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante() || 5
+    };
 
-    // 2. Mapear Estudiantes <-> Variantes asignadas y guardar confidencialmente en BD
-    const mapeo: MapeoEstudianteExamen[] = estudiantes.map((est, idx) => {
-      const letra = this.getLetraVarianteParaIndice(idx);
-      est.letraVariante = letra;
-      est.varianteAsignada = `TIPO ${letra}`;
-      est.hashControl = `CTL-${est.codigo.slice(-4)}-${item.codigo}-${letra}`;
-
-      return {
-        codigoEstudiante: est.codigo,
-        nombres: est.nombres,
-        apellido1: est.apellido1,
-        apellido2: est.apellido2,
-        variante: `TIPO ${letra}`,
-        letraVariante: letra,
-        hashSeguridad: `SHA256-${est.codigo}-${item.codigo}-${letra}-SEC`,
-        materiaCodigo: item.codigo,
-        grupo: item.grupo,
-        parcial: item.tipo
-      };
-    });
+    this.generandoTypst.set(true);
+    this.errorGeneracionTypst.set(null);
+    this.resultadoGeneracionTypst.set(null);
+    this.jobIdGeneracionTypst.set(jobId);
 
     this.cerrarModalParametrizacion();
     this.dialogQueueWorker.set(true);
     this.queueJobCompleted.set(false);
     this.queueProgress.set(15);
-    this.queuePasoActual.set('Encolando tarea en colas Redis...');
+    this.queuePasoActual.set('Encolando tarea en RabbitMQ...');
     this.queueLogs.set([
-      `[${new Date().toLocaleTimeString()}] ⏳ Job #${this.queueJobId} registrado en cola 'sea-exam-generator' con prioridad ALTA`,
-      `[${new Date().toLocaleTimeString()}] 📄 Typst v0.11 Engine: 60 Reactivos con 5 incisos (A-E), Cartilla OMR 15%`,
-      `[${new Date().toLocaleTimeString()}] 👥 Alumnos inscritos: ${estudiantes.length}, Ratio: ${this.ratioEstudiantesPorVariante()} alumnos/variante`
+      `[${new Date().toLocaleTimeString()}] ⏳ Solicitud #${jobId} encolada`,
+      `[${new Date().toLocaleTimeString()}] 📄 Configuración oficial: 30 preguntas (7 fáciles, 16 medias, 7 difíciles), Oficio, Times New Roman 11 pt`,
+      `[${new Date().toLocaleTimeString()}] 👥 Alumnos inscritos: ${estudiantes.length}, Variantes: ${variantes.join(', ')}`
     ]);
 
-    setTimeout(() => {
-      this.queueProgress.set(45);
-      this.queuePasoActual.set('Compilando archivos Typst en C:\\laragon\\www\\evaluaciones\\bases...');
-      this.queueLogs.update(logs => [
-        ...logs,
-        `[${new Date().toLocaleTimeString()}] 🎲 Compilando CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Examen.pdf...`,
-        `[${new Date().toLocaleTimeString()}] 📄 Compilando CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Patron.pdf...`
-      ]);
-    }, 600);
+    this._generacionTypst.solicitarGeneracion(request).subscribe({
+      next: accepted => {
+        // El backend devuelve el identificador efectivo del job. Usarlo para
+        // el polling mantiene la correlación aunque el cliente sea antiguo o
+        // el backend deba generar el identificador por compatibilidad.
+        const pollingJobId = accepted?.jobId || jobId;
+        this.jobIdGeneracionTypst.set(pollingJobId);
+        this.queueLogs.update(logs => [
+          ...logs,
+          `[${new Date().toLocaleTimeString()}] ✅ Solicitud aceptada por el backend. Esperando worker...`
+        ]);
 
-    setTimeout(() => {
-      this.queueProgress.set(75);
-      this.queuePasoActual.set('Generando matriz Remark OMR Excel y firmas criptográficas...');
-      this.queueLogs.update(logs => [
-        ...logs,
-        `[${new Date().toLocaleTimeString()}] 🔒 Ocultando indicador de variante visible en exámenes impresos...`,
-        `[${new Date().toLocaleTimeString()}] 📊 Generando CPEC18_Cochabamba_TA-01_1erParcial_VarA_20260822_Remark.xlsx...`
-      ]);
-    }, 1200);
+        this._generacionTypst.esperarResultado(pollingJobId).subscribe({
+          next: resultado => {
+            this.resultadoGeneracionTypst.set(resultado);
 
-    setTimeout(() => {
-      this.queueProgress.set(100);
-      this.queuePasoActual.set('¡Compilación Typst Finalizada Exitosamente!');
-      this.queueJobCompleted.set(true);
-      this.queueLogs.update(logs => [
-        ...logs,
-        `[${new Date().toLocaleTimeString()}] 🔑 Archivos oficiales disponibles en C:\\laragon\\www\\evaluaciones\\bases`,
-        `[${new Date().toLocaleTimeString()}] ✅ ${estudiantes.length} cuadernillos listos para descarga e impresión.`
-      ]);
+            if (resultado.estado === 'ERROR') {
+              this.generandoTypst.set(false);
+              this.errorGeneracionTypst.set(resultado.mensaje || 'Error desconocido en generación.');
+              this.queueProgress.set(100);
+              this.queuePasoActual.set('Error al generar el examen PDF');
+              this.queueLogs.update(logs => [
+                ...logs,
+                `[${new Date().toLocaleTimeString()}] ❌ Error: ${resultado.mensaje}`
+              ]);
+              this._mostrarToast(resultado.mensaje || 'Error en generación.', 'error');
+              return;
+            }
 
-      item.etapa = 'Generado';
-      item.estado = 'GENERADO';
-      item.variantesGeneradas = cantVariantes;
-      item.estudiantesInscritosCount = estudiantes.length;
-      this._db.upsertRolExamen(item);
-      this._db.guardarMapeoEstudiantesExamen(item.id, mapeo);
-      this.evaluaciones.update(items => [...items]);
-      this._mostrarToast(`${item.codigo}: Archivos Typst compilados exitosamente en 'bases/'.`);
-    }, 1800);
+            if (resultado.estado === 'COMPLETADO') {
+              this.generandoTypst.set(false);
+              this.queueProgress.set(100);
+              this.queuePasoActual.set('¡Examen PDF generado exitosamente!');
+              this.queueJobCompleted.set(true);
+              this.queueLogs.update(logs => [
+                ...logs,
+                `[${new Date().toLocaleTimeString()}] ✅ ${resultado.variantes.length} variantes generadas`,
+                `[${new Date().toLocaleTimeString()}] ✅ ${resultado.mapeos.length} cuadernillos listos`
+              ]);
+
+              item.etapa = 'Generado';
+              item.estado = 'GENERADO';
+              item.variantesGeneradas = cantVariantes;
+              item.estudiantesInscritosCount = estudiantes.length;
+              this._db.upsertRolExamen(item);
+              this.evaluaciones.update(items => [...items]);
+              this._mostrarToast(`${item.codigo}: Examen PDF generado exitosamente.`);
+              this.dialogQueueWorker.set(false);
+            }
+          },
+          error: err => {
+            this.generandoTypst.set(false);
+            const msg = err?.message || 'No se pudo obtener el resultado de generación.';
+            this.errorGeneracionTypst.set(msg);
+            this.queueProgress.set(100);
+            this.queuePasoActual.set('Error consultando resultado');
+            this.queueLogs.update(logs => [...logs, `[${new Date().toLocaleTimeString()}] ❌ ${msg}`]);
+            this._mostrarToast(msg, 'error');
+          }
+        });
+      },
+      error: err => {
+        this.generandoTypst.set(false);
+        const msg = err?.message || 'No se pudo iniciar la generación del examen.';
+        this.errorGeneracionTypst.set(msg);
+        this.queueProgress.set(100);
+        this.queuePasoActual.set('Error al encolar la tarea');
+        this.queueLogs.update(logs => [...logs, `[${new Date().toLocaleTimeString()}] ❌ ${msg}`]);
+        this._mostrarToast(msg, 'error');
+      }
+    });
   }
 
   public abrirVisorExamenDirecto(): void {
-    this.dialogQueueWorker.set(false);
-    this.tabVisorActiva.set('examen');
-    this.dialogVisorExamen.set(true);
+    this._mostrarToast('La vista previa fue retirada. Abra el PDF desde la columna Documentos.', 'info');
   }
 
   public abrirVisorExamen(item: EvaluacionItemUI, tab: 'examen' | 'patron' = 'examen'): void {
-    this.evaluacionActivaVisor.set(item);
-
-    // Cargar nómina de estudiantes de la materia y grupo actual
-    this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, item.seaGroupId).subscribe({
-      next: ests => {
-        this.estudiantesInscritos.set(ests);
-        const cant = this.variantesCalculadas();
-        this.variantesCompiladas.set(this.macroGenerator.generarVariantesCompletas(cant));
-        this.estudianteSeleccionadoIdx.set(0);
-      }
-    });
-
-    this.tabVisorActiva.set(tab);
-    this.dialogVisorExamen.set(true);
+    this.abrirPdfExamen(item);
   }
 
   public cerrarVisorExamen(): void {
@@ -1841,12 +1989,15 @@ export class EvaluacionesDiaComponent implements OnInit {
     return arr;
   }
 
-  // Apertura y Descarga de Archivos Typst Oficiales
+  // Apertura y descarga de archivos oficiales
   public abrirCuadernilloMasterTypst(): void {
-    const item = this.evaluacionActivaVisor();
-    const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
-    const filename = `${cod}_Cochabamba_TA-01_1erParcial_20260822_Examen.pdf`;
-    window.open(`assets/examenes/${filename}`, '_blank');
+    const resultado = this.resultadoGeneracionTypst();
+    if (resultado?.estado === 'COMPLETADO' && resultado.variantes.length > 0) {
+      const variante = resultado.variantes.find(v => v.letra === 'A') || resultado.variantes[0];
+      window.open(this._urlArchivo(variante.archivoPdfPath), '_blank');
+      return;
+    }
+    this._mostrarToast('No hay exámenes generados disponibles.', 'error');
   }
 
   private readonly _codigosPdfEstudiantes = new Set([
@@ -1854,29 +2005,48 @@ export class EvaluacionesDiaComponent implements OnInit {
     '7849102', '7928104', '8102938', '8291047', '8392104', '8401928'
   ]);
 
-  public abrirPdfTypstOficialDirecto(item: EvaluacionItemUI): void {
-    this.abrirVisorExamen(item, 'examen');
+  public abrirPdfExamen(item: EvaluacionItemUI): void {
+    if (!this.puedeMostrarDocumento(item)) {
+      this._mostrarToast('El examen PDF estará disponible después de la generación.', 'error');
+      return;
+    }
+
+    const ventana = window.open('', '_blank');
+    this._generacionTypst.consultarDocumentoExamen(item.id).subscribe({
+      next: documento => {
+        if (ventana) {
+          ventana.location.href = this._urlArchivo(documento.archivoPdfPath);
+        } else {
+          window.open(this._urlArchivo(documento.archivoPdfPath), '_blank');
+        }
+      },
+      error: err => {
+        ventana?.close();
+        const mensaje = err?.error?.message || 'No se encontró el examen PDF generado.';
+        this._mostrarToast(mensaje, 'error');
+      }
+    });
   }
 
   public abrirPdfTypstOficial(): void {
-    const item = this.evaluacionActivaVisor();
+    const resultado = this.resultadoGeneracionTypst();
+    if (!resultado || resultado.estado !== 'COMPLETADO' || resultado.variantes.length === 0) {
+      this._mostrarToast('No hay exámenes generados disponibles. Genere los exámenes primero.', 'error');
+      return;
+    }
+
     const est = this.getEstudianteActivo();
-    const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
-    if (est && this._codigosPdfEstudiantes.has(est.codigo)) {
-      const nomSlug = `${est.nombres}_${est.apellido1}_${est.apellido2}`
-        .toUpperCase()
-        .replace(/\s+/g, '_')
-        .replace(/É/g, 'E')
-        .replace(/Í/g, 'I')
-        .replace(/Ó/g, 'O')
-        .replace(/Á/g, 'A')
-        .replace(/Ú/g, 'U')
-        .replace(/Ñ/g, 'N');
-      const filename = `${cod}_${est.codigo}_${nomSlug}_Examen.pdf`;
-      window.open(`assets/examenes/${filename}`, '_blank');
-    } else {
-      const filename = `${cod}_Cochabamba_TA-01_1erParcial_VarA_20260822_Examen.pdf`;
-      window.open(`assets/examenes/${filename}`, '_blank');
+    if (est) {
+      const mapeo = resultado.mapeos.find(m => m.codigoEstudiante === est.codigo);
+      if (mapeo?.cuadernilloPdfPath) {
+        window.open(this._urlArchivo(mapeo.cuadernilloPdfPath), '_blank');
+        return;
+      }
+    }
+
+    const varianteA = resultado.variantes.find(v => v.letra === 'A') || resultado.variantes[0];
+    if (varianteA?.archivoPdfPath) {
+      window.open(this._urlArchivo(varianteA.archivoPdfPath), '_blank');
     }
   }
 
@@ -1895,7 +2065,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     link.href = `assets/examenes/${filename}`;
     link.download = filename;
     link.click();
-    this._mostrarToast(`Descargando matriz Remark OMR...`);
+    this._mostrarToast(`Descargando matriz de calificación de hoja externa...`);
   }
 
   public abrirListaFirmasPdfTypst(item?: EvaluacionItemUI): void {
@@ -1904,6 +2074,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     const filename = `${cod}_Cochabamba_TA-01_1erParcial_20260822_Lista_Firmas.pdf`;
     window.open(`assets/examenes/${filename}`, '_blank');
     this._mostrarToast(`Abriendo Planilla Oficial de Asistencia y Firmas...`);
+  }
+
+  private _urlArchivo(pdfPath: string): string {
+    return `/api/archivos?path=${encodeURIComponent(pdfPath)}`;
   }
 
   public imprimirVentanaLimpia(): void {
@@ -1919,6 +2093,10 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public solicitarReestablecimiento(item: EvaluacionItemUI): void {
+    if (!this.puedeRestablecer(item)) {
+      this._mostrarToast('Solo se puede restablecer una evaluación posterior a Validado.', 'error');
+      return;
+    }
     this.evaluacionSeleccionadaParaReestablecer.set(item);
     this.motivoReestablecimiento = '';
   }
@@ -1929,44 +2107,30 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public confirmarReestablecimiento(): void {
     const item = this.evaluacionSeleccionadaParaReestablecer();
-    if (!item) return;
+    const motivo = this.motivoReestablecimiento.trim();
+    if (!item || !this.puedeRestablecer(item) || !motivo || this.restableciendo()) return;
 
-    item.estadoPrevioRestablecimiento = item.etapa;
-    item.fueRestablecido = true;
-    item.motivoRestablecimiento = this.motivoReestablecimiento;
-    item.fechaRestablecimiento = new Date().toLocaleString();
-    item.usuarioRestablecimiento = 'Ing. Ariel Denys Cámara Arze';
-
-    item.etapa = 'Programado';
-    item.estado = 'PROGRAMADO';
-
-    this._db.upsertRolExamen(item);
-    this.evaluaciones.update(items => [...items]);
-    this.evaluacionSeleccionadaParaReestablecer.set(null);
-    this._mostrarToast(`${item.codigo}: Reestablecido a Programado.`);
-  }
-
-  public solicitarRestauracion(item: EvaluacionItemUI): void {
-    this.evaluacionSeleccionadaParaRestaurar.set(item);
-  }
-
-  public cancelarRestauracion(): void {
-    this.evaluacionSeleccionadaParaRestaurar.set(null);
-  }
-
-  public confirmarRestauracion(): void {
-    const item = this.evaluacionSeleccionadaParaRestaurar();
-    if (!item || !item.estadoPrevioRestablecimiento) return;
-
-    const previo = item.estadoPrevioRestablecimiento;
-    item.etapa = previo;
-    item.estado = previo.toUpperCase() as any;
-    item.fueRestablecido = false;
-
-    this._db.upsertRolExamen(item);
-    this.evaluaciones.update(items => [...items]);
-    this.evaluacionSeleccionadaParaRestaurar.set(null);
-    this._mostrarToast(`${item.codigo}: Restaurado a '${previo}'.`);
+    this.restableciendo.set(true);
+    this._rolService.restablecerAValidado(item.id, {
+      motivo,
+      usuario: 'Sistema',
+      ipOrigen: '127.0.0.1'
+    }).subscribe({
+      next: rol => {
+        const actualizado = this._mapearRolResponseA_UI(rol);
+        this.evaluaciones.update(items => items.map(actual =>
+          actual.id === item.id ? actualizado : actual
+        ));
+        this.evaluacionSeleccionadaParaReestablecer.set(null);
+        this.restableciendo.set(false);
+        this._mostrarToast(`${item.codigo}: Restablecido a Validado y registrado en la base de datos.`);
+      },
+      error: err => {
+        this.restableciendo.set(false);
+        const detalle = err?.error?.message || err?.error?.error || 'No se pudo restablecer la evaluación.';
+        this._mostrarToast(detalle, 'error');
+      }
+    });
   }
 
   public abrirModalReporteDiario(): void {
@@ -1988,12 +2152,12 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.filtroFechaInicio = this.hoyIso;
     this.filtroFechaFin = this.hoyIso;
     this.filtroParcial = '1er Parcial';
-    this.filtroCartilla = 'Todos';
+    this.filtroModalidad = 'Todos';
     this.estadosSeleccionados.set([]);
     this.busquedaTexto = '';
   }
 
-  private _mostrarToast(msg: string): void {
+  private _mostrarToast(msg: string, _tipo?: string): void {
     this.toastMessage.set(msg);
     setTimeout(() => this.toastMessage.set(null), 3500);
   }

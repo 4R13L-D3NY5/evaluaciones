@@ -5,16 +5,18 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
+import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
+import { OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
 }
 
 export interface DetallePreguntaOmr {
   pregunta: number;
   patron: string;
   marcada: string;
-  estado: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA';
+  estado: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA';
   puntos: number;
   densidades: number[];
   ajustadaManualmente?: boolean;
@@ -39,6 +41,11 @@ export interface EstudianteOmrItem {
   imagenEscaneada: string;
   imagenAnotada: string;
   detalles: DetallePreguntaOmr[];
+  pagina?: number;
+  codigoLeido?: boolean;
+  codigoOcr?: string[];
+  grillaDetectada?: boolean;
+  respuestasLeidas?: number;
 }
 
 /**
@@ -51,7 +58,7 @@ export interface EstudianteOmrItem {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="space-y-6">
+      <div class="space-y-6">
       
       <!-- 1. Cabecera Oficial del Módulo OMR -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -70,6 +77,17 @@ export interface EstudianteOmrItem {
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5">
+          <select
+            [ngModel]="rolExamenSeleccionado()"
+            (ngModelChange)="rolExamenSeleccionado.set($event)"
+            class="bg-card border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground outline-none focus:border-purple-600"
+            title="Rol oficial que se utilizará para validar códigos y patrón de respuestas">
+            <option value="">Seleccione un rol oficial</option>
+            @for (rol of rolesExamen(); track rol.id) {
+              <option [value]="rol.id">{{ rol.materiaCodigo }} · {{ rol.materiaNombre }} · {{ rol.grupo }} · {{ rol.fecha }}</option>
+            }
+          </select>
+
           <!-- Input oculto para subir PDF o imágenes -->
           <input 
             type="file" 
@@ -86,24 +104,6 @@ export interface EstudianteOmrItem {
             <span>Subir PDF Escaneado</span>
           </button>
 
-          <!-- Botón Ver Patrón Oficial -->
-          <button 
-            (click)="dialogPatron.set(true)"
-            class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-2.5 px-3.5 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-            <i class="pi pi-key text-amber-600"></i>
-            <span>Ver Patrón Clave (Var A)</span>
-          </button>
-
-          <!-- Botón Descargar PDF Lote -->
-          <a 
-            href="assets/omr/CPEC18_Lote_5_Cartillas_Escaneadas.pdf" 
-            download="CPEC18_Lote_5_Cartillas_Escaneadas.pdf"
-            target="_blank"
-            class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-2.5 px-3.5 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-            <i class="pi pi-download text-purple-700"></i>
-            <span>Descargar Plantilla 5 Exámenes</span>
-          </a>
-
           @if (estadoFlujo() === 'RESULTADOS') {
             <!-- Botón Exportar Acta Excel -->
             <button 
@@ -115,6 +115,12 @@ export interface EstudianteOmrItem {
           }
         </div>
       </div>
+
+      @if (mensajeOmr()) {
+        <div class="border border-blue-200 bg-blue-50 text-blue-900 rounded-xl px-4 py-3 text-xs font-bold">
+          <i class="pi pi-info-circle mr-1"></i>{{ mensajeOmr() }}
+        </div>
+      }
 
       <!-- Barra de Pasos del Flujo OMR -->
       <div class="bg-card border border-border rounded-xl p-3 flex items-center justify-between gap-4 shadow-xs">
@@ -170,7 +176,7 @@ export interface EstudianteOmrItem {
                     ✓ Resolución 300 DPI
                   </span>
                   <span class="bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded text-[10px]">
-                    ✓ Variante A Asignada
+                    ✓ Código preimpreso: validación en servidor
                   </span>
                 </div>
               </div>
@@ -187,6 +193,7 @@ export interface EstudianteOmrItem {
 
               <button 
                 (click)="ejecutarProcesamientoOmrEnVivo()"
+                [disabled]="procesandoOmr() || cargandoPdf() || !archivoSeleccionado() || totalPaginas() === 0"
                 class="bg-gradient-to-r from-purple-700 via-indigo-600 to-blue-600 hover:from-purple-800 hover:to-blue-700 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/25 transition-transform hover:scale-105 cursor-pointer">
                 <i class="pi pi-bolt text-amber-300"></i>
                 <span>Ejecutar Calificación OMR ({{ totalPaginas() }} Páginas)</span>
@@ -318,13 +325,20 @@ export interface EstudianteOmrItem {
                         <span>ÁREA OMR · [{{ boxTop() | number:'1.1-1' }}%, {{ boxLeft() | number:'1.1-1' }}% · {{ boxWidth() | number:'1.1-1' }}% × {{ boxHeight() | number:'1.1-1' }}%]</span>
                       </div>
 
-                      <!-- 4 Columnas Virtuales y Subdivisión -->
-                      <div class="grid grid-cols-4 h-full w-full divide-x divide-emerald-400/40 pt-4">
-                        <div class="p-0.5 border-r border-dashed border-emerald-400/30"></div>
+                      <!-- Tres bloques físicos de 20 respuestas -->
+                      <div class="grid grid-cols-3 h-full w-full divide-x divide-emerald-400/40 pt-4">
                         <div class="p-0.5 border-r border-dashed border-emerald-400/30"></div>
                         <div class="p-0.5 border-r border-dashed border-emerald-400/30"></div>
                         <div class="p-0.5"></div>
                       </div>
+                    </div>
+
+                    <!-- Campo de código preimpreso señalado en la cartilla -->
+                    <div class="absolute border-2 border-amber-400 bg-amber-300/10 shadow-[0_0_12px_rgba(251,191,36,0.45)] rounded"
+                         style="top: 8%; left: 48%; width: 27%; height: 6%;">
+                      <span class="absolute -top-5 left-0 bg-amber-600 text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-black whitespace-nowrap">
+                        CÓDIGO DEL ESTUDIANTE
+                      </span>
                     </div>
 
                     <!-- Marcadores de Esquina (Fiducials) -->
@@ -341,23 +355,27 @@ export interface EstudianteOmrItem {
             <!-- Diagnóstico de Calibración en la Barra Inferior -->
             <div class="bg-card border-t border-border p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
               <div class="flex items-center gap-4">
-                <span class="flex items-center gap-1.5 font-bold text-emerald-600">
-                  <i class="pi pi-check-circle text-sm"></i>
-                  <span>Alineación de Cartilla: ÓPTIMA (0.0° Desviación)</span>
+                  <span class="flex items-center gap-1.5 font-bold text-blue-600">
+                  <i class="pi pi-server text-sm"></i>
+                  <span>Lectura geométrica: se ejecuta en el worker oficial</span>
                 </span>
-                <span class="flex items-center gap-1.5 font-bold text-blue-600">
-                  <i class="pi pi-sun text-sm"></i>
-                  <span>Iluminación & Contraste: 98.4% Uniforme</span>
+                  <span class="flex items-center gap-1.5 font-bold text-amber-600">
+                  <i class="pi pi-search text-sm"></i>
+                  <span>Talón inferior: ignorado</span>
                 </span>
-                <span class="flex items-center gap-1.5 font-bold text-purple-700">
-                  <i class="pi pi-image text-sm"></i>
-                  <span>Puntos de Marcado (Burbujas): 100% Legibles</span>
+                  <span class="flex items-center gap-1.5 font-bold text-purple-700">
+                  <i class="pi pi-id-card text-sm"></i>
+                  <span>Código: validado contra la nómina del rol</span>
                 </span>
               </div>
 
-              <span class="text-[11px] text-muted-foreground font-mono">
-                Estudiante en vista: {{ estudiantePaginaActiva().nombre }} (Cód: {{ estudiantePaginaActiva().codigo }})
-              </span>
+                @if (estudiantePaginaActiva(); as estudiante) {
+                  <span class="text-[11px] text-muted-foreground font-mono">
+                    Estudiante en vista: {{ estudiante.nombre }} (Cód: {{ estudiante.codigo }})
+                  </span>
+                } @else {
+                  <span class="text-[11px] text-muted-foreground font-mono">La vista previa no asigna estudiantes por posición.</span>
+                }
             </div>
 
           </div>
@@ -370,6 +388,61 @@ export interface EstudianteOmrItem {
       <!-- ================================================================= -->
       @if (estadoFlujo() === 'RESULTADOS') {
         <div class="space-y-6 animate-fade-in">
+
+          <!-- Inspección de todas las páginas del escaneo -->
+          <div class="bg-card border border-border rounded-2xl p-4 shadow-xs space-y-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-black text-foreground">Inspección por página del PDF</h3>
+                <p class="text-xs text-muted-foreground">Cada página conserva su imagen original y el diagnóstico independiente de código y grilla.</p>
+              </div>
+              <span class="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-[10px] font-black">{{ estudiantes().length }} páginas</span>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              @for (est of estudiantes(); track $index; let pageIndex = $index) {
+                <article class="border border-border rounded-xl overflow-hidden bg-muted/20">
+                  <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/60">
+                    <span class="text-xs font-black text-foreground">Página {{ est.pagina || pageIndex + 1 }}</span>
+                    <div class="flex flex-wrap justify-end gap-1.5">
+                      <span [class]="est.codigoLeido ? 'bg-emerald-100 text-emerald-800' : ((est.codigoOcr?.length || 0) > 0 ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800')" class="px-2 py-0.5 rounded text-[10px] font-black">
+                        {{ est.codigoLeido ? 'Código validado' : ((est.codigoOcr?.length || 0) > 0 ? 'Código fuera del rol' : 'Código no leído') }}
+                      </span>
+                      <span [class]="est.grillaDetectada ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'" class="px-2 py-0.5 rounded text-[10px] font-black">
+                        {{ est.grillaDetectada ? 'Grilla detectada' : 'Grilla no detectada' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_180px] gap-3 p-3 items-start">
+                    <div class="bg-slate-950 rounded-lg overflow-hidden min-h-40 flex items-center justify-center">
+                      @if (est.imagenEscaneada) {
+                        <img [src]="est.imagenEscaneada" alt="Escaneo de la página" class="max-h-[420px] w-full object-contain" />
+                      } @else {
+                        <span class="text-xs text-slate-400 p-6 text-center">No se pudo renderizar la vista de esta página.</span>
+                      }
+                    </div>
+                    <div class="space-y-2 text-xs">
+                      <div class="border border-border rounded-lg p-2 bg-card">
+                        <span class="block text-[10px] uppercase font-black text-muted-foreground">Código del estudiante</span>
+                        <span class="font-mono font-black text-foreground">{{ est.codigoLeido ? est.codigo : ((est.codigoOcr?.length || 0) > 0 ? 'No pertenece al rol' : 'No reconocido') }}</span>
+                        @if (!est.codigoLeido && (est.codigoOcr?.length || 0) > 0) {
+                          <span class="block text-[10px] text-amber-700 mt-1">OCR: {{ est.codigoOcr?.join(', ') }}</span>
+                        }
+                      </div>
+                      <div class="border border-border rounded-lg p-2 bg-card">
+                        <span class="block text-[10px] uppercase font-black text-muted-foreground">Cuadro de respuestas</span>
+                        <span class="font-black text-foreground">{{ est.grillaDetectada ? 'Detectado' : 'No detectado' }}</span>
+                        <span class="block text-[10px] text-muted-foreground mt-1">{{ est.respuestasLeidas || 0 }} respuestas con marca</span>
+                      </div>
+                      @if (est.estadoCalificacion === 'REVISION_MANUAL') {
+                        <span class="block text-[10px] leading-4 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">Pendiente de revisión manual; no se asignó estudiante por posición.</span>
+                      }
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          </div>
           
           <!-- Tarjetas Resumen del Proceso OMR -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -518,7 +591,7 @@ export interface EstudianteOmrItem {
                   </div>
 
                   <span class="text-[10px] text-muted-foreground font-mono">
-                    Resolución: 300 DPI · OpenCV v5.0
+                    Entrada: PDF o imagen escaneada · OpenCV + OCR
                   </span>
                 </div>
 
@@ -535,7 +608,7 @@ export interface EstudianteOmrItem {
                   <div class="flex items-start justify-between gap-3">
                     <div>
                       <span class="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 dark:bg-purple-950/60 dark:text-purple-300 px-2 py-0.5 rounded-md">
-                        CÓDIGO: {{ est.codigo }} · VARIANTE {{ est.variante }}
+                        CÓDIGO: {{ est.codigo }} · clave resuelta internamente
                       </span>
                       <h3 class="text-base font-black text-foreground mt-1">{{ est.nombre }}</h3>
                       <p class="text-xs text-muted-foreground">{{ est.carrera }} · Grupo {{ est.grupo }}</p>
@@ -584,10 +657,10 @@ export interface EstudianteOmrItem {
                   <div class="flex items-center justify-between">
                     <h4 class="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <i class="pi pi-list text-purple-700"></i>
-                      <span>Auditoría de Respuestas (30 Reactivos)</span>
+                      <span>Respuestas leídas ({{ est.totalPreguntas }} Reactivos)</span>
                     </h4>
                     <span class="text-[10px] text-muted-foreground font-bold">
-                      {{ est.aciertos }} de 30 correctas
+                      {{ est.aciertos }} correctas según la clave interna
                     </span>
                   </div>
 
@@ -596,7 +669,7 @@ export interface EstudianteOmrItem {
                       <thead class="bg-muted/80 text-muted-foreground uppercase text-[9px] font-black sticky top-0 border-b border-border">
                         <tr>
                           <th class="p-2 text-center">Nº</th>
-                          <th class="p-2 text-center">Patrón</th>
+                          <th class="p-2 text-center">Clave</th>
                           <th class="p-2 text-center">Marcada</th>
                           <th class="p-2 text-center">Estado</th>
                           <th class="p-2 text-right">Pts</th>
@@ -618,6 +691,8 @@ export interface EstudianteOmrItem {
                                 <span class="text-rose-700 font-mono font-black line-through">{{ item.marcada }}</span>
                               } @else if (item.estado === 'EN_BLANCO') {
                                 <span class="text-amber-600 italic text-[10px] font-medium">[Blanco]</span>
+                              } @else if (item.estado === 'LEIDA') {
+                                <span class="text-blue-700 font-mono font-bold">{{ item.marcada }}</span>
                               } @else {
                                 <span class="text-purple-700 font-mono font-bold text-[10px]">[Doble: {{ item.marcada }}]</span>
                               }
@@ -634,6 +709,10 @@ export interface EstudianteOmrItem {
                               } @else if (item.estado === 'EN_BLANCO') {
                                 <span class="bg-amber-50 text-amber-800 border border-amber-300 font-bold px-2 py-0.5 rounded-full text-[9px]">
                                   No Respondida
+                                </span>
+                              } @else if (item.estado === 'LEIDA') {
+                                <span class="bg-blue-50 text-blue-800 border border-blue-300 font-bold px-2 py-0.5 rounded-full text-[9px]">
+                                  Leída
                                 </span>
                               } @else {
                                 <span class="bg-purple-50 text-purple-800 border border-purple-300 font-bold px-2 py-0.5 rounded-full text-[9px]">
@@ -698,91 +777,51 @@ export interface EstudianteOmrItem {
         </div>
       }
 
-      <!-- Modal de Patrón Oficial de Respuestas (Var A) -->
-      @if (dialogPatron()) {
-        <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden space-y-4 p-6">
-            
-            <div class="flex items-center justify-between border-b border-border pb-3">
-              <div class="flex items-center gap-2">
-                <i class="pi pi-key text-purple-700 text-lg"></i>
-                <h3 class="text-base font-black text-foreground">Patrón Oficial de Respuestas (Variante A)</h3>
-              </div>
-              <button (click)="dialogPatron.set(false)" class="text-muted-foreground hover:text-foreground cursor-pointer">
-                <i class="pi pi-times"></i>
-              </button>
-            </div>
-
-            <p class="text-xs text-muted-foreground">
-              Matriz de 30 reactivos con la clave oficial generada para la asignatura <strong>[CPEC18] AUDITORÍA TRIBUTARIA</strong>.
-            </p>
-
-            <div class="grid grid-cols-5 sm:grid-cols-6 gap-2">
-              @for (item of patronArray; track item.q) {
-                <div class="bg-muted/70 border border-border p-2 rounded-xl text-center">
-                  <span class="text-[9px] font-extrabold text-muted-foreground block">P{{ item.q }}</span>
-                  <span class="text-sm font-black font-mono text-purple-700">{{ item.ans }}</span>
-                </div>
-              }
-            </div>
-
-            <div class="flex justify-end pt-3 border-t border-border">
-              <button 
-                (click)="dialogPatron.set(false)"
-                class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer">
-                Cerrar Patrón
-              </button>
-            </div>
-
-          </div>
-        </div>
-      }
-
     </div>
   `
 })
 export class CalificacionOmrComponent implements OnInit {
   public readonly gateway = inject(UnitepcGatewayService);
+  private readonly rolExamenService = inject(RolExamenService);
+  private readonly omrProcesamientoService = inject(OmrProcesamientoService);
 
   // Estados reactivos
   public estadoFlujo = signal<'ALINEACION' | 'RESULTADOS'>('ALINEACION');
-  public calificacionEjecutada = signal<boolean>(true);
+  public calificacionEjecutada = signal<boolean>(false);
   public procesandoOmr = signal<boolean>(false);
   public paginaProgreso = signal<number>(1);
 
-  public archivoCargadoNombre = signal<string>('CPEC18_Lote_5_Cartillas_Escaneadas.pdf');
+  public archivoCargadoNombre = signal<string>('Sin archivo seleccionado');
+  public archivoSeleccionado = signal<File | null>(null);
+  public rolesExamen = signal<RolExamenResponse[]>([]);
+  public rolExamenSeleccionado = signal<string>('');
+  public cargandoRoles = signal<boolean>(false);
+  public mensajeOmr = signal<string>('');
   public paginaAlineacionIdx = signal<number>(0);
   public mostrarGuiasAlineacion = signal<boolean>(true);
   public zoomAlineacion = signal<number>(0.85);
   public rotacionAlineacion = signal<number>(0);
 
   // Coordenadas dinámicas del marco de calibración OMR (%) - Cartilla en Hoja 1 (Margen 2.0 cm)
-  public boxTop = signal<number>(26.7);
-  public boxLeft = signal<number>(9.5);
-  public boxWidth = signal<number>(80.0);
-  public boxHeight = signal<number>(32.0);
+  public boxTop = signal<number>(16.9);
+  public boxLeft = signal<number>(1.1);
+  public boxWidth = signal<number>(73.2);
+  public boxHeight = signal<number>(42.7);
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
   public modoAnotado = signal<boolean>(true);
   public zoomNivel = signal<number>(0.85);
   public rotacionGrados = signal<number>(0);
-  public dialogPatron = signal<boolean>(false);
 
-  public patronArray = [
-    { q: 1, ans: 'A' }, { q: 2, ans: 'E' }, { q: 3, ans: 'D' }, { q: 4, ans: 'E' }, { q: 5, ans: 'B' },
-    { q: 6, ans: 'B' }, { q: 7, ans: 'B' }, { q: 8, ans: 'A' }, { q: 9, ans: 'A' }, { q: 10, ans: 'B' },
-    { q: 11, ans: 'A' }, { q: 12, ans: 'A' }, { q: 13, ans: 'E' }, { q: 14, ans: 'B' }, { q: 15, ans: 'A' },
-    { q: 16, ans: 'C' }, { q: 17, ans: 'E' }, { q: 18, ans: 'A' }, { q: 19, ans: 'C' }, { q: 20, ans: 'B' },
-    { q: 21, ans: 'C' }, { q: 22, ans: 'D' }, { q: 23, ans: 'A' }, { q: 24, ans: 'B' }, { q: 25, ans: 'D' },
-    { q: 26, ans: 'C' }, { q: 27, ans: 'C' }, { q: 28, ans: 'B' }, { q: 29, ans: 'A' }, { q: 30, ans: 'E' }
-  ];
+  // Se conserva únicamente para compatibilidad con helpers antiguos que ya no participan del flujo.
+  private readonly patronArray = Array.from({ length: 60 }, (_, indice) => ({ q: indice + 1, ans: '' }));
 
   public paginasRenderizadas = signal<string[]>([]);
   public cargandoPdf = signal<boolean>(false);
 
   public totalPaginas = computed(() => {
-    return this.paginasRenderizadas().length || 5;
+    return this.paginasRenderizadas().length;
   });
 
   public listaBotonesPagina = computed(() => {
@@ -800,7 +839,7 @@ export class CalificacionOmrComponent implements OnInit {
       return custom[idx] || custom[0];
     }
     const est = this.estudiantePaginaActiva();
-    return est ? ('assets/omr/' + est.imagenEscaneada) : 'assets/omr/cartilla_simulada_estudiante_1_7849102.png';
+    return est ? ('assets/omr/' + est.imagenEscaneada) : '';
   });
 
   public estudiantePaginaActiva = computed(() => {
@@ -834,7 +873,28 @@ export class CalificacionOmrComponent implements OnInit {
   });
 
   public ngOnInit(): void {
-    this._cargarResultadosOmr();
+    this._cargarRolesOficiales();
+  }
+
+  private _cargarRolesOficiales(): void {
+    this.cargandoRoles.set(true);
+    this.rolExamenService.listar().subscribe({
+      next: roles => {
+        // La modalidad no determina si un rol puede calificarse con OMR.
+        // Las cartillas son preimpresas y el cotejo usa el mapeo oficial
+        // del rol seleccionado, incluso si el rol fue creado sin cartilla.
+        this.rolesExamen.set(roles.filter(rol =>
+          !['PROGRAMADO', 'VALIDADO'].includes(rol.estadoFlujo) &&
+          rol.variantesGeneradasCount > 0
+        ));
+        const primerRol = this.rolesExamen()[0];
+        if (primerRol) {
+          this.rolExamenSeleccionado.set(primerRol.id);
+        }
+      },
+      error: () => this.mensajeOmr.set('No se pudieron cargar los roles oficiales de evaluación.'),
+      complete: () => this.cargandoRoles.set(false)
+    });
   }
 
   public moverCaja(dx: number, dy: number): void {
@@ -848,17 +908,14 @@ export class CalificacionOmrComponent implements OnInit {
   }
 
   public aplicarPresetEscaneoFisico(): void {
-    this.boxTop.set(26.7);
-    this.boxLeft.set(9.5);
-    this.boxWidth.set(80.0);
-    this.boxHeight.set(32.0);
+    this.boxTop.set(16.9);
+    this.boxLeft.set(1.1);
+    this.boxWidth.set(73.2);
+    this.boxHeight.set(42.7);
   }
 
   public aplicarPresetDigital(): void {
-    this.boxTop.set(26.7);
-    this.boxLeft.set(9.5);
-    this.boxWidth.set(80.0);
-    this.boxHeight.set(32.0);
+    this.aplicarPresetEscaneoFisico();
   }
 
   public autoCalibrarCartilla(): void {
@@ -912,6 +969,10 @@ export class CalificacionOmrComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       const file = input.files[0];
+      this.archivoSeleccionado.set(file);
+      this.estudiantes.set([]);
+      this.calificacionEjecutada.set(false);
+      this.mensajeOmr.set('');
       this.archivoCargadoNombre.set(file.name);
       this.estadoFlujo.set('ALINEACION');
       this.paginaAlineacionIdx.set(0);
@@ -947,9 +1008,12 @@ export class CalificacionOmrComponent implements OnInit {
 
           if (renderedPages.length > 0) {
             this.paginasRenderizadas.set(renderedPages);
+          } else {
+            this.mensajeOmr.set('El PDF no contiene páginas renderizables. Seleccione nuevamente el escaneo.');
           }
         } catch (err) {
           console.error('Error renderizando PDF escaneado:', err);
+          this.mensajeOmr.set('No se pudo mostrar el PDF. Verifique que sea un escaneo PDF válido.');
         } finally {
           this.cargandoPdf.set(false);
         }
@@ -966,76 +1030,106 @@ export class CalificacionOmrComponent implements OnInit {
     }
   }
 
-  public async ejecutarProcesamientoOmrEnVivo(): Promise<void> {
-    const totalPags = this.totalPaginas();
-    this.procesandoOmr.set(true);
-    this.paginaProgreso.set(1);
-
-    const uploadedPages = this.paginasRenderizadas();
-    const bTop = this.boxTop();
-    const bLeft = this.boxLeft();
-    const bWidth = this.boxWidth();
-    const bHeight = this.boxHeight();
-
-    const listaReales: EstudianteOmrItem[] = [];
-
-    // Metadatos por defecto para nombres si se reconocen por orden
-    const metadatosEstudiantes = [
-      { id: 1, codigo: '8392104', nombre: 'MARÍA BELÉN QUISPE FLORES', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' },
-      { id: 2, codigo: '7849102', nombre: 'JUAN CARLOS PÉREZ MAMANI', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' },
-      { id: 3, codigo: '6928103', nombre: 'RODRIGO ALEJANDRO CONDORI RODRÍGUEZ', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' },
-      { id: 4, codigo: '7194820', nombre: 'GABRIELA SOFÍA LÓPEZ TORRICO', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' },
-      { id: 5, codigo: '7391028', nombre: 'SERGIO ALEJANDRO MENDOZA TAPIA', carrera: 'AUDITORÍA / CONTADURÍA', grupo: 'TA-01', variante: 'A' }
-    ];
-
-    try {
-      if (uploadedPages.length > 0) {
-        for (let i = 0; i < uploadedPages.length; i++) {
-          this.paginaProgreso.set(i + 1);
-          const pageDataUrl = uploadedPages[i];
-          const omrResult = await this._procesarPaginaOmrConCanvas(pageDataUrl, bTop, bLeft, bWidth, bHeight);
-
-          const meta = metadatosEstudiantes[i] || {
-            id: i + 1,
-            codigo: `784910${i + 1}`,
-            nombre: `ESTUDIANTE ${i + 1}`,
-            carrera: 'AUDITORÍA / CONTADURÍA',
-            grupo: 'TA-01',
-            variante: 'A'
-          };
-
-          listaReales.push({
-            estudianteId: meta.id,
-            codigo: meta.codigo,
-            nombre: meta.nombre,
-            carrera: meta.carrera,
-            grupo: meta.grupo,
-            variante: meta.variante,
-            totalPreguntas: 30,
-            aciertos: omrResult.aciertos,
-            fallos: omrResult.fallos,
-            blancos: omrResult.blancos,
-            doblesMarcas: omrResult.dobles,
-            nota100: omrResult.nota100,
-            nota30: omrResult.aciertos,
-            aprobado: omrResult.nota100 >= 51,
-            estadoCalificacion: 'CALIFICADO',
-            imagenEscaneada: pageDataUrl,
-            imagenAnotada: omrResult.imagenAnotada,
-            detalles: omrResult.detalles
-          });
-        }
-
-        this.estudiantes.set(listaReales);
-        this.estudianteActivoIdx.set(0);
-      }
-    } catch (err) {
-      console.error('Error durante el procesamiento OMR en canvas:', err);
-    } finally {
-      this.procesandoOmr.set(false);
-      this.calificacionEjecutada.set(true);
-      this.estadoFlujo.set('RESULTADOS');
+  public ejecutarProcesamientoOmrEnVivo(): void {
+    const archivo = this.archivoSeleccionado();
+    const rolId = this.rolExamenSeleccionado();
+    if (!archivo) {
+      this.mensajeOmr.set('Seleccione el PDF o la imagen escaneada antes de procesar.');
+      return;
     }
+    if (!rolId) {
+      this.mensajeOmr.set('Seleccione el rol oficial de evaluación para validar el código del estudiante.');
+      return;
+    }
+
+    this.mensajeOmr.set('');
+    this.procesandoOmr.set(true);
+    this.calificacionEjecutada.set(false);
+    this.paginaProgreso.set(1);
+    this.omrProcesamientoService.procesar(rolId, archivo).subscribe({
+      next: aceptado => this._esperarResultadoOmr(aceptado.jobId, archivo),
+      error: error => {
+        console.error('Error enviando escaneo OMR al backend:', error);
+        this.procesandoOmr.set(false);
+        this.mensajeOmr.set('No se pudo enviar el escaneo al motor OMR. Revise que el backend y RabbitMQ estén disponibles.');
+      }
+    });
+  }
+
+  private _esperarResultadoOmr(jobId: string, archivo: File): void {
+    this.omrProcesamientoService.consultar(jobId).subscribe({
+      next: resultado => {
+        if (resultado.estado === 'EN_COLA') {
+          window.setTimeout(() => this._esperarResultadoOmr(jobId, archivo), 1200);
+          return;
+        }
+        this.procesandoOmr.set(false);
+        if (resultado.estado !== 'COMPLETADO') {
+          this.mensajeOmr.set(resultado.mensaje || 'El motor OMR no pudo completar la lectura.');
+          return;
+        }
+        const paginas = this.paginasRenderizadas();
+        const lecturas = (resultado.resultados || []).map((lectura, indice) =>
+          this._convertirLecturaOmr(lectura, paginas[indice] || '', indice + 1)
+        );
+        this.estudiantes.set(lecturas);
+        this.estudianteActivoIdx.set(0);
+        this.paginaProgreso.set(resultado.totalPaginas || lecturas.length || 1);
+        this.calificacionEjecutada.set(true);
+        this.estadoFlujo.set('RESULTADOS');
+        this.mensajeOmr.set(resultado.mensaje || 'Lectura OMR completada. Los códigos no reconocidos quedaron para revisión manual.');
+      },
+      error: error => {
+        console.error('Error consultando resultado OMR:', error);
+        this.procesandoOmr.set(false);
+        this.mensajeOmr.set('No se pudo consultar el resultado del motor OMR.');
+      }
+    });
+  }
+
+  private _convertirLecturaOmr(lectura: OmrLecturaResponse, imagen: string, pagina: number): EstudianteOmrItem {
+    const rol = this.rolesExamen().find(item => item.id === this.rolExamenSeleccionado());
+    const total = lectura.totalReactivos || lectura.detalles?.length || 60;
+    const respuestas = lectura.respuestas || {};
+    const respuestasLeidas = Object.values(respuestas).filter(respuesta => !!respuesta).length;
+    const detalles: DetallePreguntaOmr[] = Array.from({ length: total }, (_, indice) => {
+      const pregunta = indice + 1;
+      const marcada = respuestas[String(pregunta)] || '';
+      const estado = marcada.length > 1 ? 'DOBLE_MARCA' : marcada ? 'LEIDA' : 'EN_BLANCO';
+      return {
+        pregunta,
+        patron: '—',
+        marcada,
+        estado,
+        puntos: 0,
+        densidades: lectura.detalles?.[indice]?.densidades || []
+      };
+    });
+    return {
+      estudianteId: pagina,
+      codigo: lectura.codigoEstudiante || 'NO RECONOCIDO',
+      nombre: lectura.estudianteNombre || 'PENDIENTE DE REVISIÓN MANUAL',
+      carrera: rol?.carreraNombre || '',
+      grupo: rol?.grupo || '',
+      variante: '',
+      totalPreguntas: total,
+      aciertos: lectura.aciertos || 0,
+      fallos: lectura.fallos || 0,
+      blancos: lectura.blancos || 0,
+      doblesMarcas: lectura.doblesMarcas || 0,
+      nota100: lectura.notaSobre100 || 0,
+      nota30: lectura.notaSobre30 || 0,
+      aprobado: lectura.estadoCalificacion === 'APROBADO',
+      estadoCalificacion: lectura.estado === 'CALIFICADO' ? (lectura.estadoCalificacion || 'CALIFICADO') : 'REVISION_MANUAL',
+      imagenEscaneada: imagen,
+      imagenAnotada: imagen,
+      detalles,
+      pagina,
+      codigoLeido: !!lectura.codigoEstudiante,
+      codigoOcr: lectura.codigoOcr || [],
+      grillaDetectada: !!lectura.grilla && lectura.grilla.ancho > 0 && lectura.grilla.alto > 0,
+      respuestasLeidas
+    };
   }
 
   private _detectarEsquinasFiducialesEnImageData(
@@ -1130,10 +1224,10 @@ export class CalificacionOmrComponent implements OnInit {
 
     // 2. Fallback de alta precisión para Cartilla en Hoja 1 OMR (Margen 2.0 cm)
     return {
-      rx: Math.floor(width * 0.095),
-      ry: Math.floor(height * 0.267),
-      rw: Math.floor(width * 0.800),
-      rh: Math.floor(height * 0.320)
+      rx: Math.floor(width * 0.011),
+      ry: Math.floor(height * 0.169),
+      rw: Math.floor(width * 0.732),
+      rh: Math.floor(height * 0.427)
     };
   }
 
@@ -1390,10 +1484,10 @@ export class CalificacionOmrComponent implements OnInit {
     const data: any[][] = [
       ['UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC'],
       ['ACTA OFICIAL DE CALIFICACIONES OMR - SISTEMA SEA'],
-      ['ASIGNATURA:', '[CPEC18] AUDITORÍA TRIBUTARIA', 'EVALUACIÓN:', '1er Parcial'],
-      ['DOCENTE:', 'MAURICIO QUIROZ LAFUENTE', 'FECHA:', new Date().toLocaleDateString()],
+      ['ASIGNATURA:', '[----] ASIGNATURA NO ESPECIFICADA', 'EVALUACIÓN:', '1er Parcial'],
+      ['DOCENTE:', 'Docente no identificado', 'FECHA:', new Date().toLocaleDateString()],
       [],
-      ['Nº', 'CÓDIGO ESTUDIANTE', 'APELLIDOS Y NOMBRES', 'CARRERA', 'GRUPO', 'VARIANTE', 'ACIERTOS (30P)', 'FALLOS', 'BLANCOS', 'DOBLES', 'NOTA FINAL (/100)', 'ESTADO']
+      ['Nº', 'CÓDIGO ESTUDIANTE', 'APELLIDOS Y NOMBRES', 'CARRERA', 'GRUPO', 'ACIERTOS (30P)', 'FALLOS', 'BLANCOS', 'DOBLES', 'NOTA FINAL (/100)', 'ESTADO']
     ];
 
     list.forEach((est, idx) => {
@@ -1403,7 +1497,6 @@ export class CalificacionOmrComponent implements OnInit {
         est.nombre,
         est.carrera,
         est.grupo,
-        est.variante,
         est.aciertos,
         est.fallos,
         est.blancos,

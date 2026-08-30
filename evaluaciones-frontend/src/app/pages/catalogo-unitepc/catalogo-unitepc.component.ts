@@ -266,6 +266,7 @@ import {
                         <th class="p-3.5 text-center">Créditos</th>
                         <th class="p-3.5 text-center">Horas Teoría</th>
                         <th class="p-3.5 text-center">Horas Práctica</th>
+                        <th class="p-3.5 text-center">Grupos</th>
                         <th class="p-3.5 text-right font-mono">UUID Syllabus</th>
                       </tr>
                     </thead>
@@ -305,6 +306,16 @@ import {
                             {{ mat.practiceHours }} hrs
                           </td>
 
+                          <!-- Ver Grupos -->
+                          <td class="p-3.5 text-center">
+                            <button 
+                              (click)="verGruposDeMateria(mat)"
+                              class="bg-primary/10 hover:bg-primary text-primary hover:text-white font-bold text-[10px] py-1 px-2.5 rounded-lg inline-flex items-center gap-1 transition-colors">
+                              <i class="pi pi-users text-[10px]"></i>
+                              <span>Ver Grupos</span>
+                            </button>
+                          </td>
+
                           <!-- UUID Syllabus -->
                           <td class="p-3.5 text-right font-mono text-[10px] text-muted-foreground">
                             <span class="bg-muted px-2 py-0.5 rounded border border-border truncate inline-block max-w-[120px]" [title]="mat.syllabusCourseId">
@@ -329,26 +340,52 @@ import {
       @if (vistaActiva() === 'grupos') {
         <div class="space-y-4 animate-fade-in">
           
-          <div class="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 class="text-sm font-black text-foreground flex items-center gap-2">
-                <i class="pi pi-users text-primary"></i>
-                <span>Grupos y Carga Docente Registrada (Gestión {{ gestionActiva() }})</span>
-              </h3>
-              <p class="text-[11px] text-muted-foreground mt-0.5">
-                Cruce de docentes titulares, números de documento, horarios semanales, aulas y campus físicos.
-              </p>
+          <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 class="text-sm font-black text-foreground flex items-center gap-2">
+                  <i class="pi pi-users text-primary"></i>
+                  <span>Grupos y Carga Docente (Gestión {{ gestionActiva() }})</span>
+                </h3>
+                <p class="text-[11px] text-muted-foreground mt-0.5">
+                  Sede: <strong class="text-foreground">{{ sedeSeleccionada()?.name || 'No seleccionada' }} ({{ sedeSeleccionada()?.code }})</strong> · Carrera: <strong class="text-foreground">{{ carreraSeleccionada()?.careerName || 'No seleccionada' }}</strong>
+                  @if (materiaSeleccionada()) {
+                    · Materia: <strong class="text-primary font-bold">[{{ materiaSeleccionada()?.courseCode }}] {{ materiaSeleccionada()?.courseName }}</strong>
+                  }
+                </p>
+              </div>
+
+              <!-- Buscador de Grupos -->
+              <div class="relative w-full sm:w-72">
+                <input 
+                  type="text" 
+                  [(ngModel)]="busquedaGrupo" 
+                  placeholder="Buscar por docente, CI, aula o grupo..."
+                  class="w-full bg-muted/70 border border-border rounded-xl pl-8 pr-3 py-2 text-xs font-medium text-foreground outline-none focus:border-primary">
+                <i class="pi pi-search absolute left-2.5 top-2.5 text-muted-foreground text-xs"></i>
+              </div>
             </div>
 
-            <!-- Buscador de Grupos -->
-            <div class="relative w-full sm:w-72">
-              <input 
-                type="text" 
-                [(ngModel)]="busquedaGrupo" 
-                placeholder="Buscar por docente, CI, aula o grupo..."
-                class="w-full bg-muted/70 border border-border rounded-xl pl-8 pr-3 py-2 text-xs font-medium text-foreground outline-none focus:border-primary">
-              <i class="pi pi-search absolute left-2.5 top-2.5 text-muted-foreground text-xs"></i>
-            </div>
+            <!-- Filtro de Materia para Grupos -->
+            @if (materias().length > 0) {
+              <div class="flex items-center gap-2 pt-2 border-t border-border overflow-x-auto pb-1 text-xs">
+                <span class="text-[10px] font-extrabold uppercase text-muted-foreground whitespace-nowrap">Filtrar por Asignatura:</span>
+                <button 
+                  (click)="seleccionarMateriaFiltroGrupos(null)"
+                  [class]="!materiaSeleccionada() ? 'bg-primary text-white font-bold shadow-2xs' : 'bg-muted hover:bg-muted/80 text-foreground'"
+                  class="px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-colors">
+                  Todas las Asignaturas ({{ materias().length }})
+                </button>
+                @for (mat of materias(); track mat.syllabusCourseId) {
+                  <button 
+                    (click)="seleccionarMateriaFiltroGrupos(mat)"
+                    [class]="materiaSeleccionada()?.syllabusCourseId === mat.syllabusCourseId ? 'bg-primary text-white font-bold shadow-2xs' : 'bg-muted hover:bg-muted/80 text-foreground'"
+                    class="px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-colors font-mono">
+                    {{ mat.courseCode }}
+                  </button>
+                }
+              </div>
+            }
           </div>
 
           <!-- Grid de Grupos -->
@@ -635,6 +672,7 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   public carreraSeleccionada = signal<Career | null>(null);
 
   public materias = signal<Course[]>([]);
+  public materiaSeleccionada = signal<Course | null>(null);
   public grupos = signal<GroupItem[]>([]);
   public campusList = signal<Campus[]>([]);
   public timeFrames = signal<TimeFrame[]>([]);
@@ -708,16 +746,31 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   public seleccionarSede(sede: BranchOffice): void {
     this.sedeSeleccionada.set(sede);
     this.carreraSeleccionada.set(null);
+    this.materiaSeleccionada.set(null);
     this.materias.set([]);
+    this.grupos.set([]);
     this._cargarCarrerasDeSede(sede.code);
   }
 
   public seleccionarCarrera(carrera: Career): void {
     this.carreraSeleccionada.set(carrera);
+    this.materiaSeleccionada.set(null);
     const sede = this.sedeSeleccionada();
     if (sede) {
       this._cargarMateriasDeCarrera(sede.code, carrera.careerCode);
+      this._cargarGrupos();
     }
+  }
+
+  public verGruposDeMateria(mat: Course): void {
+    this.materiaSeleccionada.set(mat);
+    this.vistaActiva.set('grupos');
+    this._cargarGrupos();
+  }
+
+  public seleccionarMateriaFiltroGrupos(mat: Course | null): void {
+    this.materiaSeleccionada.set(mat);
+    this._cargarGrupos();
   }
 
   private _cargarSedes(): void {
@@ -763,13 +816,26 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   }
 
   private _cargarGrupos(): void {
+    const sede = this.sedeSeleccionada();
+    const carrera = this.carreraSeleccionada();
+    const materia = this.materiaSeleccionada();
+    const term = this.gestionActiva() || '2-2026';
+
     this.cargandoGrupos.set(true);
-    this._gateway.getGroups('2-2026').subscribe({
+    this._gateway.getGroups(
+      term,
+      sede?.branchOfficeId,
+      carrera?.careerId,
+      materia?.syllabusCourseId
+    ).subscribe({
       next: data => {
-        this.grupos.set(data);
+        this.grupos.set(data || []);
         this.cargandoGrupos.set(false);
       },
-      error: () => this.cargandoGrupos.set(false)
+      error: () => {
+        this.grupos.set([]);
+        this.cargandoGrupos.set(false);
+      }
     });
   }
 

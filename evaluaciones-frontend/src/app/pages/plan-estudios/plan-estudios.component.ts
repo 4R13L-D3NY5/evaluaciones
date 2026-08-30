@@ -355,7 +355,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
                             } @else {
                               <button 
                                 (click)="solicitarCambioCartilla(asig)"
-                                title="Cambiar a Con Cartilla (Generación digital/Typst)"
+                                title="Cambiar a generación digital"
                                 class="bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/30 font-bold text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all">
                                 <i class="pi pi-check-circle text-[10px]"></i>
                                 <span>Con Cartilla</span>
@@ -408,14 +408,14 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
                   </div>
                   <ul class="list-disc list-inside text-amber-900/90 text-[11px] space-y-1 font-medium">
                     <li>No se requerirá la carga de archivo Excel con banco de preguntas.</li>
-                    <li>No se compilarán variantes automáticas ni cartillas con Typst.</li>
+                    <li>No se generarán variantes automáticas ni hojas de respuestas dentro del examen.</li>
                     <li>El estado del examen pasará a <strong>Gestión Manual / Exento de Banco</strong>.</li>
                   </ul>
                 </div>
               } @else {
                 <!-- Transición: De Sin Cartilla -> Con Cartilla -->
                 <p class="text-muted-foreground leading-relaxed">
-                  Está a punto de activar la modalidad <strong>Con Cartilla (Generación Digital / Typst)</strong>.
+                  Está a punto de activar la modalidad <strong>Generación digital</strong>.
                 </p>
 
                 <div class="bg-indigo-500/10 border-l-4 border-indigo-600 p-3 rounded-r-lg space-y-1.5">
@@ -425,7 +425,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
                   </div>
                   <ul class="list-disc list-inside text-indigo-900/90 text-[11px] space-y-1 font-medium">
                     <li>El encargado de evaluaciones subirá el archivo Excel con las preguntas y fórmulas.</li>
-                    <li>El ciclo requerirá: <strong>Programado $\rightarrow$ Generado (Typst) $\rightarrow$ Impreso $\rightarrow$ Entregado $\rightarrow$ Devuelto $\rightarrow$ Revisado $\rightarrow$ Subido $\rightarrow$ Recibido</strong>.</li>
+                    <li>El ciclo requerirá: <strong>Programado $\rightarrow$ Generado $\rightarrow$ Impreso $\rightarrow$ Entregado $\rightarrow$ Devuelto $\rightarrow$ Revisado $\rightarrow$ Subido $\rightarrow$ Recibido</strong>.</li>
                   </ul>
                 </div>
               }

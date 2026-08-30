@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: evaluaciones-backend
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:sea_evaluaciones}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 100MB
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  storage:
+    base-path: ${STORAGE_BASE_PATH:C:/laragon/www/evaluaciones/storage}
+  unitepc:
+    gateway-base-url: ${UNITEPC_GATEWAY_BASE_URL:https://gw-dev.unitepc.solutions}
+    client-id: ${UNITEPC_CLIENT_ID}
+    client-secret: ${UNITEPC_CLIENT_SECRET}
+    system-client-id: ${UNITEPC_SYSTEM_CLIENT_ID:sea-evaluaciones}
+
+logging:
+  level:
+    com.xpertiflow.evaluaciones: DEBUG

@@ -47,7 +47,7 @@ interface EstadoMetrica {
             </span>
             <span class="text-white/60 text-xs">|</span>
             <span class="text-xs text-white/80 font-mono font-bold flex items-center gap-1">
-              <i class="pi pi-bolt text-purple-400"></i> Motor Typst v0.11 Activo
+              <i class="pi pi-bolt text-purple-400"></i> Motor de generación activo
             </span>
           </div>
 
@@ -55,7 +55,7 @@ interface EstadoMetrica {
             Panel de Control y Monitoreo Institucional
           </h1>
           <p class="text-xs text-purple-200/80 max-w-2xl font-medium">
-            Seguimiento en tiempo real de generación de variantes Typst, lectura óptica OMR, trazabilidad de estados y cobertura en sedes.
+            Seguimiento en tiempo real de generación de exámenes, lectura óptica OMR, trazabilidad de estados y cobertura en sedes.
           </p>
         </div>
 
@@ -149,10 +149,10 @@ interface EstadoMetrica {
           </div>
         </div>
 
-        <!-- KPI 3: Variantes Typst y Paquetes Compilados -->
+        <!-- KPI 3: Variantes y Paquetes Generados -->
         <div class="bg-card border border-border rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all group">
           <div class="flex items-center justify-between mb-3">
-            <span class="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">Variantes Typst (A-E)</span>
+            <span class="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">Variantes del examen (A-E)</span>
             <div class="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 border border-blue-200 dark:border-blue-900 flex items-center justify-center group-hover:scale-110 transition-transform">
               <i class="pi pi-file-pdf text-base"></i>
             </div>
@@ -503,7 +503,7 @@ interface EstadoMetrica {
           </div>
         </div>
 
-        <!-- ESTADO DEL MOTOR TYPST & POLÍTICAS DE SEGURIDAD -->
+        <!-- ESTADO DEL MOTOR DE GENERACIÓN Y POLÍTICAS DE SEGURIDAD -->
         <div class="bg-card border border-border rounded-2xl p-6 shadow-2xs space-y-4 flex flex-col justify-between">
           <div class="space-y-3">
             <div class="flex items-center gap-2 text-primary font-black text-sm uppercase tracking-wider border-b border-border pb-3">
@@ -531,7 +531,7 @@ interface EstadoMetrica {
               <li class="p-2.5 rounded-xl bg-muted/40 border border-border/80 flex items-start gap-2.5">
                 <i class="pi pi-bolt text-purple-600 text-sm mt-0.5 shrink-0"></i>
                 <div>
-                  <strong class="text-foreground block text-[11px]">Compilador Typst Engine:</strong>
+                  <strong class="text-foreground block text-[11px]">Motor de generación:</strong>
                   <span class="text-[11px]">Generación de fórmulas, matrices y cuadernillos a 38ms por variante.</span>
                 </div>
               </li>
@@ -541,7 +541,7 @@ interface EstadoMetrica {
           <!-- Métricas de Infraestructura -->
           <div class="bg-gradient-to-r from-purple-900 to-indigo-950 text-white p-4 rounded-xl shadow-xs space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-extrabold uppercase tracking-wider text-purple-200">Worker Typst #01</span>
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-purple-200">Worker de generación #01</span>
               <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
             </div>
             <div class="flex items-baseline justify-between text-xs">

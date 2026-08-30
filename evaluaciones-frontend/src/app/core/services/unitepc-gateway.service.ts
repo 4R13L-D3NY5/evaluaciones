@@ -2,13 +2,13 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
 import { map, switchMap, tap, catchError, shareReplay, timeout } from 'rxjs/operators';
-import { 
-  TokenResponse, 
-  BranchOffice, 
-  Career, 
-  Course, 
-  GroupItem, 
-  Campus, 
+import {
+  TokenResponse,
+  BranchOffice,
+  Career,
+  Course,
+  GroupItem,
+  Campus,
   TimeFrame,
   GroupStudentItem
 } from '../models/unitepc-gateway.models';
@@ -24,17 +24,13 @@ import {
 export class UnitepcGatewayService {
   private readonly _http = inject(HttpClient);
 
-  // Configuración de Endpoints (vía Proxy dev para eliminar restricciones CORS)
-  private readonly _authUrl = '/gw-unitepc/auth/token';
-  private readonly _universityBaseUrl = '/gw-unitepc/api/v1/university/externals/research';
-  private readonly _studentBaseUrl = '/gw-unitepc/api/v1/student/externals/research';
+  // Endpoints propios del backend SEA Evaluaciones (proxy vía /api)
+  private readonly _baseUrl = '/api/catalogo-academico';
 
-  // Credenciales OAuth2 M2M
-  private readonly _clientId = 'dev-syseng-research';
-  private readonly _clientSecret = '1XqjSsWL01xegB12z3mGKpF6eeFQLsZd';
+  // Credenciales OAuth2 M2M (ahora gestionadas por el backend; se conservan para métricas de UI)
   private readonly _systemClientId = 'sea-evaluaciones';
 
-  // Token Cache en memoria
+  // Token Cache en memoria (simulado; el backend maneja el token real)
   private _cachedToken: TokenResponse | null = null;
   private _tokenExpiresAt: number = 0; // Timestamp en ms
 
@@ -57,14 +53,8 @@ export class UnitepcGatewayService {
     this._isChecking = true;
     this.seaStatus.set('checking');
 
-    this.getAccessToken().pipe(
-      timeout(3500),
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        return this._http.get<BranchOffice[]>(`${this._universityBaseUrl}/branchOffices`, { headers }).pipe(
-          timeout(3500)
-        );
-      })
+    this.getBranchOffices().pipe(
+      timeout(3500)
     ).subscribe({
       next: (res) => {
         this.seaStatus.set(res && res.length > 0 ? 'online' : 'offline');
@@ -82,59 +72,20 @@ export class UnitepcGatewayService {
   }
 
   /**
-   * Obtiene el token de acceso activo, renovándolo automáticamente si expiró o está próximo a expirar.
+   * Obtiene el token de acceso activo. Ahora el backend gestiona el token OAuth2;
+   * este método se conserva para compatibilidad con componentes que consultan estado.
    */
   public getAccessToken(): Observable<string> {
-    const now = Date.now();
-    // Renovar con margen de seguridad de 60 segundos antes de expirar
-    if (this._cachedToken && now < (this._tokenExpiresAt - 60000)) {
-      return of(this._cachedToken.access_token);
-    }
-
-    const body = new HttpParams()
-      .set('grant_type', 'client_credentials')
-      .set('client_id', this._clientId)
-      .set('client_secret', this._clientSecret);
-
-    const headers = new HttpHeaders({
-      'Content-Type': 'application/x-www-form-urlencoded'
-    });
-
-    return this._http.post<TokenResponse>(this._authUrl, body.toString(), { headers }).pipe(
-      tap(tokenRes => {
-        this._cachedToken = tokenRes;
-        // tokenRes.expires_in viene en segundos (ej. 7200)
-        this._tokenExpiresAt = Date.now() + (tokenRes.expires_in * 1000);
-      }),
-      map(tokenRes => tokenRes.access_token),
-      catchError(err => {
-        console.error('[UnitepcGatewayService] Error al obtener token OAuth2:', err);
-        return throwError(() => err);
-      }),
-      shareReplay(1)
-    );
-  }
-
-  /**
-   * Genera las cabeceras requeridas por el Gateway
-   */
-  private _buildHeaders(token: string): HttpHeaders {
-    return new HttpHeaders({
-      'Authorization': `Bearer ${token}`,
-      'clientId': this._systemClientId
-    });
+    // El frontend ya no necesita token real; el backend se encarga de la autenticación M2M.
+    return of('backend-managed');
   }
 
   /**
    * Lista todas las Sedes institucionales
-   * GET /branchOffices
+   * GET /api/catalogo-academico/sedes
    */
   public getBranchOffices(): Observable<BranchOffice[]> {
-    return this.getAccessToken().pipe(
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        return this._http.get<BranchOffice[]>(`${this._universityBaseUrl}/branchOffices`, { headers });
-      }),
+    return this._http.get<BranchOffice[]>(`${this._baseUrl}/sedes`).pipe(
       catchError(err => {
         console.error('[UnitepcGatewayService] Error al obtener Sedes:', err);
         return throwError(() => err);
@@ -144,15 +95,11 @@ export class UnitepcGatewayService {
 
   /**
    * Lista las Carreras de una Sede específica por código (ej. CBA, LPZ)
-   * GET /careers?branchOfficeCode={branchOfficeCode}
+   * GET /api/catalogo-academico/carreras?branchOfficeCode={branchOfficeCode}
    */
   public getCareers(branchOfficeCode: string): Observable<Career[]> {
-    return this.getAccessToken().pipe(
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        const params = new HttpParams().set('branchOfficeCode', branchOfficeCode);
-        return this._http.get<Career[]>(`${this._universityBaseUrl}/careers`, { headers, params });
-      }),
+    const params = new HttpParams().set('branchOfficeCode', branchOfficeCode);
+    return this._http.get<Career[]>(`${this._baseUrl}/carreras`, { params }).pipe(
       catchError(err => {
         console.error(`[UnitepcGatewayService] Error al obtener Carreras de sede ${branchOfficeCode}:`, err);
         return throwError(() => err);
@@ -162,17 +109,13 @@ export class UnitepcGatewayService {
 
   /**
    * Lista las Materias de una Carrera en una Sede específica
-   * GET /courses?branchOfficeCode={branchOfficeCode}&careerCode={careerCode}
+   * GET /api/catalogo-academico/asignaturas?branchOfficeCode={branchOfficeCode}&careerCode={careerCode}
    */
   public getCourses(branchOfficeCode: string, careerCode: string): Observable<Course[]> {
-    return this.getAccessToken().pipe(
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        const params = new HttpParams()
-          .set('branchOfficeCode', branchOfficeCode)
-          .set('careerCode', careerCode);
-        return this._http.get<Course[]>(`${this._universityBaseUrl}/courses`, { headers, params });
-      }),
+    const params = new HttpParams()
+      .set('branchOfficeCode', branchOfficeCode)
+      .set('careerCode', careerCode);
+    return this._http.get<Course[]>(`${this._baseUrl}/asignaturas`, { params }).pipe(
       catchError(err => {
         console.error(`[UnitepcGatewayService] Error al obtener Materias (${branchOfficeCode} - ${careerCode}):`, err);
         return throwError(() => err);
@@ -182,24 +125,20 @@ export class UnitepcGatewayService {
 
   /**
    * Lista los Grupos, Docentes, Aulas y Horarios de una Gestión (ej. 2-2026)
-   * GET /groups?term={term}&branchOfficeId={uuid}&careerId={uuid}&syllabusCourseId={uuid}
+   * GET /api/catalogo-academico/grupos?term={term}&branchOfficeId={uuid}&careerId={uuid}&syllabusCourseId={uuid}
    */
   public getGroups(
-    term: string = '2-2026', 
-    branchOfficeId?: string, 
-    careerId?: string, 
+    term: string = '2-2026',
+    branchOfficeId?: string,
+    careerId?: string,
     syllabusCourseId?: string
   ): Observable<GroupItem[]> {
-    return this.getAccessToken().pipe(
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        let params = new HttpParams().set('term', term);
-        if (branchOfficeId) params = params.set('branchOfficeId', branchOfficeId);
-        if (careerId) params = params.set('careerId', careerId);
-        if (syllabusCourseId) params = params.set('syllabusCourseId', syllabusCourseId);
+    let params = new HttpParams().set('term', term);
+    if (branchOfficeId) params = params.set('branchOfficeId', branchOfficeId);
+    if (careerId) params = params.set('careerId', careerId);
+    if (syllabusCourseId) params = params.set('syllabusCourseId', syllabusCourseId);
 
-        return this._http.get<GroupItem[]>(`${this._studentBaseUrl}/groups`, { headers, params });
-      }),
+    return this._http.get<GroupItem[]>(`${this._baseUrl}/grupos`, { params }).pipe(
       catchError(err => {
         console.error(`[UnitepcGatewayService] Error al obtener Grupos para term ${term}:`, err);
         return throwError(() => err);
@@ -209,15 +148,11 @@ export class UnitepcGatewayService {
 
   /**
    * Obtiene la nómina de estudiantes matriculados en un grupo
-   * GET /students/byGroup?groupId={groupId}
+   * GET /api/catalogo-academico/estudiantes?groupId={groupId}
    */
   public getStudentsByGroup(groupId: string): Observable<GroupStudentItem[]> {
-    return this.getAccessToken().pipe(
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        const params = new HttpParams().set('groupId', groupId);
-        return this._http.get<GroupStudentItem[]>(`${this._studentBaseUrl}/students/byGroup`, { headers, params });
-      }),
+    const params = new HttpParams().set('groupId', groupId);
+    return this._http.get<GroupStudentItem[]>(`${this._baseUrl}/estudiantes`, { params }).pipe(
       catchError(err => {
         console.error(`[UnitepcGatewayService] Error al obtener Estudiantes para grupo ${groupId}:`, err);
         return throwError(() => err);
@@ -227,17 +162,13 @@ export class UnitepcGatewayService {
 
   /**
    * Lista los Campus físicos de la universidad
-   * GET /campuses?branchOfficeId={uuid}
+   * GET /api/catalogo-academico/campus?branchOfficeId={uuid}
    */
   public getCampuses(branchOfficeId?: string): Observable<Campus[]> {
-    return this.getAccessToken().pipe(
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        let params = new HttpParams();
-        if (branchOfficeId) params = params.set('branchOfficeId', branchOfficeId);
+    let params = new HttpParams();
+    if (branchOfficeId) params = params.set('branchOfficeId', branchOfficeId);
 
-        return this._http.get<Campus[]>(`${this._studentBaseUrl}/campuses`, { headers, params });
-      }),
+    return this._http.get<Campus[]>(`${this._baseUrl}/campus`, { params }).pipe(
       catchError(err => {
         console.error('[UnitepcGatewayService] Error al obtener Campus:', err);
         return throwError(() => err);
@@ -247,14 +178,10 @@ export class UnitepcGatewayService {
 
   /**
    * Obtiene las Gestiones Institucionales
-   * GET /timeFrames
+   * GET /api/catalogo-academico/gestiones
    */
   public getTimeFrames(): Observable<TimeFrame[]> {
-    return this.getAccessToken().pipe(
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        return this._http.get<TimeFrame[]>(`${this._universityBaseUrl}/timeFrames`, { headers });
-      }),
+    return this._http.get<TimeFrame[]>(`${this._baseUrl}/gestiones`).pipe(
       catchError(err => {
         console.error('[UnitepcGatewayService] Error al obtener TimeFrames:', err);
         return throwError(() => err);
@@ -264,14 +191,10 @@ export class UnitepcGatewayService {
 
   /**
    * Obtiene la Gestión Activa
-   * GET /timeFrames/active
+   * GET /api/catalogo-academico/gestiones/activa
    */
   public getActiveTimeFrame(): Observable<TimeFrame> {
-    return this.getAccessToken().pipe(
-      switchMap(token => {
-        const headers = this._buildHeaders(token);
-        return this._http.get<TimeFrame>(`${this._universityBaseUrl}/timeFrames/active`, { headers });
-      }),
+    return this._http.get<TimeFrame>(`${this._baseUrl}/gestiones/activa`).pipe(
       catchError(err => {
         console.error('[UnitepcGatewayService] Error al obtener Gestión Activa:', err);
         return throwError(() => err);
@@ -283,19 +206,12 @@ export class UnitepcGatewayService {
    * Información del estado actual del token y conexión
    */
   public getTokenState(): { hasToken: boolean; secondsRemaining: number; tokenType: string } {
-    if (!this._cachedToken || Date.now() >= this._tokenExpiresAt) {
-      return { hasToken: false, secondsRemaining: 0, tokenType: 'None' };
-    }
-    const remainingMs = this._tokenExpiresAt - Date.now();
-    return {
-      hasToken: true,
-      secondsRemaining: Math.floor(remainingMs / 1000),
-      tokenType: this._cachedToken.token_type
-    };
+    // El token es gestionado por el backend; se reporta siempre como vigente.
+    return { hasToken: true, secondsRemaining: 7200, tokenType: 'BackendManaged' };
   }
 
   /**
-   * Fuerza la renovación del token
+   * Fuerza la renovación del token (ahora delegada al backend)
    */
   public clearTokenCache(): void {
     this._cachedToken = null;
