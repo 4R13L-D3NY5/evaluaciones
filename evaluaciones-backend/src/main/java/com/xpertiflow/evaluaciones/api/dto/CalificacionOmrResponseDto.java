@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class CalificacionOmrResponseDto {
@@ -21,6 +22,7 @@ public class CalificacionOmrResponseDto {
     private BigDecimal notaSobre100;
     private String estadoCalificacion;
     private String respuestasDetectadasJson;
+    private List<DetalleRespuestaOmrDto> detalles;
     private String imagenCartillaAnotadaPath;
     private String archivoEscaneadoPath;
     private String procesadoPor;

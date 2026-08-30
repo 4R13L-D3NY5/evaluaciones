@@ -33,6 +33,47 @@ UMBRAL_DIFERENCIAL_DOBLE = 18.0
 # derecho del código, excluyendo tipo de examen, N°, materia, grupo, nombre y
 # los seriales rojos superior/inferior.
 ZONA_CODIGO_ESTUDIANTE = (0.53, 0.09, 0.75, 0.14)
+PARAMETROS_OMR_DEFECTO: dict[str, float] = {
+    "umbral_densidad_marca": 70.0,
+    "umbral_diferencial_doble": 18.0,
+    "umbral_binario_grilla": 185.0,
+    "nivel_tinta_marca": 145.0,
+    "zona_codigo_x": 0.53,
+    "zona_codigo_y": 0.09,
+    "zona_codigo_ancho": 0.22,
+    "zona_codigo_alto": 0.05,
+    "escala_ocr": 2.5,
+    "radio_busqueda_pixeles": 2.0,
+}
+
+
+def _cargar_parametros_omr() -> dict[str, float]:
+    """Lee la configuración oficial vigente; usa defaults si la BD no responde."""
+    columnas = tuple(PARAMETROS_OMR_DEFECTO.keys())
+    conexion = None
+    try:
+        conexion = psycopg2.connect(
+            host=config.DB_HOST, port=config.DB_PORT, dbname=config.DB_NAME,
+            user=config.DB_USER, password=config.DB_PASSWORD
+        )
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                "SELECT " + ", ".join(columnas) +
+                " FROM sea_configuracion_omr WHERE id = 1"
+            )
+            fila = cursor.fetchone()
+        if not fila:
+            return PARAMETROS_OMR_DEFECTO.copy()
+        return {
+            columna: float(valor) if valor is not None else PARAMETROS_OMR_DEFECTO[columna]
+            for columna, valor in zip(columnas, fila)
+        }
+    except Exception as exc:
+        logger.warning("No se pudo cargar configuración OMR; se usarán defaults: %s", exc)
+        return PARAMETROS_OMR_DEFECTO.copy()
+    finally:
+        if conexion is not None:
+            conexion.close()
 
 
 def _abrir_paginas(archivo: str) -> list[np.ndarray]:
@@ -58,9 +99,10 @@ def _abrir_paginas(archivo: str) -> list[np.ndarray]:
     return [imagen]
 
 
-def _detectar_grilla(gray: np.ndarray) -> tuple[int, int, int, int]:
+def _detectar_grilla(gray: np.ndarray, parametros: dict[str, float] | None = None) -> tuple[int, int, int, int]:
     alto, ancho = gray.shape[:2]
-    binaria = cv2.threshold(gray, 185, 255, cv2.THRESH_BINARY_INV)[1]
+    parametros = parametros or PARAMETROS_OMR_DEFECTO
+    binaria = cv2.threshold(gray, int(parametros["umbral_binario_grilla"]), 255, cv2.THRESH_BINARY_INV)[1]
     contornos, _ = cv2.findContours(binaria, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     candidatos: list[tuple[int, int, int, int, int]] = []
     for contorno in contornos:
@@ -75,15 +117,21 @@ def _detectar_grilla(gray: np.ndarray) -> tuple[int, int, int, int]:
     return int(ancho * .015), int(alto * .125), int(ancho * .54), int(alto * .32)
 
 
-def _densidad_centro(gray: np.ndarray, cx: int, cy: int, radio: int) -> float:
+def _densidad_centro(
+    gray: np.ndarray, cx: int, cy: int, radio: int,
+    parametros: dict[str, float] | None = None,
+) -> float:
     # El escaneo puede desplazar el centro uno o dos píxeles aunque la grilla
     # haya sido encontrada correctamente. Se toma la mejor lectura en una
     # vecindad pequeña para no perder marcas hechas cerca del borde.
     radio_interno = max(2, int(radio * .25))
     radio_externo = max(radio_interno + 1, int(radio * .65))
+    parametros = parametros or PARAMETROS_OMR_DEFECTO
+    radio_busqueda = max(0, int(parametros["radio_busqueda_pixeles"]))
+    nivel_tinta = int(parametros["nivel_tinta_marca"])
     mejor = 0.0
-    for desplazamiento_y in range(-2, 3):
-        for desplazamiento_x in range(-2, 3):
+    for desplazamiento_y in range(-radio_busqueda, radio_busqueda + 1):
+        for desplazamiento_x in range(-radio_busqueda, radio_busqueda + 1):
             centro_x = cx + desplazamiento_x
             centro_y = cy + desplazamiento_y
             x1, x2 = max(0, centro_x - radio), min(gray.shape[1], centro_x + radio + 1)
@@ -103,7 +151,7 @@ def _densidad_centro(gray: np.ndarray, cx: int, cy: int, radio: int) -> float:
             cv2.circle(mask, centro, radio_interno, 0, -1)
             muestra = roi[mask > 0]
             if muestra.size:
-                mejor = max(mejor, float(np.mean(muestra < 145) * 100))
+                mejor = max(mejor, float(np.mean(muestra < nivel_tinta) * 100))
     return mejor
 
 
@@ -190,10 +238,14 @@ def _detectar_centros_burbujas(
     return centros_x, centros_y, radio
 
 
-def _leer_respuestas(gray: np.ndarray, grilla: tuple[int, int, int, int]) -> dict[str, Any]:
+def _leer_respuestas(
+    gray: np.ndarray, grilla: tuple[int, int, int, int],
+    parametros: dict[str, float] | None = None,
+) -> dict[str, Any]:
     gx, gy, gw, gh = grilla
     respuestas: dict[str, Any] = {}
     detalles: list[dict[str, Any]] = []
+    parametros = parametros or PARAMETROS_OMR_DEFECTO
     centros = _detectar_centros_burbujas(gray, grilla)
     if centros:
         centros_x, centros_y, radio = centros
@@ -212,17 +264,17 @@ def _leer_respuestas(gray: np.ndarray, grilla: tuple[int, int, int, int]) -> dic
         columna = (pregunta - 1) // 20
         fila = (pregunta - 1) % 20
         densidades = [
-            round(_densidad_centro(gray, centros_x[columna * 5 + opcion], centros_y[fila], radio), 2)
+            round(_densidad_centro(gray, centros_x[columna * 5 + opcion], centros_y[fila], radio, parametros), 2)
             for opcion in range(5)
         ]
         orden = np.argsort(densidades)[::-1]
         maximo = float(densidades[int(orden[0])])
         segundo = float(densidades[int(orden[1])])
-        if maximo < UMBRAL_DENSIDAD_MARCA:
+        if maximo < parametros["umbral_densidad_marca"]:
             respuesta = ""
         elif (
-            segundo >= UMBRAL_DENSIDAD_MARCA
-            and maximo - segundo < UMBRAL_DIFERENCIAL_DOBLE
+            segundo >= parametros["umbral_densidad_marca"]
+            and maximo - segundo < parametros["umbral_diferencial_doble"]
         ):
             respuesta = OPCIONES[int(orden[0])] + OPCIONES[int(orden[1])]
         else:
@@ -232,18 +284,24 @@ def _leer_respuestas(gray: np.ndarray, grilla: tuple[int, int, int, int]) -> dic
     return {"respuestas": respuestas, "detalles": detalles}
 
 
-def _candidatos_codigo(imagen: np.ndarray) -> list[str]:
+def _candidatos_codigo(imagen: np.ndarray, parametros: dict[str, float] | None = None) -> list[str]:
     alto, ancho = imagen.shape[:2]
+    parametros = parametros or PARAMETROS_OMR_DEFECTO
     # Solo se procesa el recuadro superior derecho donde se sobreimprime el
     # código del estudiante. No se cotejan grupo, materia ni nombre.
-    zonas = [ZONA_CODIGO_ESTUDIANTE]
+    x1 = parametros["zona_codigo_x"]
+    y1 = parametros["zona_codigo_y"]
+    zonas = [(x1, y1, x1 + parametros["zona_codigo_ancho"], y1 + parametros["zona_codigo_alto"])]
     candidatos: list[str] = []
     for x1, y1, x2, y2 in zonas:
         recorte = imagen[int(alto * y1):int(alto * y2), int(ancho * x1):int(ancho * x2)]
         if recorte.size == 0:
             continue
         gris = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
-        ampliada = cv2.resize(gris, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+        ampliada = cv2.resize(
+            gris, None, fx=parametros["escala_ocr"], fy=parametros["escala_ocr"],
+            interpolation=cv2.INTER_CUBIC
+        )
         variantes = (
             ampliada,
             cv2.threshold(ampliada, 170, 255, cv2.THRESH_BINARY)[1],
@@ -329,7 +387,7 @@ def _persistir_calificacion(
 
 
 def _resumen_calificacion(lectura: dict[str, Any], mapeo: dict[str, Any]) -> dict[str, Any]:
-    """Calcula el resumen sin exponer la variante interna al cliente."""
+    """Calcula el resumen y el estado de cada pregunta para revisión manual."""
     respuestas = lectura["respuestas"]
     patron = {str(clave): valor for clave, valor in mapeo["patron"].items()}
     total = len(patron)
@@ -338,8 +396,26 @@ def _resumen_calificacion(lectura: dict[str, Any], mapeo: dict[str, Any]) -> dic
     dobles = sum(1 for pregunta in patron if len(respuestas.get(pregunta, "")) > 1)
     fallos = max(0, total - aciertos - blancos)
     nota100 = round((aciertos / total) * 100, 2) if total else 0
+    detalles = []
+    for detalle in lectura.get("detalles", []):
+        pregunta = str(detalle["pregunta"])
+        respuesta = respuestas.get(pregunta, "")
+        correcta = patron.get(pregunta, "")
+        if not respuesta:
+            estado = "EN_BLANCO"
+        elif len(respuesta) > 1:
+            estado = "DOBLE_MARCA"
+        elif not correcta:
+            estado = "SIN_PATRON"
+        elif respuesta.upper() == correcta.upper():
+            estado = "CORRECTA"
+        else:
+            estado = "INCORRECTA"
+        detalles.append({**detalle, "respuestaCorrecta": correcta, "estado": estado})
     return {
         "estudianteNombre": mapeo["nombre"],
+        "codigoValidado": True,
+        "letraVariante": mapeo["variante"],
         "totalReactivos": total,
         "aciertos": aciertos,
         "fallos": fallos,
@@ -348,10 +424,12 @@ def _resumen_calificacion(lectura: dict[str, Any], mapeo: dict[str, Any]) -> dic
         "notaSobre100": nota100,
         "notaSobre30": round(aciertos * 30 / total, 2) if total else 0,
         "estadoCalificacion": "APROBADO" if nota100 >= 51 else "REPROBADO",
+        "detalles": detalles,
     }
 
 
 def procesar_archivo(archivo: str, rol_examen_id: str) -> dict[str, Any]:
+    parametros = _cargar_parametros_omr()
     mapeos = _cargar_mapeos(rol_examen_id)
     if not mapeos:
         raise ValueError("El rol no tiene un mapeo oficial de estudiantes-variante.")
@@ -359,21 +437,23 @@ def procesar_archivo(archivo: str, rol_examen_id: str) -> dict[str, Any]:
     lecturas = []
     for numero_pagina, imagen in enumerate(paginas, start=1):
         gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
-        grilla = _detectar_grilla(gris)
-        candidatos = _candidatos_codigo(imagen)
+        grilla = _detectar_grilla(gris, parametros)
+        candidatos = _candidatos_codigo(imagen, parametros)
         codigo = next((valor for valor in candidatos if valor in mapeos), None)
         lectura = {
             "pagina": numero_pagina,
             "codigoEstudiante": codigo,
             "codigoOcr": candidatos,
             "grilla": {"x": grilla[0], "y": grilla[1], "ancho": grilla[2], "alto": grilla[3]},
-            **_leer_respuestas(gris, grilla),
+            **_leer_respuestas(gris, grilla, parametros),
         }
         if codigo:
             _persistir_calificacion(rol_examen_id, lectura, mapeos[codigo], archivo)
             lectura.update(_resumen_calificacion(lectura, mapeos[codigo]))
             lectura["estado"] = "CALIFICADO"
         else:
+            lectura["codigoValidado"] = False
+            lectura["letraVariante"] = None
             lectura["estado"] = "REVISION_MANUAL"
             if candidatos:
                 lectura["mensaje"] = (

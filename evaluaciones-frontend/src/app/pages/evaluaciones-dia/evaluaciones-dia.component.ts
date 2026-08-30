@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import * as XLSX from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { RolExamenPersistedItem, MapeoEstudianteExamen } from '../../core/services/evaluaciones-db.service';
 import { 
@@ -32,6 +33,10 @@ import {
   ConfiguracionGeneracion,
   GeneracionTypstVariante
 } from '../../core/models/generacion-typst.model';
+
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
+}
 
 function fechaIsoLocal(fecha: Date = new Date()): string {
   const anio = fecha.getFullYear();
@@ -1474,21 +1479,37 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                         <div class="flex items-center gap-2 text-xs font-black"><span class="bg-muted rounded-lg px-2 py-1">Página {{ lectura.pagina }}</span><span [class.text-emerald-700]="lectura.estado === 'CALIFICADO'" [class.text-amber-700]="lectura.estado !== 'CALIFICADO'">{{ lectura.estado === 'CALIFICADO' ? 'Código y patrón validados' : 'Código no reconocido' }}</span></div>
                         <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground"><span>Marcajes: {{ cantidadRespuestasLeidas(lectura) }}/{{ lectura.totalReactivos || 30 }}</span><span class="px-2 py-0.5 rounded border" [class.border-emerald-200]="!!lectura.grilla" [class.text-emerald-700]="!!lectura.grilla" [class.border-amber-200]="!lectura.grilla" [class.text-amber-700]="!lectura.grilla">{{ lectura.grilla ? 'Grilla detectada' : 'Grilla no detectada' }}</span></div>
                       </div>
-                        <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px]">
-                          <label class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Código del estudiante</span><input [value]="codigoOmr(lectura)" (input)="editarCodigoOmr(lectura, $any($event.target).value)" inputmode="numeric" maxlength="30" class="mt-1 w-full rounded-md border border-indigo-200 bg-white px-2 py-1 font-mono text-xs font-black text-foreground outline-none focus:border-indigo-500" placeholder="Ingrese código" /></label>
-                        <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">OCR candidato</span><strong class="font-mono text-foreground">{{ (lectura.codigoOcr || []).join(', ') || '—' }}</strong></div>
-                        <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Aciertos</span><strong class="text-emerald-700">{{ lectura.aciertos ?? 0 }}</strong></div>
-                        <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Nota /30</span><strong class="text-indigo-700">{{ lectura.notaSobre30 ?? 0 }}</strong></div>
-                        <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Nota /100</span><strong class="text-indigo-700">{{ lectura.notaSobre100 ?? 0 }}</strong></div>
+                      <div class="grid grid-cols-1 lg:grid-cols-[minmax(250px,0.9fr)_minmax(400px,1.1fr)] gap-3 items-start">
+                        <div class="rounded-xl border border-sky-200 bg-slate-950/95 p-2">
+                          <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-white/80"><i class="pi pi-image mr-1 text-sky-300"></i>Escaneado · página {{ lectura.pagina }}</span><button (click)="alternarPreviewPaginaOmr(lectura.pagina)" [disabled]="cargandoPreviewOmr() || !previewPaginaOmr(lectura.pagina)" class="px-2 py-1 rounded-md border border-white/20 text-white/80 text-[10px] font-black cursor-pointer hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"><i class="pi mr-1" [class.pi-eye]="paginaPreviewOmr() !== lectura.pagina" [class.pi-eye-slash]="paginaPreviewOmr() === lectura.pagina"></i>{{ paginaPreviewOmr() === lectura.pagina ? 'Ocultar' : 'Mostrar' }}</button></div>
+                          @if (paginaPreviewOmr() === lectura.pagina && previewPaginaOmr(lectura.pagina)) {
+                            <div class="flex justify-center overflow-auto max-h-[34rem]"><img [src]="previewPaginaOmr(lectura.pagina)" [alt]="'Página escaneada ' + lectura.pagina" class="max-w-full h-auto object-contain rounded-lg shadow-lg" /></div>
+                            <div class="text-center text-[10px] text-white/70 mt-1.5">Compare aquí cada número y marcaje con la lectura.</div>
+                          } @else if (cargandoPreviewOmr()) {
+                            <div class="py-14 text-center text-xs text-white/80"><i class="pi pi-spin pi-spinner text-xl text-sky-300"></i><p class="mt-2">Preparando página escaneada...</p></div>
+                          } @else {
+                            <div class="py-14 text-center text-xs text-white/70"><i class="pi pi-eye text-xl text-sky-300"></i><p class="mt-2">Presione “Mostrar” para ver esta página.</p></div>
+                          }
                         </div>
-                        <div class="rounded-lg border border-border bg-card p-2">
-                          <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-muted-foreground">Respuestas detectadas · revisar pregunta por pregunta</span><span class="text-[10px] text-muted-foreground">— = blanco · AB = doble marca</span></div>
-                          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">
-                            @for (pregunta of preguntasOmr(lectura); track pregunta) {
-                              <label class="flex items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 text-[10px]"><span class="w-5 shrink-0 font-mono font-black text-muted-foreground">{{ pregunta }}</span><select [value]="respuestaOmr(lectura, pregunta)" (change)="editarRespuestaOmr(lectura, pregunta, $any($event.target).value)" class="min-w-0 flex-1 rounded border-0 bg-transparent py-0 text-[10px] font-black text-foreground outline-none"><option value="">—</option>@for (opcion of opcionesRespuestaOmr; track opcion) { @if (opcion) { <option [value]="opcion">{{ opcion }}</option> } }</select></label>
-                            }
+
+                        <div class="space-y-2 min-w-0">
+                          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
+                            <div class="col-span-2 rounded-lg bg-muted/50 p-2"><label class="block text-muted-foreground uppercase font-bold">Código del estudiante</label><input [value]="codigoOmr(lectura)" (input)="editarCodigoOmr(lectura, $any($event.target).value)" inputmode="numeric" maxlength="30" class="mt-1 w-full rounded-md border border-indigo-200 bg-white px-2 py-1 font-mono text-xs font-black text-foreground outline-none focus:border-indigo-500" placeholder="Ingrese código manualmente" /><button (click)="recalibrarPaginaOmr(lectura)" [disabled]="!codigoOmr(lectura) || recalibrandoOmr()[lectura.pagina]" class="mt-2 w-full rounded-md bg-indigo-700 px-2 py-1.5 text-[10px] font-black text-white cursor-pointer hover:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed"><i class="pi mr-1" [class.pi-spin]="recalibrandoOmr()[lectura.pagina]" [class.pi-spinner]="recalibrandoOmr()[lectura.pagina]" [class.pi-refresh]="!recalibrandoOmr()[lectura.pagina]"></i>{{ recalibrandoOmr()[lectura.pagina] ? 'Validando...' : 'Validar código y recalibrar' }}</button></div>
+                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Estado código</span><strong [class.text-emerald-700]="lectura.codigoValidado" [class.text-amber-700]="!lectura.codigoValidado">{{ lectura.codigoValidado ? 'Detectado / validado' : 'Pendiente de validar' }}</strong></div>
+                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Variante</span><strong class="text-indigo-700">{{ lectura.letraVariante ? 'TIPO ' + lectura.letraVariante : '—' }}</strong></div>
+                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">OCR candidato</span><strong class="font-mono text-foreground">{{ (lectura.codigoOcr || []).join(', ') || '—' }}</strong></div>
+                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Aciertos / Nota</span><strong class="text-emerald-700">{{ lectura.aciertos ?? 0 }} · {{ lectura.notaSobre30 ?? 0 }}/30</strong></div>
+                          </div>
+                          <div class="rounded-lg border border-border bg-card p-2">
+                            <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-muted-foreground">Respuestas detectadas · revisión por pregunta</span><span class="text-[10px] text-muted-foreground">— blanco · AB doble</span></div>
+                            <div class="grid grid-cols-2 gap-1.5">
+                              @for (pregunta of preguntasOmr(lectura); track pregunta) {
+                                <label class="flex items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 text-[10px]" [title]="'Leída: ' + (respuestaOmr(lectura, pregunta) || 'blanco') + (respuestaCorrectaOmr(lectura, pregunta) ? ' · Clave: ' + respuestaCorrectaOmr(lectura, pregunta) : '')"><span class="w-5 shrink-0 font-mono font-black text-muted-foreground">{{ pregunta }}</span><span class="w-5 shrink-0 rounded bg-white text-center font-mono font-black text-indigo-700">{{ respuestaOmr(lectura, pregunta) || '—' }}</span><select [value]="respuestaOmr(lectura, pregunta)" (change)="editarRespuestaOmr(lectura, pregunta, $any($event.target).value)" class="min-w-0 flex-1 rounded border-0 bg-transparent py-0 text-[10px] font-black text-foreground outline-none"><option value="">—</option>@for (opcion of opcionesRespuestaOmr; track opcion) { <option [value]="opcion">{{ opcion }}</option> }</select><span class="w-14 shrink-0 text-right text-[9px] font-black" [class.text-emerald-700]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.text-rose-700]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.text-amber-700]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.text-slate-500]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.text-indigo-700]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'">{{ etiquetaEstadoPreguntaOmr(lectura, pregunta) }}</span></label>
+                              }
+                            </div>
                           </div>
                         </div>
+                      </div>
                       @if (lectura.mensaje) { <div class="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">{{ lectura.mensaje }}</div> }
                     </div>
                   }
@@ -1654,6 +1675,10 @@ export class EvaluacionesDiaComponent implements OnInit {
   public mensajeCalificacionOmr = signal<string | null>(null);
   public errorCalificacionOmr = signal<boolean>(false);
   public edicionesOmr = signal<Record<number, { codigo: string; respuestas: Record<string, string> }>>({});
+  public previewPaginasOmr = signal<string[]>([]);
+  public cargandoPreviewOmr = signal<boolean>(false);
+  public paginaPreviewOmr = signal<number | null>(null);
+  public recalibrandoOmr = signal<Record<number, boolean>>({});
   public readonly opcionesRespuestaOmr = ['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE', 'BC', 'BD', 'BE', 'CD', 'CE', 'DE'];
 
   // Consulta de notas ya persistidas.
@@ -2129,6 +2154,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.archivoOmrSeleccionado.set(null);
     this.resultadoCalificacionOmr.set(null);
     this.edicionesOmr.set({});
+    this.previewPaginasOmr.set([]);
+    this.paginaPreviewOmr.set(null);
+    this.cargandoPreviewOmr.set(false);
+    this.recalibrandoOmr.set({});
     this.procesandoCalificacionOmr.set(false);
     this.guardandoCalificacionOmr.set(false);
     this.mensajeCalificacionOmr.set('Seleccione el PDF escaneado para iniciar la lectura página por página.');
@@ -2143,15 +2172,75 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.archivoOmrSeleccionado.set(null);
     this.resultadoCalificacionOmr.set(null);
     this.edicionesOmr.set({});
+    this.previewPaginasOmr.set([]);
+    this.paginaPreviewOmr.set(null);
+    this.cargandoPreviewOmr.set(false);
+    this.recalibrandoOmr.set({});
   }
 
-  public seleccionarArchivoOmr(event: Event): void {
+  public async seleccionarArchivoOmr(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const archivo = input.files?.[0] || null;
     this.archivoOmrSeleccionado.set(archivo);
     this.resultadoCalificacionOmr.set(null);
+    this.previewPaginasOmr.set([]);
+    this.paginaPreviewOmr.set(null);
     this.errorCalificacionOmr.set(false);
     this.mensajeCalificacionOmr.set(archivo ? 'Archivo listo para procesar.' : 'Seleccione el PDF escaneado para iniciar la lectura.');
+
+    if (archivo) {
+      this.cargandoPreviewOmr.set(true);
+      try {
+        const paginas = await this._renderizarPreviewEscaneado(archivo);
+        this.previewPaginasOmr.set(paginas);
+      } catch (error) {
+        console.error('Error renderizando previsualización del escaneado OMR:', error);
+        this.mensajeCalificacionOmr.set('El escaneado quedó listo, pero no se pudo preparar su previsualización.');
+      } finally {
+        this.cargandoPreviewOmr.set(false);
+      }
+    }
+  }
+
+  private async _renderizarPreviewEscaneado(archivo: File): Promise<string[]> {
+    const esPdf = archivo.type === 'application/pdf' || archivo.name.toLowerCase().endsWith('.pdf');
+    if (!esPdf) {
+      return new Promise<string[]>((resolve, reject) => {
+        const lector = new FileReader();
+        lector.onload = () => typeof lector.result === 'string' ? resolve([lector.result]) : reject(new Error('Imagen sin contenido.'));
+        lector.onerror = () => reject(lector.error || new Error('No se pudo leer la imagen.'));
+        lector.readAsDataURL(archivo);
+      });
+    }
+
+    const buffer = await archivo.arrayBuffer();
+    const documento = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+    const paginas: string[] = [];
+    for (let numeroPagina = 1; numeroPagina <= documento.numPages; numeroPagina++) {
+      const pagina = await documento.getPage(numeroPagina);
+      const viewportBase = pagina.getViewport({ scale: 1 });
+      const escala = Math.min(1.35, 950 / viewportBase.width);
+      const viewport = pagina.getViewport({ scale: escala });
+      const canvas = document.createElement('canvas');
+      const contexto = canvas.getContext('2d');
+      if (!contexto) continue;
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await pagina.render({ canvas, canvasContext: contexto, viewport }).promise;
+      paginas.push(canvas.toDataURL('image/jpeg', 0.86));
+      pagina.cleanup();
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+    return paginas;
+  }
+
+  public alternarPreviewPaginaOmr(pagina: number): void {
+    this.paginaPreviewOmr.update(actual => actual === pagina ? null : pagina);
+  }
+
+  public previewPaginaOmr(pagina: number): string | null {
+    return this.previewPaginasOmr()[pagina - 1] || null;
   }
 
   public ejecutarCalificacionOmr(): void {
@@ -2183,6 +2272,7 @@ export class EvaluacionesDiaComponent implements OnInit {
         this.procesandoCalificacionOmr.set(false);
         this.resultadoCalificacionOmr.set(resultado);
         this.edicionesOmr.set({});
+        this.paginaPreviewOmr.set(resultado.resultados?.[0]?.pagina ?? null);
         this.errorCalificacionOmr.set(resultado.estado !== 'COMPLETADO');
         this.mensajeCalificacionOmr.set(resultado.estado === 'COMPLETADO'
           ? 'Lectura OMR completada. Revise cada página antes de pasar la evaluación a Revisado.'
@@ -2195,7 +2285,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public cantidadRespuestasLeidas(lectura: OmrLecturaResponse): number {
-    return Object.values(lectura.respuestas || {}).filter(respuesta => !!respuesta).length;
+    return this.preguntasOmr(lectura).filter(pregunta => !!this.respuestaOmr(lectura, pregunta)).length;
   }
 
   public preguntasOmr(lectura: OmrLecturaResponse): number[] {
@@ -2213,7 +2303,47 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public respuestaOmr(lectura: OmrLecturaResponse, pregunta: number): string {
     const edicion = this.edicionesOmr()[lectura.pagina];
-    return edicion?.respuestas[String(pregunta)] ?? lectura.respuestas?.[String(pregunta)] ?? '';
+    if (edicion?.respuestas[String(pregunta)] !== undefined) {
+      return this.normalizarRespuestaOmr(edicion.respuestas[String(pregunta)]);
+    }
+    const respuestaDirecta = this.normalizarRespuestaOmr(lectura.respuestas?.[String(pregunta)]);
+    if (respuestaDirecta) return respuestaDirecta;
+    return this.normalizarRespuestaOmr(lectura.detalles?.find(detalle => detalle.pregunta === pregunta)?.respuesta);
+  }
+
+  private normalizarRespuestaOmr(valor: unknown): string {
+    if (valor === null || valor === undefined) return '';
+    const texto = Array.isArray(valor) ? valor.join('') : String(valor);
+    const incisos = texto.toUpperCase().match(/[A-E]/g) || [];
+    return [...new Set(incisos)].join('');
+  }
+
+  public respuestaCorrectaOmr(lectura: OmrLecturaResponse, pregunta: number): string {
+    return this.normalizarRespuestaOmr(lectura.detalles?.find(detalle => detalle.pregunta === pregunta)?.respuestaCorrecta);
+  }
+
+  public estadoPreguntaOmr(lectura: OmrLecturaResponse, pregunta: number): string {
+    const respuesta = this.respuestaOmr(lectura, pregunta).trim().toUpperCase();
+    if (!respuesta) return 'EN_BLANCO';
+    if (respuesta.length > 1) return 'DOBLE_MARCA';
+    const detalle = lectura.detalles?.find(item => item.pregunta === pregunta);
+    const correcta = this.normalizarRespuestaOmr(detalle?.respuestaCorrecta);
+    if (correcta) {
+      return respuesta === correcta ? 'CORRECTA' : 'INCORRECTA';
+    }
+    return detalle?.estado || 'LEIDA';
+  }
+
+  public etiquetaEstadoPreguntaOmr(lectura: OmrLecturaResponse, pregunta: number): string {
+    const estado = this.estadoPreguntaOmr(lectura, pregunta);
+    return {
+      CORRECTA: 'Correcta',
+      INCORRECTA: 'Incorrecta',
+      DOBLE_MARCA: 'Doble',
+      EN_BLANCO: 'Blanco',
+      SIN_PATRON: 'Sin patrón',
+      LEIDA: 'Leída'
+    }[estado] || estado;
   }
 
   public editarCodigoOmr(lectura: OmrLecturaResponse, codigo: string): void {
@@ -2241,6 +2371,62 @@ export class EvaluacionesDiaComponent implements OnInit {
     }));
   }
 
+  public recalibrarPaginaOmr(lectura: OmrLecturaResponse): void {
+    const item = this.evaluacionSeleccionadaOmr();
+    const codigo = this.codigoOmr(lectura).trim();
+    if (!item || !codigo || this.recalibrandoOmr()[lectura.pagina]) return;
+
+    const confirmar = window.confirm(
+      `El código ${codigo} se cotejará con la nómina oficial del grupo ${item.grupo}. ¿Confirmar y recalibrar esta página?`
+    );
+    if (!confirmar) return;
+
+    this.recalibrandoOmr.update(paginas => ({ ...paginas, [lectura.pagina]: true }));
+    this._omrService.ajustarCalificacion(item.id, {
+      pagina: lectura.pagina,
+      codigoAnterior: lectura.codigoEstudiante || null,
+      codigoEstudiante: codigo,
+      respuestas: this.respuestasOmrParaGuardar(lectura),
+      usuario: 'ADMIN_EVALUACIONES'
+    }).subscribe({
+      next: calificacion => {
+        this.resultadoCalificacionOmr.update(resultado => {
+          if (!resultado) return resultado;
+          return {
+            ...resultado,
+            resultados: (resultado.resultados || []).map(actual => actual.pagina === lectura.pagina
+              ? {
+                  ...actual,
+                  codigoEstudiante: calificacion.codigoEstudiante,
+                  codigoValidado: true,
+                  letraVariante: calificacion.letraVariante,
+                  estudianteNombre: calificacion.estudianteNombreCompleto,
+                  estado: 'CALIFICADO',
+                  totalReactivos: calificacion.totalReactivos,
+                  aciertos: calificacion.aciertos,
+                  fallos: calificacion.fallos,
+                  blancos: calificacion.blancos,
+                  doblesMarcas: calificacion.doblesMarcas,
+                  notaSobre30: calificacion.notaSobre30,
+                  notaSobre100: calificacion.notaSobre100,
+                  estadoCalificacion: calificacion.estadoCalificacion,
+                  detalles: calificacion.detalles || actual.detalles
+                }
+              : actual)
+          };
+        });
+        this.recalibrandoOmr.update(paginas => ({ ...paginas, [lectura.pagina]: false }));
+        this.mensajeCalificacionOmr.set(`Código ${codigo} confirmado en la nómina del grupo y variante TIPO ${calificacion.letraVariante}. Página recalibrada.`);
+        this.errorCalificacionOmr.set(false);
+      },
+      error: err => {
+        this.recalibrandoOmr.update(paginas => ({ ...paginas, [lectura.pagina]: false }));
+        this.errorCalificacionOmr.set(true);
+        this.mensajeCalificacionOmr.set(err?.error?.message || 'El código no pertenece a la nómina oficial de este grupo.');
+      }
+    });
+  }
+
   private respuestasOmrParaGuardar(lectura: OmrLecturaResponse): Record<string, string> {
     const respuestas: Record<string, string> = {};
     for (const pregunta of this.preguntasOmr(lectura)) {
@@ -2251,7 +2437,9 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public todasPaginasCalificadas(resultado: OmrJobResponse): boolean {
     const paginas = resultado.resultados || [];
-    return resultado.estado === 'COMPLETADO' && paginas.length > 0 && paginas.every(pagina => !!this.codigoOmr(pagina) && !!pagina.grilla);
+    return resultado.estado === 'COMPLETADO'
+      && paginas.length > 0
+      && paginas.every(pagina => !!this.codigoOmr(pagina) && pagina.codigoValidado === true && !!pagina.grilla);
   }
 
   public confirmarCalificacionYRevisado(resultado: OmrJobResponse): void {

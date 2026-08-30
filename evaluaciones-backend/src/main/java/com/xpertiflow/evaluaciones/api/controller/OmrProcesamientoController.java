@@ -3,6 +3,7 @@ package com.xpertiflow.evaluaciones.api.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
 import com.xpertiflow.evaluaciones.application.OmrProcesamientoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +38,19 @@ public class OmrProcesamientoController {
     @Operation(summary = "Listar calificaciones OMR persistidas de una evaluación")
     public ResponseEntity<List<CalificacionOmrResponseDto>> listarCalificaciones(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(omrProcesamientoService.listarCalificaciones(rolExamenId));
+    }
+
+    @GetMapping("/configuracion")
+    @Operation(summary = "Consultar parámetros de lectura OMR")
+    public ResponseEntity<ConfiguracionOmrDto> obtenerConfiguracion() {
+        return ResponseEntity.ok(omrProcesamientoService.obtenerConfiguracion());
+    }
+
+    @PutMapping("/configuracion")
+    @Operation(summary = "Guardar parámetros de lectura OMR")
+    public ResponseEntity<ConfiguracionOmrDto> guardarConfiguracion(
+            @Valid @RequestBody ConfiguracionOmrDto request) {
+        return ResponseEntity.ok(omrProcesamientoService.guardarConfiguracion(request));
     }
 
     @PutMapping("/{rolExamenId}/calificaciones/ajustar")

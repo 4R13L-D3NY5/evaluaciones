@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
-import { OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
+import { ConfiguracionOmr, OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
@@ -102,6 +102,14 @@ export interface EstudianteOmrItem {
             class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 cursor-pointer">
             <i class="pi pi-upload"></i>
             <span>Subir PDF Escaneado</span>
+          </button>
+
+          <button
+            (click)="abrirConfiguracionOmr()"
+            class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 cursor-pointer"
+            title="Consultar y configurar los parámetros del motor OMR">
+            <i class="pi pi-sliders-h text-purple-700"></i>
+            <span>Parámetros OMR</span>
           </button>
 
           @if (estadoFlujo() === 'RESULTADOS') {
@@ -739,6 +747,106 @@ export interface EstudianteOmrItem {
         </div>
       }
 
+      <!-- Modal de consulta y configuración persistente del motor OMR -->
+      @if (dialogConfiguracionOmr()) {
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div class="bg-card border border-border rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl">
+            <div class="flex items-start justify-between gap-4 p-6 border-b border-border">
+              <div>
+                <div class="flex items-center gap-2">
+                  <div class="h-10 w-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center border border-purple-200">
+                    <i class="pi pi-sliders-h text-xl"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-lg font-black text-foreground">Parámetros de lectura OMR</h3>
+                    <p class="text-xs text-muted-foreground">Configuración oficial que utilizará el worker al procesar nuevos escaneos.</p>
+                  </div>
+                </div>
+              </div>
+              <button (click)="cerrarConfiguracionOmr()" class="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer" title="Cerrar">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <div class="p-6 space-y-5">
+              @if (cargandoConfiguracionOmr()) {
+                <div class="rounded-xl border border-blue-200 bg-blue-50 text-blue-900 px-4 py-3 text-xs font-bold">
+                  <i class="pi pi-spin pi-spinner mr-1"></i> Cargando configuración oficial...
+                </div>
+              }
+
+              @if (mensajeConfiguracionOmr()) {
+                <div [class]="errorConfiguracionOmr() ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'" class="border rounded-xl px-4 py-3 text-xs font-bold">
+                  <i [class]="errorConfiguracionOmr() ? 'pi pi-exclamation-triangle mr-1' : 'pi pi-check-circle mr-1'"></i>{{ mensajeConfiguracionOmr() }}
+                </div>
+              }
+
+              <div class="rounded-xl border border-cyan-200 bg-cyan-50/60 px-4 py-3 text-xs text-cyan-950 leading-5">
+                <i class="pi pi-info-circle mr-1"></i>
+                Los cambios se guardan en la base oficial y se aplican al siguiente procesamiento. No alteran calificaciones ya guardadas ni sustituyen la revisión manual.
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label class="space-y-1.5">
+                  <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Densidad mínima de marca (%)</span>
+                  <input type="number" min="40" max="95" step="0.5" [ngModel]="configuracionOmr().umbralDensidadMarca" (ngModelChange)="actualizarConfiguracionOmr('umbralDensidadMarca', $event)" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+                  <small class="block text-[10px] text-muted-foreground">Más alto = lectura más estricta.</small>
+                </label>
+                <label class="space-y-1.5">
+                  <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Diferencial de doble marca</span>
+                  <input type="number" min="1" max="50" step="0.5" [ngModel]="configuracionOmr().umbralDiferencialDoble" (ngModelChange)="actualizarConfiguracionOmr('umbralDiferencialDoble', $event)" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+                  <small class="block text-[10px] text-muted-foreground">Menor diferencia entre dos opciones = doble marca.</small>
+                </label>
+                <label class="space-y-1.5">
+                  <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Umbral binario de grilla</span>
+                  <input type="number" min="80" max="240" step="1" [ngModel]="configuracionOmr().umbralBinarioGrilla" (ngModelChange)="actualizarConfiguracionOmr('umbralBinarioGrilla', $event)" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+                  <small class="block text-[10px] text-muted-foreground">Contraste utilizado para encontrar el cuadro.</small>
+                </label>
+                <label class="space-y-1.5">
+                  <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Nivel de tinta de marca</span>
+                  <input type="number" min="40" max="220" step="1" [ngModel]="configuracionOmr().nivelTintaMarca" (ngModelChange)="actualizarConfiguracionOmr('nivelTintaMarca', $event)" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+                  <small class="block text-[10px] text-muted-foreground">Intensidad de gris considerada tinta.</small>
+                </label>
+                <label class="space-y-1.5">
+                  <span class="block text-[10px] uppercase tracking-wide font-black">Escala OCR del código</span>
+                  <input type="number" min="1" max="5" step="0.1" [ngModel]="configuracionOmr().escalaOcr" (ngModelChange)="actualizarConfiguracionOmr('escalaOcr', $event)" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+                </label>
+                <label class="space-y-1.5">
+                  <span class="block text-[10px] uppercase tracking-wide font-black">Búsqueda del centro (píxeles)</span>
+                  <input type="number" min="0" max="5" step="1" [ngModel]="configuracionOmr().radioBusquedaPixeles" (ngModelChange)="actualizarConfiguracionOmr('radioBusquedaPixeles', $event)" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+                </label>
+              </div>
+
+              <div class="border border-border rounded-xl p-4 space-y-3">
+                <div>
+                  <h4 class="text-xs font-black text-foreground uppercase tracking-wide">Zona exclusiva del código del estudiante</h4>
+                  <p class="text-[10px] text-muted-foreground mt-1">Valores normalizados de 0 a 1 sobre la página completa. Ejemplo: 0.53 equivale a 53%.</p>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <label class="space-y-1"><span class="text-[10px] font-bold text-muted-foreground">X inicio</span><input type="number" min="0" max="1" step="0.001" [ngModel]="configuracionOmr().zonaCodigoX" (ngModelChange)="actualizarConfiguracionOmr('zonaCodigoX', $event)" class="w-full bg-card border border-border rounded-lg px-2.5 py-2 text-xs font-bold" /></label>
+                  <label class="space-y-1"><span class="text-[10px] font-bold text-muted-foreground">Y inicio</span><input type="number" min="0" max="1" step="0.001" [ngModel]="configuracionOmr().zonaCodigoY" (ngModelChange)="actualizarConfiguracionOmr('zonaCodigoY', $event)" class="w-full bg-card border border-border rounded-lg px-2.5 py-2 text-xs font-bold" /></label>
+                  <label class="space-y-1"><span class="text-[10px] font-bold text-muted-foreground">Ancho</span><input type="number" min="0.01" max="1" step="0.001" [ngModel]="configuracionOmr().zonaCodigoAncho" (ngModelChange)="actualizarConfiguracionOmr('zonaCodigoAncho', $event)" class="w-full bg-card border border-border rounded-lg px-2.5 py-2 text-xs font-bold" /></label>
+                  <label class="space-y-1"><span class="text-[10px] font-bold text-muted-foreground">Alto</span><input type="number" min="0.01" max="1" step="0.001" [ngModel]="configuracionOmr().zonaCodigoAlto" (ngModelChange)="actualizarConfiguracionOmr('zonaCodigoAlto', $event)" class="w-full bg-card border border-border rounded-lg px-2.5 py-2 text-xs font-bold" /></label>
+                </div>
+              </div>
+
+              @if (configuracionOmr().actualizadoEn) {
+                <p class="text-[10px] text-muted-foreground">Última actualización: {{ configuracionOmr().actualizadoEn }} · {{ configuracionOmr().actualizadoPor || 'ADMIN_EVALUACIONES' }}</p>
+              }
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-2 p-6 border-t border-border">
+              <button (click)="restaurarConfiguracionOmr()" [disabled]="guardandoConfiguracionOmr()" class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer">Restaurar defaults</button>
+              <button (click)="cerrarConfiguracionOmr()" class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+              <button (click)="guardarConfiguracionOmr()" [disabled]="guardandoConfiguracionOmr() || cargandoConfiguracionOmr()" class="bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white font-black text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer">
+                <i [class]="guardandoConfiguracionOmr() ? 'pi pi-spin pi-spinner' : 'pi pi-save'"></i>
+                Guardar configuración
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Modal de Animación de Procesamiento OMR en Vivo -->
       @if (procesandoOmr()) {
         <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
@@ -819,6 +927,12 @@ export class CalificacionOmrComponent implements OnInit {
 
   public paginasRenderizadas = signal<string[]>([]);
   public cargandoPdf = signal<boolean>(false);
+  public dialogConfiguracionOmr = signal<boolean>(false);
+  public cargandoConfiguracionOmr = signal<boolean>(false);
+  public guardandoConfiguracionOmr = signal<boolean>(false);
+  public mensajeConfiguracionOmr = signal<string>('');
+  public errorConfiguracionOmr = signal<boolean>(false);
+  public configuracionOmr = signal<ConfiguracionOmr>(this.configuracionOmrDefecto());
 
   public totalPaginas = computed(() => {
     return this.paginasRenderizadas().length;
@@ -874,6 +988,81 @@ export class CalificacionOmrComponent implements OnInit {
 
   public ngOnInit(): void {
     this._cargarRolesOficiales();
+    this._cargarConfiguracionOmr();
+  }
+
+  private configuracionOmrDefecto(): ConfiguracionOmr {
+    return {
+      umbralDensidadMarca: 70,
+      umbralDiferencialDoble: 18,
+      umbralBinarioGrilla: 185,
+      nivelTintaMarca: 145,
+      zonaCodigoX: 0.53,
+      zonaCodigoY: 0.09,
+      zonaCodigoAncho: 0.22,
+      zonaCodigoAlto: 0.05,
+      escalaOcr: 2.5,
+      radioBusquedaPixeles: 2
+    };
+  }
+
+  private _cargarConfiguracionOmr(): void {
+    this.cargandoConfiguracionOmr.set(true);
+    this.omrProcesamientoService.obtenerConfiguracion().subscribe({
+      next: configuracion => {
+        this.configuracionOmr.set(configuracion);
+        this.errorConfiguracionOmr.set(false);
+      },
+      error: error => {
+        console.error('No se pudo cargar la configuración OMR:', error);
+        this.errorConfiguracionOmr.set(true);
+        this.mensajeConfiguracionOmr.set('No se pudo consultar la configuración oficial. Se muestran los valores predeterminados.');
+      },
+      complete: () => this.cargandoConfiguracionOmr.set(false)
+    });
+  }
+
+  public abrirConfiguracionOmr(): void {
+    this.mensajeConfiguracionOmr.set('');
+    this.errorConfiguracionOmr.set(false);
+    this.dialogConfiguracionOmr.set(true);
+  }
+
+  public cerrarConfiguracionOmr(): void {
+    if (!this.guardandoConfiguracionOmr()) {
+      this.dialogConfiguracionOmr.set(false);
+    }
+  }
+
+  public actualizarConfiguracionOmr(campo: keyof ConfiguracionOmr, valor: string | number): void {
+    const numero = Number(valor);
+    if (!Number.isFinite(numero)) return;
+    this.configuracionOmr.update(actual => ({ ...actual, [campo]: numero }));
+    this.mensajeConfiguracionOmr.set('');
+  }
+
+  public restaurarConfiguracionOmr(): void {
+    this.configuracionOmr.set(this.configuracionOmrDefecto());
+    this.mensajeConfiguracionOmr.set('Valores predeterminados restaurados en el formulario. Presione Guardar configuración para aplicarlos.');
+    this.errorConfiguracionOmr.set(false);
+  }
+
+  public guardarConfiguracionOmr(): void {
+    this.guardandoConfiguracionOmr.set(true);
+    this.mensajeConfiguracionOmr.set('');
+    this.errorConfiguracionOmr.set(false);
+    this.omrProcesamientoService.guardarConfiguracion(this.configuracionOmr()).subscribe({
+      next: configuracion => {
+        this.configuracionOmr.set(configuracion);
+        this.mensajeConfiguracionOmr.set('Configuración guardada. Se aplicará al siguiente procesamiento OMR.');
+      },
+      error: error => {
+        console.error('No se pudo guardar la configuración OMR:', error);
+        this.errorConfiguracionOmr.set(true);
+        this.mensajeConfiguracionOmr.set('No se pudo guardar la configuración. Revise los rangos e intente nuevamente.');
+      },
+      complete: () => this.guardandoConfiguracionOmr.set(false)
+    });
   }
 
   private _cargarRolesOficiales(): void {

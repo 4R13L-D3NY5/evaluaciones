@@ -10,7 +10,7 @@ El módulo prepara la sobreimpresión de cartillas OMR separada del cuadernillo 
 - Código del estudiante.
 - Nombre completo del estudiante.
 
-La letra de variante no se imprime, no se marca y no se expone en la interfaz. El sistema mantiene la relación de variante de manera interna mediante `sea_mapeo_estudiantes_variantes`, resuelta por `rol_examen_id + codigo_estudiante` durante la calificación OMR.
+La letra de variante no se imprime ni se marca en la cartilla. El sistema mantiene la relación de variante mediante `sea_mapeo_estudiantes_variantes`, resuelta por `rol_examen_id + codigo_estudiante` durante la calificación OMR. En la revisión del escaneo sí se muestra la variante confirmada para que el docente pueda verificar que el patrón aplicado sea el correcto.
 
 ## Actores y flujo
 
@@ -70,7 +70,7 @@ Las acciones generan registros en `sea_auditoria_evaluaciones` con el lote y la 
 4. Confirmar que cada fila contiene N°, código de materia, grupo, código y nombre completo.
 5. Abrir el PDF desde el modal y validar los datos contra la lista oficial.
 6. Marcar impreso únicamente después de imprimirlo; revisar la auditoría del rol.
-7. En la etapa de OMR, validar que el código leído identifica la clave interna sin mostrar la variante al usuario.
+7. En la etapa de OMR, validar que el código leído identifica la clave interna y mostrar la variante confirmada únicamente en la inspección de resultados.
 
 ## Procesamiento OMR con escaneo real
 
@@ -105,7 +105,9 @@ Un código no reconocido no se asigna por posición, orden de página ni datos d
 
 La pantalla **Calificación Óptica OMR** debe seleccionar primero un rol con variantes generadas, cargar el escaneo y ejecutar el procesamiento. La modalidad del rol no limita el acceso al lector: también pueden calificarse roles creados como `PRESENCIAL_SIN_CARTILLA`, porque la cartilla física ya se administra como material preimpreso independiente. Los datos mostrados salen del resultado del worker; no se utiliza `localStorage` ni una nómina ficticia para completar códigos, nombres o notas.
 
-Al terminar el procesamiento, la pantalla presenta todas las páginas devueltas por el worker en una inspección independiente. Cada página muestra su imagen escaneada, si el código fue reconocido dentro de la nómina oficial, si se detectó el cuadro principal de respuestas y cuántas marcas fueron leídas. Una página sin código válido permanece en revisión manual y no se asigna a un estudiante por el orden del PDF.
+Al terminar el procesamiento, la pantalla presenta cada página en una fila de dos zonas: a la izquierda la previsualización de la página escaneada y a la derecha la lista de respuestas en dos columnas. Cada pregunta muestra la respuesta leída y su estado (`Correcta`, `Incorrecta`, `Doble`, `Blanco` o `Sin patrón`), además del código detectado, la variante confirmada y los aciertos/notas calculados. La interfaz normaliza las lecturas a incisos `A`–`E` (o combina dos incisos únicamente cuando se detecta doble marca); la clave oficial siempre se trata como un solo inciso. Una página sin código válido permanece en revisión manual y no se asigna a un estudiante por el orden del PDF.
+
+El código se puede escribir manualmente cuando el OCR no lo reconoce. El botón **Validar código y recalibrar** solicita confirmación y coteja el código contra la nómina oficial del grupo; si pertenece al rol, recupera el patrón de su variante, recalcula las respuestas y persiste el resultado. El botón final para pasar a `REVISADO` solo se habilita cuando todas las páginas tienen grilla y código validado.
 
 La guía de alineación visual utiliza por defecto la geometría del escaneo de referencia: grilla principal aproximada en `top 16,9 %`, `left 1,1 %`, `width 73,2 %`, `height 42,7 %`; el recuadro exclusivo de código `top 9 %`, `left 53 %`, `width 22 %`, `height 5 %` se resalta por separado para verificarlo antes de procesar.
 
@@ -114,7 +116,30 @@ La guía de alineación visual utiliza por defecto la geometría del escaneo de 
 - La primera cara completa de la cartilla debe estar dentro de la imagen; el talón puede permanecer visible porque se descarta por geometría.
 - El código estudiantil debe estar preimpreso en la zona de identificación y pertenecer a la nómina del rol.
 - El archivo de referencia `img20260829_15254285.pdf` es válido para calibrar geometría, pero al estar vacío y no contener un código estudiantil del rol debe terminar en `REVISION_MANUAL`.
-- Las respuestas devueltas por el lector incluyen densidades por burbuja para auditoría; la clave interna no se imprime en la cartilla ni se expone durante la lectura.
+- Las respuestas devueltas por el lector incluyen densidades por burbuja y estado por pregunta para auditoría; la clave interna no se imprime en la cartilla. La variante se expone únicamente después de validar el código dentro del rol.
+
+### Configuración de parámetros de lectura
+
+El módulo **Calificación Óptica OMR** incluye el apartado **Parámetros OMR** para consultar y ajustar la calibración sin editar código. La configuración se guarda en `sea_configuracion_omr` y el worker la consulta al iniciar cada procesamiento; por tanto, los cambios aplican a nuevos escaneos y no recalculan automáticamente resultados ya guardados.
+
+| Parámetro | Default | Rango | Efecto |
+| --- | ---: | ---: | --- |
+| Densidad mínima de marca | 70 | 40–95 | Decide cuándo una burbuja tiene tinta suficiente. |
+| Diferencial de doble marca | 18 | 1–50 | Identifica dos opciones cuando sus densidades quedan próximas. |
+| Umbral binario de grilla | 185 | 80–240 | Ayuda a localizar el cuadro de respuestas. |
+| Nivel de tinta de marca | 145 | 40–220 | Umbral de gris medido dentro del anillo de la burbuja. |
+| Zona código X/Y/ancho/alto | 0.53/0.09/0.22/0.05 | 0–1 | Recuadro exclusivo del código estudiantil, normalizado sobre la página. |
+| Escala OCR | 2.5 | 1–5 | Ampliación aplicada al código antes de OCR. |
+| Búsqueda del centro | 2 px | 0–5 | Vecindad de tolerancia para compensar pequeños desplazamientos. |
+
+API administrativa de la configuración:
+
+| Método | Ruta | Uso |
+| --- | --- | --- |
+| GET | `/api/omr/configuracion` | Consulta los parámetros oficiales vigentes. |
+| PUT | `/api/omr/configuracion` | Guarda cambios validados y registra fecha/usuario de actualización. |
+
+Los rangos se validan en el backend para evitar una configuración que inutilice la lectura. La pantalla permite restaurar los defaults en el formulario, pero estos solo se aplican después de presionar **Guardar configuración**.
 
 ## Límite conocido y siguiente iteración
 

@@ -15,11 +15,19 @@ export interface OmrLecturaResponse {
   pagina: number;
   codigoEstudiante?: string | null;
   codigoOcr: string[];
+  codigoValidado?: boolean;
+  letraVariante?: string | null;
   estado: 'CALIFICADO' | 'REVISION_MANUAL';
   mensaje?: string;
   respuestas: Record<string, string>;
   grilla?: { x: number; y: number; ancho: number; alto: number };
-  detalles: Array<{ pregunta: number; respuesta: string; densidades: number[] }>;
+  detalles: Array<{
+    pregunta: number;
+    respuesta: string;
+    respuestaCorrecta?: string;
+    estado?: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA' | 'SIN_PATRON';
+    densidades: number[];
+  }>;
   estudianteNombre?: string;
   totalReactivos?: number;
   aciertos?: number;
@@ -54,10 +62,32 @@ export interface CalificacionOmrResponse {
   notaSobre100: number;
   estadoCalificacion: string;
   respuestasDetectadasJson: string;
+  detalles?: Array<{
+    pregunta: number;
+    respuesta: string;
+    respuestaCorrecta?: string;
+    estado?: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA' | 'SIN_PATRON';
+    densidades: number[];
+  }>;
   imagenCartillaAnotadaPath?: string;
   archivoEscaneadoPath?: string;
   procesadoPor?: string;
   fechaProcesamiento?: string;
+}
+
+export interface ConfiguracionOmr {
+  umbralDensidadMarca: number;
+  umbralDiferencialDoble: number;
+  umbralBinarioGrilla: number;
+  nivelTintaMarca: number;
+  zonaCodigoX: number;
+  zonaCodigoY: number;
+  zonaCodigoAncho: number;
+  zonaCodigoAlto: number;
+  escalaOcr: number;
+  radioBusquedaPixeles: number;
+  actualizadoEn?: string;
+  actualizadoPor?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -76,6 +106,14 @@ export class OmrProcesamientoService {
 
   public listarCalificaciones(rolExamenId: string): Observable<CalificacionOmrResponse[]> {
     return this._http.get<CalificacionOmrResponse[]>(`/api/omr/${rolExamenId}/calificaciones`);
+  }
+
+  public obtenerConfiguracion(): Observable<ConfiguracionOmr> {
+    return this._http.get<ConfiguracionOmr>('/api/omr/configuracion');
+  }
+
+  public guardarConfiguracion(configuracion: ConfiguracionOmr): Observable<ConfiguracionOmr> {
+    return this._http.put<ConfiguracionOmr>('/api/omr/configuracion', configuracion);
   }
 
   public ajustarCalificacion(rolExamenId: string, request: AjustarCalificacionOmrRequest): Observable<CalificacionOmrResponse> {

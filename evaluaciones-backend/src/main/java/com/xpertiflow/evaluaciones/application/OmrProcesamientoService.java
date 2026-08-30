@@ -5,11 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
+import com.xpertiflow.evaluaciones.api.dto.DetalleRespuestaOmrDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
+import com.xpertiflow.evaluaciones.domain.entity.ConfiguracionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.repository.CalificacionOmrRepository;
+import com.xpertiflow.evaluaciones.domain.repository.ConfiguracionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,12 +26,14 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +42,7 @@ public class OmrProcesamientoService {
     private final ObjectMapper objectMapper;
     private final AppProperties appProperties;
     private final CalificacionOmrRepository calificacionRepository;
+    private final ConfiguracionOmrRepository configuracionRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final ExamenVarianteRepository varianteRepository;
     private final Map<String, JsonNode> resultados = new ConcurrentHashMap<>();
@@ -70,6 +77,66 @@ public class OmrProcesamientoService {
         return calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId).stream()
                 .map(this::mapearCalificacion)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ConfiguracionOmrDto obtenerConfiguracion() {
+        return mapearConfiguracion(configuracionRepository.findById((short) 1)
+                .orElseGet(this::configuracionDefecto));
+    }
+
+    @Transactional
+    public ConfiguracionOmrDto guardarConfiguracion(ConfiguracionOmrDto request) {
+        ConfiguracionOmr configuracion = configuracionRepository.findById((short) 1)
+                .orElseGet(this::configuracionDefecto);
+        configuracion.setId((short) 1);
+        if (request.getUmbralDensidadMarca() != null) configuracion.setUmbralDensidadMarca(request.getUmbralDensidadMarca());
+        if (request.getUmbralDiferencialDoble() != null) configuracion.setUmbralDiferencialDoble(request.getUmbralDiferencialDoble());
+        if (request.getUmbralBinarioGrilla() != null) configuracion.setUmbralBinarioGrilla(request.getUmbralBinarioGrilla());
+        if (request.getNivelTintaMarca() != null) configuracion.setNivelTintaMarca(request.getNivelTintaMarca());
+        if (request.getZonaCodigoX() != null) configuracion.setZonaCodigoX(request.getZonaCodigoX());
+        if (request.getZonaCodigoY() != null) configuracion.setZonaCodigoY(request.getZonaCodigoY());
+        if (request.getZonaCodigoAncho() != null) configuracion.setZonaCodigoAncho(request.getZonaCodigoAncho());
+        if (request.getZonaCodigoAlto() != null) configuracion.setZonaCodigoAlto(request.getZonaCodigoAlto());
+        if (request.getEscalaOcr() != null) configuracion.setEscalaOcr(request.getEscalaOcr());
+        if (request.getRadioBusquedaPixeles() != null) configuracion.setRadioBusquedaPixeles(request.getRadioBusquedaPixeles());
+        configuracion.setActualizadoEn(LocalDateTime.now());
+        configuracion.setActualizadoPor(usuarioValido(request.getActualizadoPor()));
+        return mapearConfiguracion(configuracionRepository.save(configuracion));
+    }
+
+    private ConfiguracionOmr configuracionDefecto() {
+        ConfiguracionOmr configuracion = new ConfiguracionOmr();
+        configuracion.setId((short) 1);
+        configuracion.setUmbralDensidadMarca(new BigDecimal("70.00"));
+        configuracion.setUmbralDiferencialDoble(new BigDecimal("18.00"));
+        configuracion.setUmbralBinarioGrilla((short) 185);
+        configuracion.setNivelTintaMarca((short) 145);
+        configuracion.setZonaCodigoX(new BigDecimal("0.5300"));
+        configuracion.setZonaCodigoY(new BigDecimal("0.0900"));
+        configuracion.setZonaCodigoAncho(new BigDecimal("0.2200"));
+        configuracion.setZonaCodigoAlto(new BigDecimal("0.0500"));
+        configuracion.setEscalaOcr(new BigDecimal("2.50"));
+        configuracion.setRadioBusquedaPixeles((short) 2);
+        configuracion.setActualizadoPor("ADMIN_EVALUACIONES");
+        return configuracion;
+    }
+
+    private ConfiguracionOmrDto mapearConfiguracion(ConfiguracionOmr configuracion) {
+        ConfiguracionOmrDto dto = new ConfiguracionOmrDto();
+        dto.setUmbralDensidadMarca(configuracion.getUmbralDensidadMarca());
+        dto.setUmbralDiferencialDoble(configuracion.getUmbralDiferencialDoble());
+        dto.setUmbralBinarioGrilla(configuracion.getUmbralBinarioGrilla());
+        dto.setNivelTintaMarca(configuracion.getNivelTintaMarca());
+        dto.setZonaCodigoX(configuracion.getZonaCodigoX());
+        dto.setZonaCodigoY(configuracion.getZonaCodigoY());
+        dto.setZonaCodigoAncho(configuracion.getZonaCodigoAncho());
+        dto.setZonaCodigoAlto(configuracion.getZonaCodigoAlto());
+        dto.setEscalaOcr(configuracion.getEscalaOcr());
+        dto.setRadioBusquedaPixeles(configuracion.getRadioBusquedaPixeles());
+        dto.setActualizadoEn(configuracion.getActualizadoEn());
+        dto.setActualizadoPor(configuracion.getActualizadoPor());
+        return dto;
     }
 
     @Transactional
@@ -184,11 +251,51 @@ public class OmrProcesamientoService {
         dto.setNotaSobre100(calificacion.getNotaSobre100());
         dto.setEstadoCalificacion(calificacion.getEstadoCalificacion());
         dto.setRespuestasDetectadasJson(calificacion.getRespuestasDetectadasJson());
+        dto.setDetalles(detallesCalificacion(calificacion));
         dto.setImagenCartillaAnotadaPath(calificacion.getImagenCartillaAnotadaPath());
         dto.setArchivoEscaneadoPath(calificacion.getArchivoEscaneadoPath());
         dto.setProcesadoPor(calificacion.getProcesadoPor());
         dto.setFechaProcesamiento(calificacion.getFechaProcesamiento());
         return dto;
+    }
+
+    private List<DetalleRespuestaOmrDto> detallesCalificacion(CalificacionOmr calificacion) {
+        Map<String, String> respuestas = new LinkedHashMap<>();
+        if (calificacion.getRespuestasDetectadasJson() != null && !calificacion.getRespuestasDetectadasJson().isBlank()) {
+            try {
+                respuestas = objectMapper.readValue(calificacion.getRespuestasDetectadasJson(), new TypeReference<LinkedHashMap<String, String>>() {});
+            } catch (IOException exception) {
+                throw new IllegalStateException("No se pudieron leer las respuestas guardadas del OMR.", exception);
+            }
+        }
+        Map<String, String> patron = varianteRepository
+                .findByRolExamenIdAndLetraVariante(calificacion.getRolExamenId(), calificacion.getLetraVariante())
+                .map(variante -> leerPatron(variante.getPatronClavesJson()))
+                .orElse(Map.of());
+        int total = calificacion.getTotalReactivos() == null ? 0 : calificacion.getTotalReactivos();
+        List<DetalleRespuestaOmrDto> detalles = new ArrayList<>();
+        for (int pregunta = 1; pregunta <= total; pregunta++) {
+            String numero = String.valueOf(pregunta);
+            String respuesta = respuestas.getOrDefault(numero, "");
+            String correcta = patron.getOrDefault(numero, "");
+            String estado;
+            if (respuesta.isBlank()) {
+                estado = "EN_BLANCO";
+            } else if (respuesta.length() > 1) {
+                estado = "DOBLE_MARCA";
+            } else if (correcta.isBlank()) {
+                estado = "SIN_PATRON";
+            } else {
+                estado = respuesta.equalsIgnoreCase(correcta) ? "CORRECTA" : "INCORRECTA";
+            }
+            DetalleRespuestaOmrDto detalle = new DetalleRespuestaOmrDto();
+            detalle.setPregunta(pregunta);
+            detalle.setRespuesta(respuesta);
+            detalle.setRespuestaCorrecta(correcta);
+            detalle.setEstado(estado);
+            detalles.add(detalle);
+        }
+        return detalles;
     }
 
     public void registrarResultado(String mensaje) throws IOException {
