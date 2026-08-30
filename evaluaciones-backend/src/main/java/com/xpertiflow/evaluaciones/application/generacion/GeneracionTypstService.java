@@ -9,6 +9,7 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionTypstResultadoDt
 import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionColaItemDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionColaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.DocumentoExamenDto;
+import com.xpertiflow.evaluaciones.api.dto.generacion.ConfiguracionGeneracionResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.MapeoResultadoDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.VarianteResultadoDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
@@ -95,7 +96,7 @@ public class GeneracionTypstService {
         mensaje.put("bancoPreguntasId", request.getBancoPreguntasId());
         mensaje.put("variantes", request.getVariantes());
         mensaje.put("ratioEstudiantesPorVariante", request.getRatioEstudiantesPorVariante() != null
-                ? request.getRatioEstudiantesPorVariante() : 5);
+                ? request.getRatioEstudiantesPorVariante() : 1);
         mensaje.put("outputBasePath", outputBase);
         mensaje.put("estudiantes", obtenerEstudiantesOficiales(rol));
 
@@ -180,6 +181,53 @@ public class GeneracionTypstService {
                 .archivoPdfPath(variante.getArchivoPdfPath())
                 .nombreArchivo(archivo.getFileName().toString())
                 .build();
+    }
+
+    /**
+     * Consulta la configuración ya persistida de una generación. Esta vista
+     * permite auditar variantes, patrones y asignaciones después de cerrar el
+     * diálogo de generación o reiniciar el navegador.
+     */
+    @Transactional(readOnly = true)
+    public ConfiguracionGeneracionResponseDto consultarConfiguracion(String rolExamenId) {
+        rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
+
+        List<VarianteResultadoDto> variantes = varianteRepository.findByRolExamenId(rolExamenId).stream()
+                .sorted(Comparator.comparing(ExamenVariante::getLetraVariante))
+                .map(variante -> {
+                    VarianteResultadoDto dto = new VarianteResultadoDto();
+                    dto.setLetra(variante.getLetraVariante());
+                    dto.setSemilla(variante.getSemillaPermutacion());
+                    dto.setPatronClavesJson(variante.getPatronClavesJson());
+                    dto.setOrdenReactivosIdsJson(variante.getOrdenReactivosIdsJson());
+                    dto.setArchivoPdfPath(variante.getArchivoPdfPath());
+                    dto.setArchivoTypstPath(variante.getArchivoTypstPath());
+                    dto.setArchivoRemarkXlsxPath(variante.getArchivoRemarkXlsxPath());
+                    return dto;
+                })
+                .toList();
+
+        List<MapeoResultadoDto> mapeos = mapeoRepository.findByRolExamenId(rolExamenId).stream()
+                .sorted(Comparator.comparing(MapeoEstudianteVariante::getCodigoEstudiante))
+                .map(mapeo -> {
+                    MapeoResultadoDto dto = new MapeoResultadoDto();
+                    dto.setCodigoEstudiante(mapeo.getCodigoEstudiante());
+                    dto.setNombres(mapeo.getNombres());
+                    dto.setApellidoPaterno(mapeo.getApellidoPaterno());
+                    dto.setApellidoMaterno(mapeo.getApellidoMaterno());
+                    dto.setLetraVariante(mapeo.getLetraVariante());
+                    dto.setHashControl(mapeo.getHashControlSeguridad());
+                    dto.setCuadernilloPdfPath(mapeo.getCuadernilloIndividualPdf());
+                    return dto;
+                })
+                .toList();
+
+        ConfiguracionGeneracionResponseDto respuesta = new ConfiguracionGeneracionResponseDto();
+        respuesta.setRolExamenId(rolExamenId);
+        respuesta.setVariantes(variantes);
+        respuesta.setMapeos(mapeos);
+        return respuesta;
     }
 
     /**

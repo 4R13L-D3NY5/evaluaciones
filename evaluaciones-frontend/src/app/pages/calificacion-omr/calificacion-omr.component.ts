@@ -333,9 +333,9 @@ export interface EstudianteOmrItem {
                       </div>
                     </div>
 
-                    <!-- Campo de código preimpreso señalado en la cartilla -->
+                    <!-- Campo exclusivo del código preimpreso en la casilla superior derecha -->
                     <div class="absolute border-2 border-amber-400 bg-amber-300/10 shadow-[0_0_12px_rgba(251,191,36,0.45)] rounded"
-                         style="top: 8%; left: 48%; width: 27%; height: 6%;">
+                         style="top: 9%; left: 53%; width: 22%; height: 5%;">
                       <span class="absolute -top-5 left-0 bg-amber-600 text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-black whitespace-nowrap">
                         CÓDIGO DEL ESTUDIANTE
                       </span>
@@ -1261,7 +1261,7 @@ export class CalificacionOmrComponent implements OnInit {
             blancos: 30,
             dobles: 0,
             nota100: 0,
-            detalles: this._generarDetallesEstudiante(1, {}),
+            detalles: [],
             imagenAnotada: imgDataUrl
           });
           return;
@@ -1450,7 +1450,7 @@ export class CalificacionOmrComponent implements OnInit {
           blancos: 30,
           dobles: 0,
           nota100: 0,
-          detalles: this._generarDetallesEstudiante(1, {}),
+          detalles: [],
           imagenAnotada: imgDataUrl
         });
       };
@@ -1481,11 +1481,16 @@ export class CalificacionOmrComponent implements OnInit {
     const list = this.estudiantes();
     if (list.length === 0) return;
 
+    const rol = this.rolesExamen().find(item => item.id === this.rolExamenSeleccionado());
+    const codigoMateria = rol?.materiaCodigo || 'EVALUACION';
+    const parcial = rol?.tipoParcial || 'Parcial';
+    const codigoArchivo = `${codigoMateria}_${parcial}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+
     const data: any[][] = [
       ['UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC'],
       ['ACTA OFICIAL DE CALIFICACIONES OMR - SISTEMA SEA'],
-      ['ASIGNATURA:', '[----] ASIGNATURA NO ESPECIFICADA', 'EVALUACIÓN:', '1er Parcial'],
-      ['DOCENTE:', 'Docente no identificado', 'FECHA:', new Date().toLocaleDateString()],
+      ['ASIGNATURA:', rol ? `[${rol.materiaCodigo}] ${rol.materiaNombre}` : 'No especificada', 'EVALUACIÓN:', parcial],
+      ['DOCENTE:', rol?.docenteNombre || 'No identificado', 'FECHA:', rol?.fecha || new Date().toLocaleDateString()],
       [],
       ['Nº', 'CÓDIGO ESTUDIANTE', 'APELLIDOS Y NOMBRES', 'CARRERA', 'GRUPO', 'ACIERTOS (30P)', 'FALLOS', 'BLANCOS', 'DOBLES', 'NOTA FINAL (/100)', 'ESTADO']
     ];
@@ -1509,145 +1514,6 @@ export class CalificacionOmrComponent implements OnInit {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(data);
     XLSX.utils.book_append_sheet(wb, ws, 'Acta_Calificaciones_OMR');
-    XLSX.writeFile(wb, `ACTA_CALIFICACIONES_OMR_CPEC18_1ER_PARCIAL.xlsx`);
-  }
-
-  private _cargarResultadosOmr(): void {
-    const mockEstudiantes: EstudianteOmrItem[] = [
-      {
-        estudianteId: 1,
-        codigo: '7849102',
-        nombre: 'JUAN CARLOS PÉREZ MAMANI',
-        carrera: 'AUDITORÍA / CONTADURÍA',
-        grupo: 'TA-01',
-        variante: 'A',
-        totalPreguntas: 30,
-        aciertos: 28,
-        fallos: 2,
-        blancos: 0,
-        doblesMarcas: 0,
-        nota100: 93.3,
-        nota30: 28.0,
-        aprobado: true,
-        estadoCalificacion: 'CALIFICADO',
-        imagenEscaneada: 'cartilla_simulada_estudiante_1_7849102.png',
-        imagenAnotada: 'cartilla_calificada_estudiante_1_7849102.png',
-        detalles: this._generarDetallesEstudiante(1, { 4: 'C', 12: 'B' })
-      },
-      {
-        estudianteId: 2,
-        codigo: '8392104',
-        nombre: 'MARÍA BELÉN QUISPE FLORES',
-        carrera: 'AUDITORÍA / CONTADURÍA',
-        grupo: 'TA-01',
-        variante: 'A',
-        totalPreguntas: 30,
-        aciertos: 24,
-        fallos: 6,
-        blancos: 0,
-        doblesMarcas: 0,
-        nota100: 80.0,
-        nota30: 24.0,
-        aprobado: true,
-        estadoCalificacion: 'CALIFICADO',
-        imagenEscaneada: 'cartilla_simulada_estudiante_2_8392104.png',
-        imagenAnotada: 'cartilla_calificada_estudiante_2_8392104.png',
-        detalles: this._generarDetallesEstudiante(2, { 2: 'A', 5: 'A', 9: 'C', 15: 'D', 20: 'B', 28: 'C' })
-      },
-      {
-        estudianteId: 3,
-        codigo: '6928103',
-        nombre: 'RODRIGO ALEJANDRO CONDORI RODRÍGUEZ',
-        carrera: 'AUDITORÍA / CONTADURÍA',
-        grupo: 'TA-01',
-        variante: 'A',
-        totalPreguntas: 30,
-        aciertos: 18,
-        fallos: 12,
-        blancos: 0,
-        doblesMarcas: 0,
-        nota100: 60.0,
-        nota30: 18.0,
-        aprobado: true,
-        estadoCalificacion: 'CALIFICADO',
-        imagenEscaneada: 'cartilla_simulada_estudiante_3_6928103.png',
-        imagenAnotada: 'cartilla_calificada_estudiante_3_6928103.png',
-        detalles: this._generarDetallesEstudiante(3, { 1: 'A', 3: 'D', 6: 'B', 7: 'C', 10: 'E', 13: 'B', 16: 'C', 19: 'D', 22: 'E', 25: 'B', 27: 'C', 30: 'D' })
-      },
-      {
-        estudianteId: 4,
-        codigo: '7194820',
-        nombre: 'GABRIELA SOFÍA LÓPEZ TORRICO',
-        carrera: 'AUDITORÍA / CONTADURÍA',
-        grupo: 'TA-01',
-        variante: 'A',
-        totalPreguntas: 30,
-        aciertos: 13,
-        fallos: 15,
-        blancos: 2,
-        doblesMarcas: 0,
-        nota100: 43.3,
-        nota30: 13.0,
-        aprobado: false,
-        estadoCalificacion: 'CALIFICADO',
-        imagenEscaneada: 'cartilla_simulada_estudiante_4_7194820.png',
-        imagenAnotada: 'cartilla_calificada_estudiante_4_7194820.png',
-        detalles: this._generarDetallesEstudiante(4, { 1: 'B', 2: 'B', 4: 'A', 5: 'B', 7: 'B', 8: 'C', 9: 'D', 11: 'E', 14: '', 17: 'B', 18: 'C', 20: 'D', 21: 'E', 23: 'B', 24: 'C', 26: 'D', 29: '' })
-      },
-      {
-        estudianteId: 5,
-        codigo: '7391028',
-        nombre: 'SERGIO ALEJANDRO MENDOZA TAPIA',
-        carrera: 'AUDITORÍA / CONTADURÍA',
-        grupo: 'TA-01',
-        variante: 'A',
-        totalPreguntas: 30,
-        aciertos: 22,
-        fallos: 7,
-        blancos: 0,
-        doblesMarcas: 1,
-        nota100: 73.3,
-        nota30: 22.0,
-        aprobado: true,
-        estadoCalificacion: 'CALIFICADO',
-        imagenEscaneada: 'cartilla_simulada_estudiante_5_7391028.png',
-        imagenAnotada: 'cartilla_calificada_estudiante_5_7391028.png',
-        detalles: this._generarDetallesEstudiante(5, { 3: 'A', 5: 'D', 8: 'B', 11: 'C', 15: 'E', 18: 'AB', 22: 'D', 27: 'B' })
-      }
-    ];
-
-    this.estudiantes.set(mockEstudiantes);
-  }
-
-  private _generarDetallesEstudiante(estId: number, overrides: Record<number, string>): DetallePreguntaOmr[] {
-    const list: DetallePreguntaOmr[] = [];
-    for (let q = 1; q <= 30; q++) {
-      const patron = this.patronArray[q - 1].ans;
-      const marcada = overrides[q] !== undefined ? overrides[q] : patron;
-
-      let estado: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' = 'CORRECTA';
-      let puntos = 3.33;
-
-      if (marcada === '') {
-        estado = 'EN_BLANCO';
-        puntos = 0;
-      } else if (marcada.length > 1) {
-        estado = 'DOBLE_MARCA';
-        puntos = 0;
-      } else if (marcada !== patron) {
-        estado = 'INCORRECTA';
-        puntos = 0;
-      }
-
-      list.push({
-        pregunta: q,
-        patron,
-        marcada,
-        estado,
-        puntos,
-        densidades: [20, 5, 4, 6, 5]
-      });
-    }
-    return list;
+    XLSX.writeFile(wb, `ACTA_CALIFICACIONES_OMR_${codigoArchivo}.xlsx`);
   }
 }

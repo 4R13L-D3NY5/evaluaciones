@@ -594,7 +594,7 @@ export interface ParcialConfig {
                       <span class="text-xs font-bold text-foreground">estudiantes / variante</span>
                     </div>
                     <p class="text-[10px] text-muted-foreground mt-1">
-                      El sistema dividirá la nómina de estudiantes entre este valor y redondeará hacia arriba (máx. 5 variantes).
+                      Para esta fase de pruebas se utilizará 1 estudiante por variante (máx. 5 variantes A–E).
                     </p>
                   </div>
 
@@ -1033,13 +1033,18 @@ export class AdministracionEvaluacionesComponent {
   private readonly _db = inject(EvaluacionesDbService);
   public readonly Math = Math;
 
-  public ratioEstudiantesPorVariante: number = 5;
+  public ratioEstudiantesPorVariante: number = 1;
 
   public tabActual = signal<'campus' | 'carreras' | 'usuarios' | 'configuracion' | 'tiempos'>('campus');
   public toastMessage = signal<string | null>(null);
 
   constructor() {
     this.ratioEstudiantesPorVariante = this._db.getEstudiantesPorVarianteParam();
+    // El catálogo operativo debe llegar desde SEA. No mostrar catálogos
+    // históricos o de demostración embebidos en el frontend.
+    this.listaCampus = [];
+    this.listaCarrerasCampus = [];
+    this.listaUsuariosEvaluadores = [];
   }
 
   // TAB 1: Campus por Sede
@@ -1344,8 +1349,8 @@ export class AdministracionEvaluacionesComponent {
 
   // Acciones Configuración
   public guardarConfiguracion(): void {
-    this._db.setEstudiantesPorVarianteParam(this.ratioEstudiantesPorVariante || 5);
-    this._mostrarToast(`Configuración de exámenes guardada exitosamente. Ratio de ${this.ratioEstudiantesPorVariante} alumnos por variante activo.`);
+    this._db.setEstudiantesPorVarianteParam(this.ratioEstudiantesPorVariante || 1);
+    this._mostrarToast(`Ratio de ${this.ratioEstudiantesPorVariante} alumno(s) por variante aplicado durante esta sesión.`);
   }
 
   public guardarTiempos(): void {

@@ -8,11 +8,14 @@ import com.xpertiflow.evaluaciones.domain.entity.CartillaOmr;
 import com.xpertiflow.evaluaciones.domain.entity.LoteCartillasOmr;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
+import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.CartillaOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.LoteCartillasOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
+import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +27,19 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class CartillaOmrService {
+
+    private static final Set<EstadoFlujo> ESTADOS_PERMITIDOS_MARCAS = Set.of(
+            EstadoFlujo.PROGRAMADO,
+            EstadoFlujo.VALIDADO,
+            EstadoFlujo.GENERADO,
+            EstadoFlujo.IMPRESO
+    );
 
     private final RolExamenRepository rolExamenRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
@@ -37,6 +48,7 @@ public class CartillaOmrService {
     private final AuditoriaEvaluacionRepository auditoriaRepository;
     private final CartillaOmrPdfService pdfService;
     private final AppProperties appProperties;
+    private final UnitepcGatewayClient unitepcGatewayClient;
 
     @Transactional(readOnly = true)
     public Optional<LoteCartillasOmrResponseDto> obtenerUltimo(String rolExamenId) {
@@ -47,12 +59,8 @@ public class CartillaOmrService {
     public LoteCartillasOmrResponseDto generar(String rolExamenId, String usuario) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
-        List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId).stream()
-                .sorted(Comparator.comparing(MapeoEstudianteVariante::getCodigoEstudiante))
-                .toList();
-        if (mapeos.isEmpty()) {
-            throw new IllegalStateException("Primero genere el examen para crear el mapeo oficial de estudiantes.");
-        }
+        validarEstadoParaMarcas(rol);
+        List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
 
         String loteId = "CART-" + UUID.randomUUID();
         String sello = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
@@ -63,22 +71,22 @@ public class CartillaOmrService {
         lote.setId(loteId);
         lote.setRolExamen(rol);
         lote.setEstado("GENERADO");
-        lote.setTotalCartillas(mapeos.size());
+        lote.setTotalCartillas(estudiantes.size());
         lote.setArchivoPdfPath(archivo.toString());
         lote.setGeneradoEn(LocalDateTime.now());
         loteRepository.saveAndFlush(lote);
 
         List<CartillaOmr> cartillas = new java.util.ArrayList<>();
-        for (int indice = 0; indice < mapeos.size(); indice++) {
-            MapeoEstudianteVariante mapeo = mapeos.get(indice);
+        for (int indice = 0; indice < estudiantes.size(); indice++) {
+            DatosEstudiante estudiante = estudiantes.get(indice);
             CartillaOmr cartilla = new CartillaOmr();
             cartilla.setLote(lote);
             cartilla.setRolExamenId(rolExamenId);
             cartilla.setNumeroOrden(indice + 1);
             cartilla.setCodigoMateria(rol.getMateriaCodigo());
             cartilla.setGrupo(rol.getGrupo());
-            cartilla.setCodigoEstudiante(mapeo.getCodigoEstudiante());
-            cartilla.setNombreCompleto(nombreCompleto(mapeo));
+            cartilla.setCodigoEstudiante(estudiante.codigo());
+            cartilla.setNombreCompleto(estudiante.nombreCompleto());
             cartilla.setEstado("GENERADA");
             cartillas.add(cartilla);
         }
@@ -89,8 +97,45 @@ public class CartillaOmrService {
             throw new IllegalStateException("No se pudo crear el PDF de cartillas OMR", exception);
         }
 
-        registrarAuditoria(rol, "GENERACION_LOTE_CARTILLAS_OMR", usuario, mapeos.size(), loteId);
+        registrarAuditoria(rol, "GENERACION_LOTE_CARTILLAS_OMR", usuario, estudiantes.size(), loteId);
         return mapearLote(lote);
+    }
+
+    /**
+     * Las marcas solo necesitan los datos de identificación. Antes de que se
+     * genere el examen todavía no existe el mapeo estudiante-variante, por lo
+     * que se usa directamente la nómina oficial del grupo SEA.
+     */
+    private List<DatosEstudiante> obtenerEstudiantesParaMarcas(String rolExamenId, RolExamen rol) {
+        List<DatosEstudiante> mapeados = mapeoRepository.findByRolExamenId(rolExamenId).stream()
+                .sorted(Comparator.comparing(MapeoEstudianteVariante::getCodigoEstudiante))
+                .map(mapeo -> new DatosEstudiante(mapeo.getCodigoEstudiante(), nombreCompleto(mapeo)))
+                .toList();
+        if (!mapeados.isEmpty()) {
+            return mapeados;
+        }
+
+        if (rol.getSeaGroupId() == null || rol.getSeaGroupId().isBlank()) {
+            throw new IllegalStateException("El rol no tiene grupo SEA para consultar los estudiantes oficiales.");
+        }
+
+        List<StudentItemDto> estudiantes;
+        try {
+            estudiantes = unitepcGatewayClient.getStudentsByGroup(rol.getSeaGroupId());
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("No se pudo consultar la nómina oficial del grupo SEA.", exception);
+        }
+        if (estudiantes == null || estudiantes.isEmpty()) {
+            throw new IllegalStateException("El grupo SEA no tiene estudiantes oficiales inscritos.");
+        }
+
+        return estudiantes.stream().map(estudiante -> {
+            if (estudiante.getStudentCode() == null || estudiante.getStudentCode().isBlank()
+                    || estudiante.getFullName() == null || estudiante.getFullName().isBlank()) {
+                throw new IllegalStateException("La nómina SEA contiene un estudiante sin código o nombre completo.");
+            }
+            return new DatosEstudiante(estudiante.getStudentCode().trim(), estudiante.getFullName().trim());
+        }).toList();
     }
 
     @Transactional
@@ -98,6 +143,7 @@ public class CartillaOmrService {
         LoteCartillasOmr lote = loteRepository.findById(loteId)
                 .filter(encontrado -> encontrado.getRolExamen().getId().equals(rolExamenId))
                 .orElseThrow(() -> new IllegalArgumentException("Lote de cartillas no encontrado."));
+        validarEstadoParaMarcas(lote.getRolExamen());
         LocalDateTime fecha = LocalDateTime.now();
         lote.setEstado("IMPRESO");
         lote.setImpresoEn(fecha);
@@ -145,7 +191,17 @@ public class CartillaOmrService {
         return usuario == null || usuario.isBlank() ? "ADMIN_EVALUACIONES" : usuario.trim();
     }
 
+    private void validarEstadoParaMarcas(RolExamen rol) {
+        if (!ESTADOS_PERMITIDOS_MARCAS.contains(rol.getEstadoFlujo())) {
+            throw new IllegalStateException("Las marcas OMR solo pueden generarse antes de entregar el examen. "
+                    + "Estado actual: " + rol.getEstadoFlujo().getValor());
+        }
+    }
+
     private String seguro(String valor) {
         return valor == null ? "SIN_DATO" : valor.replaceAll("[^A-Za-z0-9_-]", "_");
+    }
+
+    private record DatosEstudiante(String codigo, String nombreCompleto) {
     }
 }

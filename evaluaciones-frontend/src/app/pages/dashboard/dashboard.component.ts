@@ -570,7 +570,9 @@ export class DashboardComponent {
   });
 
   public totalExamenesHoy = computed(() => {
-    return this.storage.gestionEvaluaciones().filter(e => e.fecha === '08/06/2026' || e.fecha === '09/06/2026' || e.fecha === '10/06/2026').length;
+    const hoy = new Date();
+    const fechaHoy = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
+    return this.storage.gestionEvaluaciones().filter(e => e.fecha === fechaHoy).length;
   });
 
   public totalConCartillaHoy = computed(() => {
@@ -583,7 +585,7 @@ export class DashboardComponent {
 
   public porcentajeTurnosHoy = computed(() => {
     const total = this.totalExamenesFiltrados();
-    return total > 0 ? Math.round((this.totalExamenesHoy() / total) * 100) : 40;
+    return total > 0 ? Math.round((this.totalExamenesHoy() / total) * 100) : 0;
   });
 
   public totalVariantesGeneradas = computed(() => {
@@ -594,11 +596,11 @@ export class DashboardComponent {
   public porcentajeGenerados = computed(() => {
     const total = this.totalExamenesFiltrados();
     const listos = this.storage.gestionEvaluaciones().filter(e => e.etapa !== 'Programado').length;
-    return total > 0 ? Math.round((listos / total) * 100) : 60;
+    return total > 0 ? Math.round((listos / total) * 100) : 0;
   });
 
   public totalReactivosBancos = computed(() => {
-    return 1840;
+    return 0;
   });
 
   public metricasEstados = computed<EstadoMetrica[]>(() => {
@@ -630,12 +632,7 @@ export class DashboardComponent {
   });
 
   public estadisticasSedes = computed<SedeMetrica[]>(() => {
-    return [
-      { id: 1, nombre: 'Campus Colonial', ciudad: 'Cochabamba', totalExamenes: 18, generados: 16, impresos: 14, devueltos: 8, porcentaje: 88, color: 'bg-purple-600' },
-      { id: 2, nombre: 'Campus Juan Pablo II', ciudad: 'Cochabamba', totalExamenes: 12, generados: 10, impresos: 8, devueltos: 4, porcentaje: 75, color: 'bg-indigo-600' },
-      { id: 3, nombre: 'Sede Central La Paz', ciudad: 'La Paz', totalExamenes: 10, generados: 8, impresos: 6, devueltos: 3, porcentaje: 70, color: 'bg-blue-600' },
-      { id: 4, nombre: 'Sede Santa Cruz', ciudad: 'Santa Cruz', totalExamenes: 10, generados: 7, impresos: 5, devueltos: 2, porcentaje: 65, color: 'bg-amber-500' }
-    ];
+    return [];
   });
 
   public proximosTurnos = computed<GestionEvaluacionItem[]>(() => {

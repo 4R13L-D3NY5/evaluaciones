@@ -31,6 +31,35 @@ export interface OmrLecturaResponse {
   estadoCalificacion?: string;
 }
 
+export interface AjustarCalificacionOmrRequest {
+  pagina: number;
+  codigoAnterior?: string | null;
+  codigoEstudiante: string;
+  respuestas: Record<string, string>;
+  usuario?: string;
+}
+
+export interface CalificacionOmrResponse {
+  id: number;
+  rolExamenId: string;
+  codigoEstudiante: string;
+  estudianteNombreCompleto: string;
+  letraVariante: string;
+  totalReactivos: number;
+  aciertos: number;
+  fallos: number;
+  blancos: number;
+  doblesMarcas: number;
+  notaSobre30: number;
+  notaSobre100: number;
+  estadoCalificacion: string;
+  respuestasDetectadasJson: string;
+  imagenCartillaAnotadaPath?: string;
+  archivoEscaneadoPath?: string;
+  procesadoPor?: string;
+  fechaProcesamiento?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OmrProcesamientoService {
   private readonly _http = inject(HttpClient);
@@ -43,5 +72,13 @@ export class OmrProcesamientoService {
 
   public consultar(jobId: string): Observable<OmrJobResponse> {
     return this._http.get<OmrJobResponse>(`/api/omr/jobs/${jobId}`);
+  }
+
+  public listarCalificaciones(rolExamenId: string): Observable<CalificacionOmrResponse[]> {
+    return this._http.get<CalificacionOmrResponse[]>(`/api/omr/${rolExamenId}/calificaciones`);
+  }
+
+  public ajustarCalificacion(rolExamenId: string, request: AjustarCalificacionOmrRequest): Observable<CalificacionOmrResponse> {
+    return this._http.put<CalificacionOmrResponse>(`/api/omr/${rolExamenId}/calificaciones/ajustar`, request);
   }
 }

@@ -21,10 +21,18 @@ from src import config
 
 logger = logging.getLogger(__name__)
 OPCIONES = "ABCDE"
+# Umbral mínimo de tinta en el anillo interno de la burbuja para considerar una marca.
+# Se mantiene separado de la lectura OCR del código del estudiante.
+UMBRAL_DENSIDAD_MARCA = 70.0
+# Diferencia mínima entre la primera y segunda opción para no confundir una
+# marca parcialmente escrita con una doble marca. La comparación se hace sobre
+# un anillo interno que excluye las letras A-E preimpresas.
+UMBRAL_DIFERENCIAL_DOBLE = 18.0
 # Zona exclusiva del código del estudiante en la primera cara de la cartilla.
-# Está normalizada sobre la página completa para excluir N°, materia, grupo,
-# nombre y los seriales rojos superior/inferior.
-ZONA_CODIGO_ESTUDIANTE = (0.48, 0.08, 0.75, 0.14)
+# Está normalizada sobre la página completa y ajustada al recuadro superior
+# derecho del código, excluyendo tipo de examen, N°, materia, grupo, nombre y
+# los seriales rojos superior/inferior.
+ZONA_CODIGO_ESTUDIANTE = (0.53, 0.09, 0.75, 0.14)
 
 
 def _abrir_paginas(archivo: str) -> list[np.ndarray]:
@@ -68,42 +76,157 @@ def _detectar_grilla(gray: np.ndarray) -> tuple[int, int, int, int]:
 
 
 def _densidad_centro(gray: np.ndarray, cx: int, cy: int, radio: int) -> float:
-    x1, x2 = max(0, cx - radio), min(gray.shape[1], cx + radio + 1)
-    y1, y2 = max(0, cy - radio), min(gray.shape[0], cy + radio + 1)
+    # El escaneo puede desplazar el centro uno o dos píxeles aunque la grilla
+    # haya sido encontrada correctamente. Se toma la mejor lectura en una
+    # vecindad pequeña para no perder marcas hechas cerca del borde.
+    radio_interno = max(2, int(radio * .25))
+    radio_externo = max(radio_interno + 1, int(radio * .65))
+    mejor = 0.0
+    for desplazamiento_y in range(-2, 3):
+        for desplazamiento_x in range(-2, 3):
+            centro_x = cx + desplazamiento_x
+            centro_y = cy + desplazamiento_y
+            x1, x2 = max(0, centro_x - radio), min(gray.shape[1], centro_x + radio + 1)
+            y1, y2 = max(0, centro_y - radio), min(gray.shape[0], centro_y + radio + 1)
+            roi = gray[y1:y2, x1:x2]
+            if roi.size == 0:
+                continue
+            mask = np.zeros(roi.shape, dtype=np.uint8)
+            centro = (
+                min(radio, roi.shape[1] // 2),
+                min(radio, roi.shape[0] // 2),
+            )
+            # Las letras A-E están impresas en el centro de cada burbuja y por
+            # eso no pueden usarse como indicador de tinta. Se mide un anillo
+            # intermedio: excluye la letra y el borde circular preimpreso.
+            cv2.circle(mask, centro, radio_externo, 255, -1)
+            cv2.circle(mask, centro, radio_interno, 0, -1)
+            muestra = roi[mask > 0]
+            if muestra.size:
+                mejor = max(mejor, float(np.mean(muestra < 145) * 100))
+    return mejor
+
+
+def _detectar_centros_burbujas(
+    gray: np.ndarray, grilla: tuple[int, int, int, int]
+) -> tuple[list[int], list[int], int] | None:
+    """Obtiene centros reales para compensar escala, desplazamiento y leve sesgo.
+
+    La cartilla se imprime con dos distribuciones que ya se encuentran en uso:
+    algunas copias dejan más espacio entre el borde de la grilla y la primera
+    fila. Derivar los centros con las circunferencias impresas evita depender de
+    un único porcentaje vertical y evita muestrear la fila anterior.
+    """
+    gx, gy, gw, gh = grilla
+    x1 = gx + int(gw * .04)
+    y1 = gy + int(gh * .03)
+    x2 = gx + int(gw * .98)
+    y2 = gy + int(gh * .97)
     roi = gray[y1:y2, x1:x2]
     if roi.size == 0:
-        return 0.0
-    mask = np.zeros(roi.shape, dtype=np.uint8)
-    centro = (min(radio, roi.shape[1] // 2), min(radio, roi.shape[0] // 2))
-    # La tinta preimpresa del círculo no debe contar como respuesta. Se mide
-    # solo el núcleo de la burbuja, donde queda la marca del estudiante.
-    cv2.circle(mask, centro, max(2, int(radio * .35)), 255, -1)
-    muestra = roi[mask > 0]
-    return float(np.mean(muestra < 145) * 100) if muestra.size else 0.0
+        return None
+
+    circulos = cv2.HoughCircles(
+        roi,
+        cv2.HOUGH_GRADIENT,
+        dp=1.2,
+        minDist=max(10, int(gw * .018)),
+        param1=100,
+        param2=18,
+        minRadius=max(5, int(gw * .005)),
+        maxRadius=max(10, int(gw * .018)),
+    )
+    if circulos is None:
+        return None
+
+    puntos = circulos[0]
+    radio_minimo = max(5, int(gw * .005))
+    puntos_x = [
+        (float(x) + x1, float(y) + y1, float(r))
+        for x, y, r in puntos
+        if gx + gw * .07 < x + x1 < gx + gw * .97 and r >= radio_minimo
+    ]
+    if not puntos_x:
+        return None
+
+    # Agrupar posiciones X de las 15 opciones. Los textos cercanos a la grilla
+    # pueden producir falsos círculos, por lo que se conservan los grupos con
+    # la frecuencia dominante de la detección.
+    tolerancia_x = max(6, int(gw * .015))
+    grupos_x: list[list[float]] = []
+    for x, _, _ in sorted(puntos_x, key=lambda punto: punto[0]):
+        if not grupos_x or x - float(np.mean(grupos_x[-1])) > tolerancia_x:
+            grupos_x.append([x])
+        else:
+            grupos_x[-1].append(x)
+    frecuencia_x = max(len(grupo) for grupo in grupos_x)
+    centros_x = [
+        int(round(float(np.mean(grupo))))
+        for grupo in grupos_x
+        if len(grupo) >= max(10, int(frecuencia_x * .9))
+    ]
+
+    # Agrupar filas. Se exige una cantidad suficiente de burbujas para excluir
+    # los círculos aislados de encabezados, números y talón inferior.
+    tolerancia_y = max(5, int(gh * .008))
+    grupos_y: list[list[float]] = []
+    for _, y, _ in sorted(puntos_x, key=lambda punto: punto[1]):
+        if not grupos_y or y - float(np.mean(grupos_y[-1])) > tolerancia_y:
+            grupos_y.append([y])
+        else:
+            grupos_y[-1].append(y)
+    centros_y = [
+        int(round(float(np.mean(grupo))))
+        for grupo in grupos_y
+        if len(grupo) >= 10
+    ]
+
+    radios = [radio for _, _, radio in puntos_x]
+    # El radio de Hough describe principalmente el borde; una ventana algo
+    # mayor permite medir suficiente tinta sin tocar la burbuja contigua.
+    radio = max(5, int(round(float(np.median(radios) * 1.2))))
+    if len(centros_x) != 15 or len(centros_y) != 20:
+        return None
+    return centros_x, centros_y, radio
 
 
 def _leer_respuestas(gray: np.ndarray, grilla: tuple[int, int, int, int]) -> dict[str, Any]:
     gx, gy, gw, gh = grilla
     respuestas: dict[str, Any] = {}
     detalles: list[dict[str, Any]] = []
-    radio = max(5, int(gw * .011))
-    posiciones_opciones = (.262, .397, .529, .657, .792)
+    centros = _detectar_centros_burbujas(gray, grilla)
+    if centros:
+        centros_x, centros_y, radio = centros
+    else:
+        # Fallback para escaneos con resolución o contraste insuficiente para
+        # Hough. Mantiene la geometría anterior, pero con la lectura en anillo.
+        radio = max(5, int(gw * .011))
+        centros_x = [
+            gx + int((columna + posicion) * gw / 3)
+            for columna in range(3)
+            for posicion in (.262, .397, .529, .657, .792)
+        ]
+        centros_y = [gy + int((.055 + fila * .0482) * gh) for fila in range(20)]
+
     for pregunta in range(1, 61):
         columna = (pregunta - 1) // 20
         fila = (pregunta - 1) % 20
-        centro_x = gx + int((columna + posiciones_opciones[0]) * gw / 3)
-        centro_y = gy + int((.055 + fila * .0482) * gh)
-        densidades = []
-        for posicion in posiciones_opciones:
-            cx = gx + int((columna + posicion) * gw / 3)
-            densidades.append(round(_densidad_centro(gray, cx, centro_y, radio), 2))
+        densidades = [
+            round(_densidad_centro(gray, centros_x[columna * 5 + opcion], centros_y[fila], radio), 2)
+            for opcion in range(5)
+        ]
         orden = np.argsort(densidades)[::-1]
-        # En la plantilla vacía las letras A-E pueden alcanzar densidades altas;
-        # una marca real debe cubrir el núcleo prácticamente completo.
-        marcadas = [OPCIONES[int(indice)] for indice in orden if densidades[int(indice)] >= 94.0]
-        if len(marcadas) > 2:
-            marcadas = marcadas[:2]
-        respuesta = "".join(marcadas) if marcadas else ""
+        maximo = float(densidades[int(orden[0])])
+        segundo = float(densidades[int(orden[1])])
+        if maximo < UMBRAL_DENSIDAD_MARCA:
+            respuesta = ""
+        elif (
+            segundo >= UMBRAL_DENSIDAD_MARCA
+            and maximo - segundo < UMBRAL_DIFERENCIAL_DOBLE
+        ):
+            respuesta = OPCIONES[int(orden[0])] + OPCIONES[int(orden[1])]
+        else:
+            respuesta = OPCIONES[int(orden[0])]
         respuestas[str(pregunta)] = respuesta
         detalles.append({"pregunta": pregunta, "respuesta": respuesta, "densidades": densidades})
     return {"respuestas": respuestas, "detalles": detalles}
@@ -164,7 +287,12 @@ def _cargar_mapeos(rol_examen_id: str) -> dict[str, dict[str, Any]]:
         conexion.close()
 
 
-def _persistir_calificacion(rol_examen_id: str, lectura: dict[str, Any], mapeo: dict[str, Any]) -> None:
+def _persistir_calificacion(
+    rol_examen_id: str,
+    lectura: dict[str, Any],
+    mapeo: dict[str, Any],
+    archivo_escaneado_path: str,
+) -> None:
     respuestas = lectura["respuestas"]
     patron = {str(clave): valor for clave, valor in mapeo["patron"].items()}
     total = len(patron)
@@ -187,11 +315,13 @@ def _persistir_calificacion(rol_examen_id: str, lectura: dict[str, Any], mapeo: 
                     (rol_examen_id, codigo_estudiante, estudiante_nombre_completo,
                      letra_variante, total_reactivos, aciertos, fallos, blancos,
                      dobles_marcas, nota_sobre_30, nota_sobre_100,
-                     estado_calificacion, respuestas_detectadas_json, procesado_por)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                     estado_calificacion, respuestas_detectadas_json, archivo_escaneado_path,
+                     procesado_por)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (rol_examen_id, lectura["codigoEstudiante"], mapeo["nombre"], mapeo["variante"],
                  total, aciertos, fallos, blancos, dobles, round(aciertos * 30 / total, 2) if total else 0,
-                 nota100, "APROBADO" if nota100 >= 51 else "REPROBADO", json.dumps(respuestas), "OMR_VISION_ENGINE_V1"),
+                 nota100, "APROBADO" if nota100 >= 51 else "REPROBADO", json.dumps(respuestas),
+                 archivo_escaneado_path, "OMR_VISION_ENGINE_V1"),
             )
         conexion.commit()
     finally:
@@ -240,7 +370,7 @@ def procesar_archivo(archivo: str, rol_examen_id: str) -> dict[str, Any]:
             **_leer_respuestas(gris, grilla),
         }
         if codigo:
-            _persistir_calificacion(rol_examen_id, lectura, mapeos[codigo])
+            _persistir_calificacion(rol_examen_id, lectura, mapeos[codigo], archivo)
             lectura.update(_resumen_calificacion(lectura, mapeos[codigo]))
             lectura["estado"] = "CALIFICADO"
         else:

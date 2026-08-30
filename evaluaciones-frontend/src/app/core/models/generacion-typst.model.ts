@@ -11,13 +11,23 @@ export interface GeneracionTypstVariante {
   ordenReactivosIdsJson: string;
   archivoPdfPath: string;
   archivoTypstPath: string;
+  archivoRemarkXlsxPath?: string;
 }
 
 export interface GeneracionTypstMapeo {
   codigoEstudiante: string;
+  nombres?: string;
+  apellidoPaterno?: string;
+  apellidoMaterno?: string;
   letraVariante: 'A' | 'B' | 'C' | 'D' | 'E';
   hashControl: string;
   cuadernilloPdfPath: string;
+}
+
+export interface ConfiguracionGeneracion {
+  rolExamenId: string;
+  variantes: GeneracionTypstVariante[];
+  mapeos: GeneracionTypstMapeo[];
 }
 
 export interface GeneracionTypstRequest {

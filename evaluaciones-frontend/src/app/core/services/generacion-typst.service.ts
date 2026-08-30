@@ -7,7 +7,8 @@ import {
   GeneracionTypstRequest,
   GeneracionTypstResultado,
   GeneracionColaResponse,
-  DocumentoExamen
+  DocumentoExamen,
+  ConfiguracionGeneracion
 } from '../models/generacion-typst.model';
 
 /**
@@ -63,6 +64,15 @@ export class GeneracionTypstService {
     return this._http.get<DocumentoExamen>(`${this._baseUrl}/roles/${rolExamenId}/documento`).pipe(
       catchError(err => {
         console.error(`[GeneracionTypstService] Error al consultar el PDF del rol ${rolExamenId}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public consultarConfiguracion(rolExamenId: string): Observable<ConfiguracionGeneracion> {
+    return this._http.get<ConfiguracionGeneracion>(`${this._baseUrl}/roles/${rolExamenId}/configuracion`).pipe(
+      catchError(err => {
+        console.error(`[GeneracionTypstService] Error al consultar configuración del rol ${rolExamenId}:`, err);
         return throwError(() => err);
       })
     );

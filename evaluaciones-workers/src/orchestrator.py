@@ -150,7 +150,7 @@ def run_local_test() -> None:
         "rolExamenId": "ROL-CPEC18-TA01-1P",
         "bancoPreguntasId": "BANCO-CPEC18-001",
         "variantes": ["A", "B", "C"],
-        "ratioEstudiantesPorVariante": 5,
+        "ratioEstudiantesPorVariante": 1,
         "outputBasePath": os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_output"),
     }
     result = procesar_job(payload)

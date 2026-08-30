@@ -25,8 +25,8 @@ public class GeneracionTypstRequestDto {
     @NotEmpty
     private List<String> variantes;
 
-    /** Cantidad máxima de estudiantes que comparte una variante. Default institucional: 5. */
-    private Integer ratioEstudiantesPorVariante = 5;
+    /** Cantidad máxima de estudiantes que comparte una variante. Modo de pruebas: 1. */
+    private Integer ratioEstudiantesPorVariante = 1;
 
     private String outputBasePath;
 }

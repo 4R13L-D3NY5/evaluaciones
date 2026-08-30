@@ -1,23 +1,16 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
-import { 
-  EvaluacionesDbService, 
-  RolExamenPersistedItem, 
-  MapeoEstudianteExamen 
-} from '../../core/services/evaluaciones-db.service';
+import { RolExamenPersistedItem, MapeoEstudianteExamen } from '../../core/services/evaluaciones-db.service';
 import { 
   EstudiantesGatewayService, 
   EstudianteInscrito 
 } from '../../core/services/estudiantes-gateway.service';
 import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
-import { 
-  ExamenMacroGeneratorService, 
-  VarianteCompilada,
-  ReactivoExamen 
-} from '../../core/services/examen-macro-generator.service';
+import { VarianteCompilada } from '../../core/services/examen-macro-generator.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { BancoPreguntasService, BancoPreguntasResponse } from '../../core/services/banco-preguntas.service';
 import {
@@ -26,9 +19,18 @@ import {
 } from '../../core/services/rol-examen.service';
 import { CartillasOmrService, LoteCartillasOmr } from '../../core/services/cartillas-omr.service';
 import {
+  CalificacionOmrResponse,
+  AjustarCalificacionOmrRequest,
+  OmrJobResponse,
+  OmrLecturaResponse,
+  OmrProcesamientoService
+} from '../../core/services/omr-procesamiento.service';
+import {
   GeneracionTypstRequest,
   GeneracionTypstResultado,
-  GeneracionColaResponse
+  GeneracionColaResponse,
+  ConfiguracionGeneracion,
+  GeneracionTypstVariante
 } from '../../core/models/generacion-typst.model';
 
 function fechaIsoLocal(fecha: Date = new Date()): string {
@@ -287,7 +289,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   <th class="p-3.5">Fecha / Hora</th>
                   <th class="p-3.5 text-center">Modalidad</th>
                   <th class="p-3.5 text-center min-w-[310px]">Flujo de Estados</th>
-                  <th class="p-3.5 text-center">Cartillas</th>
+                  <th class="p-3.5 text-center">Marcas</th>
                   <th class="p-3.5 text-center">Documentos</th>
                   <th class="p-3.5 text-center min-w-[110px]">Acciones</th>
                 </tr>
@@ -381,13 +383,19 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                         <button
                           (click)="abrirGestionCartillas(item)"
                           [disabled]="!puedeGestionarCartillas(item)"
-                          title="Gestionar cartillas OMR"
-                          aria-label="Gestionar cartillas OMR"
-                          class="h-7 w-7 rounded-lg text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35">
+                          [title]="marcaImpresa(item) ? 'Marcas OMR impresas' : 'Gestionar marcas OMR'"
+                          [attr.aria-label]="marcaImpresa(item) ? 'Marcas OMR impresas' : 'Gestionar marcas OMR'"
+                          [class]="marcaImpresa(item) ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-teal-700 bg-teal-50 border-teal-200'"
+                          class="relative h-7 w-7 rounded-lg hover:bg-teal-100 border flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35">
                           <i class="pi pi-id-card text-xs"></i>
+                          @if (marcaImpresa(item)) {
+                            <span class="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-emerald-600 text-white border border-white flex items-center justify-center">
+                              <i class="pi pi-check text-[8px]"></i>
+                            </span>
+                          }
                         </button>
                         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/cartillas:flex flex-col items-center z-50 pointer-events-none">
-                          <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Sobreimpresión de datos OMR</span>
+                          <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">{{ marcaImpresa(item) ? 'Marcas OMR impresas' : 'Sobreimpresión de datos OMR' }}</span>
                           <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                         </div>
                       </div>
@@ -435,7 +443,41 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           </div>
                         </div>
 
-                        <!-- 2. Botón Restablecer a Validado -->
+                        <!-- 2. Variantes, patrones y asignaciones persistidas -->
+                        @if (puedeMostrarConfiguracion(item)) {
+                          <div class="relative group/configuracion">
+                            <button
+                              (click)="abrirConfiguracionGeneracion(item)"
+                              title="Ver variantes, patrones y asignaciones"
+                              aria-label="Ver variantes, patrones y asignaciones"
+                              class="h-7 w-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-sitemap text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/configuracion:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Variantes y patrones guardados</span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
+                        <!-- 3. Notas OMR persistidas -->
+                        @if (puedeMostrarNotas(item)) {
+                          <div class="relative group/notas">
+                            <button
+                              (click)="abrirNotasOmr(item)"
+                              title="Ver notas OMR"
+                              aria-label="Ver notas OMR"
+                              class="h-7 w-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-chart-bar text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/notas:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Notas OMR /30 y /100</span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
+                        <!-- 4. Botón Restablecer a Validado -->
                         @if (puedeRestablecer(item)) {
                           <div class="relative group/reestablecer">
                             <button 
@@ -911,8 +953,9 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                 @for (estudianteItem of (modoUnificado() ? estudiantesInscritos() : [getEstudianteActivo()]); track estudianteItem?.codigo; let i = $index) {
                   @if (estudianteItem) {
                     @let varComp = getVarianteParaEstudiante(estudianteItem);
-                    
-                    <div 
+
+                    @if (varComp) {
+                    <div
                       [style.font-family]="paramTipoFuente"
                       [style.font-size.pt]="paramTamanoFuente"
                       [style.line-height]="paramEspaciado"
@@ -1071,6 +1114,11 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       </div>
 
                     </div>
+                    } @else {
+                      <div class="max-w-4xl mx-auto p-6 rounded-xl border border-dashed border-amber-300 bg-amber-50 text-amber-900 text-xs">
+                        No existe una variante oficial persistida para este estudiante. Genere el examen desde el banco validado antes de visualizarlo.
+                      </div>
+                    }
                   }
                 }
               }
@@ -1138,7 +1186,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             <!-- Footer Visor -->
             <div class="bg-muted/60 border-t border-border p-3 flex items-center justify-between shrink-0 print:hidden">
               <span class="text-xs font-mono text-muted-foreground">
-                Documentos Oficiales alojados en bases/ · CPEC18_Cochabamba_TA-01_1erParcial
+                Documentos oficiales generados y persistidos para la evaluación seleccionada
               </span>
               <div class="flex items-center gap-2">
                 <button 
@@ -1289,8 +1337,187 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   <button (click)="confirmarImpresionCartillas(lote)" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"><i class="pi pi-print mr-1.5"></i>Marcar como impreso</button>
                 }
               }
-              <button (click)="generarCartillas()" [disabled]="generandoCartillas()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-plus]="!generandoCartillas()"></i> {{ loteCartillasActual() ? 'Generar nuevo lote' : 'Generar lote' }}</button>
+              @if (!loteCartillasActual()) {
+                <button (click)="generarCartillas()" [disabled]="generandoCartillas()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-plus]="!generandoCartillas()"></i> Generar marcas</button>
+              }
             </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: CONFIGURACIÓN PERSISTIDA DE VARIANTES Y PATRONES -->
+      @if (dialogConfiguracionGeneracion()) {
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-6xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center"><i class="pi pi-sitemap text-lg"></i></div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Variantes, patrones y asignaciones</h3>
+                  <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaConfiguracion()?.codigo }} · {{ evaluacionSeleccionadaConfiguracion()?.materia }} · datos persistidos de la generación</p>
+                </div>
+              </div>
+              <button (click)="cerrarConfiguracionGeneracion()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-5">
+              @if (cargandoConfiguracionGeneracion()) {
+                <div class="py-14 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spinner pi-spin text-primary mr-2"></i>Cargando configuración guardada...</div>
+              } @else {
+                @if (configuracionGeneracion(); as configuracion) {
+                  <div class="grid grid-cols-2 gap-3 max-w-md">
+                    <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 text-center"><span class="block text-[10px] uppercase font-bold text-indigo-700">Variantes</span><strong class="text-xl text-indigo-950">{{ configuracion.variantes.length }}</strong></div>
+                    <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-center"><span class="block text-[10px] uppercase font-bold text-emerald-700">Estudiantes asignados</span><strong class="text-xl text-emerald-950">{{ configuracion.mapeos.length }}</strong></div>
+                  </div>
+
+                  <section>
+                    <h4 class="text-xs font-black uppercase tracking-wide text-foreground mb-2">Patrones oficiales por variante</h4>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      @for (variante of configuracion.variantes; track variante.letra) {
+                        <div class="rounded-xl border border-border overflow-hidden">
+                          <div class="px-3 py-2 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+                            <span class="text-xs font-black text-indigo-900">VARIANTE {{ variante.letra }}</span>
+                            <span class="text-[10px] font-mono text-indigo-700">Semilla: {{ variante.semilla }}</span>
+                          </div>
+                          <div class="grid grid-cols-5 sm:grid-cols-6 gap-1.5 p-3 max-h-48 overflow-y-auto">
+                            @for (clave of patronComoEntradas(variante); track clave.numero) {
+                              <div class="flex items-center justify-between gap-1 rounded border border-border bg-muted/30 px-1.5 py-1 text-[10px] font-mono">
+                                <span class="text-muted-foreground">{{ clave.numero }}</span><strong class="text-indigo-800">{{ clave.respuesta }}</strong>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 class="text-xs font-black uppercase tracking-wide text-foreground mb-2">Asignación confidencial estudiante–variante</h4>
+                    <div class="border border-border rounded-xl overflow-hidden">
+                      <div class="grid grid-cols-[55px_1fr_140px_1fr] gap-3 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Variante</span><span>Hash de control</span></div>
+                      <div class="max-h-64 overflow-y-auto divide-y divide-border">
+                        @for (mapeo of configuracion.mapeos; track mapeo.codigoEstudiante) {
+                          <div class="grid grid-cols-[55px_1fr_140px_1fr] gap-3 px-3 py-2 items-center text-[11px]">
+                            <span class="font-mono text-muted-foreground">{{ $index + 1 }}</span>
+                            <span class="truncate"><strong>{{ mapeo.codigoEstudiante }}</strong><span class="text-muted-foreground ml-2">{{ nombreMapeo(mapeo) }}</span></span>
+                            <span class="font-black text-indigo-700">TIPO {{ mapeo.letraVariante }}</span>
+                            <span class="font-mono text-[10px] text-muted-foreground truncate" [title]="mapeo.hashControl">{{ mapeo.hashControl || '—' }}</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  </section>
+                } @else {
+                  <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">No existe una configuración de variantes persistida para esta evaluación.</div>
+                }
+              }
+            </div>
+
+            <div class="p-4 border-t border-border flex justify-end shrink-0">
+              <button (click)="cerrarConfiguracionGeneracion()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold cursor-pointer">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: CALIFICACIÓN OMR PARA PASAR A REVISADO -->
+      @if (dialogCalificacionOmr()) {
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-5xl w-full max-h-[94vh] shadow-2xl overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-purple-950 via-indigo-900 to-slate-950 text-white p-5 flex items-start justify-between gap-4 shrink-0">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center"><i class="pi pi-check-square text-lg text-purple-200"></i></div>
+                <div>
+                  <h3 class="text-sm font-black">Calificación OMR · pasar a Revisado</h3>
+                  <p class="text-[11px] text-white/70">{{ evaluacionSeleccionadaOmr()?.codigo }} · {{ evaluacionSeleccionadaOmr()?.grupo }} · el patrón se toma de la asignación interna.</p>
+                </div>
+              </div>
+              <button (click)="cerrarCalificacionOmr()" aria-label="Cerrar calificación OMR" title="Cerrar" class="h-8 w-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4">
+              <input #archivoOmrInput type="file" accept=".pdf,image/png,image/jpeg" class="hidden" (change)="seleccionarArchivoOmr($event)" />
+              <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="text-xs text-indigo-950">
+                  <div class="font-black">Escaneado de cartillas</div>
+                  <div class="text-[11px] mt-1">Se revisará cada página: código del estudiante, grilla y respuestas. Los códigos se cotejan exclusivamente con la nómina y su patrón de variante.</div>
+                  @if (archivoOmrSeleccionado()) {
+                    <div class="font-mono font-bold text-indigo-700 mt-2"><i class="pi pi-file mr-1"></i>{{ archivoOmrSeleccionado()?.name }}</div>
+                  }
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button (click)="archivoOmrInput.click()" class="px-3 py-2 rounded-xl border border-indigo-300 bg-white text-indigo-800 text-xs font-black cursor-pointer hover:bg-indigo-100"><i class="pi pi-folder-open mr-1.5"></i>{{ archivoOmrSeleccionado() ? 'Cambiar escaneado' : 'Seleccionar PDF' }}</button>
+                  <button (click)="ejecutarCalificacionOmr()" [disabled]="procesandoCalificacionOmr() || !archivoOmrSeleccionado()" class="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="procesandoCalificacionOmr()" [class.pi-spinner]="procesandoCalificacionOmr()" [class.pi-bolt]="!procesandoCalificacionOmr()"></i> {{ procesandoCalificacionOmr() ? 'Procesando...' : 'Ejecutar OMR' }}</button>
+                </div>
+              </div>
+
+              @if (mensajeCalificacionOmr()) {
+                <div class="rounded-xl border px-3 py-2.5 text-xs font-bold" [class.border-amber-300]="!errorCalificacionOmr()" [class.bg-amber-50]="!errorCalificacionOmr()" [class.text-amber-900]="!errorCalificacionOmr()" [class.border-rose-300]="errorCalificacionOmr()" [class.bg-rose-50]="errorCalificacionOmr()" [class.text-rose-900]="errorCalificacionOmr()"><i class="pi mr-1.5" [class.pi-info-circle]="!errorCalificacionOmr()" [class.pi-exclamation-triangle]="errorCalificacionOmr()"></i>{{ mensajeCalificacionOmr() }}</div>
+              }
+
+              @if (procesandoCalificacionOmr()) {
+                <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-2xl text-purple-700"></i><p class="mt-2">Procesando todas las páginas del PDF...</p><p class="text-[10px] font-normal mt-1">El motor OMR está leyendo código y marcajes.</p></div>
+              } @else {
+                @if (resultadoCalificacionOmr(); as resultado) {
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="text-xs font-black text-foreground">Inspección del lote · {{ resultado.totalPaginas || resultado.resultados?.length || 0 }} páginas</div>
+                  <span class="text-[10px] font-black px-2.5 py-1 rounded-full" [class.bg-emerald-100]="todasPaginasCalificadas(resultado)" [class.text-emerald-800]="todasPaginasCalificadas(resultado)" [class.bg-amber-100]="!todasPaginasCalificadas(resultado)" [class.text-amber-900]="!todasPaginasCalificadas(resultado)">{{ todasPaginasCalificadas(resultado) ? 'LISTO PARA REVISADO' : 'REQUIERE REVISIÓN MANUAL' }}</span>
+                </div>
+                <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-2.5 text-[11px] text-indigo-950">
+                  <i class="pi pi-pencil mr-1.5"></i>
+                  Verifique cada número de pregunta. Puede corregir el código y seleccionar la respuesta leída; al guardar se recalculan los aciertos, fallos, dobles y notas usando el patrón oficial de la variante.
+                </div>
+                <div class="border border-border rounded-xl overflow-hidden divide-y divide-border">
+                  @for (lectura of resultado.resultados ?? []; track lectura.pagina) {
+                    <div class="p-3 space-y-2">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 text-xs font-black"><span class="bg-muted rounded-lg px-2 py-1">Página {{ lectura.pagina }}</span><span [class.text-emerald-700]="lectura.estado === 'CALIFICADO'" [class.text-amber-700]="lectura.estado !== 'CALIFICADO'">{{ lectura.estado === 'CALIFICADO' ? 'Código y patrón validados' : 'Código no reconocido' }}</span></div>
+                        <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground"><span>Marcajes: {{ cantidadRespuestasLeidas(lectura) }}/{{ lectura.totalReactivos || 30 }}</span><span class="px-2 py-0.5 rounded border" [class.border-emerald-200]="!!lectura.grilla" [class.text-emerald-700]="!!lectura.grilla" [class.border-amber-200]="!lectura.grilla" [class.text-amber-700]="!lectura.grilla">{{ lectura.grilla ? 'Grilla detectada' : 'Grilla no detectada' }}</span></div>
+                      </div>
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px]">
+                          <label class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Código del estudiante</span><input [value]="codigoOmr(lectura)" (input)="editarCodigoOmr(lectura, $any($event.target).value)" inputmode="numeric" maxlength="30" class="mt-1 w-full rounded-md border border-indigo-200 bg-white px-2 py-1 font-mono text-xs font-black text-foreground outline-none focus:border-indigo-500" placeholder="Ingrese código" /></label>
+                        <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">OCR candidato</span><strong class="font-mono text-foreground">{{ (lectura.codigoOcr || []).join(', ') || '—' }}</strong></div>
+                        <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Aciertos</span><strong class="text-emerald-700">{{ lectura.aciertos ?? 0 }}</strong></div>
+                        <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Nota /30</span><strong class="text-indigo-700">{{ lectura.notaSobre30 ?? 0 }}</strong></div>
+                        <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Nota /100</span><strong class="text-indigo-700">{{ lectura.notaSobre100 ?? 0 }}</strong></div>
+                        </div>
+                        <div class="rounded-lg border border-border bg-card p-2">
+                          <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-muted-foreground">Respuestas detectadas · revisar pregunta por pregunta</span><span class="text-[10px] text-muted-foreground">— = blanco · AB = doble marca</span></div>
+                          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">
+                            @for (pregunta of preguntasOmr(lectura); track pregunta) {
+                              <label class="flex items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 text-[10px]"><span class="w-5 shrink-0 font-mono font-black text-muted-foreground">{{ pregunta }}</span><select [value]="respuestaOmr(lectura, pregunta)" (change)="editarRespuestaOmr(lectura, pregunta, $any($event.target).value)" class="min-w-0 flex-1 rounded border-0 bg-transparent py-0 text-[10px] font-black text-foreground outline-none"><option value="">—</option>@for (opcion of opcionesRespuestaOmr; track opcion) { @if (opcion) { <option [value]="opcion">{{ opcion }}</option> } }</select></label>
+                            }
+                          </div>
+                        </div>
+                      @if (lectura.mensaje) { <div class="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">{{ lectura.mensaje }}</div> }
+                    </div>
+                  }
+                </div>
+                }
+              }
+            </div>
+
+            <div class="p-4 border-t border-border flex flex-wrap items-center justify-end gap-2 shrink-0">
+              <button (click)="cerrarCalificacionOmr()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
+              @if (resultadoCalificacionOmr(); as resultado) {
+                <button (click)="confirmarCalificacionYRevisado(resultado)" [disabled]="!todasPaginasCalificadas(resultado) || guardandoCalificacionOmr()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="guardandoCalificacionOmr()" [class.pi-spinner]="guardandoCalificacionOmr()" [class.pi-check]="!guardandoCalificacionOmr()"></i> {{ guardandoCalificacionOmr() ? 'Guardando ajustes...' : 'Guardar resultados y pasar a Revisado' }}</button>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: NOTAS OMR -->
+      @if (dialogNotasOmr()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-5xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0"><div><h3 class="text-sm font-black text-foreground">Notas OMR de la evaluación</h3><p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotas()?.codigo }} · resultados guardados en el servidor</p></div><button (click)="cerrarNotasOmr()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button></div>
+            <div class="p-5 overflow-y-auto">
+              @if (cargandoNotasOmr()) { <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-xl text-purple-700"></i><p class="mt-2">Cargando notas...</p></div> }
+              @else if (notasOmr().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen calificaciones OMR guardadas para esta evaluación.</div> }
+              @else { <div class="border border-border rounded-xl overflow-hidden"><div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Variante</span><span>/30</span><span>/100</span><span>Estado</span></div><div class="divide-y divide-border">@for (nota of notasOmr(); track nota.id) {<div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 px-3 py-2.5 items-center text-xs"><span class="font-mono text-muted-foreground">{{ $index + 1 }}</span><span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span><span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span><strong>{{ nota.notaSobre30 }}</strong><strong>{{ nota.notaSobre100 }}</strong><span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="nota.estadoCalificacion !== 'APROBADO'">{{ nota.estadoCalificacion }}</span></div>}</div></div> }
+            </div>
+            <div class="p-4 border-t border-border flex justify-end shrink-0"><button (click)="cerrarNotasOmr()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
           </div>
         </div>
       }
@@ -1308,13 +1535,12 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 })
 export class EvaluacionesDiaComponent implements OnInit {
   private readonly _gateway = inject(UnitepcGatewayService);
-  private readonly _db = inject(EvaluacionesDbService);
   private readonly _rolService = inject(RolExamenService);
   private readonly _studentService = inject(EstudiantesGatewayService);
   private readonly _generacionTypst = inject(GeneracionTypstService);
   private readonly _bancoService = inject(BancoPreguntasService);
   private readonly _cartillasOmr = inject(CartillasOmrService);
-  public readonly macroGenerator = inject(ExamenMacroGeneratorService);
+  private readonly _omrService = inject(OmrProcesamientoService);
 
   // Sedes y Carreras desde SEA Gateway
   public sedes = signal<BranchOffice[]>([]);
@@ -1370,6 +1596,11 @@ export class EvaluacionesDiaComponent implements OnInit {
   public dialogVisorExamen = signal<boolean>(false);
   public tabVisorActiva = signal<'examen' | 'patron'>('examen');
   public evaluacionActivaVisor = signal<EvaluacionItemUI | null>(null);
+  public dialogConfiguracionGeneracion = signal<boolean>(false);
+  public evaluacionSeleccionadaConfiguracion = signal<EvaluacionItemUI | null>(null);
+  public configuracionGeneracion = signal<ConfiguracionGeneracion | null>(null);
+  public cargandoConfiguracionGeneracion = signal<boolean>(false);
+  public estadoMarcas = signal<Record<string, string>>({});
 
   // Generación real vía backend
   public bancoSeleccionado = signal<BancoPreguntasResponse | null>(null);
@@ -1394,7 +1625,8 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   // Estudiantes
   public estudiantesInscritos = signal<EstudianteInscrito[]>([]);
-  public ratioEstudiantesPorVariante = signal<number>(5);
+  // Modo temporal de pruebas: una variante por estudiante.
+  public ratioEstudiantesPorVariante = signal<number>(1);
   public estudianteSeleccionadoIdx = signal<number>(0);
   public variantesCompiladas = signal<VarianteCompilada[]>([]);
   public modoUnificado = signal<boolean>(false);
@@ -1412,13 +1644,31 @@ export class EvaluacionesDiaComponent implements OnInit {
   public cargandoCartillas = signal<boolean>(false);
   public generandoCartillas = signal<boolean>(false);
 
+  // Calificación OMR integrada al flujo de estados.
+  public dialogCalificacionOmr = signal<boolean>(false);
+  public evaluacionSeleccionadaOmr = signal<EvaluacionItemUI | null>(null);
+  public archivoOmrSeleccionado = signal<File | null>(null);
+  public procesandoCalificacionOmr = signal<boolean>(false);
+  public guardandoCalificacionOmr = signal<boolean>(false);
+  public resultadoCalificacionOmr = signal<OmrJobResponse | null>(null);
+  public mensajeCalificacionOmr = signal<string | null>(null);
+  public errorCalificacionOmr = signal<boolean>(false);
+  public edicionesOmr = signal<Record<number, { codigo: string; respuestas: Record<string, string> }>>({});
+  public readonly opcionesRespuestaOmr = ['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE', 'BC', 'BD', 'BE', 'CD', 'CE', 'DE'];
+
+  // Consulta de notas ya persistidas.
+  public dialogNotasOmr = signal<boolean>(false);
+  public evaluacionSeleccionadaNotas = signal<EvaluacionItemUI | null>(null);
+  public notasOmr = signal<CalificacionOmrResponse[]>([]);
+  public cargandoNotasOmr = signal<boolean>(false);
+
   // Lista viva de evaluaciones
   public evaluaciones = signal<EvaluacionItemUI[]>([]);
 
-  // La regla institucional vigente es una variante por cada cinco estudiantes.
+  // Durante las pruebas se genera una variante por estudiante.
   public variantesCalculadas = computed(() => {
     const totalEst = this.estudiantesInscritos().length;
-    const ratio = this.ratioEstudiantesPorVariante() || 5;
+    const ratio = this.ratioEstudiantesPorVariante() || 1;
     if (totalEst <= 0) return 1;
     const num = Math.ceil(totalEst / ratio);
     return Math.min(Math.max(num, 1), 5);
@@ -1473,7 +1723,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   });
 
   public ngOnInit(): void {
-    this.ratioEstudiantesPorVariante.set(this._db.getEstudiantesPorVarianteParam());
+    this.ratioEstudiantesPorVariante.set(1);
     this._cargarSedes();
   }
 
@@ -1565,6 +1815,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       next: roles => {
         const uiList: EvaluacionItemUI[] = roles.map(rol => this._mapearRolResponseA_UI(rol));
         this.evaluaciones.set(uiList);
+        this._cargarEstadoMarcas(uiList);
         this.cargando.set(false);
       },
       error: err => {
@@ -1637,7 +1888,37 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public puedeGestionarCartillas(item: EvaluacionItemUI): boolean {
+    // Las marcas se pueden preparar antes de entregar el examen. Desde
+    // Entregado en adelante la cartilla ya no debe modificarse.
+    return ['Programado', 'Validado', 'Generado', 'Impreso'].includes(item.etapa);
+  }
+
+  public puedeMostrarConfiguracion(item: EvaluacionItemUI): boolean {
     return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'].includes(item.etapa);
+  }
+
+  public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
+    return ['Revisado', 'Subido', 'Recibido'].includes(item.etapa);
+  }
+
+  public marcaImpresa(item: EvaluacionItemUI): boolean {
+    return this.estadoMarcas()[item.id] === 'IMPRESO';
+  }
+
+  private _cargarEstadoMarcas(items: EvaluacionItemUI[]): void {
+    this.estadoMarcas.set({});
+    items.filter(item => this.puedeGestionarCartillas(item)).forEach(item => {
+      this._cartillasOmr.obtenerUltimo(item.id).subscribe({
+        next: lote => this.estadoMarcas.update(estados => ({
+          ...estados,
+          [item.id]: lote?.estado || 'SIN_GENERAR'
+        })),
+        error: () => this.estadoMarcas.update(estados => ({
+          ...estados,
+          [item.id]: 'SIN_GENERAR'
+        }))
+      });
+    });
   }
 
   public abrirGestionCartillas(item: EvaluacionItemUI): void {
@@ -1674,7 +1955,11 @@ export class EvaluacionesDiaComponent implements OnInit {
       },
         error: err => {
           this.generandoCartillas.set(false);
-          this._mostrarToast(err?.error?.message || 'No se pudo generar la sobreimpresión de datos.', 'error');
+          this._mostrarToast(
+            err?.error?.message || err?.error?.error || err?.message ||
+            'No se pudo generar la sobreimpresión de datos.',
+            'error'
+          );
       }
     });
   }
@@ -1685,6 +1970,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     this._cartillasOmr.marcarImpreso(item.id, lote.id).subscribe({
       next: actualizado => {
         this.loteCartillasActual.set(actualizado);
+        this.estadoMarcas.update(estados => ({ ...estados, [item.id]: actualizado.estado }));
         this._mostrarToast('Lote de cartillas marcado como impreso.');
       },
       error: () => this._mostrarToast('No se pudo confirmar la impresión del lote.', 'error')
@@ -1694,6 +1980,48 @@ export class EvaluacionesDiaComponent implements OnInit {
   public abrirPdfCartillas(lote: LoteCartillasOmr): void {
     if (!lote.archivoPdfPath) return;
     window.open(`/api/archivos?path=${encodeURIComponent(lote.archivoPdfPath)}`, '_blank', 'noopener');
+  }
+
+  public abrirConfiguracionGeneracion(item: EvaluacionItemUI): void {
+    if (!this.puedeMostrarConfiguracion(item)) return;
+    this.evaluacionSeleccionadaConfiguracion.set(item);
+    this.configuracionGeneracion.set(null);
+    this.cargandoConfiguracionGeneracion.set(true);
+    this.dialogConfiguracionGeneracion.set(true);
+    this._generacionTypst.consultarConfiguracion(item.id).subscribe({
+      next: configuracion => {
+        this.configuracionGeneracion.set(configuracion);
+        this.cargandoConfiguracionGeneracion.set(false);
+      },
+      error: () => {
+        this.cargandoConfiguracionGeneracion.set(false);
+        this._mostrarToast('No se pudo consultar la configuración persistida de la generación.', 'error');
+      }
+    });
+  }
+
+  public cerrarConfiguracionGeneracion(): void {
+    this.dialogConfiguracionGeneracion.set(false);
+    this.evaluacionSeleccionadaConfiguracion.set(null);
+    this.configuracionGeneracion.set(null);
+  }
+
+  public patronComoEntradas(variante: GeneracionTypstVariante): { numero: string; respuesta: string }[] {
+    if (!variante.patronClavesJson) return [];
+    try {
+      const patron = JSON.parse(variante.patronClavesJson) as Record<string, string>;
+      return Object.entries(patron)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([numero, respuesta]) => ({ numero, respuesta }));
+    } catch {
+      return [];
+    }
+  }
+
+  public nombreMapeo(mapeo: ConfiguracionGeneracion['mapeos'][number]): string {
+    return [mapeo.nombres, mapeo.apellidoPaterno, mapeo.apellidoMaterno]
+      .filter(valor => valor && valor.trim())
+      .join(' ');
   }
 
   public isEstadoSeleccionado(etapa: string): boolean {
@@ -1774,13 +2102,224 @@ export class EvaluacionesDiaComponent implements OnInit {
       return;
     }
 
-    if (pasoIdx === currentIdx + 1) {
-      item.etapa = pasoKey;
-      item.estado = pasoKey.toUpperCase() as any;
-      this._db.upsertRolExamen(item);
-      this.evaluaciones.update(items => [...items]);
-      this._mostrarToast(`${item.codigo}: Estado avanzado a '${pasoKey}'.`);
+    if (pasoKey === 'Revisado' && item.etapa === 'Devuelto') {
+      this.abrirCalificacionOmr(item);
+      return;
     }
+
+    if (pasoIdx === currentIdx + 1) {
+      const nuevoEstado = pasoKey.toUpperCase() as RolExamenResponse['estadoFlujo'];
+      this._rolService.transicionarEstado(item.id, {
+        nuevoEstado,
+        usuario: 'ADMIN_EVALUACIONES'
+      }).subscribe({
+        next: rolActualizado => {
+          const actualizado = this._mapearRolResponseA_UI(rolActualizado);
+          this.evaluaciones.update(items => items.map(actual => actual.id === item.id ? actualizado : actual));
+          this._mostrarToast(`${item.codigo}: Estado avanzado a '${pasoKey}'.`);
+        },
+        error: err => this._mostrarToast(err?.error?.message || 'No se pudo actualizar el estado oficial del examen.', 'error')
+      });
+    }
+  }
+
+  public abrirCalificacionOmr(item: EvaluacionItemUI): void {
+    if (item.etapa !== 'Devuelto') return;
+    this.evaluacionSeleccionadaOmr.set(item);
+    this.archivoOmrSeleccionado.set(null);
+    this.resultadoCalificacionOmr.set(null);
+    this.edicionesOmr.set({});
+    this.procesandoCalificacionOmr.set(false);
+    this.guardandoCalificacionOmr.set(false);
+    this.mensajeCalificacionOmr.set('Seleccione el PDF escaneado para iniciar la lectura página por página.');
+    this.errorCalificacionOmr.set(false);
+    this.dialogCalificacionOmr.set(true);
+  }
+
+  public cerrarCalificacionOmr(): void {
+    if (this.procesandoCalificacionOmr() || this.guardandoCalificacionOmr()) return;
+    this.dialogCalificacionOmr.set(false);
+    this.evaluacionSeleccionadaOmr.set(null);
+    this.archivoOmrSeleccionado.set(null);
+    this.resultadoCalificacionOmr.set(null);
+    this.edicionesOmr.set({});
+  }
+
+  public seleccionarArchivoOmr(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const archivo = input.files?.[0] || null;
+    this.archivoOmrSeleccionado.set(archivo);
+    this.resultadoCalificacionOmr.set(null);
+    this.errorCalificacionOmr.set(false);
+    this.mensajeCalificacionOmr.set(archivo ? 'Archivo listo para procesar.' : 'Seleccione el PDF escaneado para iniciar la lectura.');
+  }
+
+  public ejecutarCalificacionOmr(): void {
+    const item = this.evaluacionSeleccionadaOmr();
+    const archivo = this.archivoOmrSeleccionado();
+    if (!item || !archivo || this.procesandoCalificacionOmr()) return;
+
+    this.procesandoCalificacionOmr.set(true);
+    this.resultadoCalificacionOmr.set(null);
+    this.errorCalificacionOmr.set(false);
+    this.mensajeCalificacionOmr.set('Enviando escaneado al motor OMR...');
+    this._omrService.procesar(item.id, archivo).subscribe({
+      next: aceptado => this._esperarResultadoCalificacionOmr(aceptado.jobId),
+      error: err => {
+        this.procesandoCalificacionOmr.set(false);
+        this.errorCalificacionOmr.set(true);
+        this.mensajeCalificacionOmr.set(err?.error?.message || 'No se pudo enviar el escaneado al motor OMR.');
+      }
+    });
+  }
+
+  private _esperarResultadoCalificacionOmr(jobId: string): void {
+    this._omrService.consultar(jobId).subscribe({
+      next: resultado => {
+        if (resultado.estado === 'EN_COLA') {
+          window.setTimeout(() => this._esperarResultadoCalificacionOmr(jobId), 1200);
+          return;
+        }
+        this.procesandoCalificacionOmr.set(false);
+        this.resultadoCalificacionOmr.set(resultado);
+        this.edicionesOmr.set({});
+        this.errorCalificacionOmr.set(resultado.estado !== 'COMPLETADO');
+        this.mensajeCalificacionOmr.set(resultado.estado === 'COMPLETADO'
+          ? 'Lectura OMR completada. Revise cada página antes de pasar la evaluación a Revisado.'
+          : resultado.mensaje || 'El motor OMR no pudo completar la lectura.');
+      },
+      error: () => {
+        window.setTimeout(() => this._esperarResultadoCalificacionOmr(jobId), 1500);
+      }
+    });
+  }
+
+  public cantidadRespuestasLeidas(lectura: OmrLecturaResponse): number {
+    return Object.values(lectura.respuestas || {}).filter(respuesta => !!respuesta).length;
+  }
+
+  public preguntasOmr(lectura: OmrLecturaResponse): number[] {
+    const preguntasDetectadas = Object.keys(lectura.respuestas || {})
+      .map(numero => Number(numero))
+      .filter(numero => Number.isFinite(numero));
+    const preguntasDetalladas = (lectura.detalles || []).map(detalle => detalle.pregunta);
+    const total = Math.max(lectura.totalReactivos || 30, ...preguntasDetectadas, ...preguntasDetalladas);
+    return Array.from({ length: total }, (_, indice) => indice + 1);
+  }
+
+  public codigoOmr(lectura: OmrLecturaResponse): string {
+    return this.edicionesOmr()[lectura.pagina]?.codigo ?? lectura.codigoEstudiante ?? '';
+  }
+
+  public respuestaOmr(lectura: OmrLecturaResponse, pregunta: number): string {
+    const edicion = this.edicionesOmr()[lectura.pagina];
+    return edicion?.respuestas[String(pregunta)] ?? lectura.respuestas?.[String(pregunta)] ?? '';
+  }
+
+  public editarCodigoOmr(lectura: OmrLecturaResponse, codigo: string): void {
+    const actual = this.edicionesOmr()[lectura.pagina] || {
+      codigo: lectura.codigoEstudiante || '',
+      respuestas: { ...(lectura.respuestas || {}) }
+    };
+    this.edicionesOmr.update(ediciones => ({
+      ...ediciones,
+      [lectura.pagina]: { ...actual, codigo: codigo.replace(/\D/g, '') }
+    }));
+  }
+
+  public editarRespuestaOmr(lectura: OmrLecturaResponse, pregunta: number, respuesta: string): void {
+    const actual = this.edicionesOmr()[lectura.pagina] || {
+      codigo: lectura.codigoEstudiante || '',
+      respuestas: { ...(lectura.respuestas || {}) }
+    };
+    this.edicionesOmr.update(ediciones => ({
+      ...ediciones,
+      [lectura.pagina]: {
+        ...actual,
+        respuestas: { ...actual.respuestas, [String(pregunta)]: respuesta }
+      }
+    }));
+  }
+
+  private respuestasOmrParaGuardar(lectura: OmrLecturaResponse): Record<string, string> {
+    const respuestas: Record<string, string> = {};
+    for (const pregunta of this.preguntasOmr(lectura)) {
+      respuestas[String(pregunta)] = this.respuestaOmr(lectura, pregunta);
+    }
+    return respuestas;
+  }
+
+  public todasPaginasCalificadas(resultado: OmrJobResponse): boolean {
+    const paginas = resultado.resultados || [];
+    return resultado.estado === 'COMPLETADO' && paginas.length > 0 && paginas.every(pagina => !!this.codigoOmr(pagina) && !!pagina.grilla);
+  }
+
+  public confirmarCalificacionYRevisado(resultado: OmrJobResponse): void {
+    const item = this.evaluacionSeleccionadaOmr();
+    if (!item || !this.todasPaginasCalificadas(resultado) || this.guardandoCalificacionOmr()) return;
+
+    const paginas = resultado.resultados || [];
+    const ajustes: AjustarCalificacionOmrRequest[] = paginas.map(pagina => ({
+      pagina: pagina.pagina,
+      codigoAnterior: pagina.codigoEstudiante || null,
+      codigoEstudiante: this.codigoOmr(pagina),
+      respuestas: this.respuestasOmrParaGuardar(pagina),
+      usuario: 'ADMIN_EVALUACIONES'
+    }));
+    this.guardandoCalificacionOmr.set(true);
+    forkJoin(ajustes.map(ajuste => this._omrService.ajustarCalificacion(item.id, ajuste))).subscribe({
+      next: () => this._transicionarARevisado(item),
+      error: err => {
+        this.guardandoCalificacionOmr.set(false);
+        this.errorCalificacionOmr.set(true);
+        this.mensajeCalificacionOmr.set(err?.error?.message || 'No se pudieron guardar los ajustes de código y respuestas. Verifique que el código pertenezca a la nómina oficial.');
+      }
+    });
+  }
+
+  private _transicionarARevisado(item: EvaluacionItemUI): void {
+    this._rolService.transicionarEstado(item.id, {
+      nuevoEstado: 'REVISADO',
+      usuario: 'ADMIN_EVALUACIONES'
+    }).subscribe({
+      next: rolActualizado => {
+        const actualizado = this._mapearRolResponseA_UI(rolActualizado);
+        this.evaluaciones.update(items => items.map(actual => actual.id === item.id ? actualizado : actual));
+        this.guardandoCalificacionOmr.set(false);
+        this.dialogCalificacionOmr.set(false);
+        this.evaluacionSeleccionadaOmr.set(null);
+        this._mostrarToast(`${item.codigo}: resultados confirmados y evaluación pasada a Revisado.`);
+      },
+      error: err => {
+        this.guardandoCalificacionOmr.set(false);
+        this.errorCalificacionOmr.set(true);
+        this.mensajeCalificacionOmr.set(err?.error?.message || 'Los resultados se guardaron, pero no se pudo pasar la evaluación a Revisado.');
+      }
+    });
+  }
+
+  public abrirNotasOmr(item: EvaluacionItemUI): void {
+    if (!this.puedeMostrarNotas(item)) return;
+    this.evaluacionSeleccionadaNotas.set(item);
+    this.notasOmr.set([]);
+    this.cargandoNotasOmr.set(true);
+    this.dialogNotasOmr.set(true);
+    this._omrService.listarCalificaciones(item.id).subscribe({
+      next: notas => {
+        this.notasOmr.set(notas);
+        this.cargandoNotasOmr.set(false);
+      },
+      error: () => {
+        this.cargandoNotasOmr.set(false);
+        this._mostrarToast('No se pudieron consultar las notas OMR guardadas.', 'error');
+      }
+    });
+  }
+
+  public cerrarNotasOmr(): void {
+    this.dialogNotasOmr.set(false);
+    this.evaluacionSeleccionadaNotas.set(null);
+    this.notasOmr.set([]);
   }
 
   public cerrarModalValidar(): void {
@@ -1791,14 +2330,18 @@ export class EvaluacionesDiaComponent implements OnInit {
     const item = this.evaluacionSeleccionadaParaValidar();
     if (!item) return;
 
-    item.etapa = 'Validado';
-    item.estado = 'VALIDADO' as any;
-    item.hashEncriptacion = `SHA256-${item.codigo}-ENC-${Date.now()}`;
-
-    this._db.upsertRolExamen(item);
-    this.evaluaciones.update(items => [...items]);
-    this.evaluacionSeleccionadaParaValidar.set(null);
-    this._mostrarToast(`${item.codigo}: Examen validado, encriptado en servidor y listo para generación.`);
+    this._rolService.transicionarEstado(item.id, {
+      nuevoEstado: 'VALIDADO',
+      usuario: 'ADMIN_EVALUACIONES'
+    }).subscribe({
+      next: rolActualizado => {
+        const actualizado = this._mapearRolResponseA_UI(rolActualizado);
+        this.evaluaciones.update(items => items.map(actual => actual.id === item.id ? actualizado : actual));
+        this.evaluacionSeleccionadaParaValidar.set(null);
+        this._mostrarToast(`${item.codigo}: Examen validado y listo para generación.`);
+      },
+      error: err => this._mostrarToast(err?.error?.message || 'No se pudo validar el examen en el backend oficial.', 'error')
+    });
   }
 
   public abrirModalParametrizacion(item: EvaluacionItemUI): void {
@@ -1807,7 +2350,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.errorGeneracionTypst.set(null);
     this.resultadoGeneracionTypst.set(null);
     this.jobIdGeneracionTypst.set(null);
-    this.ratioEstudiantesPorVariante.set(this._db.getEstudiantesPorVarianteParam());
+    this.ratioEstudiantesPorVariante.set(1);
 
     // Cargar la nómina de estudiantes en vivo desde el Gateway por groupId
     this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, item.seaGroupId).subscribe({
@@ -1861,7 +2404,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       rolExamenId: item.id,
       bancoPreguntasId: banco.id,
       variantes,
-      ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante() || 5
+      ratioEstudiantesPorVariante: 1
     };
 
     this.generandoTypst.set(true);
@@ -1924,7 +2467,6 @@ export class EvaluacionesDiaComponent implements OnInit {
               item.estado = 'GENERADO';
               item.variantesGeneradas = cantVariantes;
               item.estudiantesInscritosCount = estudiantes.length;
-              this._db.upsertRolExamen(item);
               this.evaluaciones.update(items => [...items]);
               this._mostrarToast(`${item.codigo}: Examen PDF generado exitosamente.`);
               this.dialogQueueWorker.set(false);
@@ -1971,14 +2513,14 @@ export class EvaluacionesDiaComponent implements OnInit {
     return list[idx] || list[0];
   }
 
-  public getVarianteParaEstudiante(est: EstudianteInscrito): VarianteCompilada {
+  public getVarianteParaEstudiante(est: EstudianteInscrito): VarianteCompilada | null {
     const list = this.estudiantesInscritos();
     const idx = list.findIndex(e => e.codigo === est.codigo);
     const letra = this.getLetraVarianteParaIndice(idx >= 0 ? idx : 0);
     const tipo = `TIPO ${letra}`;
 
     const compiladas = this.variantesCompiladas();
-    return compiladas.find(v => v.tipo === tipo) || compiladas[0] || this.macroGenerator.generarVariantesCompletas(1)[0];
+    return compiladas.find(v => v.tipo === tipo) || compiladas[0] || null;
   }
 
   public getNumerosRango(min: number, max: number): number[] {
@@ -1999,11 +2541,6 @@ export class EvaluacionesDiaComponent implements OnInit {
     }
     this._mostrarToast('No hay exámenes generados disponibles.', 'error');
   }
-
-  private readonly _codigosPdfEstudiantes = new Set([
-    '6549812', '6839201', '6928103', '7194820', '7391028', '7482910', 
-    '7849102', '7928104', '8102938', '8291047', '8392104', '8401928'
-  ]);
 
   public abrirPdfExamen(item: EvaluacionItemUI): void {
     if (!this.puedeMostrarDocumento(item)) {
@@ -2051,29 +2588,15 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public abrirPatronPdfTypst(): void {
-    const item = this.evaluacionActivaVisor();
-    const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
-    const filename = `${cod}_Cochabamba_TA-01_1erParcial_VarA_20260822_Patron.pdf`;
-    window.open(`assets/examenes/${filename}`, '_blank');
+    this._mostrarToast('El patrón oficial estará disponible cuando exista una generación persistida para el rol.', 'info');
   }
 
   public descargarRemarkExcelOficial(): void {
-    const item = this.evaluacionActivaVisor();
-    const cod = item?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
-    const filename = `${cod}_Cochabamba_TA-01_1erParcial_VarA_20260822_Remark.xlsx`;
-    const link = document.createElement('a');
-    link.href = `assets/examenes/${filename}`;
-    link.download = filename;
-    link.click();
-    this._mostrarToast(`Descargando matriz de calificación de hoja externa...`);
+    this._mostrarToast('La matriz Remark oficial estará disponible cuando exista una generación persistida para el rol.', 'info');
   }
 
   public abrirListaFirmasPdfTypst(item?: EvaluacionItemUI): void {
-    const evalItem = item || this.evaluacionActivaVisor();
-    const cod = evalItem?.codigo?.replace(/[^a-zA-Z0-9]/g, '') || 'CPEC18';
-    const filename = `${cod}_Cochabamba_TA-01_1erParcial_20260822_Lista_Firmas.pdf`;
-    window.open(`assets/examenes/${filename}`, '_blank');
-    this._mostrarToast(`Abriendo Planilla Oficial de Asistencia y Firmas...`);
+    this._mostrarToast('La lista oficial de firmas estará disponible cuando exista un documento generado para el rol.', 'info');
   }
 
   private _urlArchivo(pdfPath: string): string {

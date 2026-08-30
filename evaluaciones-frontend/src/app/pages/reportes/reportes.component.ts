@@ -541,7 +541,7 @@ export class ReporteEvaluacionesComponent {
   public datosFiltrados = computed(() => {
     return this.storage.gestionEvaluaciones().filter(item => {
       if (this.filtroSede !== 'Todos' && !item.carrera.toLowerCase().includes(this.filtroSede.toLowerCase())) {
-        // En mock se filtra por sede o carrera
+        // La sede se resolverá con el catálogo oficial del backend.
       }
       if (this.filtroCarrera !== 'Todos' && item.carrera !== this.filtroCarrera) {
         return false;

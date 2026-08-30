@@ -15,7 +15,7 @@ La letra de variante no se imprime, no se marca y no se expone en la interfaz. E
 ## Actores y flujo
 
 1. El administrador genera el examen oficial, lo que persiste el mapeo confidencial estudiante-variante.
-2. Desde **Lista de Evaluaciones**, abre el icono de cartillas de un rol generado.
+2. Desde **Lista de Evaluaciones**, abre el icono de cartillas de un rol previo a `ENTREGADO`.
 3. El sistema crea un lote PDF con un estudiante por página A4 y guarda únicamente la capa de datos.
 4. El administrador revisa/abre el PDF e indica **Marcar como impreso** solo cuando el lote salió físicamente de la impresora.
 5. En la futura carga OMR se escanea solamente el cuerpo superior de la cartilla. El talón inferior se conserva para el estudiante y se ignora en la lectura.
@@ -25,10 +25,11 @@ La letra de variante no se imprime, no se marca y no se expone en la interfaz. E
 | Regla | Aplicación |
 | --- | --- |
 | Precondición | Solo se generan cartillas si ya existen mapeos oficiales de estudiantes, creados al generar el examen. |
+| Disponibilidad | Las marcas se pueden generar y gestionar en `PROGRAMADO`, `VALIDADO`, `GENERADO` e `IMPRESO`; desde `ENTREGADO` en adelante quedan bloqueadas. |
 | Datos impresos | N°, código de materia, grupo, código y nombre completo. |
 | Variante | Confidencial e interna; nunca se imprime ni se marca en A-E. |
 | Formato | Una sobreimpresión por página A4, alineada con la cartilla de referencia. No se dibuja cartilla ni talón. |
-| Coordenadas | X/Y del documento, con origen superior izquierdo: datos `250,95`, código `315,95`, nombre `250,125`. El código se imprime a 22 pt y el nombre completo a 13.5 pt. |
+| Coordenadas | X/Y del documento, con origen superior izquierdo: datos `250,90`, código `315,90` con desplazamiento efectivo de 10 puntos a la izquierda, nombre `250,120`. El código se imprime a 22 pt y el nombre completo a 10.5 pt. |
 | Impresión | Generar no significa imprimir. La confirmación de impresión es una acción explícita y auditable. |
 | Flujo de examen | La impresión de cartillas no cambia por sí sola el estado del rol; evita avanzar el examen sin haber realizado las demás tareas de impresión/control. |
 | Escaneo | La lectura usa exclusivamente el código preimpreso del estudiante para recuperar la clave correcta; no coteja N°, materia, grupo ni nombre, y el talón inferior no forma parte del área OMR. |
@@ -78,9 +79,18 @@ El lector no reproduce ni redibuja la cartilla institucional. Recibe el PDF o la
 El worker `worker-omr` realiza la primera iteración oficial:
 
 1. Renderiza cada página del PDF o abre la imagen escaneada.
-2. Detecta el contorno de la grilla principal de 60 reactivos (tres bloques de 20).
-3. Lee la densidad del núcleo de cada burbuja A-E, sin contar el borde preimpreso.
-4. Busca mediante OCR únicamente el campo superior derecho del código estudiantil, en la zona normalizada `x 48%-75%`, `y 8%-14%`; usa ampliación y binarización para tolerar escaneos, y no procesa N°, materia, grupo, nombre ni los seriales rojos superior e inferior.
+2. Detecta el contorno de la grilla principal de 60 reactivos (tres bloques de 20)
+   y calibra los 15 centros de opciones y las 20 filas mediante las
+   circunferencias impresas. Así se compensan desplazamientos, escala y las dos
+   distribuciones verticales de la cartilla que están en uso.
+3. Lee la densidad en un anillo interno de cada burbuja A-E, excluyendo las
+   letras preimpresas y el borde circular. Se tolera un desplazamiento de hasta
+   dos píxeles del centro y se considera marcada una opción cuando la densidad
+   alcanza al menos el 70%. Una segunda opción solo se informa como doble cuando
+   también supera ese umbral y la diferencia frente a la primera es menor a
+   18 puntos; así una letra impresa o un trazo parcial no se convierte en doble
+   marca.
+4. Busca mediante OCR únicamente el recuadro superior derecho del código estudiantil, en la zona normalizada `x 53%-75%`, `y 9%-14%`; usa ampliación y binarización para tolerar escaneos, y no procesa tipo de examen, N°, materia, grupo, nombre ni los seriales rojos superior e inferior.
 5. Acepta el resultado solo si el código pertenece a `sea_mapeo_estudiantes_variantes` del rol seleccionado.
 6. Recupera internamente el patrón de la variante asignada, califica y persiste en `sea_calificaciones_omr`.
 
@@ -97,7 +107,7 @@ La pantalla **Calificación Óptica OMR** debe seleccionar primero un rol con va
 
 Al terminar el procesamiento, la pantalla presenta todas las páginas devueltas por el worker en una inspección independiente. Cada página muestra su imagen escaneada, si el código fue reconocido dentro de la nómina oficial, si se detectó el cuadro principal de respuestas y cuántas marcas fueron leídas. Una página sin código válido permanece en revisión manual y no se asigna a un estudiante por el orden del PDF.
 
-La guía de alineación visual utiliza por defecto la geometría del escaneo de referencia: grilla principal aproximada en `top 16,9 %`, `left 1,1 %`, `width 73,2 %`, `height 42,7 %`; el campo exclusivo de código `top 8 %`, `left 48 %`, `width 27 %`, `height 6 %` se resalta por separado para verificarlo antes de procesar.
+La guía de alineación visual utiliza por defecto la geometría del escaneo de referencia: grilla principal aproximada en `top 16,9 %`, `left 1,1 %`, `width 73,2 %`, `height 42,7 %`; el recuadro exclusivo de código `top 9 %`, `left 53 %`, `width 22 %`, `height 5 %` se resalta por separado para verificarlo antes de procesar.
 
 ### Condiciones del escaneo
 
@@ -108,4 +118,4 @@ La guía de alineación visual utiliza por defecto la geometría del escaneo de 
 
 ## Límite conocido y siguiente iteración
 
-La sobreimpresión usa la página A4 del documento de referencia y las coordenadas X/Y ajustadas para las tres casillas: datos `250,95`, código `315,95` y nombre `250,125`. El código del estudiante se imprime a 22 pt y el nombre completo a 13.5 pt. Antes de usarla para impresión masiva se debe hacer una prueba física con una hoja preimpresa y ajustar el desplazamiento fino de impresora si fuera necesario; ese ajuste no cambia las tablas, la API ni el flujo de impresión.
+La sobreimpresión usa la página A4 del documento de referencia y las coordenadas X/Y ajustadas para las tres casillas: datos `250,90`, código `315,90` con 10 puntos adicionales hacia la izquierda, y nombre `250,120`. El código del estudiante se imprime a 22 pt y el nombre completo a 10.5 pt. Antes de usarla para impresión masiva se debe hacer una prueba física con una hoja preimpresa y ajustar el desplazamiento fino de impresora si fuera necesario; ese ajuste no cambia las tablas, la API ni el flujo de impresión.

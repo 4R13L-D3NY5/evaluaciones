@@ -9,6 +9,11 @@ import { RolExamenResponse, RolExamenService } from '../../core/services/rol-exa
 import { BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
+import * as pdfjsLib from 'pdfjs-dist';
+
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
+}
 
 export interface PreguntaValidada {
   fila: number;
@@ -215,7 +220,7 @@ export interface DiaCalendario {
                 </label>
                 <select 
                   [ngModel]="grupoSeleccionado()"
-                  (ngModelChange)="grupoSeleccionado.set($event)"
+                  (ngModelChange)="onGrupoChange($event)"
                   [disabled]="cargandoGrupos()"
                   class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer disabled:opacity-50">
                   @if (grupos().length > 0) {
@@ -230,13 +235,19 @@ export interface DiaCalendario {
             </div>
 
             @if (rolExamenActivo(); as rol) {
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+              <div [class]="rolPuedeCargarBanco() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950'">
                 <div class="flex items-center gap-2">
-                  <i class="pi pi-database"></i>
+                  <i [class]="rolPuedeCargarBanco() ? 'pi pi-database' : 'pi pi-lock'"></i>
                   <span><strong>Rol oficial:</strong> {{ rol.id }} · {{ rol.fechaDisplay }}</span>
                 </div>
                 <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
               </div>
+              @if (!rolPuedeCargarBanco()) {
+                <div class="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950">
+                  <i class="pi pi-info-circle mt-0.5"></i>
+                  <span>Este rol ya está en <strong>{{ rol.estadoFlujo }}</strong>. Para reemplazar o volver a registrar el banco, primero debes restablecerlo a <strong>VALIDADO</strong> desde Evaluaciones del día, indicando el motivo.</span>
+                </div>
+              }
             } @else {
               <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                 <i class="pi pi-exclamation-triangle"></i>
@@ -261,7 +272,7 @@ export interface DiaCalendario {
               </div>
             </div>
 
-            <!-- Botonera de Plantilla y Ejemplos -->
+            <!-- Recursos oficiales de carga -->
             <div class="flex flex-wrap items-center gap-2">
               <button 
                 (click)="descargarExcelBaseMacro()"
@@ -269,22 +280,6 @@ export interface DiaCalendario {
                 class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
                 <i class="pi pi-download text-xs"></i>
                 <span>Plantilla Oficial (4 Hojas)</span>
-              </button>
-
-              <button 
-                (click)="descargarEjemploValido()"
-                title="Descargar y cargar en vivo un banco 100% conforme con 60 preguntas y las 6 tipologías"
-                class="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
-                <i class="pi pi-check-circle text-xs"></i>
-                <span>Ejemplo Válido (60 Reactivos)</span>
-              </button>
-
-              <button 
-                (click)="descargarEjemploInvalido()"
-                title="Descargar y cargar en vivo un banco con observaciones intencionales para probar el validador"
-                class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
-                <i class="pi pi-exclamation-triangle text-xs"></i>
-                <span>Ejemplo con Errores</span>
               </button>
 
               <button 
@@ -310,7 +305,7 @@ export interface DiaCalendario {
               </div>
 
               <!-- Botones de Acción: Forzar Previsualización PDF antes de Descargar o Previsualizar Encriptado -->
-              @if (esBancoTotalmenteValido()) {
+              @if (esBancoTotalmenteValido() && rolPuedeCargarBanco()) {
                 <div class="flex flex-wrap items-center gap-2.5 animate-fade-in">
                   
                   <!-- BOTÓN 1: PREVISUALIZAR PDF (OBLIGATORIO) -->
@@ -386,7 +381,7 @@ export interface DiaCalendario {
             </div>
 
             <!-- Banner de Estado de Previsualización Obligatoria -->
-            @if (esBancoTotalmenteValido()) {
+            @if (esBancoTotalmenteValido() && rolPuedeCargarBanco()) {
               @if (!pdfPrevisualizadoYConforme()) {
                 <div class="p-4 bg-amber-500/10 border border-amber-300 dark:border-amber-700 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fade-in">
                   <div class="h-9 w-9 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 flex items-center justify-center shrink-0 mt-0.5 border border-amber-300">
@@ -428,18 +423,34 @@ export interface DiaCalendario {
               }
             }
 
+            @if (esBancoTotalmenteValido() && !rolPuedeCargarBanco()) {
+              <div class="p-4 bg-amber-500/10 border border-amber-300 dark:border-amber-700 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fade-in">
+                <div class="h-9 w-9 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 flex items-center justify-center shrink-0 mt-0.5 border border-amber-300">
+                  <i class="pi pi-lock text-base"></i>
+                </div>
+                <div class="space-y-1 flex-1">
+                  <h5 class="text-xs font-black text-amber-950 dark:text-amber-200 uppercase tracking-tight">
+                    Banco validado, pero el rol no admite nuevos registros
+                  </h5>
+                  <p class="text-xs text-amber-900/90 dark:text-amber-300/90 font-medium leading-relaxed">
+                    El archivo cumple el 100%, pero el rol está en <strong>{{ rolExamenActivo()?.estadoFlujo }}</strong>. Restablécelo a <strong>VALIDADO</strong> desde Evaluaciones del día antes de aprobar o reemplazar el banco.
+                  </p>
+                </div>
+              </div>
+            }
+
             <!-- Zona Drag and Drop con Input Interactivo -->
             <div 
               (click)="triggerFileInput()"
               (dragover)="onDragOver($event)"
               (drop)="onDropFile($event)"
-              class="border-2 border-dashed border-border hover:border-purple-600 rounded-2xl p-8 text-center space-y-3 bg-muted/20 hover:bg-muted/40 transition-all cursor-pointer">
-              <div class="h-14 w-14 rounded-2xl bg-purple-100 text-purple-800 flex items-center justify-center text-2xl mx-auto shadow-2xs">
-                <i class="pi pi-file-excel"></i>
+              [class]="rolPuedeCargarBanco() ? 'border-2 border-dashed border-border hover:border-purple-600 rounded-2xl p-8 text-center space-y-3 bg-muted/20 hover:bg-muted/40 transition-all cursor-pointer' : 'border-2 border-dashed border-amber-300 rounded-2xl p-8 text-center space-y-3 bg-amber-50/60 opacity-80 cursor-not-allowed'">
+              <div [class]="rolPuedeCargarBanco() ? 'h-14 w-14 rounded-2xl bg-purple-100 text-purple-800 flex items-center justify-center text-2xl mx-auto shadow-2xs' : 'h-14 w-14 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center text-2xl mx-auto shadow-2xs'">
+                <i [class]="rolPuedeCargarBanco() ? 'pi pi-file-excel' : 'pi pi-lock'"></i>
               </div>
               <div>
                 <div class="text-sm font-black text-foreground">
-                  {{ nombreArchivoCargado() || 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' }}
+                  {{ nombreArchivoCargado() || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol debe estar PROGRAMADO o VALIDADO') }}
                 </div>
                 <p class="text-xs text-muted-foreground mt-1">
                   Validación instantánea de tipos de reactivos, cuotas de dificultad y fórmulas matemáticas/químicas.
@@ -1106,7 +1117,8 @@ export interface DiaCalendario {
                     2. Asignatura y Rol de Examen Programado
                   </label>
                   <select 
-                    [(ngModel)]="examenRolSeleccionadoId"
+                    [ngModel]="examenRolSeleccionadoId()"
+                    (ngModelChange)="examenRolSeleccionadoId.set($event)"
                     class="w-full bg-muted/60 border border-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-foreground outline-none focus:border-purple-600 cursor-pointer">
                     @for (ex of listaExamenesDocente; track ex.id) {
                       <option [value]="ex.id">
@@ -1299,10 +1311,22 @@ export interface DiaCalendario {
               </div>
             </div>
 
-            <!-- PDF real generado con las reglas oficiales, no una maqueta HTML. -->
+            <!-- PDF real generado con las reglas oficiales, renderizado por el
+                 componente para poder controlar el desplazamiento completo. -->
             <div id="area-scroll-banco-pdf" (scroll)="onScrollDocumentoPdf($event)" class="p-4 sm:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 min-h-[65vh] max-h-[72vh]">
-              @if (pdfPreviewUrl(); as pdfUrl) {
-                <iframe [src]="pdfUrl" title="Previsualización PDF oficial del examen" class="w-full h-[65vh] rounded-xl bg-white border border-slate-300 shadow-xl"></iframe>
+              @if (pdfPreviewPages().length > 0) {
+                <div class="w-full flex flex-col items-center gap-6">
+                  @for (page of pdfPreviewPages(); track $index) {
+                    <div class="w-full max-w-[900px] bg-white shadow-xl border border-slate-300 rounded-sm overflow-hidden">
+                      <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-[10px] font-mono text-slate-500 text-right">
+                        PÁGINA {{ $index + 1 }} / {{ pdfPreviewPages().length }}
+                      </div>
+                      <img [src]="page" [alt]="'Página ' + ($index + 1) + ' de la previsualización oficial'" class="block w-full h-auto" />
+                    </div>
+                  }
+                </div>
+              } @else if (pdfPreviewUrl()) {
+                <div class="h-[65vh] flex items-center justify-center text-slate-600">Renderizando páginas del PDF oficial...</div>
               } @else {
                 <div class="h-[65vh] flex items-center justify-center text-slate-600">Generando PDF oficial...</div>
               }
@@ -1574,7 +1598,7 @@ export interface DiaCalendario {
                 </button>
 
                 <button 
-                  [disabled]="!documentoRecorridoCompleto() || !rolExamenActivo() || cargandoBanco()"
+                  [disabled]="!documentoRecorridoCompleto() || !rolExamenActivo() || !archivoExcelSeleccionado() || cargandoBanco() || pdfPreviewPages().length === 0"
                   (click)="aprobarDiagramacionPdf()"
                   class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                   <i class="pi pi-check-circle text-sm"></i>
@@ -2259,11 +2283,28 @@ export class BancoPreguntasComponent implements OnInit {
     const materiaCodigo = this.asignaturaSeleccionada()?.courseCode;
     const grupo = this.grupoSeleccionado();
     const parcial = this._mapParcialBackend(this.parcialActivo());
-    return this.rolesOficiales().find(rol =>
-      rol.materiaCodigo === materiaCodigo &&
-      rol.grupo === grupo &&
-      rol.tipoParcial === parcial
-    ) || null;
+    const rolSeleccionado = this.rolesOficiales().find(rol => rol.id === this.examenRolSeleccionadoId());
+
+    // El ID seleccionado puede quedar de una materia anterior. Nunca debe
+    // prevalecer sobre la materia, grupo y parcial visibles actualmente.
+    if (materiaCodigo && grupo && parcial) {
+      const compatibles = this.rolesOficiales().filter(rol =>
+        rol.materiaCodigo === materiaCodigo &&
+        rol.grupo === grupo &&
+        rol.tipoParcial === parcial
+      );
+      return compatibles.find(rol => rol.id === this.examenRolSeleccionadoId())
+        || compatibles.find(rol => rol.estadoFlujo === 'PROGRAMADO' || rol.estadoFlujo === 'VALIDADO')
+        || compatibles[0]
+        || null;
+    }
+
+    return rolSeleccionado || null;
+  });
+
+  public rolPuedeCargarBanco = computed(() => {
+    const estado = this.rolExamenActivo()?.estadoFlujo;
+    return estado === 'PROGRAMADO' || estado === 'VALIDADO';
   });
 
   public ngOnInit(): void {
@@ -2336,8 +2377,8 @@ export class BancoPreguntasComponent implements OnInit {
       next: roles => {
         this.rolesOficiales.set(roles);
         this.listaExamenesDocente = roles.map(rol => this._mapearRolACronograma(rol));
+        this.examenRolSeleccionadoId.set(null);
         if (roles.length > 0) {
-          this.examenRolSeleccionadoId = roles[0].id;
           const fecha = new Date(`${roles[0].fecha}T00:00:00`);
           if (!Number.isNaN(fecha.getTime())) {
             this.mesActual.set(fecha.getMonth());
@@ -2352,8 +2393,9 @@ export class BancoPreguntasComponent implements OnInit {
             );
             if (materiaConRol) this.seleccionarAsignatura(materiaConRol);
           }
+          this._sincronizarRolSeleccionadoConContexto();
         } else {
-          this.examenRolSeleccionadoId = null;
+          this.examenRolSeleccionadoId.set(null);
         }
       },
       error: err => {
@@ -2387,8 +2429,16 @@ export class BancoPreguntasComponent implements OnInit {
     }
   }
 
+  public onGrupoChange(grupo: string): void {
+    this.grupoSeleccionado.set(grupo);
+    this._sincronizarRolSeleccionadoConContexto();
+    this.pdfPrevisualizadoYConforme.set(false);
+  }
+
   public seleccionarAsignatura(asig: Course): void {
     this.asignaturaSeleccionada.set(asig);
+    // Evita conservar el ID de otra asignatura mientras se cargan los grupos.
+    this.examenRolSeleccionadoId.set(null);
     this.pdfPrevisualizadoYConforme.set(false);
     this._cargarGruposDeMateria(asig.syllabusCourseId);
   }
@@ -2411,12 +2461,14 @@ export class BancoPreguntasComponent implements OnInit {
             ? grupoPreferido
             : rolDeSeleccion?.grupo;
           this.grupoSeleccionado.set(codigoPreferido || data[0].code);
+          this._sincronizarRolSeleccionadoConContexto();
         } else {
           const rol = this.rolesOficiales().find(r =>
             r.materiaCodigo === this.asignaturaSeleccionada()?.courseCode &&
             r.tipoParcial === this._mapParcialBackend(this.parcialActivo())
           );
           this.grupoSeleccionado.set(grupoPreferido || rol?.grupo || '');
+          this._sincronizarRolSeleccionadoConContexto();
         }
       },
       error: () => {
@@ -2426,6 +2478,7 @@ export class BancoPreguntasComponent implements OnInit {
           r.tipoParcial === this._mapParcialBackend(this.parcialActivo())
         );
         this.grupoSeleccionado.set(grupoPreferido || rol?.grupo || '');
+        this._sincronizarRolSeleccionadoConContexto();
       }
     });
   }
@@ -2447,6 +2500,7 @@ export class BancoPreguntasComponent implements OnInit {
   public filtroGuiaTipo = signal<string>('TODOS');
   public dialogPrevisualizacionPdf = signal<boolean>(false);
   public pdfPreviewUrl = signal<SafeResourceUrl | null>(null);
+  public pdfPreviewPages = signal<string[]>([]);
   private pdfPreviewObjectUrl: string | null = null;
   public documentoRecorridoCompleto = signal<boolean>(false);
   public pdfPrevisualizadoYConforme = signal<boolean>(false);
@@ -2485,7 +2539,7 @@ export class BancoPreguntasComponent implements OnInit {
 
 
   public campusSeleccionadoId = 'CBBA-COL';
-  public examenRolSeleccionadoId: string | null = null;
+  public examenRolSeleccionadoId = signal<string | null>(null);
   public observacionesDocenteEnvio = '';
 
   public campusActivo = computed(() => {
@@ -2588,7 +2642,7 @@ export class BancoPreguntasComponent implements OnInit {
   public irAValidarExamenDesdeCalendario(ex: ExamenDocenteCronograma): void {
     this.examenSeleccionadoModal.set(null);
     this.parcialActivo.set(ex.tipo);
-    this.examenRolSeleccionadoId = ex.id;
+    this.examenRolSeleccionadoId.set(ex.id);
     const asignatura = this.asignaturas().find(item => item.courseCode === ex.codigo);
     if (asignatura) {
       this.asignaturaSeleccionada.set(asignatura);
@@ -2685,8 +2739,8 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public nombreArchivoPaquete = computed(() => {
-    const ex = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId);
-    const cod = (ex?.codigo || this.asignaturaSeleccionada()?.courseCode || 'SIN_MATERIA').replace('-', '');
+    const ex = this.rolExamenActivo();
+    const cod = (ex?.materiaCodigo || this.asignaturaSeleccionada()?.courseCode || 'SIN_MATERIA').replace('-', '');
     const pCode = this.parcialActivo().toUpperCase().replace(' ', '_');
     return `PAQUETE_EVAL_${cod}_${pCode}_${this.anioActual()}.pkg`;
   });
@@ -2697,8 +2751,27 @@ export class BancoPreguntasComponent implements OnInit {
 
   public cambiarParcial(parcial: string): void {
     this.parcialActivo.set(parcial as any);
+    this.examenRolSeleccionadoId.set(null);
+    this._sincronizarRolSeleccionadoConContexto();
     this.pdfPrevisualizadoYConforme.set(false);
     this._mostrarToast(`Examen configurado para ${parcial} (${this.getResumenCuota(parcial)}).`);
+  }
+
+  private _sincronizarRolSeleccionadoConContexto(): void {
+    const materiaCodigo = this.asignaturaSeleccionada()?.courseCode;
+    const grupo = this.grupoSeleccionado();
+    const parcial = this._mapParcialBackend(this.parcialActivo());
+    if (!materiaCodigo || !grupo || !parcial) return;
+
+    const compatibles = this.rolesOficiales().filter(rol =>
+      rol.materiaCodigo === materiaCodigo &&
+      rol.grupo === grupo &&
+      rol.tipoParcial === parcial
+    );
+    const rol = compatibles.find(item => item.estadoFlujo === 'PROGRAMADO' || item.estadoFlujo === 'VALIDADO')
+      || compatibles[0]
+      || null;
+    this.examenRolSeleccionadoId.set(rol?.id || null);
   }
 
   public getEstadoBadgeClass(estado: string): string {
@@ -2717,6 +2790,10 @@ export class BancoPreguntasComponent implements OnInit {
   // CARGA Y VALIDACIÓN ROBUSTA DE ARCHIVOS EXCEL (SheetJS)
   // ============================================================
   public triggerFileInput(): void {
+    if (!this.rolPuedeCargarBanco()) {
+      this._mostrarToast('El rol ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
+      return;
+    }
     this.fileInputRef.nativeElement.click();
   }
 
@@ -2728,6 +2805,10 @@ export class BancoPreguntasComponent implements OnInit {
   public onDropFile(event: DragEvent): void {
     event.preventDefault();
     event.stopPropagation();
+    if (!this.rolPuedeCargarBanco()) {
+      this._mostrarToast('El rol ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
+      return;
+    }
     if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
       const file = event.dataTransfer.files[0];
       this.procesarArchivoExcelReal(file);
@@ -2742,6 +2823,10 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public async procesarArchivoExcelReal(file: File): Promise<void> {
+    if (!this.rolPuedeCargarBanco()) {
+      this._mostrarToast('El rol ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
+      return;
+    }
     this.archivoExcelSeleccionado.set(file);
     this.nombreArchivoCargado.set(file.name);
     this.pdfPrevisualizadoYConforme.set(false);
@@ -2752,7 +2837,7 @@ export class BancoPreguntasComponent implements OnInit {
       const previewBytes = new Uint8Array(arrayBuffer.slice(0, 150));
       const previewText = new TextDecoder('utf-8').decode(previewBytes).toLowerCase();
       if (previewText.includes('<!doctype') || previewText.includes('<html') || previewText.includes('404')) {
-        this._mostrarToast('El archivo cargado es un documento HTML o está dañado. Por favor haz clic en "Ejemplo con Errores" arriba para descargar el Excel oficial.', 'error');
+        this._mostrarToast('El archivo cargado es un documento HTML o está dañado. Descarga la plantilla oficial y vuelve a intentarlo.', 'error');
         return;
       }
 
@@ -2935,111 +3020,6 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   // ============================================================
-  // DESCARGA Y CARGA DE EJEMPLOS OFICIALES (SheetJS - 4 Hojas)
-  // ============================================================
-  public descargarEjemploValido(): void {
-    const materia = this.asignaturaSeleccionada();
-    const codigoMateria = materia?.courseCode || 'MATERIA';
-    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'parcial', 'observaciones'];
-    
-    const dataInst = [
-      ['BANCO DE PREGUNTAS - GUÍA OFICIAL UNITEPC'],
-      [],
-      ['1. CÓDIGOS DE PREGUNTA OFICIALES', 'Verdadero o Falso Simple, Verdadero o Falso Complejas, Respuesta A/B/Ambas/Ninguna, Selección de la mejor respuesta, Ítems agrupados por caso clínico o problema, Subítem de caso o problema, Emparejamiento Ampliado, Opción de Emparejamiento Ampliado'],
-      ['2. CUOTAS OFICIALES EXIGIDAS', '15 Fáciles (1), 30 Medias (2), 15 Difíciles (3) - Total: 60 preguntas para 1er/2do Parcial'],
-      ['3. CONTEXTO SELECCIONADO', materia ? `[${materia.courseCode}] ${materia.courseName}` : 'Sin materia seleccionada']
-    ];
-
-    const dataBanco: any[][] = [headers];
-    const preguntas60 = this._generarPreguntasEjemplo();
-
-    for (const p of preguntas60) {
-      let tipoStr = 'Selección de la mejor respuesta';
-      if (p.tipo === 'VERDADERO_O_FALSO_SIMPLE') tipoStr = 'Verdadero o Falso Simple';
-      else if (p.tipo === 'RESPUESTA_PREMISAS_ABCD') tipoStr = 'Respuesta A/B/Ambas/Ninguna';
-      else if (p.tipo === 'VERDADERO_O_FALSO_COMPLEJAS') tipoStr = 'Verdadero o Falso Complejas';
-      else if (p.tipo === 'SUBITEM_CASO') tipoStr = 'Subítem de caso o problema';
-      else if (p.tipo === 'OPCION_EMPAREJAMIENTO') tipoStr = 'Opción de Emparejamiento Ampliado';
-
-      dataBanco.push([
-        tipoStr,
-        p.grupo || '',
-        p.enunciado,
-        p.opcion_a || '',
-        p.opcion_b || '',
-        p.opcion_c || '',
-        p.opcion_d || '',
-        p.opcion_e || '',
-        p.respuesta_correcta,
-        p.dificultad,
-        '1P',
-        'OK'
-      ]);
-    }
-
-    const dataEj = [
-      headers,
-      ['Verdadero o Falso Simple', '', 'El agua hierve a 100 grados Celsius al nivel del mar.', 'Verdadero', 'Falso', '', '', '', 'A', '1', '1P', 'OK'],
-      ['Selección de la mejor respuesta', '', '¿Qué órgano bombea la sangre en el cuerpo humano?', 'Pulmón', 'Hígado', 'Corazón', 'Estómago', 'Riñón', 'C', '2', '1P', 'OK']
-    ];
-
-    const dataVal = [
-      ['TIPOS_PREGUNTA', 'RESP_ABCDE', 'RESP_ABCD', 'RESP_AB', 'DIFICULTADES_123'],
-      ['Verdadero o Falso Simple', 'A', 'A', 'A', '1'],
-      ['Verdadero o Falso Complejas', 'B', 'B', 'B', '2'],
-      ['Respuesta A/B/Ambas/Ninguna', 'C', 'C', '', '3'],
-      ['Selección de la mejor respuesta', 'D', 'D', '', ''],
-      ['Ítems agrupados por caso clínico o problema', 'E', '', '', ''],
-      ['Subítem de caso o problema', '', '', '', ''],
-      ['Emparejamiento Ampliado', '', '', '', ''],
-      ['Opción de Emparejamiento Ampliado', '', '', '', '']
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataVal), 'VALIDACIONES');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataInst), 'Instrucciones');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataEj), 'Ejemplo');
-
-    const fileName = `EJEMPLO_BANCO_${codigoMateria.replace(/[^a-zA-Z0-9]/g, '')}_60PREGUNTAS.xlsx`;
-
-    XLSX.writeFile(wb, fileName);
-    this._mostrarToast(`Ejemplo descargado: ${fileName}. Selecciona explícitamente el archivo que deseas registrar.`);
-  }
-
-  public descargarEjemploInvalido(): void {
-    const headers = ['tipo', 'grupo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad', 'parcial', 'observaciones'];
-    const dataBanco: any[][] = [headers];
-
-    // Filas con errores pedagógicos y sintácticos intencionales
-    dataBanco.push(['Verdadero o Falso Simple', '', 'Pregunta V/F con clave errónea (marcada C en vez de A/B)', 'Verdadero', 'Falso', '', '', '', 'C', '1', '1P', 'Falta revisar: respuesta A-B']);
-    dataBanco.push(['Selección de la mejor respuesta', '', '', 'Distractor A', 'Distractor B', 'Distractor C', 'Distractor D', 'Distractor E', 'A', '1', '1P', 'Falta revisar: enunciado']);
-    dataBanco.push(['Selección de la mejor respuesta', '', 'Pregunta de selección incompleta con solo 3 opciones', 'Opción 1', 'Opción 2', 'Opción 3', '', '', 'A', '2', '1P', 'Falta revisar: incisos A-E']);
-    dataBanco.push(['Subítem de caso o problema', '', 'Subítem sin código de grupo identificador del caso padre', 'Opción A', 'Opción B', 'Opción C', 'Opción D', 'Opción E', 'B', '3', '1P', 'Falta revisar: grupo']);
-    dataBanco.push(['Respuesta A/B/Ambas/Ninguna', '', 'I. Premisa tributaria 1.\nII. Premisa 2.', 'A. Primera verdadera', 'B. Segunda verdadera', 'C. Ambas', 'D. Ninguna', '', 'Z', '2', '1P', 'Falta revisar: respuesta A-D']);
-    dataBanco.push(['Emparejamiento Ampliado', 'EMP-01', 'Emparejamiento con solo 1 clave definida', 'Clave 1', '', '', '', '', '', '', '1P', 'Falta revisar: minimo 2 claves']);
-    dataBanco.push(['Verdadero o Falso Complejas', '', 'V/F compleja con proposición 3 vacía', '1. Premisa 1', '2. Premisa 2', '', '4. Premisa 4', '', 'A', '2', '1P', 'Falta revisar: incisos 1-4']);
-
-    for (let i = 8; i <= 25; i++) {
-      dataBanco.push(['Selección de la mejor respuesta', '', `Pregunta sin completar cuota ${i}`, 'Opción A', 'Opción B', 'Opción C', 'Opción D', 'Opción E', 'A', '2', '1P', 'OK']);
-    }
-
-    const dataInst = [
-      ['BANCO DE PREGUNTAS CON ERRORES PARA PRUEBAS DE VALIDACIÓN'],
-      ['Este archivo contiene fallas intencionales para verificar el validador institucional UNITEPC.']
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataInst), 'Instrucciones');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataBanco), 'Banco');
-
-    const codigoMateria = this.asignaturaSeleccionada()?.courseCode || 'MATERIA';
-    const fileName = `EJEMPLO_CON_OBSERVACIONES_${codigoMateria.replace(/[^a-zA-Z0-9]/g, '')}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    this._mostrarToast(`Ejemplo con errores descargado: ${fileName}. No se cargó en el flujo oficial.`);
-  }
-
-  // ============================================================
   // DESCARGA DE PLANTILLA OFICIAL ENRIQUECIDA (4 HOJAS CON VALIDACIONES Y FÓRMULAS)
   // ============================================================
   public descargarExcelBaseMacro(): void {
@@ -3069,7 +3049,8 @@ export class BancoPreguntasComponent implements OnInit {
     this.enviandoCorreo.set(true);
 
     const campus = this.campusActivo();
-    const examenRol = this.listaExamenesDocente.find(e => e.id === this.examenRolSeleccionadoId);
+    const rolActivo = this.rolExamenActivo();
+    const examenRol = rolActivo ? this._mapearRolACronograma(rolActivo) : undefined;
     if (!examenRol) {
       this.enviandoCorreo.set(false);
       this._mostrarToast('Selecciona un rol oficial antes de preparar el envío.', 'error');
@@ -3225,14 +3206,22 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     }
 
     this._liberarPdfPreview();
+    this.documentoRecorridoCompleto.set(false);
     try {
       const pdf = await this._crearPdfPreviewOficial(preguntas);
       this.pdfPreviewObjectUrl = URL.createObjectURL(pdf);
       this.pdfPreviewUrl.set(this._sanitizer.bypassSecurityTrustResourceUrl(this.pdfPreviewObjectUrl));
-      this.documentoRecorridoCompleto.set(true);
       this.dialogPrevisualizacionPdf.set(true);
+      const paginas = await this._renderizarPaginasPdfPreview(pdf);
+      this.pdfPreviewPages.set(paginas);
+      // Si todo el documento cabe en el área visible no existe desplazamiento
+      // pendiente; para documentos de varias páginas se habilita únicamente
+      // al llegar al final del contenedor real de páginas.
+      setTimeout(() => this._comprobarFinPrevisualizacion(), 0);
     } catch (error) {
       console.error('[BancoPreguntasComponent] No se pudo generar la previsualización PDF:', error);
+      this.dialogPrevisualizacionPdf.set(false);
+      this._liberarPdfPreview();
       this._mostrarToast('No se pudo generar el PDF oficial de previsualización.', 'error');
     }
   }
@@ -3383,7 +3372,9 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     const piePagina = () => {
       fuente('normal', 11);
       doc.text('NOMBRE COMPLETO:', margen, alto - 12);
-      fuente('normal', 15);
+      // En la previsualización los valores permanecen vacíos. La excepción
+      // de 15 pt aplica únicamente al valor del código del estudiante en el
+      // examen generado, no a la etiqueta.
       doc.text('CÓDIGO:', margen, alto - 6);
       fuente('normal', 11);
       doc.text(`PÁG. ${pagina}`, ancho - margen, alto - 6, { align: 'right' });
@@ -3438,6 +3429,12 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     y += interlineado;
 
     let tipoAnterior = '';
+    const medirLineas = (texto: string, anchoDisponible: number): string[] => (
+      (texto || '').split(/\r?\n/).flatMap(linea =>
+        doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), anchoDisponible) as string[]
+      )
+    );
+
     preguntas.forEach((pregunta, indice) => {
       const tipo = tituloTipo(pregunta.tipo);
       if (tipo && tipo !== tipoAnterior) {
@@ -3450,12 +3447,24 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
         tipoAnterior = tipo;
       }
 
-      escribirPregunta(indice + 1, pregunta.enunciado || '');
-
-      let opciones: Array<[string, string]> = pregunta.tipo === 'VERDADERO_O_FALSO_SIMPLE' ? [] : [
+      // Reservar el bloque completo antes de dibujarlo para que el número,
+      // enunciado e incisos permanezcan juntos en la misma página.
+      const prefijo = `${indice + 1}. ___`;
+      fuente('bold');
+      const anchoPrefijo = doc.getTextWidth(prefijo) + 1;
+      const lineasEnunciado = medirLineas(pregunta.enunciado || '', ancho - margen * 2 - anchoPrefijo);
+      const opciones: Array<[string, string]> = pregunta.tipo === 'VERDADERO_O_FALSO_SIMPLE' ? [] : [
         ['A', pregunta.opcion_a], ['B', pregunta.opcion_b], ['C', pregunta.opcion_c],
         ['D', pregunta.opcion_d], ['E', pregunta.opcion_e]
       ].filter(([, texto]) => !!texto?.trim()) as Array<[string, string]>;
+      const altoEnunciado = Math.max(1, lineasEnunciado.length) * interlineado;
+      const altoOpciones = opciones.reduce((total, [letra, texto]) =>
+        total + Math.max(1, medirLineas(`${letra}) ${texto}`, ancho - margen * 2 - indentacion).length) * interlineado, 0);
+      const altoBloque = altoEnunciado + altoOpciones + (opciones.length ? interlineado * 0.15 : 0) + separacionPregunta;
+      if (y + altoBloque > alto - margen - pieReservado) nuevaPagina();
+
+      escribirPregunta(indice + 1, pregunta.enunciado || '');
+
       opciones.forEach(([letra, texto]) => escribir(`${letra}) ${texto}`, margen + indentacion, ancho - margen * 2 - indentacion, 'normal'));
       y += separacionPregunta;
     });
@@ -3471,11 +3480,56 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     return doc.output('blob');
   }
 
+  private async _renderizarPaginasPdfPreview(pdf: Blob): Promise<string[]> {
+    const buffer = await pdf.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+    const pdfDocument = await loadingTask.promise;
+    const paginas: string[] = [];
+
+    for (let numeroPagina = 1; numeroPagina <= pdfDocument.numPages; numeroPagina++) {
+      const pagina = await pdfDocument.getPage(numeroPagina);
+      const viewportBase = pagina.getViewport({ scale: 1 });
+      const escala = Math.min(1.35, 860 / viewportBase.width);
+      const viewport = pagina.getViewport({ scale: escala });
+      const canvas = document.createElement('canvas');
+      const contexto = canvas.getContext('2d');
+      if (!contexto) {
+        continue;
+      }
+
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await pagina.render({ canvas, canvasContext: contexto, viewport }).promise;
+      paginas.push(canvas.toDataURL('image/png'));
+
+      // Liberar el buffer gráfico de cada página antes de continuar con la siguiente.
+      pagina.cleanup();
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+
+    return paginas;
+  }
+
   public onScrollDocumentoPdf(event: Event): void {
     const element = event.target as HTMLElement;
     if (!element) return;
-    // Comprobar si el scroll llegó al final o está a menos de 80px del final
+    // Comprobar si el scroll llegó al final o está a menos de 80px del final.
     if (element.scrollTop + element.clientHeight >= element.scrollHeight - 80) {
+      this.documentoRecorridoCompleto.set(true);
+    }
+  }
+
+  private _comprobarFinPrevisualizacion(): void {
+    const element = document.getElementById('area-scroll-banco-pdf');
+    if (!this.dialogPrevisualizacionPdf() || this.pdfPreviewPages().length === 0) {
+      return;
+    }
+    if (!element) {
+      setTimeout(() => this._comprobarFinPrevisualizacion(), 50);
+      return;
+    }
+    if (element.scrollHeight <= element.clientHeight + 2) {
       this.documentoRecorridoCompleto.set(true);
     }
   }
@@ -3491,6 +3545,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       this.pdfPreviewObjectUrl = null;
     }
     this.pdfPreviewUrl.set(null);
+    this.pdfPreviewPages.set([]);
   }
 
   public getTipoBadgeClass(tipo: string): string {
@@ -3567,6 +3622,10 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     const file = this.archivoExcelSeleccionado();
     if (!rol) {
       this._mostrarToast('No existe un rol oficial para la selección actual.', 'error');
+      return;
+    }
+    if (!this.rolPuedeCargarBanco()) {
+      this._mostrarToast(`El rol está en ${rol.estadoFlujo}. Restablécelo a VALIDADO antes de registrar el banco.`, 'error');
       return;
     }
     if (!file) {
@@ -3660,764 +3719,6 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
   public cerrarModalEjemplos(): void {
     this.dialogEjemplos.set(false);
-  }
-
-  private _generarPreguntasEjemplo(): PreguntaValidada[] {
-    const list: PreguntaValidada[] = [];
-
-    // =========================================================================
-    // 1. SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 15)
-    // =========================================================================
-    // Fáciles (1..10)
-    list.push({
-      fila: 2,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'En la auditoría tributaria para determinar la base imponible del IUE se debe considerar como gasto no deducible:',
-      opcion_a: 'Excluir los gastos personales de los socios sin respaldo de factura legal',
-      opcion_b: 'Deducir únicamente las compras vinculadas a la actividad gravada',
-      opcion_c: 'Depreciar conforme a la tabla oficial del D.S. 24051',
-      opcion_d: 'Registrar contablemente los sueldos del personal de planta',
-      opcion_e: 'Computar los aportes patronales devengados en el ejercicio',
-      respuesta_correcta: 'A',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 3,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'Según el Código Tributario Boliviano (Ley 2492), el término de prescripción de las facultades de fiscalización es de:',
-      opcion_a: '2 años calendario continuos',
-      opcion_b: '4 años improrrogables',
-      opcion_c: '5 años para personas naturales únicamente',
-      opcion_d: '20 años en materia de contravenciones aduaneras',
-      opcion_e: '8 años para tributos de periodicidad anual y contravenciones',
-      respuesta_correcta: 'E',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 4,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'Para el cómputo del Crédito Fiscal IVA en compras de bienes y servicios, el documento fiscal debe:',
-      opcion_a: 'Ser emitido exclusivamente en moneda extranjera',
-      opcion_b: 'Ser cancelado únicamente en efectivo al momento de la entrega',
-      opcion_c: 'Contar con autorización del Ministerio de Economía',
-      opcion_d: 'Estar vinculado a la actividad gravada, a nombre y NIT del sujeto pasivo y respaldado',
-      opcion_e: 'Tener una antigüedad mayor a 180 días calendario',
-      respuesta_correcta: 'D',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 5,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'En una auditoría tributaria, la técnica de confirmación de saldos con terceros verifica principalmente:',
-      opcion_a: 'Estructura societaria y tenencia accionaria',
-      opcion_b: 'Existencia, integridad y exactitud de cuentas por cobrar y pagar comerciales',
-      opcion_c: 'Capacidad de pago futura y solvencia de la entidad',
-      opcion_d: 'Coeficiente de liquidez ácida del período',
-      opcion_e: 'Depreciación acumulada de activos intangibles',
-      respuesta_correcta: 'B',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 6,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'El método de determinación de la base imponible sobre base presunta procede cuando:',
-      opcion_a: 'Se cuenta con estados financieros auditados con dictamen limpio',
-      opcion_b: 'El sujeto pasivo no presenta libros contables ni documentación fidedigna',
-      opcion_c: 'Las ventas superan los límites del régimen simplificado',
-      opcion_d: 'Se solicita una prórroga para el pago de la deuda',
-      opcion_e: 'El contribuyente presenta todos sus libros notariados',
-      respuesta_correcta: 'B',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 7,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'La alícuota general del Impuesto a las Transacciones (IT) según la Ley 843 es del:',
-      opcion_a: '3% sobre los ingresos brutos devengados o percibidos',
-      opcion_b: '13% sobre el valor neto de la factura',
-      opcion_c: '25% sobre la utilidad neta imponible',
-      opcion_d: '1.5% sobre transacciones comerciales al por mayor',
-      opcion_e: '0.30% aplicable al débito y crédito bancario',
-      respuesta_correcta: 'A',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 8,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'Las compensaciones del IUE efectivamente pagado contra el IT operan:',
-      opcion_a: 'A partir del mes siguiente al pago del IUE hasta su total agotamiento o nuevo vencimiento',
-      opcion_b: 'De manera retroactiva a los períodos del año anterior',
-      opcion_c: 'Únicamente contra el débito fiscal IVA compras',
-      opcion_d: 'Hasta un máximo del 50% de las ventas brutas declaradas',
-      opcion_e: 'Exclusivamente en empresas del sector minero y petrolero',
-      respuesta_correcta: 'A',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 9,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'El plazo reglamentario para la presentación de descargos ante una Vista de Cargo emitida por el SIN es de:',
-      opcion_a: '30 días calendario improrrogables computables a partir de su notificación',
-      opcion_b: '10 días hábiles administrativos',
-      opcion_c: '60 días calendario continuos',
-      opcion_d: '15 días hábiles según Ley 2492',
-      opcion_e: '5 días hábiles a partir de la publicación en prensa',
-      respuesta_correcta: 'A',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 10,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'La bancarización obligatoria establecida por el SIN es exigible para transacciones iguales o mayores a:',
-      opcion_a: 'Bs 10.000',
-      opcion_b: 'Bs 50.000',
-      opcion_c: 'Bs 100.000',
-      opcion_d: 'Bs 25.000',
-      opcion_e: 'Bs 5.000',
-      respuesta_correcta: 'B',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 11,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'La no emisión de factura en una venta de bienes o servicios constituye una contravención tributaria sancionada con:',
-      opcion_a: 'Clausura del establecimiento comercial de acuerdo a la reincidencia',
-      opcion_b: 'Pérdida automática de la personería jurídica',
-      opcion_c: 'Decomiso definitivo de la mercadería sin reclamo',
-      opcion_d: 'Prisión de 1 a 3 años para el representante legal',
-      opcion_e: 'Suspensión definitiva del Registro Tributario (NIT)',
-      respuesta_correcta: 'A',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    // Medias (11..15)
-    list.push({
-      fila: 12,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'En el Régimen Complementario al IVA (RC-IVA) para dependientes, el Formulario 110 admite facturas de hasta:',
-      opcion_a: '120 días anteriores a la fecha de presentación al empleador',
-      opcion_b: '30 días anteriores a la fecha de presentación',
-      opcion_c: '60 días calendario improrrogables',
-      opcion_d: '180 días del año fiscal',
-      opcion_e: 'Exclusivamente del mes en curso',
-      respuesta_correcta: 'A',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 13,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'El ajuste por inflación y tenencia de bienes (AITB) de los activos fijos según la NC 3 tiene efecto fiscal de:',
-      opcion_a: 'Ingreso o gasto gravable/deducible en la determinación del IUE',
-      opcion_b: 'No deducible en un 100% bajo ninguna circunstancia',
-      opcion_c: 'Exento de todo tributo de dominio nacional',
-      opcion_d: 'Compensable directamente contra el IVA compras',
-      opcion_e: 'Gravado exclusivamente por el Impuesto a las Grandes Fortunas',
-      respuesta_correcta: 'A',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 14,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'La alícuota por remesas de utilidades a beneficiarios del exterior por servicios prestados desde el extranjero es del:',
-      opcion_a: '25% sobre el 50% presunto (Tasa efectiva 12.5%)',
-      opcion_b: '13% sobre el total remesado',
-      opcion_c: '3% por concepto de retención IT',
-      opcion_d: '25% sobre el 10% presunto (Tasa efectiva 2.5%)',
-      opcion_e: 'Exención total por tratados de doble tributación',
-      respuesta_correcta: 'A',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 15,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'En auditoría fiscal, las previsiones para incobrables no admitidas por el D.S. 24051 generan:',
-      opcion_a: 'Un activo por impuesto diferido',
-      opcion_b: 'Un pasivo por impuesto diferido',
-      opcion_c: 'La nulidad de los estados financieros',
-      opcion_d: 'Un crédito fiscal trasladable al IT',
-      opcion_e: 'Una contingencia penal tributaria',
-      respuesta_correcta: 'A',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 16,
-      tipo: 'SELECCION_MEJOR_RESPUESTA',
-      grupo: '',
-      enunciado: 'El recurso de alzada ante la Autoridad Regional de Impugnación Tributaria (ARIT) debe interponerse en el plazo perentorio de:',
-      opcion_a: '20 días improrrogables computables a partir de la notificación legal',
-      opcion_b: '15 días hábiles administrativos',
-      opcion_c: '30 días calendario continuos',
-      opcion_d: '45 días hábiles procesales',
-      opcion_e: '60 días calendario según Ley 2492',
-      respuesta_correcta: 'A',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    // =========================================================================
-    // 2. FALSO O VERDADERO SIMPLE (Preguntas 16 a 25)
-    // =========================================================================
-    // Fáciles (16..20)
-    list.push({
-      fila: 17,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'El principio de devengado tributario reconoce ingresos y gastos cuando se generan legalmente, con independencia del cobro o pago.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'A',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 18,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'Las donaciones a instituciones no lucrativas autorizadas son deducibles del IUE hasta el límite del 10% de la utilidad imponible.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'A',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 19,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'Las multas pagadas por contravenciones tributarias al SIN son consideradas gastos deducibles en la liquidación del IUE.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'B',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 20,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'El débito fiscal IVA se genera en la venta de bienes muebles en el momento de la entrega del bien o emisión de factura, lo que ocurra primero.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'A',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 21,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'Los contribuyentes del Régimen Tributario Simplificado (RTS) están obligados a emitir facturas oficiales y llevar libros de compras.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'B',
-      dificultad: '1',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    // Medias (21..25)
-    list.push({
-      fila: 22,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'La depreciación de inmuebles bajo el método de línea recta tiene un coeficiente anual del 2.5% según el D.S. 24051.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'A',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 23,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'El Impuesto a las Grandes Fortunas (IGF) aplica a personas naturales con patrimonio superior a Bs 30 millones en territorio nacional y extranjero.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'A',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 24,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'Las pérdidas tributarias acumuladas en el IUE pueden compensarse de manera indefinida sin límite temporal en empresas no productivas.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'B',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 25,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'La rectificatoria de una declaración jurada que incrementa el saldo a favor del contribuyente requiere aprobación previa mediante Resolución Administrativa del SIN.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'A',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 26,
-      tipo: 'VERDADERO_O_FALSO_SIMPLE',
-      grupo: '',
-      enunciado: 'El crédito fiscal generado en compras de combustible (gasolina y diésel) es computable al 100% del valor total de la factura.',
-      opcion_a: 'Verdadero',
-      opcion_b: 'Falso',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'B',
-      dificultad: '2',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    // =========================================================================
-    // 3. PREMISAS A / B / AMBAS / NINGUNA (Preguntas 26 a 35)
-    // =========================================================================
-    for (let i = 1; i <= 10; i++) {
-      let enun = '';
-      let resp = 'C';
-      if (i === 1) {
-        enun = 'I. El crédito fiscal IVA respaldado por compras vinculadas a la actividad gravada es computable.\nII. Las retenciones tributarias no liberan al sujeto pasivo de su obligación formal.';
-        resp = 'C';
-      } else if (i === 2) {
-        enun = 'I. Los profesionales independientes liquidan el IUE mediante el Formulario 510 aplicando la alícuota del 25% sobre el 50% presunto.\nII. El IT pagado por profesionales independientes es acreditable al 100% contra el IVA débito.';
-        resp = 'A';
-      } else if (i === 3) {
-        enun = 'I. Los gastos de representación con respaldo de factura son 100% deducibles en el IUE sin ningún tope reglamentario.\nII. Los sueldos pagados a socios que no trabajan efectivamente en la empresa son deducibles.';
-        resp = 'D';
-      } else if (i === 4) {
-        enun = 'I. La prescripción tributaria se interrumpe con la notificación de la Resolución Determinativa.\nII. El pago parcial de la deuda tributaria suspende el cómputo de la prescripción.';
-        resp = 'C';
-      } else if (i === 5) {
-        enun = 'I. Las exportaciones definitivas de bienes están gravadas con tasa cero en el IVA.\nII. Los exportadores pueden solicitar la devolución del crédito fiscal mediante CEDEIMs.';
-        resp = 'C';
-      } else if (i === 6) {
-        enun = 'I. Las compras de servicios a personas naturales no inscritas generan retención del 12.5% por IUE y 3% por IT.\nII. Las retenciones por compra de bienes son del 5% por IUE y 3% por IT.';
-        resp = 'C';
-      } else if (i === 7) {
-        enun = 'I. El valor residual de los activos fijos totalmente depreciados se mantiene contablemente en Bs 1.\nII. La revalorización técnica de activos fijos genera crédito fiscal IVA automático.';
-        resp = 'A';
-      } else if (i === 8) {
-        enun = 'I. Las notas fiscales emitidas por el Sistema Electrónico no requieren impresión física para su validez.\nII. El código QR impreso en facturas contiene información fiscal validada por el SIN.';
-        resp = 'C';
-      } else if (i === 9) {
-        enun = 'I. La Vista de Cargo fija la liquidación previa de la deuda tributaria y abre el período probatorio.\nII. La Resolución Determinativa es el acto definitivo que pone fin al procedimiento de fiscalización.';
-        resp = 'C';
-      } else {
-        enun = 'I. La alícuota del ICE es idéntica para bebidas alcohólicas y vehículos automotores.\nII. El ICE pagado en importaciones es computable como crédito fiscal IVA.';
-        resp = 'D';
-      }
-
-      list.push({
-        fila: 26 + i,
-        tipo: 'RESPUESTA_PREMISAS_ABCD',
-        grupo: '',
-        enunciado: enun,
-        opcion_a: 'Si la primera premisa es verdadera',
-        opcion_b: 'Si la segunda premisa es verdadera',
-        opcion_c: 'Si ambas premisas son verdaderas',
-        opcion_d: 'Si ninguna de las premisas es verdadera',
-        opcion_e: '',
-        respuesta_correcta: resp,
-        dificultad: '2',
-        peso: 5,
-        observaciones: 'OK',
-        valido: true,
-        errores: []
-      });
-    }
-
-    // =========================================================================
-    // 4. PREGUNTAS CON CLAVE DE RESPUESTA / F-V COMPLEJAS (Preguntas 36 a 45)
-    // =========================================================================
-    for (let i = 1; i <= 10; i++) {
-      let enun = '';
-      let resp = 'A';
-      if (i === 1) {
-        enun = 'En una auditoría fiscal determine los reparos aplicables por incumplimiento a la normativa tributaria:';
-        resp = 'A';
-      } else if (i === 2) {
-        enun = 'Son condiciones formales para la deducción de sueldos y salarios en la liquidación del IUE:';
-        resp = 'B';
-      } else if (i === 3) {
-        enun = 'Constituyen hechos generadores del Impuesto a las Transacciones (IT):';
-        resp = 'E';
-      } else if (i === 4) {
-        enun = 'Respecto a los métodos de depreciación admitidos por el D.S. 24051 determine su validez:';
-        resp = 'A';
-      } else if (i === 5) {
-        enun = 'Son facultades específicas de la Administración Tributaria según la Ley 2492:';
-        resp = 'E';
-      } else if (i === 6) {
-        enun = 'Constituyen causales de nulidad absoluta en los actos administrativos tributarios:';
-        resp = 'B';
-      } else if (i === 7) {
-        enun = 'Son elementos que componen la Deuda Tributaria (DT) según el Artículo 47 del CTB:';
-        resp = 'E';
-      } else if (i === 8) {
-        enun = 'Tratamiento de las mermas y desmedros en la auditoría de inventarios para el IUE:';
-        resp = 'C';
-      } else if (i === 9) {
-        enun = 'Requisitos para la deducibilidad de intereses por deudas financieras contraídas en el exterior:';
-        resp = 'A';
-      } else {
-        enun = 'Son documentos soporte indispensables en el legajo de auditoría tributaria permanente:';
-        resp = 'E';
-      }
-
-      list.push({
-        fila: 36 + i,
-        tipo: 'VERDADERO_O_FALSO_COMPLEJAS',
-        grupo: '',
-        enunciado: enun,
-        opcion_a: '1. Omisión de ingresos reales en estados financieros auditados.',
-        opcion_b: '2. Gastos no deducibles por falta de documento de bancarización fehaciente.',
-        opcion_c: '3. Crédito fiscal computado sin factura original o electrónica autorizada.',
-        opcion_d: '4. Errores aritméticos en libros de compras y ventas IVA del período.',
-        opcion_e: '',
-        respuesta_correcta: resp,
-        dificultad: '2',
-        peso: 5,
-        observaciones: 'OK',
-        valido: true,
-        errores: []
-      });
-    }
-
-    // =========================================================================
-    // 5. CASOS PRÁCTICOS / PROBLEMAS FINANCIEROS (Preguntas 46 a 55)
-    // =========================================================================
-    // CASO-TRIB1 (46..50)
-    for (let i = 1; i <= 5; i++) {
-      let enun = '';
-      let resp = 'A';
-      if (i === 1) {
-        enun = 'Calcule el reparo impositivo aplicable por IUE no deducible al detectarse facturas sin bancarización por Bs 150.000:';
-        resp = 'A';
-      } else if (i === 2) {
-        enun = 'Al no haber bancarizado las compras de Bs 150.000, ¿cuál es el Crédito Fiscal IVA indebidamente apropiado a reintegrar?';
-        resp = 'C';
-      } else if (i === 3) {
-        enun = 'Determine la sanción por omisión de pago si la empresa no rectifica voluntariamente antes de la Vista de Cargo:';
-        resp = 'A';
-      } else if (i === 4) {
-        enun = 'Calcule el interés moratorio generado si transcurrieron 500 días con una tasa de interés del 4% anual:';
-        resp = 'B';
-      } else {
-        enun = 'Determine la Deuda Tributaria consolidada total expresada en Unidades de Fomento de Vivienda (UFV):';
-        resp = 'A';
-      }
-
-      list.push({
-        fila: 46 + i,
-        tipo: 'SUBITEM_CASO',
-        grupo: 'CASO-TRIB1',
-        enunciado: enun,
-        opcion_a: 'Reparo IUE Bs 37.500 (25%) + Sanción formal 500 UFV',
-        opcion_b: 'Reparo IUE Bs 19.500 (13%) + Sanción formal 200 UFV',
-        opcion_c: 'Crédito Fiscal IVA a reintegrar de Bs 19.500 (13%)',
-        opcion_d: 'No procede reparo si la factura tiene código de autorización vigente',
-        opcion_e: 'Reparo total acumulado consolidado de Bs 75.000',
-        respuesta_correcta: resp,
-        dificultad: '3',
-        peso: 5,
-        observaciones: 'OK',
-        formulaTypst: '$ "Reparo IUE" = 150.000 times 25% = 37.500 " Bs" $',
-        valido: true,
-        errores: []
-      });
-    }
-
-    // CASO-TRIB2 (51..55)
-    for (let i = 1; i <= 5; i++) {
-      let enun = '';
-      let resp = 'A';
-      if (i === 1) {
-        enun = 'En una constructora con contrato de Bs 2.000.000 y 60% de avance físico certificado, ¿cuál es el ingreso gravado devengado en el IUE?';
-        resp = 'A';
-      } else if (i === 2) {
-        enun = 'Si los costos reales acumulados fueron de Bs 800.000, determine la Utilidad Bruta Imponible devengada en el ejercicio:';
-        resp = 'B';
-      } else if (i === 3) {
-        enun = 'Tratamiento tributario de la retención de garantía del 7% efectuada por el contratante en planillas de avance:';
-        resp = 'C';
-      } else if (i === 4) {
-        enun = 'Cálculo del Impuesto a las Transacciones (IT) generado sobre la planilla certificada de Bs 1.200.000:';
-        resp = 'A';
-      } else {
-        enun = 'Efecto de la provisión por garantías de post-construcción en la liquidación del IUE:';
-        resp = 'D';
-      }
-
-      list.push({
-        fila: 51 + i,
-        tipo: 'SUBITEM_CASO',
-        grupo: 'CASO-TRIB2',
-        enunciado: enun,
-        opcion_a: 'Ingreso devengado de Bs 1.200.000 sujeto a facturación y cómputo de IUE',
-        opcion_b: 'Utilidad Bruta Imponible de Bs 400.000 (Bs 1.200.000 - Bs 800.000)',
-        opcion_c: 'No reduce la base imponible del IVA ni del IT y se factura sobre el monto total',
-        opcion_d: 'Constituye gasto no deducible hasta que se ejecute el desembolso efectivo',
-        opcion_e: 'Deducción automática al 100% en el ejercicio de suscripción',
-        respuesta_correcta: resp,
-        dificultad: '3',
-        peso: 5,
-        observaciones: 'OK',
-        formulaTypst: '$ "Ingreso IUE" = 2.000.000 times 60% = 1.200.000 " Bs" $',
-        valido: true,
-        errores: []
-      });
-    }
-
-    // =========================================================================
-    // 6. EMPAREJAMIENTO DE CONCEPTOS (Preguntas 56 a 60)
-    // =========================================================================
-    list.push({
-      fila: 57,
-      tipo: 'OPCION_EMPAREJAMIENTO',
-      grupo: 'EMP-TRIB1',
-      enunciado: 'Procedimiento de fiscalización directa con libros contables y documentos de respaldo fidedignos.',
-      opcion_a: '',
-      opcion_b: '',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'E',
-      dificultad: '3',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 58,
-      tipo: 'OPCION_EMPAREJAMIENTO',
-      grupo: 'EMP-TRIB1',
-      enunciado: 'Tratamiento fiscal del saldo a favor del contribuyente que se actualiza con la variación de la UFV.',
-      opcion_a: '',
-      opcion_b: '',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'B',
-      dificultad: '3',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 59,
-      tipo: 'OPCION_EMPAREJAMIENTO',
-      grupo: 'EMP-TRIB1',
-      enunciado: 'Método de liquidación tributaria aplicable cuando el contribuyente oculta ventas y no tiene registros contables.',
-      opcion_a: '',
-      opcion_b: '',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'A',
-      dificultad: '3',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 60,
-      tipo: 'OPCION_EMPAREJAMIENTO',
-      grupo: 'EMP-TRIB1',
-      enunciado: 'Beneficio tributario otorgado a fundaciones y asociaciones civiles sin fines de lucro debidamente registradas.',
-      opcion_a: '',
-      opcion_b: '',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'D',
-      dificultad: '3',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    list.push({
-      fila: 61,
-      tipo: 'OPCION_EMPAREJAMIENTO',
-      grupo: 'EMP-TRIB1',
-      enunciado: 'Sobretasa impositiva del 25% aplicada a entidades de intermediación financiera con rentabilidad superior al 6%.',
-      opcion_a: '',
-      opcion_b: '',
-      opcion_c: '',
-      opcion_d: '',
-      opcion_e: '',
-      respuesta_correcta: 'C',
-      dificultad: '3',
-      peso: 5,
-      observaciones: 'OK',
-      valido: true,
-      errores: []
-    });
-
-    return list;
   }
 
   private _mostrarToast(msg: string, type: 'success' | 'error' = 'success'): void {

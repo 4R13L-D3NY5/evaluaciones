@@ -141,19 +141,6 @@ export interface AuditoriaAccesoItem {
   providedIn: 'root'
 })
 export class EvaluacionesStorageService {
-  private readonly _STORAGE_KEYS = {
-    SEDES: 'sea_eval_sedes',
-    CARRERAS: 'sea_eval_carreras',
-    ASIGNATURAS: 'sea_eval_asignaturas',
-    DOCENTES: 'sea_eval_docentes',
-    ROLES_EXAMENES: 'sea_eval_roles_examenes',
-    CONFIGURACIONES: 'sea_eval_configuraciones',
-    GESTION_ACTIVA: 'sea_eval_gestion_activa',
-    PLAN_ESTUDIOS: 'sea_eval_plan_estudios',
-    GESTION_EVALUACIONES: 'sea_eval_gestion_evaluaciones',
-    BITACORA_AUDITORIA: 'sea_eval_bitacora_auditoria'
-  };
-
   // Signals reactivos
   public sedes = signal<Sede[]>([]);
   public carreras = signal<Carrera[]>([]);
@@ -200,37 +187,9 @@ export class EvaluacionesStorageService {
   }
 
   private _loadOrSeedData(): void {
-    // NOTA: Todos los seeds de demostración fueron eliminados.
-    // Los datos deben provenir del backend / gateway institucional.
-    // Solo se conserva la gestión activa como configuración por defecto.
-
-    const storedGestion = localStorage.getItem(this._STORAGE_KEYS.GESTION_ACTIVA);
-    this.gestionActiva.set(storedGestion || 'II-2026');
-
-    const rawSedes = localStorage.getItem(this._STORAGE_KEYS.SEDES);
-    if (rawSedes) {
-      this.sedes.set(JSON.parse(rawSedes));
-    }
-
-    const rawCarreras = localStorage.getItem(this._STORAGE_KEYS.CARRERAS);
-    if (rawCarreras) {
-      this.carreras.set(JSON.parse(rawCarreras));
-    }
-
-    const rawPlan = localStorage.getItem(this._STORAGE_KEYS.PLAN_ESTUDIOS);
-    if (rawPlan) {
-      this.planSemestres.set(JSON.parse(rawPlan));
-    }
-
-    const rawGestion = localStorage.getItem(this._STORAGE_KEYS.GESTION_EVALUACIONES);
-    if (rawGestion) {
-      this.gestionEvaluaciones.set(JSON.parse(rawGestion));
-    }
-
-    const rawAuditoria = localStorage.getItem(this._STORAGE_KEYS.BITACORA_AUDITORIA);
-    if (rawAuditoria) {
-      this.bitacoraAuditoria.set(JSON.parse(rawAuditoria));
-    }
+    // No se cargan semillas ni datos de demostración. Los datos oficiales
+    // deben provenir del backend/SEA y las señales viven solo en la sesión.
+    this.gestionActiva.set('II-2026');
   }
 
   public campusList = signal<any[]>([]);
@@ -256,7 +215,6 @@ export class EvaluacionesStorageService {
 
   public setGestionActiva(gestion: string): void {
     this.gestionActiva.set(gestion);
-    localStorage.setItem(this._STORAGE_KEYS.GESTION_ACTIVA, gestion);
   }
 
   public toggleCartillaPlan(itemId: number): void {
@@ -270,7 +228,6 @@ export class EvaluacionesStorageService {
       })
     }));
     this.planSemestres.set(current);
-    localStorage.setItem(this._STORAGE_KEYS.PLAN_ESTUDIOS, JSON.stringify(current));
   }
 
   public toggleCartillaGestionEvaluacion(id: number): void {
@@ -281,7 +238,6 @@ export class EvaluacionesStorageService {
       return item;
     });
     this.gestionEvaluaciones.set(current);
-    localStorage.setItem(this._STORAGE_KEYS.GESTION_EVALUACIONES, JSON.stringify(current));
   }
 
   public avanzarEstado(id: number, usuario: string = 'Sistema', detalle?: string): { anterior: EtapaEvaluacion; nuevo: EtapaEvaluacion } | null {
@@ -333,7 +289,6 @@ export class EvaluacionesStorageService {
 
     if (result) {
       this.gestionEvaluaciones.set(current);
-      localStorage.setItem(this._STORAGE_KEYS.GESTION_EVALUACIONES, JSON.stringify(current));
     }
 
     return result;
@@ -394,7 +349,6 @@ export class EvaluacionesStorageService {
 
     if (ok) {
       this.gestionEvaluaciones.set(current);
-      localStorage.setItem(this._STORAGE_KEYS.GESTION_EVALUACIONES, JSON.stringify(current));
       
       this.registrarAccionAuditoria({
         usuarioNombre: usuario,
@@ -459,7 +413,6 @@ export class EvaluacionesStorageService {
 
     if (ok) {
       this.gestionEvaluaciones.set(current);
-      localStorage.setItem(this._STORAGE_KEYS.GESTION_EVALUACIONES, JSON.stringify(current));
       
       this.registrarAccionAuditoria({
         usuarioNombre: usuario,
@@ -523,7 +476,6 @@ export class EvaluacionesStorageService {
     });
 
     this.gestionEvaluaciones.set(current);
-    localStorage.setItem(this._STORAGE_KEYS.GESTION_EVALUACIONES, JSON.stringify(current));
   }
 
   public registrarAccionAuditoria(entry: Partial<AuditoriaAccesoItem>): void {
@@ -551,6 +503,5 @@ export class EvaluacionesStorageService {
 
     const actualizados = [nuevo, ...this.bitacoraAuditoria()];
     this.bitacoraAuditoria.set(actualizados);
-    localStorage.setItem(this._STORAGE_KEYS.BITACORA_AUDITORIA, JSON.stringify(actualizados));
   }
 }

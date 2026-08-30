@@ -25,37 +25,23 @@ export interface EstudianteInscrito {
 export class EstudiantesGatewayService {
   private readonly _gateway = inject(UnitepcGatewayService);
 
-  // 3 Estudiantes piloto para CPEC18 AUDITORÍA TRIBUTARIA (Grupo TA-01)
-  private readonly _estudiantesCPEC18: EstudianteInscrito[] = [
-    { codigo: '7849102', nombres: 'JUAN CARLOS', apellido1: 'PÉREZ', apellido2: 'MAMANI', courseState: 'CURSANDO' },
-    { codigo: '8392104', nombres: 'MARÍA BELÉN', apellido1: 'QUISPE', apellido2: 'FLORES', courseState: 'CURSANDO' },
-    { codigo: '6928103', nombres: 'RODRIGO ALEJANDRO', apellido1: 'CONDORI', apellido2: 'RODRÍGUEZ', courseState: 'CURSANDO' }
-  ];
-
   /**
    * Obtiene la nómina de estudiantes matriculados en vivo desde el Gateway por groupId
-   * GET /students/byGroup?groupId={groupId}
-   */
+  * GET /students/byGroup?groupId={groupId}
+  */
   public getEstudiantesPorGrupo(groupId: string): Observable<EstudianteInscrito[]> {
-    if (!groupId || groupId.startsWith('SEA-G-') || groupId === 'PILOT-CPEC18') {
-      return of([...this._estudiantesCPEC18]);
-    }
+    if (!groupId) return of([]);
 
     return this._gateway.getStudentsByGroup(groupId).pipe(
       map(items => {
-        if (!items || items.length === 0) {
-          return [...this._estudiantesCPEC18];
-        }
-        const mapped = items.map(item => this._mapGatewayStudentToInscrito(item));
-        if (mapped.length < 3) {
-          const complementos = this._estudiantesCPEC18.slice(mapped.length);
-          return [...mapped, ...complementos];
-        }
-        return mapped;
+        // Para un grupo real la nómina de SEA es la única fuente válida.
+        // No completar con estudiantes piloto: eso desincroniza la Lista de
+        // Evaluaciones respecto al catálogo oficial de Servicios SEA.
+        return (items || []).map(item => this._mapGatewayStudentToInscrito(item));
       }),
       catchError(err => {
-        console.warn(`[EstudiantesGatewayService] Fallback a datos locales para grupo ${groupId}:`, err);
-        return of([...this._estudiantesCPEC18]);
+        console.warn(`[EstudiantesGatewayService] No se pudo consultar SEA para grupo ${groupId}:`, err);
+        return of([]);
       })
     );
   }
@@ -64,21 +50,7 @@ export class EstudiantesGatewayService {
    * Obtiene la nómina de estudiantes inscritos de una materia y grupo
    */
   public getEstudiantesPorMateriaYGrupo(materiaCodigo: string, grupo: string, groupId?: string): Observable<EstudianteInscrito[]> {
-    if (groupId && !groupId.startsWith('SEA-G-') && groupId !== 'PILOT-CPEC18') {
-      return this.getEstudiantesPorGrupo(groupId);
-    }
-
-    // Si es CPEC18 o cualquier materia de prueba, entregamos la nómina piloto
-    if (materiaCodigo.toUpperCase().includes('CPEC18') || materiaCodigo.toUpperCase().includes('AUDIT')) {
-      return of([...this._estudiantesCPEC18]);
-    }
-
-    // Para otras materias, generamos una nómina equivalente determinista
-    const lista = this._estudiantesCPEC18.map((e, idx) => ({
-      ...e,
-      codigo: `${7800000 + idx * 1342}`
-    }));
-    return of(lista);
+    return this.getEstudiantesPorGrupo(groupId || '');
   }
 
   /**

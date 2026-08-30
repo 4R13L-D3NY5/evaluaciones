@@ -4,6 +4,7 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionTypstRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionTypstResultadoDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionColaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.DocumentoExamenDto;
+import com.xpertiflow.evaluaciones.api.dto.generacion.ConfiguracionGeneracionResponseDto;
 import com.xpertiflow.evaluaciones.application.generacion.GeneracionTypstService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +37,12 @@ public class GeneracionTypstController {
     @Operation(summary = "Obtener el PDF oficial de un examen ya generado")
     public ResponseEntity<DocumentoExamenDto> consultarDocumento(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(generacionTypstService.consultarDocumentoExamen(rolExamenId));
+    }
+
+    @GetMapping("/roles/{rolExamenId}/configuracion")
+    @Operation(summary = "Consultar variantes, patrones y asignaciones persistidas")
+    public ResponseEntity<ConfiguracionGeneracionResponseDto> consultarConfiguracion(@PathVariable String rolExamenId) {
+        return ResponseEntity.ok(generacionTypstService.consultarConfiguracion(rolExamenId));
     }
 
     @GetMapping("/{jobId}/resultado")

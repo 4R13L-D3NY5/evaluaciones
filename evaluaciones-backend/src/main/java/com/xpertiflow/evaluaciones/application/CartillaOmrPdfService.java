@@ -28,10 +28,15 @@ public class CartillaOmrPdfService {
     private static final float PAGE_WIDTH = 595f;
     private static final float PAGE_HEIGHT = 841f;
     private static final float DATOS_X = 250f;
+    // Ajuste de la segunda iteración: el código debe iniciar 10 puntos más
+    // a la izquierda dentro de su casilla superior derecha.
     private static final float CODIGO_X = 315f;
     private static final float NOMBRE_X = 250f;
-    private static final float DATOS_Y = 95f;
-    private static final float NOMBRE_Y = 125f;
+    // Desplazamiento vertical solicitado para todos los datos preimpresos:
+    // cinco puntos hacia arriba respecto de la primera iteración.
+    private static final float DATOS_Y = 90f;
+    private static final float NOMBRE_Y = 120f;
+    private static final float NOMBRE_TAMANO = 10.5f;
 
     public void generar(Path archivo, RolExamen rol, List<CartillaOmr> cartillas) throws IOException {
         Files.createDirectories(archivo.getParent());
@@ -59,11 +64,13 @@ public class CartillaOmrPdfService {
 
         // Casilla superior derecha: únicamente el código del estudiante.
         textoDesdeArriba(contenido, cartilla.getCodigoEstudiante(),
-                CODIGO_X + 29f, DATOS_Y + 18f, PDType1Font.HELVETICA_BOLD, 22f);
+                CODIGO_X + 19f, DATOS_Y + 18f, PDType1Font.HELVETICA_BOLD, 22f);
 
         // Casilla inferior: únicamente el nombre completo del estudiante.
+        // Se usa peso normal para reducir el ancho y evitar que nombres largos
+        // se salgan de la casilla al imprimir.
         textoDesdeArriba(contenido, limitar(cartilla.getNombreCompleto(), 34),
-                NOMBRE_X + 5f, NOMBRE_Y + 17f, PDType1Font.HELVETICA_BOLD, 13.5f);
+                NOMBRE_X + 5f, NOMBRE_Y + 17f, PDType1Font.HELVETICA, NOMBRE_TAMANO);
     }
 
     private void textoDesdeArriba(PDPageContentStream contenido, String valor, float x, float yDesdeArriba,

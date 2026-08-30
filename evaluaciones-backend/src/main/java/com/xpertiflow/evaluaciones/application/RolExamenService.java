@@ -146,7 +146,8 @@ public class RolExamenService {
         EstadoFlujo origen = rol.getEstadoFlujo();
 
         if (origen != EstadoFlujo.PROGRAMADO && origen != EstadoFlujo.VALIDADO) {
-            throw new RuntimeException("No se puede cargar un banco para un rol en estado " + origen.getValor());
+            throw new RuntimeException("No se puede cargar un banco para un rol en estado " + origen.getValor()
+                    + ". Restablezca el rol a VALIDADO antes de reemplazar el banco de preguntas.");
         }
 
         rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
