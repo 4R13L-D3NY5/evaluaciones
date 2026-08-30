@@ -6,7 +6,9 @@ import { EvaluacionesStorageService } from '../../core/services/evaluaciones-sto
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
-import { BancoPreguntasService } from '../../core/services/banco-preguntas.service';
+import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
+import { of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -242,6 +244,32 @@ export interface DiaCalendario {
                 </div>
                 <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
               </div>
+              @if (cargandoBancoPersistido()) {
+                <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700">
+                  <i class="pi pi-spin pi-spinner"></i><span>Consultando banco de preguntas guardado...</span>
+                </div>
+              } @else {
+                @if (bancoPersistido(); as banco) {
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-950">
+                    <div class="flex items-start gap-2">
+                      <i class="pi pi-check-circle mt-0.5 text-emerald-700"></i>
+                      <div>
+                        <strong class="block uppercase">Banco de preguntas cargado</strong>
+                        <span class="text-[10px]">{{ banco.totalReactivos }} reactivos · {{ banco.nombreArchivoExcel }} · Validado</span>
+                      </div>
+                    </div>
+                    @if (rolPuedeEliminarBanco()) {
+                      <button (click)="abrirEliminarBancoPersistido()" class="shrink-0 rounded-lg border border-rose-200 bg-white px-3 py-2 text-[10px] font-black text-rose-700 hover:bg-rose-50 cursor-pointer">
+                        <i class="pi pi-trash mr-1"></i> Eliminar banco
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                    <i class="pi pi-info-circle"></i><span>Este grupo todavía no tiene banco de preguntas cargado para {{ parcialActivo() }}.</span>
+                  </div>
+                }
+              }
               @if (!rolPuedeCargarBanco()) {
                 <div class="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950">
                   <i class="pi pi-info-circle mt-0.5"></i>
@@ -397,7 +425,7 @@ export interface DiaCalendario {
                       </span>
                     </div>
                     <p class="text-xs text-amber-900/90 dark:text-amber-300/90 font-medium leading-relaxed">
-                      El banco de preguntas ha alcanzado el 100% de cuotas válidas. Por normativa institucional, <strong>debes hacer clic en "Previsualizar Examen (Paso 1 Obligatorio)"</strong> para verificar la diagramación en PDF, fórmulas matemáticas/químicas y enunciados antes de desbloquear la descarga del paquete encriptado (.pkg) o la remisión oficial.
+                      El banco de preguntas ha alcanzado el 100% de cuotas válidas. Por normativa institucional, <strong>debes abrir "Previsualizar Examen (Paso 1 Obligatorio)" y recorrer el PDF completo hasta su última página</strong> para verificar la diagramación oficial, fórmulas matemáticas/químicas y enunciados antes de desbloquear la descarga del paquete encriptado (.pkg), la remisión oficial o el registro del banco.
                     </p>
                   </div>
                 </div>
@@ -464,6 +492,12 @@ export interface DiaCalendario {
                 <div class="flex items-center gap-2 font-black text-rose-900">
                   <i class="pi pi-exclamation-triangle text-rose-600"></i>
                   <span>Se detectaron {{ preguntasConErrores().length }} filas con observaciones que deben corregirse:</span>
+                </div>
+                <div class="rounded-lg border border-rose-200 bg-white/70 px-3 py-2 text-[11px] leading-relaxed text-rose-900">
+                  <strong>¿Dónde corregir la opción?</strong> La aplicación no mueve incisos automáticamente. Corrige la fila en el Excel original,
+                  usando las columnas oficiales <code>respuesta_correcta</code> y <code>opcion_a</code> a <code>opcion_e</code>.
+                  Si la respuesta es <code>E</code>, la columna <code>opcion_e</code> debe contener el texto de esa alternativa.
+                  Luego vuelve a cargar el archivo para ejecutar nuevamente todas las validaciones.
                 </div>
                 <ul class="list-disc pl-5 space-y-1 text-rose-800 text-[11px]">
                   @for (errItem of preguntasConErrores(); track errItem.fila) {
@@ -1580,12 +1614,12 @@ export interface DiaCalendario {
                 @if (!documentoRecorridoCompleto()) {
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 font-bold">
                     <i class="pi pi-arrow-down animate-bounce text-xs"></i>
-                    <span>Revisa el PDF oficial antes de habilitar la aprobación.</span>
+                    <span>Debes visualizar y recorrer las {{ pdfPreviewPages().length || 'todas las' }} páginas del PDF oficial hasta el final para habilitar la validación y el registro.</span>
                   </div>
                 } @else {
                   <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 font-bold">
                     <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
-                    <span>PDF oficial generado en una sola columna y listo para validar.</span>
+                    <span>PDF oficial real generado en Oficio, una columna y revisado hasta el final. Ya puedes validar y registrar.</span>
                   </div>
                 }
               </div>
@@ -2223,6 +2257,39 @@ export interface DiaCalendario {
         </div>
       }
 
+      <!-- MODAL: ELIMINAR BANCO PERSISTIDO -->
+      @if (dialogEliminarBancoPersistido()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-rose-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <div class="h-9 w-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center"><i class="pi pi-trash"></i></div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Eliminar banco de preguntas</h3>
+                  <p class="text-xs text-muted-foreground">{{ asignaturaNombreCompleto() }} · {{ grupoSeleccionado() }} · {{ parcialActivo() }}</p>
+                </div>
+              </div>
+              <button (click)="cerrarEliminarBancoPersistido()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+              <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-900 leading-relaxed">
+                Se eliminarán el banco y sus reactivos asociados. El rol volverá a <strong>PROGRAMADO</strong> para permitir una nueva carga.
+              </div>
+              <label class="block space-y-1.5">
+                <span class="font-black text-foreground">Escribe <code class="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">ELIMINAR</code> para confirmar</span>
+                <input [(ngModel)]="confirmacionEliminarBancoPersistido" autocomplete="off" class="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-xs font-black uppercase tracking-wider text-foreground outline-none focus:border-rose-500" placeholder="ELIMINAR">
+              </label>
+            </div>
+            <div class="p-4 border-t border-border flex justify-end gap-2">
+              <button (click)="cerrarEliminarBancoPersistido()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
+              <button (click)="confirmarEliminarBancoPersistido()" [disabled]="confirmacionEliminarBancoPersistido.trim().toUpperCase() !== 'ELIMINAR' || eliminandoBancoPersistido()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50">
+                <i class="pi" [class.pi-spin]="eliminandoBancoPersistido()" [class.pi-spinner]="eliminandoBancoPersistido()" [class.pi-trash]="!eliminandoBancoPersistido()"></i> {{ eliminandoBancoPersistido() ? 'Eliminando...' : 'Eliminar banco' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -2305,6 +2372,11 @@ export class BancoPreguntasComponent implements OnInit {
   public rolPuedeCargarBanco = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     return estado === 'PROGRAMADO' || estado === 'VALIDADO';
+  });
+
+  public rolPuedeEliminarBanco = computed(() => {
+    const estado = this.rolExamenActivo()?.estadoFlujo;
+    return this.bancoPersistido() !== null && (estado === 'PROGRAMADO' || estado === 'VALIDADO');
   });
 
   public ngOnInit(): void {
@@ -2496,6 +2568,11 @@ export class BancoPreguntasComponent implements OnInit {
   public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>('1er Parcial');
   public nombreArchivoCargado = signal<string | null>(null);
   public cargandoBanco = signal<boolean>(false);
+  public bancoPersistido = signal<BancoPreguntasResponse | null>(null);
+  public cargandoBancoPersistido = signal<boolean>(false);
+  public dialogEliminarBancoPersistido = signal<boolean>(false);
+  public confirmacionEliminarBancoPersistido = '';
+  public eliminandoBancoPersistido = signal<boolean>(false);
   public dialogEjemplos = signal<boolean>(false);
   public filtroGuiaTipo = signal<string>('TODOS');
   public dialogPrevisualizacionPdf = signal<boolean>(false);
@@ -2710,11 +2787,11 @@ export class BancoPreguntasComponent implements OnInit {
 
   public cuotaDificultadCumplida = computed(() => {
     const c = this.cuotasDificultad();
-    return this.countFaciles() >= c.facil && this.countMedias() >= c.medio && this.countDificiles() >= c.dificil;
+    return this.countFaciles() === c.facil && this.countMedias() === c.medio && this.countDificiles() === c.dificil;
   });
 
   public esBancoTotalmenteValido = computed(() => {
-    return this.totalPreguntasValidas() >= this.totalPreguntasRequeridas() && this.cuotaDificultadCumplida() && this.preguntasConErrores().length === 0;
+    return this.totalPreguntasValidas() === this.totalPreguntasRequeridas() && this.cuotaDificultadCumplida() && this.preguntasConErrores().length === 0;
   });
 
   public preguntasConErrores = computed(() => {
@@ -2731,6 +2808,83 @@ export class BancoPreguntasComponent implements OnInit {
     if (this.filtroPdfDificultad() === 'TODAS') return todas;
     return todas.filter(p => p.dificultad === this.filtroPdfDificultad());
   });
+
+  private validarEstructuraAgrupada(preguntas: PreguntaValidada[]): void {
+    this.validarBloqueAgrupado(preguntas, 'CASO_CLINICO_TRONCO', 'SUBITEM_CASO', 'caso o problema', 'preguntas relacionadas');
+    this.validarBloqueAgrupado(preguntas, 'EMPAREJAMIENTO_TRONCO', 'OPCION_EMPAREJAMIENTO', 'emparejamiento', 'opciones de emparejamiento');
+  }
+
+  private validarBloqueAgrupado(
+    preguntas: PreguntaValidada[],
+    tipoPrincipal: string,
+    tipoHijo: string,
+    nombreBloque: string,
+    nombreHijos: string
+  ): void {
+    const principalesPorGrupo = new Map<string, PreguntaValidada[]>();
+    const hijosPorGrupo = new Map<string, PreguntaValidada[]>();
+
+    for (const pregunta of preguntas) {
+      if (!pregunta.grupo) continue;
+      if (pregunta.tipo === tipoPrincipal) {
+        const grupo = principalesPorGrupo.get(pregunta.grupo) || [];
+        grupo.push(pregunta);
+        principalesPorGrupo.set(pregunta.grupo, grupo);
+      } else if (pregunta.tipo === tipoHijo) {
+        const grupo = hijosPorGrupo.get(pregunta.grupo) || [];
+        grupo.push(pregunta);
+        hijosPorGrupo.set(pregunta.grupo, grupo);
+      }
+    }
+
+    const grupos = new Set([...principalesPorGrupo.keys(), ...hijosPorGrupo.keys()]);
+    for (const grupo of grupos) {
+      const principales = principalesPorGrupo.get(grupo) || [];
+      const hijos = hijosPorGrupo.get(grupo) || [];
+
+      if (principales.length === 0) {
+        for (const hijo of hijos) {
+          this.agregarErrorEstructural(hijo, `Esta fila de ${nombreBloque} necesita primero un enunciado principal con el mismo grupo '${grupo}'`);
+        }
+        continue;
+      }
+
+      for (const principalDuplicado of principales.slice(1)) {
+        this.agregarErrorEstructural(principalDuplicado, `El grupo '${grupo}' solo puede tener un enunciado principal de ${nombreBloque}`);
+      }
+
+      const principal = principales[0];
+      if (hijos.length < 2 || hijos.length > 10) {
+        this.agregarErrorEstructural(principal, `El grupo '${grupo}' necesita entre 2 y 10 ${nombreHijos}`);
+      }
+
+      const indicePrincipal = preguntas.indexOf(principal);
+      const indicesInmediatos = new Set<number>();
+      let filaEsperada = principal.fila + 1;
+      for (let indice = indicePrincipal + 1; indice < preguntas.length; indice++) {
+        const siguiente = preguntas[indice];
+        if (siguiente.tipo === tipoHijo && siguiente.grupo === grupo && siguiente.fila === filaEsperada) {
+          indicesInmediatos.add(indice);
+          filaEsperada++;
+          continue;
+        }
+        break;
+      }
+
+      for (const hijo of hijos) {
+        if (!indicesInmediatos.has(preguntas.indexOf(hijo))) {
+          this.agregarErrorEstructural(hijo, `Esta fila debe aparecer inmediatamente después del enunciado principal del grupo '${grupo}'. No dejes otras filas entre ambos`);
+        }
+      }
+    }
+  }
+
+  private agregarErrorEstructural(pregunta: PreguntaValidada, mensaje: string): void {
+    if (pregunta.errores.includes(mensaje)) return;
+    pregunta.errores.push(mensaje);
+    pregunta.observaciones = pregunta.errores.join(', ');
+    pregunta.valido = false;
+  }
 
   public getDificultadNombre(dif: string): string {
     if (dif === '1') return 'Fácil';
@@ -2771,7 +2925,26 @@ export class BancoPreguntasComponent implements OnInit {
     const rol = compatibles.find(item => item.estadoFlujo === 'PROGRAMADO' || item.estadoFlujo === 'VALIDADO')
       || compatibles[0]
       || null;
-    this.examenRolSeleccionadoId.set(rol?.id || null);
+    const nuevoId = rol?.id || null;
+    if (this.examenRolSeleccionadoId() !== nuevoId) {
+      this.examenRolSeleccionadoId.set(nuevoId);
+      this._cargarBancoPersistido();
+    }
+  }
+
+  private _cargarBancoPersistido(): void {
+    const rol = this.rolExamenActivo();
+    this.bancoPersistido.set(null);
+    this.cargandoBancoPersistido.set(false);
+    if (!rol) return;
+
+    this.cargandoBancoPersistido.set(true);
+    this._bancoService.obtenerPorRol(rol.id).pipe(
+      catchError(() => of(null))
+    ).subscribe(banco => {
+      this.bancoPersistido.set(banco);
+      this.cargandoBancoPersistido.set(false);
+    });
   }
 
   public getEstadoBadgeClass(estado: string): string {
@@ -2829,8 +3002,17 @@ export class BancoPreguntasComponent implements OnInit {
     }
     this.archivoExcelSeleccionado.set(file);
     this.nombreArchivoCargado.set(file.name);
+    this.preguntasCargadas.set([]);
     this.pdfPrevisualizadoYConforme.set(false);
     try {
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        this._mostrarToast('Solo se aceptan archivos Excel .xlsx; no se permiten .xls, .xlsm, .csv ni archivos renombrados.', 'error');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        this._mostrarToast('El archivo supera el límite máximo de 10 MB.', 'error');
+        return;
+      }
       const arrayBuffer = await file.arrayBuffer();
 
       // Detección temprana de archivo corrupto o HTML previo
@@ -2844,16 +3026,22 @@ export class BancoPreguntasComponent implements OnInit {
       const data = new Uint8Array(arrayBuffer);
       const workbook = XLSX.read(data, { type: 'array' });
 
-      // Buscar hoja Banco o primera hoja
-      const sheetName = workbook.SheetNames.find(s => s.toLowerCase() === 'banco') || workbook.SheetNames[0];
+      // El formato oficial exige una hoja llamada Banco; no se usa una hoja alternativa.
+      const sheetName = workbook.SheetNames.find(s => this.normalizarEncabezadoExcel(s) === 'banco');
+      if (!sheetName) {
+        this._mostrarToast('No se encontró la hoja oficial "Banco" en el archivo Excel.', 'error');
+        return;
+      }
       const worksheet = workbook.Sheets[sheetName];
-      if (!worksheet) {
-        this._mostrarToast('No se encontró la hoja "Banco" en el archivo Excel.', 'error');
+
+      const erroresEncabezado = this.validarEncabezadosExcel(worksheet);
+      if (erroresEncabezado.length > 0) {
+        this._mostrarToast(erroresEncabezado.join(' · '), 'error');
         return;
       }
 
       // Convertir a JSON plano
-      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false, blankrows: true });
 
       if (rows.length === 0) {
         this._mostrarToast('El archivo no contiene filas con datos en la hoja Banco.', 'error');
@@ -2890,43 +3078,41 @@ export class BancoPreguntasComponent implements OnInit {
         let opE = getVal(['opcion_e', 'opcion e', 'E', 'e']);
         let respRaw = getVal(['respuesta_correcta', 'respuesta', 'RESPUESTA']).trim().toUpperCase();
         const difRaw = getVal(['dificultad', 'DIFICULTAD', 'nivel_dificultad']).trim().toUpperCase();
-        const pesoNum = Number(getVal(['peso', 'PESO'])) || 5;
-
-        if (!tipoRaw && !enunciadoRaw) return;
+        const hayDatos = [tipoRaw, grupoRaw, enunciadoRaw, opA, opB, opC, opD, opE, respRaw, difRaw, getVal(['parcial', 'PARCIAL']), getVal(['peso', 'PESO'])].some(valor => valor.trim() !== '');
+        if (!hayDatos) return;
 
         // Normalizar Tipo de Pregunta Oficial UNITEPC
-        let tipoNorm = 'SELECCION_MEJOR_RESPUESTA';
+        let tipoNorm = '';
         if (tipoClave.includes('VERDADERO_O_FALSO_SIMPLE') || tipoClave.includes('FALSO_VERDADERO') || tipoClave === 'VF_SIMPLE') {
           tipoNorm = 'VERDADERO_O_FALSO_SIMPLE';
         } else if (tipoClave.includes('VERDADERO_O_FALSO_COMPLEJAS') || tipoClave.includes('PREGUNTA_CON_CLAVE') || tipoClave === 'VF_COMPLEJAS') {
           tipoNorm = 'VERDADERO_O_FALSO_COMPLEJAS';
         } else if (tipoClave.includes('RESPUESTA_A_B_AMBAS_NINGUNA') || tipoClave.includes('RESPUESTA_COMPUESTA') || tipoClave.includes('PREMISAS')) {
           tipoNorm = 'RESPUESTA_PREMISAS_ABCD';
-        } else if (tipoClave.includes('ITEMS_AGRUPADOS') || tipoClave === 'PROBLEMA' || tipoClave === 'CASO_CLINICO') {
+        } else if (tipoClave.includes('ITEMS_AGRUPADOS') || ['PROBLEMA', 'CASO_CLINICO', 'CASO_CLINICO_TRONCO'].includes(tipoClave)) {
           tipoNorm = 'CASO_CLINICO_TRONCO';
         } else if (tipoClave.includes('SUBITEM') || tipoClave === 'SUBPROBLEMA') {
           tipoNorm = 'SUBITEM_CASO';
-        } else if (tipoClave === 'EMPAREJAMIENTO_AMPLIADO' || tipoClave === 'EMPAREJAMIENTO') {
+        } else if (['EMPAREJAMIENTO_AMPLIADO', 'EMPAREJAMIENTO_DE_CONCEPTOS', 'EMPAREJAMIENTO_TRONCO', 'EMPAREJAMIENTO'].includes(tipoClave)) {
           tipoNorm = 'EMPAREJAMIENTO_TRONCO';
         } else if (tipoClave.includes('OPCION_DE_EMPAREJAMIENTO') || tipoClave === 'OPCION_EMPAREJAMIENTO') {
           tipoNorm = 'OPCION_EMPAREJAMIENTO';
         } else if (tipoClave.includes('SELECCION') || tipoClave === 'SELECCION_SIMPLE' || tipoClave === 'SELECCION_UNICA') {
           tipoNorm = 'SELECCION_MEJOR_RESPUESTA';
+        } else {
+          tipoNorm = 'TIPO_NO_RECONOCIDO';
         }
 
         // Normalizar Respuesta Correcta (extraer letra principal A-E)
-        let respNorm = respRaw;
-        if (respNorm.startsWith('A')) respNorm = 'A';
-        else if (respNorm.startsWith('B')) respNorm = 'B';
-        else if (respNorm.startsWith('C')) respNorm = 'C';
-        else if (respNorm.startsWith('D')) respNorm = 'D';
-        else if (respNorm.startsWith('E')) respNorm = 'E';
-        else if (respNorm === 'VERDADERO') respNorm = 'A';
-        else if (respNorm === 'FALSO') respNorm = 'B';
+        let respNorm = '';
+        if (/^[A-E]$/.test(respRaw)) respNorm = respRaw;
+        else if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'VERDADERO') respNorm = 'A';
+        else if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'FALSO') respNorm = 'B';
 
         // Normalizar Dificultad (1, 2, 3)
         let difNorm: '1' | '2' | '3' = '2';
         if (difRaw === '1' || difRaw === 'FACIL' || difRaw === 'FÁCIL') difNorm = '1';
+        else if (difRaw === '2' || difRaw === 'MEDIO') difNorm = '2';
         else if (difRaw === '3' || difRaw === 'DIFICIL' || difRaw === 'DIFÍCIL') difNorm = '3';
 
         // Auto-completado inteligente de opciones según el tipo
@@ -2943,14 +3129,26 @@ export class BancoPreguntasComponent implements OnInit {
 
         // Validaciones Estrictas basadas en formato_banco_preguntas_asig_EF.xlsx
         const errores: string[] = [];
+        if (!tipoRaw) {
+          errores.push('Falta tipo de reactivo');
+        }
+        if (tipoNorm === 'TIPO_NO_RECONOCIDO') {
+          errores.push(`Tipo de reactivo no reconocido: ${tipoRaw}`);
+        }
         if (!enunciadoRaw && tipoNorm !== 'EMPAREJAMIENTO_TRONCO') {
           errores.push('Falta enunciado de la pregunta');
         }
 
         if (['CASO_CLINICO_TRONCO', 'SUBITEM_CASO', 'EMPAREJAMIENTO_TRONCO', 'OPCION_EMPAREJAMIENTO'].includes(tipoNorm)) {
           if (!grupoRaw) {
-            errores.push('Falta código de grupo identificador (ej. CASO-01 o EMP-01)');
+            errores.push('Esta pregunta necesita un código de grupo para relacionarla con su enunciado principal');
           }
+        }
+
+        if (grupoRaw.length > 100) errores.push('El grupo supera el máximo de 100 caracteres');
+        if (enunciadoRaw.length > 10000) errores.push('El enunciado supera el máximo de 10000 caracteres');
+        if ([opA, opB, opC, opD, opE].some(opcion => opcion.length > 2000)) {
+          errores.push('Una opción supera el máximo de 2000 caracteres');
         }
 
         if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE') {
@@ -2976,13 +3174,66 @@ export class BancoPreguntasComponent implements OnInit {
             errores.push('Respuesta debe ser una letra entre A y E');
           }
         } else if (tipoNorm === 'EMPAREJAMIENTO_TRONCO') {
-          if (!opA || !opB) {
-            errores.push('Emparejamiento requiere al menos 2 claves/conceptos en opciones A y B');
+          const activas = [opA, opB, opC, opD, opE].filter(Boolean).length;
+          if (activas < 2 || activas > 5) {
+            errores.push('El enunciado principal debe tener entre 2 y 5 opciones de referencia en las columnas A a E');
           }
+          if (respRaw) errores.push('Emparejamiento madre no debe llevar respuesta correcta');
         } else if (tipoNorm === 'OPCION_EMPAREJAMIENTO') {
           if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
             errores.push('Respuesta de emparejamiento debe ser la letra asignada (A-E)');
           }
+        }
+
+        if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && (opC || opD || opE)) {
+          errores.push('V/F simple solo permite opciones A y B');
+        }
+        if ((tipoNorm === 'VERDADERO_O_FALSO_COMPLEJAS' || tipoNorm === 'RESPUESTA_PREMISAS_ABCD') && opE) {
+          errores.push(`${tipoNorm} no permite opción E`);
+        }
+        if (tipoNorm === 'CASO_CLINICO_TRONCO' && (opA || opB || opC || opD || opE || respRaw)) {
+          errores.push('La fila madre de caso no debe llevar opciones ni respuesta correcta');
+        }
+        if (tipoNorm === 'OPCION_EMPAREJAMIENTO' && (opA || opB || opC || opD || opE)) {
+          errores.push('La opción de emparejamiento no debe llevar opciones A-E');
+        }
+        if (!['CASO_CLINICO_TRONCO', 'EMPAREJAMIENTO_TRONCO', 'OPCION_EMPAREJAMIENTO'].includes(tipoNorm)
+          && respNorm && !({ A: opA, B: opB, C: opC, D: opD, E: opE } as Record<string, string>)[respNorm]) {
+          errores.push(`La respuesta correcta ${respNorm} no tiene una opción activa`);
+        }
+
+        if (!['CASO_CLINICO_TRONCO', 'EMPAREJAMIENTO_TRONCO'].includes(tipoNorm) && !difRaw) {
+          errores.push('Dificultad obligatoria: use 1, 2 o 3');
+        } else if (['CASO_CLINICO_TRONCO', 'EMPAREJAMIENTO_TRONCO'].includes(tipoNorm) && difRaw) {
+          errores.push('Esta tipología madre no debe llevar dificultad');
+        } else if (difRaw && !['1', '2', '3', 'FACIL', 'FÁCIL', 'MEDIO', 'DIFICIL', 'DIFÍCIL'].includes(difRaw)) {
+          errores.push(`Dificultad inválida: ${difRaw}`);
+        }
+
+        const parcialRaw = getVal(['parcial', 'PARCIAL']).trim();
+        if (parcialRaw && !this.parcialExcelCoincide(parcialRaw)) {
+          errores.push(`Parcial '${parcialRaw}' no coincide con el parcial seleccionado`);
+        }
+
+        const pesoRaw = getVal(['peso', 'PESO']).trim();
+        const pesoNormalizado = pesoRaw.replace(',', '.');
+        const pesoParsed = pesoRaw ? Number(pesoNormalizado) : 1;
+        if (!Number.isFinite(pesoParsed) || pesoParsed <= 0 || pesoParsed > 100 || (pesoRaw && !/^\d+([.,]\d{1,2})?$/.test(pesoRaw))) {
+          errores.push('Peso inválido: debe ser mayor que 0, máximo 100 y con hasta 2 decimales');
+        }
+
+        const textos = [enunciadoRaw, opA, opB, opC, opD, opE];
+        if (textos.some(texto => this.textoExcelTieneError(texto))) {
+          errores.push('El enunciado u opciones contienen una fórmula inválida, error de Excel o delimitadores $ desbalanceados');
+        }
+        const huellasOpciones = textos.slice(1).filter(Boolean).map(texto => this.huellaTextoExcel(texto));
+        if (new Set(huellasOpciones).size !== huellasOpciones.length) {
+          errores.push('Las opciones no pueden repetir el mismo texto');
+        }
+
+        const huellaPregunta = this.huellaTextoExcel(`${tipoNorm}|${grupoRaw}|${enunciadoRaw}`);
+        if (preguntasParsed.some(pregunta => this.huellaTextoExcel(`${pregunta.tipo}|${pregunta.grupo}|${pregunta.enunciado}`) === huellaPregunta)) {
+          errores.push('La pregunta está duplicada: mismo tipo, grupo y enunciado');
         }
 
         const valido = errores.length === 0;
@@ -3000,12 +3251,14 @@ export class BancoPreguntasComponent implements OnInit {
           opciones: { A: opA, B: opB, C: opC, D: opD, E: opE },
           respuesta_correcta: respNorm,
           dificultad: difNorm,
-          peso: pesoNum,
+          peso: pesoParsed,
           observaciones: valido ? 'OK' : errores.join(', '),
           valido,
           errores
+          });
         });
-      });
+
+      this.validarEstructuraAgrupada(preguntasParsed);
 
       this.preguntasCargadas.set(preguntasParsed);
       if (this.esBancoTotalmenteValido()) {
@@ -3022,6 +3275,71 @@ export class BancoPreguntasComponent implements OnInit {
   // ============================================================
   // DESCARGA DE PLANTILLA OFICIAL ENRIQUECIDA (4 HOJAS CON VALIDACIONES Y FÓRMULAS)
   // ============================================================
+  private normalizarEncabezadoExcel(valor: string): string {
+    return (valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  }
+
+  private aliasColumnaExcel(valor: string): string | null {
+    switch (this.normalizarEncabezadoExcel(valor)) {
+      case 'tipo': case 'tipo_reactivo': case 'tipo_de_reactivo': return 'tipo';
+      case 'grupo': case 'grupo_contexto': return 'grupo';
+      case 'enunciado': case 'pregunta': return 'enunciado';
+      case 'opcion_a': case 'opciona': case 'a': return 'opcion_a';
+      case 'opcion_b': case 'opcionb': case 'b': return 'opcion_b';
+      case 'opcion_c': case 'opcionc': case 'c': return 'opcion_c';
+      case 'opcion_d': case 'opciond': case 'd': return 'opcion_d';
+      case 'opcion_e': case 'opcione': case 'e': return 'opcion_e';
+      case 'respuesta': case 'respuesta_correcta': case 'clave': case 'clave_respuesta': return 'respuesta_correcta';
+      case 'dificultad': case 'nivel': case 'nivel_dificultad': return 'dificultad';
+      case 'parcial': case 'tipo_parcial': return 'parcial';
+      case 'peso': case 'peso_puntos': case 'puntaje': return 'peso';
+      default: return null;
+    }
+  }
+
+  private validarEncabezadosExcel(worksheet: XLSX.WorkSheet): string[] {
+    const errores: string[] = [];
+    const rango = worksheet['!ref'];
+    if (!rango) return ['La hoja Banco no tiene un rango de datos válido.'];
+    const filas = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', raw: false }) as unknown[][];
+    const encabezado = filas[0] || [];
+    const columnas = new Set<string>();
+    encabezado.forEach(valor => {
+      const canonico = this.aliasColumnaExcel(String(valor ?? ''));
+      if (!canonico) return;
+      if (columnas.has(canonico)) errores.push(`Encabezado duplicado: ${String(valor)}`);
+      columnas.add(canonico);
+    });
+    ['tipo', 'enunciado', 'opcion_a', 'opcion_b', 'opcion_c', 'opcion_d', 'opcion_e', 'respuesta_correcta', 'dificultad']
+      .filter(columna => !columnas.has(columna))
+      .forEach(columna => errores.push(`Falta la columna oficial obligatoria: ${columna}`));
+    return errores;
+  }
+
+  private textoExcelTieneError(valor: string): boolean {
+    if (!valor) return false;
+    const mayusculas = valor.toUpperCase();
+    return ['#REF!', '#DIV/0!', '#VALUE!', '#NAME?', '#N/A'].some(error => mayusculas.includes(error))
+      || (valor.match(/\$/g) || []).length % 2 !== 0
+      || [...valor].some(caracter => /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(caracter));
+  }
+
+  private huellaTextoExcel(valor: string): string {
+    return (valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  private parcialExcelCoincide(valor: string): boolean {
+    const parcial = this.normalizarEncabezadoExcel(valor).replace(/_/g, '');
+    switch (this.parcialActivo()) {
+      case '1er Parcial': return ['1p', '1erparcial', 'primerparcial'].includes(parcial);
+      case '2do Parcial': return ['2p', '2doparcial', 'segundoparcial'].includes(parcial);
+      case 'Examen Final': return ['ef', 'final', 'examenfinal'].includes(parcial);
+      case '2da Instancia': return ['2i', '2dainstancia', 'segundainstancia'].includes(parcial);
+      default: return false;
+    }
+  }
+
   public descargarExcelBaseMacro(): void {
     const filename = 'formato_banco_preguntas_asig_EF.xlsx';
     const asigNombre = this.asignaturaNombreCompleto();
@@ -3657,6 +3975,49 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
         this.cargandoBanco.set(false);
         const msg = err?.error?.error || err?.error?.message || err?.message || 'No se pudo registrar el banco.';
         this._mostrarToast(msg, 'error');
+      }
+    });
+  }
+
+  public abrirEliminarBancoPersistido(): void {
+    if (!this.rolPuedeEliminarBanco()) {
+      this._mostrarToast('El banco solo se puede eliminar cuando el rol está PROGRAMADO o VALIDADO.', 'error');
+      return;
+    }
+    this.confirmacionEliminarBancoPersistido = '';
+    this.dialogEliminarBancoPersistido.set(true);
+  }
+
+  public cerrarEliminarBancoPersistido(): void {
+    if (this.eliminandoBancoPersistido()) return;
+    this.dialogEliminarBancoPersistido.set(false);
+    this.confirmacionEliminarBancoPersistido = '';
+  }
+
+  public confirmarEliminarBancoPersistido(): void {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.rolPuedeEliminarBanco() || this.confirmacionEliminarBancoPersistido.trim().toUpperCase() !== 'ELIMINAR' || this.eliminandoBancoPersistido()) return;
+
+    this.eliminandoBancoPersistido.set(true);
+    this._bancoService.eliminarPorRol(rol.id, 'ELIMINAR', this.docenteSesion.nombre).subscribe({
+      next: () => {
+        this.bancoPersistido.set(null);
+        this.archivoExcelSeleccionado.set(null);
+        this.nombreArchivoCargado.set(null);
+        this.preguntasCargadas.set([]);
+        this.pdfPrevisualizadoYConforme.set(false);
+        this.eliminandoBancoPersistido.set(false);
+        this.dialogEliminarBancoPersistido.set(false);
+        this.confirmacionEliminarBancoPersistido = '';
+        const sede = this.sedeSeleccionada();
+        const carrera = this.carreraSeleccionada();
+        if (sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
+        this._mostrarToast('Banco de preguntas eliminado. El rol volvió a PROGRAMADO.');
+      },
+      error: err => {
+        this.eliminandoBancoPersistido.set(false);
+        const detalle = err?.error?.message || err?.error?.error || 'No se pudo eliminar el banco de preguntas.';
+        this._mostrarToast(detalle, 'error');
       }
     });
   }

@@ -165,6 +165,28 @@ public class RolExamenService {
     }
 
     @Transactional
+    public RolExamen revertirPorEliminacionBanco(String id, String usuario) {
+        RolExamen rol = rolExamenRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
+        EstadoFlujo origen = rol.getEstadoFlujo();
+        if (origen != EstadoFlujo.PROGRAMADO && origen != EstadoFlujo.VALIDADO) {
+            throw new RuntimeException("El banco solo se puede eliminar cuando el rol está PROGRAMADO o VALIDADO; estado actual: " + origen.getValor());
+        }
+
+        if (origen == EstadoFlujo.VALIDADO) {
+            rol.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
+            rol.setHashEncriptacion(null);
+            rol.setFechaValidacion(null);
+        }
+        RolExamen guardado = rolExamenRepository.save(rol);
+        registrarAuditoria(guardado, origen, EstadoFlujo.PROGRAMADO,
+                "ELIMINACION_BANCO_PREGUNTAS",
+                usuario != null && !usuario.isBlank() ? usuario : "Sistema",
+                "127.0.0.1");
+        return guardado;
+    }
+
+    @Transactional
     public RolExamenResponseDto transicionarEstado(String id, TransicionEstadoRequestDto dto) {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));

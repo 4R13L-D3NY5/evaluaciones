@@ -44,4 +44,14 @@ public class BancoPreguntasController {
         return ResponseEntity.ok(bancoPreguntasService.cargarDesdeExcelPorParametros(
                 materiaCodigo, grupo, tipoParcial, file, docenteAprobador));
     }
+
+    @DeleteMapping("/{rolExamenId}")
+    @Operation(summary = "Eliminar el banco de preguntas cargado para un rol")
+    public ResponseEntity<Void> eliminarPorRol(
+            @PathVariable String rolExamenId,
+            @RequestParam("confirmacion") String confirmacion,
+            @RequestParam(value = "usuario", required = false) String usuario) {
+        bancoPreguntasService.eliminarPorRolExamenId(rolExamenId, confirmacion, usuario);
+        return ResponseEntity.noContent().build();
+    }
 }

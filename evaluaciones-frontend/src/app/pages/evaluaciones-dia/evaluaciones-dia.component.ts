@@ -1,7 +1,8 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
@@ -60,6 +61,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   nombreArchivoExcel?: string;
   hashEncriptacion?: string;
   variantesGeneradas?: number;
+  bancoPreguntasCargado?: boolean;
   fueRestablecido?: boolean;
   estadoPrevioRestablecimiento?: EtapaEvaluacion;
   motivoRestablecimiento?: string;
@@ -314,6 +316,15 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                       <div class="text-[10px] text-muted-foreground font-medium">
                         {{ carreraSeleccionada()?.careerName }} · Sem. {{ item.semestre }}° · <strong>{{ item.grupo }}</strong>
                       </div>
+                      @if (bancoPreguntasCargado(item)) {
+                        <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
+                          <i class="pi pi-check-circle text-[9px]"></i> Banco cargado
+                        </span>
+                      } @else {
+                        <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Este examen todavía no tiene un banco de preguntas cargado">
+                          <i class="pi pi-exclamation-circle text-[9px]"></i> Sin banco
+                        </span>
+                      }
                     </td>
 
                     <!-- Docente -->
@@ -478,6 +489,22 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/notas:flex flex-col items-center z-50 pointer-events-none">
                               <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Notas OMR /30 y /100</span>
                               <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
+                        @if (puedeEliminarBanco(item)) {
+                          <div class="relative group/eliminarBanco">
+                            <button
+                              (click)="abrirEliminarBanco(item)"
+                              title="Eliminar banco de preguntas"
+                              aria-label="Eliminar banco de preguntas"
+                              class="h-7 w-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-trash text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/eliminarBanco:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-rose-950 text-rose-100 text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Eliminar banco (escribir ELIMINAR)</span>
+                              <div class="w-2 h-2 bg-rose-950 rotate-45 -mt-1"></div>
                             </div>
                           </div>
                         }
@@ -1543,6 +1570,39 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
         </div>
       }
 
+      <!-- MODAL: ELIMINAR BANCO DE PREGUNTAS -->
+      @if (dialogEliminarBanco()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-rose-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <div class="h-9 w-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center"><i class="pi pi-trash"></i></div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Eliminar banco de preguntas</h3>
+                  <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaParaEliminarBanco()?.codigo }} · {{ evaluacionSeleccionadaParaEliminarBanco()?.materia }}</p>
+                </div>
+              </div>
+              <button (click)="cerrarEliminarBanco()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+              <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-900 leading-relaxed">
+                Esta acción eliminará el banco cargado y sus reactivos asociados. El examen volverá a <strong>Programado</strong> para permitir una nueva carga.
+              </div>
+              <label class="block space-y-1.5">
+                <span class="font-black text-foreground">Escribe <code class="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">ELIMINAR</code> para confirmar</span>
+                <input [(ngModel)]="confirmacionEliminarBanco" autocomplete="off" class="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-xs font-black uppercase tracking-wider text-foreground outline-none focus:border-rose-500" placeholder="ELIMINAR">
+              </label>
+            </div>
+            <div class="p-4 border-t border-border flex justify-end gap-2">
+              <button (click)="cerrarEliminarBanco()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
+              <button (click)="confirmarEliminarBanco()" [disabled]="confirmacionEliminarBanco.trim().toUpperCase() !== 'ELIMINAR' || eliminandoBanco()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50">
+                <i class="pi" [class.pi-spin]="eliminandoBanco()" [class.pi-spinner]="eliminandoBanco()" [class.pi-trash]="!eliminandoBanco()"></i> {{ eliminandoBanco() ? 'Eliminando...' : 'Eliminar banco' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -1686,6 +1746,13 @@ export class EvaluacionesDiaComponent implements OnInit {
   public evaluacionSeleccionadaNotas = signal<EvaluacionItemUI | null>(null);
   public notasOmr = signal<CalificacionOmrResponse[]>([]);
   public cargandoNotasOmr = signal<boolean>(false);
+
+  // Indicador y eliminación protegida del banco cargado por evaluación.
+  public estadoBancos = signal<Record<string, boolean>>({});
+  public dialogEliminarBanco = signal<boolean>(false);
+  public evaluacionSeleccionadaParaEliminarBanco = signal<EvaluacionItemUI | null>(null);
+  public confirmacionEliminarBanco = '';
+  public eliminandoBanco = signal<boolean>(false);
 
   // Lista viva de evaluaciones
   public evaluaciones = signal<EvaluacionItemUI[]>([]);
@@ -1841,6 +1908,7 @@ export class EvaluacionesDiaComponent implements OnInit {
         const uiList: EvaluacionItemUI[] = roles.map(rol => this._mapearRolResponseA_UI(rol));
         this.evaluaciones.set(uiList);
         this._cargarEstadoMarcas(uiList);
+        this._cargarEstadoBancos(uiList);
         this.cargando.set(false);
       },
       error: err => {
@@ -1928,6 +1996,30 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public marcaImpresa(item: EvaluacionItemUI): boolean {
     return this.estadoMarcas()[item.id] === 'IMPRESO';
+  }
+
+  public bancoPreguntasCargado(item: EvaluacionItemUI): boolean {
+    return item.bancoPreguntasCargado === true || this.estadoBancos()[item.id] === true;
+  }
+
+  public puedeEliminarBanco(item: EvaluacionItemUI): boolean {
+    return this.bancoPreguntasCargado(item) && ['Programado', 'Validado'].includes(item.etapa);
+  }
+
+  private _cargarEstadoBancos(items: EvaluacionItemUI[]): void {
+    this.estadoBancos.set({});
+    if (items.length === 0) return;
+
+    const consultas = items.map(item => this._bancoService.obtenerPorRol(item.id).pipe(
+      catchError(() => of(null))
+    ));
+    forkJoin(consultas).subscribe(bancos => {
+      const estados: Record<string, boolean> = {};
+      bancos.forEach((banco, indice) => {
+        estados[items[indice].id] = banco !== null;
+      });
+      this.estadoBancos.set(estados);
+    });
   }
 
   private _cargarEstadoMarcas(items: EvaluacionItemUI[]): void {
@@ -2801,6 +2893,46 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public cerrarBitacora(): void {
     this.evaluacionSeleccionadaParaBitacora.set(null);
+  }
+
+  public abrirEliminarBanco(item: EvaluacionItemUI): void {
+    if (!this.puedeEliminarBanco(item)) {
+      this._mostrarToast('El banco solo se puede eliminar antes de Generado.', 'error');
+      return;
+    }
+    this.evaluacionSeleccionadaParaEliminarBanco.set(item);
+    this.confirmacionEliminarBanco = '';
+    this.dialogEliminarBanco.set(true);
+  }
+
+  public cerrarEliminarBanco(): void {
+    if (this.eliminandoBanco()) return;
+    this.dialogEliminarBanco.set(false);
+    this.evaluacionSeleccionadaParaEliminarBanco.set(null);
+    this.confirmacionEliminarBanco = '';
+  }
+
+  public confirmarEliminarBanco(): void {
+    const item = this.evaluacionSeleccionadaParaEliminarBanco();
+    if (!item || !this.puedeEliminarBanco(item) || this.confirmacionEliminarBanco.trim().toUpperCase() !== 'ELIMINAR' || this.eliminandoBanco()) return;
+
+    this.eliminandoBanco.set(true);
+    this._bancoService.eliminarPorRol(item.id, 'ELIMINAR', 'Sistema').subscribe({
+      next: () => {
+        this.estadoBancos.update(estados => ({ ...estados, [item.id]: false }));
+        this.eliminandoBanco.set(false);
+        this.dialogEliminarBanco.set(false);
+        this.evaluacionSeleccionadaParaEliminarBanco.set(null);
+        this.confirmacionEliminarBanco = '';
+        this._mostrarToast(`${item.codigo}: banco de preguntas eliminado. El examen volvió a Programado.`);
+        this._cargarEvaluaciones();
+      },
+      error: err => {
+        this.eliminandoBanco.set(false);
+        const detalle = err?.error?.message || err?.error?.error || 'No se pudo eliminar el banco de preguntas.';
+        this._mostrarToast(detalle, 'error');
+      }
+    });
   }
 
   public solicitarReestablecimiento(item: EvaluacionItemUI): void {

@@ -72,4 +72,15 @@ export class BancoPreguntasService {
       })
     );
   }
+
+  public eliminarPorRol(rolExamenId: string, confirmacion: string, usuario?: string): Observable<void> {
+    let params = { confirmacion } as Record<string, string>;
+    if (usuario) params['usuario'] = usuario;
+    return this._http.delete<void>(`${this._baseUrl}/${rolExamenId}`, { params }).pipe(
+      catchError(err => {
+        console.error(`[BancoPreguntasService] Error al eliminar banco del rol ${rolExamenId}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
 }

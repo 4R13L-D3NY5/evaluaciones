@@ -22,7 +22,7 @@ La cartilla OMR es un documento separado del examen. El cuadernillo no incluye c
 - La previsualización se construye como PDF Oficio, no como maqueta HTML.
 - Siempre usa una sola columna, Times New Roman 11 pt, interlineado 1 em, separación de preguntas 1,5 em, sangría de incisos de 1 em y márgenes de 2 cm.
 - No debe contener nombres, códigos ni otros datos ficticios de estudiantes. El pie queda reservado para `NOMBRE COMPLETO` y `CÓDIGO`, sin valores.
-- La aprobación del banco solo se habilita después de generar y revisar este PDF.
+- La aprobación del banco solo se habilita después de generar y recorrer este PDF real hasta su última página; si el documento aún no se ha visualizado por completo, la interfaz debe mostrar el aviso y mantener bloqueado el registro.
 
 ## 2. Papel, márgenes y tipografía
 
@@ -140,6 +140,7 @@ Debe conservarse en la base de datos:
 | 2026-08-29 | Ficha de cabecera por estudiante con datos oficiales y saltos explícitos en las instrucciones. Las reglas iniciales de salto después de `___` e incisos A/B de V/F simple fueron reemplazadas por la configuración vigente. |
 | 2026-08-29 | Recuperación de cabecera institucional, separadores superior/inferior por sección, instrucciones en mayúsculas, numeración con `___` en negrita y tarjetas para casos/emparejamientos en el PDF oficial y la previsualización. |
 | 2026-08-29 | Previsualización PDF real del banco, sin datos ficticios, una sola columna y normalización de etiquetas descriptivas oficiales del Excel. |
+| 2026-08-30 | La aprobación de la previsualización queda bloqueada hasta recorrer todas las páginas del PDF real; se agrega un mensaje explícito y se aclara que las observaciones de opciones se corrigen en el Excel oficial. |
 | 2026-08-29 | Un PDF consolidado por rol, un examen por estudiante, inicio en página impar, pie con identidad y paginación reiniciada, ratio 5 y asignación aleatoria. |
 | 2026-08-28 | Times New Roman 11 pt, leading 1 em, separación 1,5 em, incisos con sangría, tres guiones por pregunta y eliminación de cartilla/vista previa. |
 # Nota operativa de cartilla OMR
