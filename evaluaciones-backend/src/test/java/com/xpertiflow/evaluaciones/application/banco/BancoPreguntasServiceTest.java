@@ -102,6 +102,22 @@ class BancoPreguntasServiceTest {
     }
 
     @Test
+    void cargaValidaAceptaReactivosPorEncimaDeLasCuotasMinimas() throws Exception {
+        MockMultipartFile archivo = crearExcel(61);
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(
+                rol.getId(), archivo, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isTrue();
+        assertThat(respuesta.getTotalReactivos()).isEqualTo(61);
+        assertThat(respuesta.getFacilesCount()).isEqualTo(15);
+        assertThat(respuesta.getMediasCount()).isEqualTo(30);
+        assertThat(respuesta.getDificilesCount()).isEqualTo(16);
+        verify(reactivoRepository, times(61)).save(any(Reactivo.class));
+    }
+
+    @Test
     void cargaInvalidaNoPersisteDatosNiCambiaElRol() throws Exception {
         MockMultipartFile archivo = crearExcel(59);
         when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
@@ -110,7 +126,7 @@ class BancoPreguntasServiceTest {
                 rol.getId(), archivo, "Docente Oficial");
 
         assertThat(respuesta.isExito()).isFalse();
-        assertThat(respuesta.getErroresValidacion()).anyMatch(error -> error.contains("Total de reactivos"));
+        assertThat(respuesta.getErroresValidacion()).anyMatch(error -> error.contains("mínimo 60 reactivos"));
         verify(bancoRepository, never()).save(any());
         verify(reactivoRepository, never()).save(any());
         verify(rolExamenService, never()).validarPorBanco(anyString(), anyString(), anyString());

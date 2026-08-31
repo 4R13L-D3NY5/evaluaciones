@@ -6,6 +6,7 @@ import com.xpertiflow.evaluaciones.application.banco.BancoPreguntasService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,6 +26,7 @@ public class BancoPreguntasController {
     }
 
     @PostMapping("/{rolExamenId}/upload")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
     @Operation(summary = "Cargar y validar banco de preguntas Excel por rol de examen")
     public ResponseEntity<CargaBancoResponseDto> uploadPorRol(
             @PathVariable String rolExamenId,
@@ -34,6 +36,7 @@ public class BancoPreguntasController {
     }
 
     @PostMapping("/upload")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
     @Operation(summary = "Cargar y validar banco de preguntas Excel por materia/grupo/parcial")
     public ResponseEntity<CargaBancoResponseDto> uploadPorParametros(
             @RequestParam("file") MultipartFile file,
@@ -46,6 +49,7 @@ public class BancoPreguntasController {
     }
 
     @DeleteMapping("/{rolExamenId}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Eliminar el banco de preguntas cargado para un rol")
     public ResponseEntity<Void> eliminarPorRol(
             @PathVariable String rolExamenId,

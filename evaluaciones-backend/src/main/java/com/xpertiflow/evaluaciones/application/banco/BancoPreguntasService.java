@@ -678,17 +678,17 @@ public class BancoPreguntasService {
     }
 
     private void validarCuotas(int faciles, int medias, int dificiles, int total, List<String> errores) {
-        if (total != TOTAL_REQUERIDO) {
-            errores.add("Total de reactivos debe ser " + TOTAL_REQUERIDO + ", se encontraron " + total);
+        if (total < TOTAL_REQUERIDO) {
+            errores.add("El banco debe tener como mínimo " + TOTAL_REQUERIDO + " reactivos; se encontraron " + total);
         }
-        if (faciles != CUOTA_FACILES) {
-            errores.add("Cuota de faciles debe ser " + CUOTA_FACILES + ", se encontraron " + faciles);
+        if (faciles < CUOTA_FACILES) {
+            errores.add("Debe haber como mínimo " + CUOTA_FACILES + " preguntas fáciles; se encontraron " + faciles);
         }
-        if (medias != CUOTA_MEDIAS) {
-            errores.add("Cuota de medias debe ser " + CUOTA_MEDIAS + ", se encontraron " + medias);
+        if (medias < CUOTA_MEDIAS) {
+            errores.add("Debe haber como mínimo " + CUOTA_MEDIAS + " preguntas medias; se encontraron " + medias);
         }
-        if (dificiles != CUOTA_DIFICILES) {
-            errores.add("Cuota de dificiles debe ser " + CUOTA_DIFICILES + ", se encontraron " + dificiles);
+        if (dificiles < CUOTA_DIFICILES) {
+            errores.add("Debe haber como mínimo " + CUOTA_DIFICILES + " preguntas difíciles; se encontraron " + dificiles);
         }
     }
 

@@ -26,4 +26,10 @@ public interface RolExamenRepository extends JpaRepository<RolExamen, String> {
 
     Optional<RolExamen> findFirstByMateriaCodigoAndGrupoAndTipoParcialOrderByCreadoEnDesc(
             String materiaCodigo, String grupo, com.xpertiflow.evaluaciones.domain.enums.TipoParcial tipoParcial);
+
+    Optional<RolExamen> findTopBySeaGroupIdAndTipoParcialOrderByVersionDesc(
+            String seaGroupId, com.xpertiflow.evaluaciones.domain.enums.TipoParcial tipoParcial);
+
+    Optional<RolExamen> findTopByMateriaCodigoAndGrupoAndTipoParcialOrderByVersionDesc(
+            String materiaCodigo, String grupo, com.xpertiflow.evaluaciones.domain.enums.TipoParcial tipoParcial);
 }

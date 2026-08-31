@@ -20,8 +20,8 @@ TYPST_BIN = os.getenv("TYPST_BIN", "")
 
 # Semillas fijas para reproducibilidad de variantes en el MVP.
 SEED_POR_VARIANTE = {"A": 100, "B": 153, "C": 206, "D": 259, "E": 312}
-# Modo temporal de pruebas: una variante por estudiante.
-RATIO_ESTUDIANTES_POR_VARIANTE = 1
+# Cantidad institucional por defecto de estudiantes que comparte una variante.
+RATIO_ESTUDIANTES_POR_VARIANTE = 5
 
 # Cuotas del algoritmo 7F/16M/7D.
 CUOTA_FACILES = 7

@@ -6,6 +6,7 @@ import com.xpertiflow.evaluaciones.application.CartillaOmrService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +28,7 @@ public class CartillaOmrController {
     }
 
     @PostMapping("/generar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Generar un lote de cartillas OMR preimpresas")
     public ResponseEntity<LoteCartillasOmrResponseDto> generar(
             @PathVariable String rolExamenId,
@@ -36,6 +38,7 @@ public class CartillaOmrController {
     }
 
     @PostMapping("/lotes/{loteId}/marcar-impreso")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Confirmar la impresión de todo un lote de cartillas")
     public ResponseEntity<LoteCartillasOmrResponseDto> marcarImpreso(
             @PathVariable String rolExamenId,

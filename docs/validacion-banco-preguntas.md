@@ -68,9 +68,9 @@ No se permite que dos opciones de una misma fila tengan el mismo texto normaliza
 
 ## 6. Cuotas oficiales
 
-- El banco debe contener exactamente 60 reactivos.
-- Debe contener exactamente 15 fáciles, 30 medios y 15 difíciles.
-- El frontend y el backend deben usar igualdad exacta, no `mayor o igual`.
+- El banco debe contener como mínimo 60 reactivos; puede contener más.
+- Debe contener como mínimo 15 fáciles, 30 medios y 15 difíciles; cada dificultad puede exceder su mínimo.
+- El frontend y el backend deben usar comparación `mayor o igual` para las cuotas y el total mínimo.
 - Ninguna fila con error permite registrar el banco.
 
 ## 7. Persistencia y seguridad
@@ -94,11 +94,11 @@ En **Lista de Evaluaciones** y en **Gestión y Validación de Evaluaciones** se 
 - Dificultades `1`, `2`, `3`, vacía, decimal y texto inválido.
 - Pesos positivos, cero, negativos, texto y más de dos decimales.
 - Enunciados duplicados, fórmulas con error y `$` sin cerrar.
-- Totales 59, 60 y 61; cuotas 14/31/15 y 15/30/15.
+- Totales 59, 60 y 61; cuotas 14/31/15 (inválido por faltar fáciles) y 15/30/15 (válido). Un total de 61 o más es válido si también cumple todos los mínimos.
 - Rol en cada estado del flujo y segundo registro del mismo archivo.
 - Indicador correcto con banco existente/ausente en ambas pantallas y eliminación rechazada sin confirmación `ELIMINAR`.
 - Eliminación bloqueada desde `GENERADO` en adelante y eliminación correcta de banco/reactivos en `VALIDADO`.
 
 ## 9. Estado de implementación
 
-En la primera aplicación de este documento se endurecen archivo, encabezados, filas parciales, respuestas de un solo inciso, opciones, duplicados, fórmulas con error, dificultad, peso, cuotas exactas y consistencia frontend-backend. Quedan como siguiente bloque la validación avanzada de estructura de grupos/casos, control de duplicados de archivo por hash y pruebas de seguridad del contenedor Excel.
+En la primera aplicación de este documento se endurecen archivo, encabezados, filas parciales, respuestas de un solo inciso, opciones, duplicados, fórmulas con error, dificultad, peso, cuotas mínimas y consistencia frontend-backend. Quedan como siguiente bloque la validación avanzada de estructura de grupos/casos, control de duplicados de archivo por hash y pruebas de seguridad del contenedor Excel.

@@ -88,9 +88,10 @@ export class GeneracionTypstService {
     maxIntentos = 60
   ): Observable<GeneracionTypstResultado> {
     return interval(intervalMs).pipe(
+      take(maxIntentos),
       switchMap(() => this.consultarResultado(jobId)),
       filter(resultado => resultado.estado === 'COMPLETADO' || resultado.estado === 'ERROR'),
-      take(maxIntentos),
+      take(1),
       catchError(err => throwError(() => err))
     );
   }

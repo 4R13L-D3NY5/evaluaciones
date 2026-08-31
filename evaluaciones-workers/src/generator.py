@@ -21,6 +21,7 @@ TIPOLOGIAS_ORDEN = [
     "VERDADERO_O_FALSO_COMPLEJAS",
     "SUBITEM_CASO",
     "OPCION_EMPAREJAMIENTO",
+    "EMPAREJAMIENTO_TRONCO",
 ]
 
 INSTRUCCIONES_POR_TIPO = {
@@ -269,18 +270,19 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]]) -> str:
         num = idx + 1
         tipo = p.get("tipo_reactivo", "")
 
-        if tipo in INSTRUCCIONES_POR_TIPO and current_section != tipo:
-            current_section = tipo
-            titulo, instruccion = INSTRUCCIONES_POR_TIPO[tipo]
+        seccion_tipo = "OPCION_EMPAREJAMIENTO" if tipo in {"EMPAREJAMIENTO_TRONCO", "OPCION_EMPAREJAMIENTO"} else tipo
+        if seccion_tipo in INSTRUCCIONES_POR_TIPO and current_section != seccion_tipo:
+            current_section = seccion_tipo
+            titulo, instruccion = INSTRUCCIONES_POR_TIPO[seccion_tipo]
             typ_code += _seccion_typst(titulo, instruccion)
-            if tipo == "SUBITEM_CASO":
+            if seccion_tipo == "SUBITEM_CASO":
                 typ_code += '''
 #rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
   [#text(weight: "bold")[CASO CLINICO O PROBLEMA:]  Resuelva el caso planteado y responda cada pregunta del grupo.]\
 ]
 #v(1em)
 '''
-            elif tipo == "OPCION_EMPAREJAMIENTO":
+            elif seccion_tipo == "OPCION_EMPAREJAMIENTO" and tipo == "OPCION_EMPAREJAMIENTO":
                 typ_code += '''
 #rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
   [#text(weight: "bold")[RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:]]\\
@@ -292,6 +294,20 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]]) -> str:
 ]
 #v(1em)
 '''
+
+        if tipo == "EMPAREJAMIENTO_TRONCO":
+            opciones_referencia = parsear_opciones(p.get("opciones_json", "[]"))
+            lineas_tarjeta = [str(p.get("enunciado") or "RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:")]
+            lineas_tarjeta.extend(f"{letra}) {texto}" for letra, texto, _ in opciones_referencia)
+            contenido_tarjeta = "\\\\\n  ".join(
+                f'[#text(weight: "regular")[{_typst_content(linea)}]]' for linea in lineas_tarjeta
+            )
+            typ_code += f'''\n#rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
+  {contenido_tarjeta}
+]
+#v(1em)
+'''
+            continue
 
         opciones = [] if tipo == "VERDADERO_O_FALSO_SIMPLE" else parsear_opciones(p.get("opciones_json", "[]"))
         enunciado = _typst_content(str(p.get("enunciado", "")))
@@ -414,6 +430,23 @@ def generar_variante(
     # Barajar opciones de cada pregunta de forma determinística.
     preguntas = [_barajar_opciones_pregunta(p, seed + idx) for idx, p in enumerate(preguntas)]
 
+    # Contrato seguro para el examen web: conserva exactamente el orden y los
+    # incisos que se imprimen, pero elimina cualquier marca de respuesta correcta.
+    contenido_virtual = []
+    for p in preguntas:
+        opciones = [
+            {"letra": letra, "texto": texto}
+            for letra, texto, _ in parsear_opciones(p.get("opciones_json", "[]"))
+        ]
+        contenido_virtual.append({
+            "id": p["id"],
+            "numeroOrden": p.get("numero_orden"),
+            "tipoReactivo": p.get("tipo_reactivo"),
+            "grupoContexto": p.get("grupo_contexto"),
+            "enunciado": p.get("enunciado", ""),
+            "opciones": opciones,
+        })
+
     estudiante_default = {
         "codigo_estudiante": "",
         "nombres": "",
@@ -456,6 +489,7 @@ def generar_variante(
         "semilla": seed,
         "patronClavesJson": json.dumps(patron, ensure_ascii=False),
         "ordenReactivosIdsJson": json.dumps(orden_ids, ensure_ascii=False),
+        "contenidoVirtualJson": json.dumps(contenido_virtual, ensure_ascii=False),
         "archivoPdfPath": pdf_path,
         "archivoTypstPath": typ_path,
         "_preguntas": preguntas,

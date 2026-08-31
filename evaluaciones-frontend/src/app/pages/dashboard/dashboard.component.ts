@@ -136,7 +136,7 @@ interface EstadoMetrica {
             <div>
               <span class="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">{{ totalExamenesHoy() }}</span>
               <span class="text-[11px] font-bold text-emerald-700/80 dark:text-emerald-300/80 block mt-0.5">
-                {{ totalConCartillaHoy() }} Con Cartilla · {{ totalSinCartillaHoy() }} Manual
+                {{ totalConCartillaHoy() }} Con Cartilla · {{ totalSinCartillaHoy() }} Sin Cartilla
               </span>
             </div>
             <span class="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -435,7 +435,7 @@ interface EstadoMetrica {
                       {{ item.hora }}
                     </span>
                     <span class="text-[9px] font-bold text-muted-foreground block mt-0.5">
-                      {{ item.conCartilla ? 'OMR Óptico' : 'Manual' }}
+                      {{ item.conCartilla ? 'Con Cartilla' : 'Sin Cartilla' }}
                     </span>
                   </div>
 

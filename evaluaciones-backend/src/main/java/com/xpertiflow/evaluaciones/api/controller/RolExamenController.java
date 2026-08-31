@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,13 +40,15 @@ public class RolExamenController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Crear un nuevo rol de examen")
     public ResponseEntity<RolExamenResponseDto> crear(@Valid @RequestBody RolExamenRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(rolExamenService.crear(dto));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar un rol de examen programado")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Actualizar un rol de examen programado o validado")
     public ResponseEntity<RolExamenResponseDto> actualizar(
             @PathVariable String id,
             @Valid @RequestBody RolExamenRequestDto dto) {
@@ -53,13 +56,15 @@ public class RolExamenController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar un rol de examen programado")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Eliminar un rol de examen programado o validado")
     public ResponseEntity<Void> eliminar(@PathVariable String id) {
         rolExamenService.eliminar(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/transicion")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Transicionar el estado de un rol de examen")
     public ResponseEntity<RolExamenResponseDto> transicionarEstado(
             @PathVariable String id,
@@ -68,6 +73,7 @@ public class RolExamenController {
     }
 
     @PostMapping("/{id}/restablecer")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Restablecer un rol posterior a VALIDADO a VALIDADO")
     public ResponseEntity<RolExamenResponseDto> restablecerAValidado(
             @PathVariable String id,

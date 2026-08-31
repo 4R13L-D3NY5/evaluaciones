@@ -1,7 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { UnitepcGatewayService } from '../../../core/services/unitepc-gateway.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { AppRole } from '../../../core/models/auth.models';
 
 export interface MenuItem {
   label: string;
@@ -9,6 +11,7 @@ export interface MenuItem {
   icon: string;
   badge?: string;
   description: string;
+  roles: AppRole[];
 }
 
 @Component({
@@ -27,7 +30,7 @@ export interface MenuItem {
           </span>
           
           <nav class="space-y-1">
-            @for (item of menuItems; track item.route) {
+            @for (item of visibleMenuItems(); track item.route) {
               <a 
                 [routerLink]="item.route" 
                 routerLinkActive="bg-primary/10 text-primary border-primary font-bold shadow-2xs"
@@ -87,89 +90,125 @@ export interface MenuItem {
       </div>
 
       <!-- Pie de Navegación: Usuario y Sede -->
-      <div class="border-t border-border pt-4 px-2">
-        <div class="flex items-center gap-3">
-          <div class="h-9 w-9 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-primary font-black text-xs">
-            AD
-          </div>
-          <div class="flex-1 min-w-0">
-            <h4 class="text-xs font-bold text-foreground truncate">Ariel Camara</h4>
-            <p class="text-[10px] text-muted-foreground truncate">Sede Cochabamba · Admin</p>
+      @if (authService.usuario(); as usuario) {
+        <div class="border-t border-border pt-4 px-2">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-primary font-black text-xs">
+              {{ obtenerIniciales(usuario.nombreCompleto) }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-xs font-bold text-foreground truncate">{{ usuario.nombreCompleto }}</h4>
+              <p class="text-[10px] text-muted-foreground truncate">{{ usuario.rolNombre }}</p>
+            </div>
+            <button
+              type="button"
+              title="Cerrar sesión"
+              aria-label="Cerrar sesión"
+              (click)="cerrarSesion()"
+              class="h-8 w-8 rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-primary transition-colors">
+              <i class="pi pi-sign-out text-xs"></i>
+            </button>
           </div>
         </div>
-      </div>
+      }
 
     </aside>
   `
 })
 export class SidebarComponent implements OnInit {
   public readonly gatewayService = inject(UnitepcGatewayService);
+  public readonly authService = inject(AuthService);
+  private readonly _router = inject(Router);
   public readonly seaStatus = this.gatewayService.seaStatus;
+  public readonly visibleMenuItems = computed(() => {
+    const usuario = this.authService.usuario();
+    if (!usuario) return [];
+    if (usuario.rol === 'ADMINISTRADOR_SISTEMA') return this.menuItems;
+    return this.menuItems.filter(item => item.roles.includes(usuario.rol));
+  });
 
   public readonly menuItems: MenuItem[] = [
     {
       label: 'Dashboard',
       route: '/dashboard',
       icon: 'pi pi-chart-pie',
-      description: 'Métricas, KPIs y estadísticas generales de evaluaciones'
+      description: 'Métricas, KPIs y estadísticas generales de evaluaciones',
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE', 'VICERRECTOR']
     },
     {
       label: 'Servicios SEA',
       route: '/catalogo-academico',
       icon: 'pi pi-building-columns',
       badge: 'Live',
-      description: 'Sedes, Carreras, Materias, Grupos, Horarios y Campus sincronizados del SEA'
+      description: 'Sedes, Carreras, Materias, Grupos, Horarios y Campus sincronizados del SEA',
+      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']
     },
     {
       label: 'Plan de Estudios',
       route: '/plan-estudios',
       icon: 'pi pi-book',
-      description: 'Asignaturas, docentes y estado de banco por carrera'
+      description: 'Asignaturas, docentes y estado de banco por carrera',
+      roles: ['RESPONSABLE_EVALUACIONES', 'DOCENTE']
     },
     {
       label: 'Lista de Evaluaciones por Día',
       route: '/evaluaciones-dia',
       icon: 'pi pi-calendar-clock',
       badge: 'Hoy',
-      description: 'Exámenes del día, horarios y generación de paquetes'
+      description: 'Exámenes del día, horarios y generación de paquetes',
+      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE']
+    },
+    {
+      label: 'Salas Virtuales',
+      route: '/salas-virtuales',
+      icon: 'pi pi-desktop',
+      badge: 'Nuevo',
+      description: 'Ingreso, espera, inicio y seguimiento de exámenes virtuales',
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE']
     },
     {
       label: 'Calificación OMR',
       route: '/calificacion-omr',
       icon: 'pi pi-check-square',
       badge: 'OMR',
-      description: 'Lector óptico interactivo, verificación de marcas y comparación con patrón'
+      description: 'Lector óptico interactivo, verificación de marcas y comparación con patrón',
+      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']
     },
     {
       label: 'Banco de Preguntas',
       route: '/banco-preguntas',
       icon: 'pi pi-question-circle',
-      description: 'Descarga de plantillas, validación y previsualización de preguntas'
+      description: 'Descarga de plantillas, validación y previsualización de preguntas',
+      roles: ['RESPONSABLE_EVALUACIONES', 'DOCENTE']
     },
     {
       label: 'Administración de Evaluaciones',
       route: '/administracion-evaluaciones',
       icon: 'pi pi-sliders-h',
-      description: 'Parámetros institucionales, cuotas de dificultad y tiempos'
+      description: 'Parámetros institucionales, cuotas de dificultad y tiempos',
+      roles: ['RESPONSABLE_EVALUACIONES']
     },
     {
       label: 'Reporte de Evaluaciones',
       route: '/reporte-evaluaciones',
       icon: 'pi pi-file-excel',
-      description: 'Auditoría, cobertura de bancos y consolidado nacional'
+      description: 'Auditoría, cobertura de bancos y consolidado nacional',
+      roles: ['RESPONSABLE_EVALUACIONES', 'VICERRECTOR']
     },
     {
       label: 'Rol de Exámenes',
       route: '/rol-examenes',
       icon: 'pi pi-calendar',
-      description: 'Calendarización, grilla semanal y subida de Excel'
+      description: 'Calendarización, grilla semanal y subida de Excel',
+      roles: ['RESPONSABLE_EVALUACIONES']
     },
     {
       label: 'Auditoría & Bitácora',
       route: '/auditoria',
       icon: 'pi pi-shield-check',
       badge: 'Seguridad',
-      description: 'Seguimiento de accesos, terminales MAC, IPs públicas y trazabilidad'
+      description: 'Seguimiento de accesos, terminales MAC, IPs públicas y trazabilidad',
+      roles: ['ADMINISTRADOR_SISTEMA']
     }
   ];
 
@@ -189,5 +228,19 @@ export class SidebarComponent implements OnInit {
     if (!u) return 'Verificando...';
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${pad(u.getHours())}:${pad(u.getMinutes())}:${pad(u.getSeconds())}`;
+  }
+
+  public obtenerIniciales(nombre: string): string {
+    return nombre.split(' ').filter(Boolean).slice(0, 2).map(parte => parte[0]).join('').toUpperCase();
+  }
+
+  public cerrarSesion(): void {
+    this.authService.cerrarSesion().subscribe({
+      next: () => this._router.navigateByUrl('/login'),
+      error: () => {
+        this.authService.usuario.set(null);
+        this._router.navigateByUrl('/login');
+      }
+    });
   }
 }

@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
@@ -17,9 +18,11 @@ import { GeneracionTypstService } from '../../core/services/generacion-typst.ser
 import { BancoPreguntasService, BancoPreguntasResponse } from '../../core/services/banco-preguntas.service';
 import {
   RolExamenService,
-  RolExamenResponse
+  RolExamenResponse,
+  AuditoriaRolExamen
 } from '../../core/services/rol-examen.service';
 import { CartillasOmrService, LoteCartillasOmr } from '../../core/services/cartillas-omr.service';
+import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import {
   CalificacionOmrResponse,
   AjustarCalificacionOmrRequest,
@@ -67,12 +70,49 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   motivoRestablecimiento?: string;
   fechaRestablecimiento?: string;
   usuarioRestablecimiento?: string;
+  auditoria?: AuditoriaRolExamen[];
   bitacora?: {
     estado: string;
     fechaHora: string;
     usuario: string;
     detalle: string;
   }[];
+}
+
+interface SalaVirtualOperacion {
+  id: string;
+  rolExamenId: string;
+  codigoSala: string;
+  estado: string;
+  duracionMinutos: number;
+  graciaIngresoMinutos?: number;
+  iniciadaEn?: string;
+  terminaEn?: string;
+  participantes: { codigoEstudiante: string; nombreEstudiante: string; estado: string }[];
+}
+
+interface AccesoVirtualGenerado {
+  codigoEstudiante: string;
+  nombreEstudiante: string;
+  token: string;
+}
+
+interface SalaVirtualCreada {
+  sala: SalaVirtualOperacion;
+  accesos: AccesoVirtualGenerado[];
+}
+
+interface ResultadoVirtual {
+  intentoId: string;
+  codigoEstudiante: string;
+  nombreEstudiante: string;
+  letraVariante?: string;
+  estado: string;
+  aciertos?: number;
+  notaSobre30?: string;
+  notaSobre100?: string;
+  enviadoEn?: string;
+  respuestas: { numeroPregunta: number; reactivoId: number; respuesta: string; guardadaEn?: string }[];
 }
 
 /**
@@ -171,7 +211,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             </select>
           </div>
 
-          <!-- Modalidad (Presencial o Virtual) -->
+          <!-- Modalidad -->
           <div>
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
               <i class="pi pi-desktop text-primary text-[10px]"></i> Modalidad
@@ -180,8 +220,9 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
               [(ngModel)]="filtroModalidad"
               class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
               <option value="Todos">Todas</option>
-              <option value="Presencial">Presencial · Hoja externa</option>
-              <option value="Virtual">Virtual Online</option>
+              <option value="PRESENCIAL_CARTILLA">Con Cartilla</option>
+              <option value="PRESENCIAL_SIN_CARTILLA">Sin Cartilla</option>
+              <option value="VIRTUAL">Virtual</option>
             </select>
           </div>
 
@@ -357,15 +398,15 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                     <td class="p-3.5 text-center">
                       @if (item.modalidad === 'VIRTUAL') {
                         <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-desktop text-[9px]"></i> Virtual Online
+                          <i class="pi pi-desktop text-[9px]"></i> Virtual
                         </span>
-                      } @else if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA' || !item.modalidad) {
+                      } @else if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA' || (!item.modalidad && !item.conCartilla)) {
                         <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-file-edit text-[9px]"></i> Presencial · Hoja externa
+                          <i class="pi pi-file text-[9px]"></i> Sin Cartilla
                         </span>
-                      } @else if (item.conCartilla) {
+                      } @else {
                         <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-file-edit text-[9px]"></i> Presencial · Hoja externa
+                          <i class="pi pi-file-check text-[9px]"></i> Con Cartilla
                         </span>
                       }
                     </td>
@@ -392,10 +433,16 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           </div>
                         }
                       </div>
+                      @if (ultimaActividad(item); as actividad) {
+                        <div class="mt-1 text-[9px] text-muted-foreground whitespace-nowrap">
+                          <i class="pi pi-clock mr-1"></i>{{ formatearFechaHoraAuditoria(actividad.fechaEvento) }} · {{ actividad.usuario || 'Sistema' }}
+                        </div>
+                      }
                     </td>
 
                     <td class="p-3.5 text-center">
                       <div class="relative inline-flex group/cartillas">
+                        @if (item.modalidad !== 'VIRTUAL') {
                         <button
                           (click)="abrirGestionCartillas(item)"
                           [disabled]="!puedeGestionarCartillas(item)"
@@ -414,6 +461,9 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">{{ marcaImpresa(item) ? 'Marcas OMR impresas' : 'Sobreimpresión de datos OMR' }}</span>
                           <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                         </div>
+                        } @else {
+                          <span class="text-muted-foreground/50">—</span>
+                        }
                       </div>
                     </td>
 
@@ -449,7 +499,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                           <button 
                             (click)="abrirBitacora(item)"
                             class="h-7 w-7 rounded-lg bg-muted hover:bg-border text-foreground border border-border flex items-center justify-center cursor-pointer transition-colors">
-                            <i class="pi pi-history text-xs"></i>
+                               <i class="pi pi-clock text-xs"></i>
                           </button>
                           <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/bitacora:flex flex-col items-center z-50 pointer-events-none">
                             <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
@@ -488,6 +538,22 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                             </button>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/notas:flex flex-col items-center z-50 pointer-events-none">
                               <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Notas OMR /30 y /100</span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
+                        @if (puedeMostrarResultadosVirtuales(item)) {
+                          <div class="relative group/resultadosVirtuales">
+                            <button
+                              (click)="abrirResultadosVirtuales(item)"
+                              title="Ver respuestas y resultados virtuales"
+                              aria-label="Ver respuestas y resultados virtuales"
+                              class="h-7 w-7 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-chart-bar text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/resultadosVirtuales:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Resultados y respuestas virtuales</span>
                               <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                             </div>
                           </div>
@@ -610,7 +676,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
         </div>
       }
 
-      <!-- MODAL 2: PARAMETRIZACIÓN CON ESTUDIANTES Y GENERACIÓN PDF -->
+      <!-- MODAL 2: PREPARACIÓN O GENERACIÓN -->
       @if (evaluacionSeleccionadaParaParametrizar()) {
         <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in overflow-y-auto">
           <div class="bg-card border border-border rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden animate-scale-in my-4 space-y-4 p-6">
@@ -622,7 +688,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   <i class="pi pi-sliders-h"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-black text-foreground">Parámetros y generación del examen PDF</h3>
+                  <h3 class="text-sm font-black text-foreground">{{ evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL' ? 'Preparación del examen virtual' : 'Parámetros y generación del examen PDF' }}</h3>
                   <p class="text-xs text-muted-foreground">
                     [{{ evaluacionSeleccionadaParaParametrizar()?.codigo }}] {{ evaluacionSeleccionadaParaParametrizar()?.materia }} · Grupo {{ evaluacionSeleccionadaParaParametrizar()?.grupo }}
                   </p>
@@ -636,12 +702,13 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 
             <div class="space-y-4 text-xs">
               
+              @if (evaluacionSeleccionadaParaParametrizar()?.modalidad !== 'VIRTUAL') {
               <!-- 1. PARÁMETROS OFICIALES DE DIAGRAMACIÓN -->
               <div class="bg-muted/40 border border-border rounded-xl p-4 space-y-3">
                 <div class="flex items-center justify-between text-foreground font-black text-xs border-b border-border pb-2">
                   <div class="flex items-center gap-2">
-                    <i class="pi pi-palette text-primary"></i>
-                    <span>Parámetros de Diagramación</span>
+                    <i class="pi text-primary" [class.pi-desktop]="evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL'" [class.pi-palette]="evaluacionSeleccionadaParaParametrizar()?.modalidad !== 'VIRTUAL'"></i>
+                    <span>{{ evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL' ? 'Parámetros del examen virtual' : 'Parámetros de Diagramación' }}</span>
                   </div>
                   <span class="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-200">
                     30 Preguntas (7 Fáciles, 16 Medias, 7 Difíciles)
@@ -684,6 +751,43 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
 
                 </div>
               </div>
+              } @else {
+                <!-- Configuración exclusiva del examen virtual -->
+                <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-3">
+                  <div class="flex items-center justify-between text-purple-950 font-black text-xs border-b border-purple-200 pb-2">
+                    <div class="flex items-center gap-2">
+                      <i class="pi pi-desktop text-purple-700"></i>
+                      <span>Configuración del examen virtual</span>
+                    </div>
+                    <span class="text-[10px] font-mono text-purple-800 font-bold bg-white/70 px-2 py-0.5 rounded-full border border-purple-200">
+                      Sin PDF ni cartilla
+                    </span>
+                  </div>
+
+                  <p class="text-[11px] text-purple-950 leading-relaxed">
+                    Se conservarán la secuencia, el contenido y el ratio del examen con cartilla. Cada estudiante resolverá su variante dentro de la sala virtual y sus respuestas se guardarán automáticamente.
+                  </p>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div class="bg-white/70 border border-purple-200 rounded-lg p-2">
+                      <span class="block text-[10px] uppercase tracking-wider text-purple-700 font-extrabold">Variantes a preparar</span>
+                      <strong class="text-sm text-purple-950">{{ variantesCalculadas() }}</strong>
+                    </div>
+                    <div class="bg-white/70 border border-purple-200 rounded-lg p-2">
+                      <span class="block text-[10px] uppercase tracking-wider text-purple-700 font-extrabold">Ratio institucional</span>
+                      <strong class="text-sm text-purple-950">{{ ratioEstudiantesPorVariante() }} estudiantes / variante</strong>
+                    </div>
+                    <div class="bg-white/70 border border-purple-200 rounded-lg p-2">
+                      <span class="block text-[10px] uppercase tracking-wider text-purple-700 font-extrabold">Acceso</span>
+                      <strong class="text-sm text-purple-950">Sala + token individual</strong>
+                    </div>
+                    <div class="bg-white/70 border border-purple-200 rounded-lg p-2">
+                      <span class="block text-[10px] uppercase tracking-wider text-purple-700 font-extrabold">Duración</span>
+                      <strong class="text-sm text-purple-950">{{ duracionExamenVirtualMinutos() }} minutos</strong>
+                    </div>
+                  </div>
+                </div>
+              }
 
               <!-- 2. NÓMINA DE ESTUDIANTES INSCRITOS -->
               <div class="p-4 bg-card border border-border rounded-xl space-y-3 shadow-2xs">
@@ -711,6 +815,15 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   </div>
                 </div>
 
+                @if (evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL') {
+                <div class="p-2.5 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between text-[11px] text-purple-950">
+                  <div class="flex items-center gap-2 font-bold">
+                    <i class="pi pi-desktop text-purple-700"></i>
+                    <span>Examen virtual · respuestas guardadas automáticamente</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-purple-800 font-black">{{ variantesCalculadas() }} variantes · sin PDF</span>
+                </div>
+                } @else {
                 <!-- Banner informativo: configuración vigente -->
                 <div class="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between text-[11px] text-indigo-950">
                   <div class="flex items-center gap-2 font-bold">
@@ -719,6 +832,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
                   </div>
                   <span class="text-[10px] font-mono text-indigo-800 font-black">Oficio · Times New Roman 11 pt</span>
                 </div>
+                }
               </div>
 
             </div>
@@ -734,8 +848,8 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
               <button 
                 (click)="ejecutarGeneracionVariantes()" 
                 class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-102">
-                <i class="pi pi-bolt"></i>
-                <span>Generar examen PDF (30 preguntas A-E)</span>
+                <i class="pi" [class.pi-desktop]="evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL'" [class.pi-bolt]="evaluacionSeleccionadaParaParametrizar()?.modalidad !== 'VIRTUAL'"></i>
+                <span>{{ evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL' ? 'Preparar sala virtual y accesos' : 'Generar examen PDF (30 preguntas A-E)' }}</span>
               </button>
             </div>
 
@@ -751,7 +865,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             <div class="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-4 flex items-center justify-between border-b border-purple-900">
               <div class="flex items-center gap-2.5">
                 <i class="pi pi-spin pi-cog text-purple-400 text-lg"></i>
-                <h3 class="text-sm font-black">Generación de examen #{{ queueJobId }}</h3>
+                <h3 class="text-sm font-black">{{ esGeneracionVirtualActual() ? 'Preparación de examen virtual' : 'Generación de examen' }} #{{ queueJobId }}</h3>
               </div>
               <span class="text-[10px] font-mono bg-purple-900/60 px-2 py-0.5 rounded text-purple-300 border border-purple-500/30">
                 COLA DE GENERACIÓN · ALTA PRIORIDAD
@@ -777,9 +891,42 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
             </div>
 
             <div class="bg-muted/40 border-t border-border p-4 flex justify-end gap-2">
-              <span class="text-[11px] font-bold text-muted-foreground">El PDF estará disponible en Documentos al completar la generación.</span>
+              <span class="text-[11px] font-bold text-muted-foreground">{{ esGeneracionVirtualActual() ? 'Se crearán la sala y los accesos individuales; no se generará PDF.' : 'El PDF estará disponible en Documentos al completar la generación.' }}</span>
             </div>
 
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: SALA VIRTUAL Y TOKENS -->
+      @if (dialogSalaVirtual()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-purple-200 rounded-2xl max-w-4xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
+              <div><p class="text-[10px] font-black uppercase tracking-widest text-purple-700">Sala virtual preparada</p><h3 class="text-lg font-black text-foreground">Ingreso organizado por estudiante</h3><p class="text-xs text-muted-foreground">Comparte a cada estudiante únicamente su token. Los tokens se muestran una sola vez.</p></div>
+              <button (click)="cerrarSalaVirtual()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="p-5 space-y-4 overflow-y-auto">
+              @if (salaVirtualCreada(); as sala) {
+                <div class="grid gap-3 sm:grid-cols-3">
+                  <div class="rounded-xl border border-purple-200 bg-purple-50 p-4"><span class="text-[10px] font-black uppercase text-purple-700">Código de sala</span><strong class="mt-1 block font-mono text-xl text-purple-950">{{ sala.codigoSala }}</strong></div>
+                  <div class="rounded-xl border border-border bg-muted/40 p-4"><span class="text-[10px] font-black uppercase text-muted-foreground">Duración</span><strong class="mt-1 block text-xl text-foreground">{{ sala.duracionMinutos }} min</strong></div>
+                  <div class="rounded-xl border border-border bg-muted/40 p-4"><span class="text-[10px] font-black uppercase text-muted-foreground">Estado</span><strong class="mt-1 block text-xl text-foreground">{{ sala.estado }}</strong></div>
+                </div>
+                @if (accesosVirtuales().length) {
+                  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4"><p class="text-xs font-black text-amber-950">Tokens individuales</p><p class="mt-1 text-[11px] text-amber-900">Guárdalos o entrégalos individualmente antes de cerrar esta ventana.</p><div class="mt-3 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-amber-200 text-[10px] font-black uppercase text-amber-800"><th class="p-2">Estudiante</th><th class="p-2">Token</th></tr></thead><tbody>@for (acceso of accesosVirtuales(); track acceso.codigoEstudiante) {<tr class="border-b border-amber-100"><td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td><td class="p-2 font-mono break-all">{{ acceso.token }}</td></tr>}</tbody></table></div></div>
+                } @else {
+                  <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-900">Los tokens ya fueron ocultados. La sala continúa disponible.</div>
+                }
+              }
+            </div>
+            <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2 shrink-0">
+              @if (salaVirtualCreada()?.estado === 'PREPARADA') { <button (click)="abrirSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-door-open mr-1"></i> Abrir sala para estudiantes</button> }
+              @else if (salaVirtualCreada()?.estado === 'ABIERTA') { <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button> }
+              @else if (salaVirtualCreada()?.estado === 'EN_CURSO') { <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso. El tiempo lo controla el servidor.</span> }
+              @else { <span class="self-center text-[11px] font-bold text-muted-foreground">La sala ya concluyó.</span> }
+              <button (click)="cerrarSalaVirtual()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
+            </div>
           </div>
         </div>
       }
@@ -1284,9 +1431,42 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
               <button (click)="cerrarBitacora()" class="text-muted-foreground hover:text-foreground text-sm cursor-pointer"><i class="pi pi-times"></i></button>
             </div>
             <div class="p-3 bg-muted/40 rounded-xl text-xs">
-              <div class="font-bold text-foreground">{{ evaluacionSeleccionadaParaBitacora()?.estado }}</div>
-              <div class="text-[10px] text-muted-foreground font-mono">{{ evaluacionSeleccionadaParaBitacora()?.fechaDisplay || evaluacionSeleccionadaParaBitacora()?.fecha }}</div>
+              <div class="font-bold text-foreground">{{ evaluacionSeleccionadaParaBitacora()?.codigo }} · {{ evaluacionSeleccionadaParaBitacora()?.materia }}</div>
+              <div class="text-[10px] text-muted-foreground">{{ evaluacionSeleccionadaParaBitacora()?.tipo }} · {{ evaluacionSeleccionadaParaBitacora()?.grupo }} · Estado actual: {{ evaluacionSeleccionadaParaBitacora()?.estado }}</div>
             </div>
+            @if (cargandoBitacora()) {
+              <div class="py-8 text-center text-xs font-bold text-muted-foreground">
+                <i class="pi pi-spin pi-spinner text-xl text-purple-700"></i>
+                <p class="mt-2">Cargando actividades...</p>
+              </div>
+            } @else if (errorBitacora()) {
+              <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800">{{ errorBitacora() }}</div>
+            } @else if (auditoriaBitacora().length === 0) {
+              <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">Todavía no hay actividades registradas para este rol.</div>
+            } @else {
+              <div class="max-h-[52vh] overflow-y-auto space-y-2 pr-1">
+                @for (evento of auditoriaBitacora(); track evento.id) {
+                  <div class="rounded-xl border border-border bg-card p-3 shadow-2xs">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="text-xs font-black text-foreground">{{ descripcionAuditoria(evento) }}</div>
+                        <div class="mt-1 text-[10px] text-muted-foreground">
+                          {{ etapaAuditoria(evento) }}
+                        </div>
+                      </div>
+                      <i class="pi pi-clock shrink-0 text-purple-700"></i>
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-muted-foreground">
+                      <span><i class="pi pi-calendar mr-1"></i>{{ formatearFechaHoraAuditoria(evento.fechaEvento) }}</span>
+                      <span><i class="pi pi-user mr-1"></i>{{ evento.usuario || 'Sistema' }}</span>
+                    </div>
+                    @if (detalleAuditoria(evento)) {
+                      <div class="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-[10px] text-muted-foreground">{{ detalleAuditoria(evento) }}</div>
+                    }
+                  </div>
+                }
+              </div>
+            }
             <div class="flex justify-end pt-2 border-t border-border">
               <button (click)="cerrarBitacora()" class="px-4 py-2 rounded-xl bg-muted hover:bg-border text-xs font-bold text-foreground cursor-pointer">Cerrar</button>
             </div>
@@ -1570,6 +1750,21 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
         </div>
       }
 
+      <!-- MODAL: RESULTADOS DEL EXAMEN VIRTUAL -->
+      @if (dialogResultadosVirtuales()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-cyan-200 rounded-2xl max-w-6xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0"><div><p class="text-[10px] font-black uppercase tracking-widest text-cyan-700">Evaluación virtual concluida</p><h3 class="text-lg font-black text-foreground">Resultados y respuestas marcadas</h3><p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaResultados()?.codigo }} · calificación automática al cierre de la sala</p></div><button (click)="cerrarResultadosVirtuales()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button></div>
+            <div class="p-5 overflow-y-auto">
+              @if (cargandoResultadosVirtuales()) { <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-xl text-cyan-700"></i><p class="mt-2">Cargando respuestas y calificaciones...</p></div> }
+              @else if (resultadosVirtuales().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen resultados para esta sala.</div> }
+              @else { <div class="space-y-3">@for (resultado of resultadosVirtuales(); track resultado.intentoId) {<article class="rounded-xl border border-border bg-muted/20 p-4"><div class="flex flex-wrap items-center justify-between gap-3"><div><strong class="text-sm text-foreground">{{ resultado.codigoEstudiante }} · {{ resultado.nombreEstudiante }}</strong><p class="mt-1 text-[10px] font-black uppercase text-cyan-700">Variante {{ resultado.letraVariante || '—' }} · {{ resultado.estado }}</p></div><div class="flex gap-4 text-xs"><span><small class="block text-[10px] text-muted-foreground">Aciertos</small><b>{{ resultado.aciertos ?? 0 }}/30</b></span><span><small class="block text-[10px] text-muted-foreground">Nota /30</small><b>{{ resultado.notaSobre30 || '0.00' }}</b></span><span><small class="block text-[10px] text-muted-foreground">Nota /100</small><b>{{ resultado.notaSobre100 || '0.00' }}</b></span></div></div><div class="mt-3 flex flex-wrap gap-1.5">@for (respuesta of resultado.respuestas; track respuesta.numeroPregunta) {<span class="rounded-lg border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-900">{{ respuesta.numeroPregunta }}: {{ respuesta.respuesta }}</span>} @if (!resultado.respuestas.length) {<span class="text-[11px] text-muted-foreground">Sin respuestas marcadas</span>}</div></article>}</div> }
+            </div>
+            <div class="p-4 border-t border-border flex justify-end shrink-0"><button (click)="cerrarResultadosVirtuales()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
+          </div>
+        </div>
+      }
+
       <!-- MODAL: ELIMINAR BANCO DE PREGUNTAS -->
       @if (dialogEliminarBanco()) {
         <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -1615,6 +1810,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   `
 })
 export class EvaluacionesDiaComponent implements OnInit {
+  private readonly _http = inject(HttpClient);
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _rolService = inject(RolExamenService);
   private readonly _studentService = inject(EstudiantesGatewayService);
@@ -1622,6 +1818,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   private readonly _bancoService = inject(BancoPreguntasService);
   private readonly _cartillasOmr = inject(CartillasOmrService);
   private readonly _omrService = inject(OmrProcesamientoService);
+  private readonly _configuracionEvaluaciones = inject(ConfiguracionEvaluacionesService);
 
   // Sedes y Carreras desde SEA Gateway
   public sedes = signal<BranchOffice[]>([]);
@@ -1635,7 +1832,7 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   // Filtros Parametrizados
   public filtroParcial: string = '1er Parcial';
-  public filtroModalidad: 'Todos' | 'Presencial' | 'Virtual' = 'Todos';
+  public filtroModalidad: 'Todos' | 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'Todos';
   
   // No usar toISOString(): convierte la hora local a UTC y en Bolivia puede
   // mover la fecha al día siguiente durante la noche.
@@ -1670,6 +1867,9 @@ export class EvaluacionesDiaComponent implements OnInit {
   public evaluacionSeleccionadaParaValidar = signal<EvaluacionItemUI | null>(null);
   public evaluacionSeleccionadaParaParametrizar = signal<EvaluacionItemUI | null>(null);
   public evaluacionSeleccionadaParaBitacora = signal<EvaluacionItemUI | null>(null);
+  public auditoriaBitacora = signal<AuditoriaRolExamen[]>([]);
+  public cargandoBitacora = signal<boolean>(false);
+  public errorBitacora = signal<string>('');
   public evaluacionSeleccionadaParaReestablecer = signal<EvaluacionItemUI | null>(null);
   public motivoReestablecimiento = '';
   public restableciendo = signal<boolean>(false);
@@ -1706,8 +1906,9 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   // Estudiantes
   public estudiantesInscritos = signal<EstudianteInscrito[]>([]);
-  // Modo temporal de pruebas: una variante por estudiante.
-  public ratioEstudiantesPorVariante = signal<number>(1);
+  // Configuración global administrable: cantidad máxima de estudiantes por variante.
+  public ratioEstudiantesPorVariante = signal<number>(5);
+  public duracionExamenVirtualMinutos = signal<number>(45);
   public estudianteSeleccionadoIdx = signal<number>(0);
   public variantesCompiladas = signal<VarianteCompilada[]>([]);
   public modoUnificado = signal<boolean>(false);
@@ -1720,6 +1921,7 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public archivoExcelNombre = signal<string | null>(null);
   public toastMessage = signal<string | null>(null);
+  private toastTimer: ReturnType<typeof setTimeout> | undefined;
   public evaluacionSeleccionadaCartillas = signal<EvaluacionItemUI | null>(null);
   public loteCartillasActual = signal<LoteCartillasOmr | null>(null);
   public cargandoCartillas = signal<boolean>(false);
@@ -1747,6 +1949,17 @@ export class EvaluacionesDiaComponent implements OnInit {
   public notasOmr = signal<CalificacionOmrResponse[]>([]);
   public cargandoNotasOmr = signal<boolean>(false);
 
+  // Operación y resultados del examen virtual.
+  public dialogSalaVirtual = signal<boolean>(false);
+  public salaVirtualCreada = signal<SalaVirtualOperacion | null>(null);
+  public accesosVirtuales = signal<AccesoVirtualGenerado[]>([]);
+  public creandoSalaVirtual = signal<boolean>(false);
+  public generacionVirtualActual = signal<boolean>(false);
+  public dialogResultadosVirtuales = signal<boolean>(false);
+  public evaluacionSeleccionadaResultados = signal<EvaluacionItemUI | null>(null);
+  public resultadosVirtuales = signal<ResultadoVirtual[]>([]);
+  public cargandoResultadosVirtuales = signal<boolean>(false);
+
   // Indicador y eliminación protegida del banco cargado por evaluación.
   public estadoBancos = signal<Record<string, boolean>>({});
   public dialogEliminarBanco = signal<boolean>(false);
@@ -1757,10 +1970,10 @@ export class EvaluacionesDiaComponent implements OnInit {
   // Lista viva de evaluaciones
   public evaluaciones = signal<EvaluacionItemUI[]>([]);
 
-  // Durante las pruebas se genera una variante por estudiante.
+  // Calcula las variantes a partir de la nómina y el ratio institucional.
   public variantesCalculadas = computed(() => {
     const totalEst = this.estudiantesInscritos().length;
-    const ratio = this.ratioEstudiantesPorVariante() || 1;
+    const ratio = this.ratioEstudiantesPorVariante() || 5;
     if (totalEst <= 0) return 1;
     const num = Math.ceil(totalEst / ratio);
     return Math.min(Math.max(num, 1), 5);
@@ -1784,10 +1997,11 @@ export class EvaluacionesDiaComponent implements OnInit {
       list = list.filter(e => e.tipo === this.filtroParcial);
     }
 
-    if (this.filtroModalidad === 'Presencial') {
-      list = list.filter(e => e.modalidad !== 'VIRTUAL');
-    } else if (this.filtroModalidad === 'Virtual') {
-      list = list.filter(e => e.modalidad === 'VIRTUAL');
+    if (this.filtroModalidad !== 'Todos') {
+      list = list.filter(e => {
+        const modalidad = e.modalidad || (e.conCartilla ? 'PRESENCIAL_CARTILLA' : 'PRESENCIAL_SIN_CARTILLA');
+        return modalidad === this.filtroModalidad;
+      });
     }
 
     if (estados.length > 0) {
@@ -1811,11 +2025,35 @@ export class EvaluacionesDiaComponent implements OnInit {
       );
     }
 
-    return list;
+    return [...list].sort((a, b) => {
+      const codigo = a.codigo.localeCompare(b.codigo, 'es', { numeric: true, sensitivity: 'base' });
+      if (codigo !== 0) return codigo;
+      const grupo = a.grupo.localeCompare(b.grupo, 'es', { numeric: true, sensitivity: 'base' });
+      if (grupo !== 0) return grupo;
+      const tipoOrden: Record<string, number> = { '1er Parcial': 1, '2do Parcial': 2, 'Final': 3, '2da Instancia': 4 };
+      const tipo = (tipoOrden[a.tipo] || 99) - (tipoOrden[b.tipo] || 99);
+      if (tipo !== 0) return tipo;
+      return (a.version || 1) - (b.version || 1);
+    });
   });
 
   public ngOnInit(): void {
-    this.ratioEstudiantesPorVariante.set(1);
+    this.ratioEstudiantesPorVariante.set(
+      this._configuracionEvaluaciones.configuracion().ratioEstudiantesPorVariante
+    );
+    this.duracionExamenVirtualMinutos.set(
+      this._configuracionEvaluaciones.configuracion().duracionExamenVirtualMinutos || 45
+    );
+    this._configuracionEvaluaciones.cargar().subscribe({
+      next: configuracion => {
+        this.ratioEstudiantesPorVariante.set(configuracion.ratioEstudiantesPorVariante);
+        this.duracionExamenVirtualMinutos.set(configuracion.duracionExamenVirtualMinutos || 45);
+      },
+      error: () => {
+        this.ratioEstudiantesPorVariante.set(5);
+        this.duracionExamenVirtualMinutos.set(45);
+      }
+    });
     this._cargarSedes();
   }
 
@@ -1909,7 +2147,23 @@ export class EvaluacionesDiaComponent implements OnInit {
         this.evaluaciones.set(uiList);
         this._cargarEstadoMarcas(uiList);
         this._cargarEstadoBancos(uiList);
-        this.cargando.set(false);
+        if (uiList.length === 0) {
+          this.cargando.set(false);
+          return;
+        }
+
+        forkJoin(uiList.map(item => this._rolService.listarAuditoria(item.id).pipe(
+          catchError(() => of([] as AuditoriaRolExamen[]))
+        ))).subscribe({
+          next: auditorias => {
+            this.evaluaciones.set(uiList.map((item, index) => ({
+              ...item,
+              auditoria: auditorias[index]
+            })));
+            this.cargando.set(false);
+          },
+          error: () => this.cargando.set(false)
+        });
       },
       error: err => {
         console.error('Error cargando evaluaciones desde backend:', err);
@@ -1921,7 +2175,13 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   private _mapearRolResponseA_UI(rol: RolExamenResponse): EvaluacionItemUI {
-    const conCartilla = false;
+    const conCartilla = rol.modalidad === 'PRESENCIAL_CARTILLA';
+    const etapaMapeada = this._mapearEtapa(rol.estadoFlujo);
+    // Compatibilidad con generaciones virtuales antiguas: aunque hayan
+    // quedado como GENERADO, operativamente esperan una sala y no un PDF.
+    const etapa = rol.modalidad === 'VIRTUAL' && etapaMapeada === 'Generado'
+      ? 'Validado'
+      : etapaMapeada;
 
     return {
       id: rol.id,
@@ -1937,6 +2197,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       docenteNombre: rol.docenteNombre,
       docenteCI: rol.docenteCi,
       tipo: rol.tipoParcial as RolExamenPersistedItem['tipo'],
+      version: rol.version || 1,
       estado: rol.estadoFlujo as RolExamenPersistedItem['estado'],
       conCartilla,
       modalidad: rol.modalidad,
@@ -1950,7 +2211,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       estudiantesInscritosCount: rol.estudiantesInscritosCount,
       hashEncriptacion: rol.hashEncriptacion,
       fechaValidacion: rol.fechaValidacion,
-      etapa: this._mapearEtapa(rol.estadoFlujo),
+      etapa,
       hora: rol.horario.split('-')[0]?.trim() || '08:15',
       variantesGeneradas: rol.variantesGeneradasCount
     };
@@ -1971,27 +2232,36 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public puedeRestablecer(item: EvaluacionItemUI): boolean {
+    if (item.modalidad === 'VIRTUAL') return false;
     return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido']
       .includes(item.etapa);
   }
 
   public puedeMostrarDocumento(item: EvaluacionItemUI): boolean {
+    if (item.modalidad === 'VIRTUAL') return false;
     return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido']
       .includes(item.etapa);
   }
 
   public puedeGestionarCartillas(item: EvaluacionItemUI): boolean {
+    if (item.modalidad === 'VIRTUAL') return false;
     // Las marcas se pueden preparar antes de entregar el examen. Desde
     // Entregado en adelante la cartilla ya no debe modificarse.
     return ['Programado', 'Validado', 'Generado', 'Impreso'].includes(item.etapa);
   }
 
   public puedeMostrarConfiguracion(item: EvaluacionItemUI): boolean {
-    return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'].includes(item.etapa);
+    return item.modalidad === 'VIRTUAL'
+      ? ['Validado', 'Revisado'].includes(item.etapa)
+      : ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'].includes(item.etapa);
   }
 
   public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
-    return ['Revisado', 'Subido', 'Recibido'].includes(item.etapa);
+    return item.modalidad !== 'VIRTUAL' && ['Revisado', 'Subido', 'Recibido'].includes(item.etapa);
+  }
+
+  public puedeMostrarResultadosVirtuales(item: EvaluacionItemUI): boolean {
+    return item.modalidad === 'VIRTUAL' && item.etapa === 'Revisado';
   }
 
   public marcaImpresa(item: EvaluacionItemUI): boolean {
@@ -2159,6 +2429,13 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public getPasosFlujo(item: EvaluacionItemUI): StepDef[] {
+    if (item.modalidad === 'VIRTUAL') {
+      return [
+        { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
+        { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
+        { key: 'Revisado', label: 'Revisado', icon: 'pi pi-check' }
+      ];
+    }
     return this.flujoOficial;
   }
 
@@ -2193,12 +2470,17 @@ export class EvaluacionesDiaComponent implements OnInit {
     const pasos = this.getPasosFlujo(item).map(p => p.key);
     const currentIdx = pasos.indexOf(item.etapa);
     const pasoIdx = pasos.indexOf(st.key);
+    const actividad = this.auditoriaDeEtapa(item, st.key);
 
+    if (pasoIdx <= currentIdx && actividad) {
+      return `Completado: ${this.formatearFechaHoraAuditoria(actividad.fechaEvento)} · ${actividad.usuario || 'Sistema'}`;
+    }
     if (pasoIdx < currentIdx) return `Completado: ${st.label}`;
     if (pasoIdx === currentIdx) return `Estado actual: ${st.label}`;
     if (pasoIdx === currentIdx + 1) {
       if (st.key === 'Validado') return 'Clic para Validar y Encriptar Examen de Docente';
       if (st.key === 'Generado') return 'Clic para generar el examen PDF (30 preguntas A-E)';
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Revisado') return 'Preparar sala virtual, variantes y tokens de acceso';
       return `Clic para avanzar a: ${st.label}`;
     }
     return `Pendiente: ${st.label}`;
@@ -2215,6 +2497,11 @@ export class EvaluacionesDiaComponent implements OnInit {
     }
 
     if (pasoKey === 'Generado' && (item.etapa === 'Validado' || item.etapa === 'Programado')) {
+      this.abrirModalParametrizacion(item);
+      return;
+    }
+
+    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Revisado' && item.etapa === 'Validado') {
       this.abrirModalParametrizacion(item);
       return;
     }
@@ -2602,6 +2889,30 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.notasOmr.set([]);
   }
 
+  public abrirResultadosVirtuales(item: EvaluacionItemUI): void {
+    if (!this.puedeMostrarResultadosVirtuales(item)) return;
+    this.evaluacionSeleccionadaResultados.set(item);
+    this.resultadosVirtuales.set([]);
+    this.cargandoResultadosVirtuales.set(true);
+    this.dialogResultadosVirtuales.set(true);
+    this._http.get<ResultadoVirtual[]>(`/api/examenes-virtuales/roles/${item.id}/resultados`).subscribe({
+      next: resultados => {
+        this.resultadosVirtuales.set(resultados || []);
+        this.cargandoResultadosVirtuales.set(false);
+      },
+      error: err => {
+        this.cargandoResultadosVirtuales.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudieron consultar los resultados virtuales.', 'error');
+      }
+    });
+  }
+
+  public cerrarResultadosVirtuales(): void {
+    this.dialogResultadosVirtuales.set(false);
+    this.evaluacionSeleccionadaResultados.set(null);
+    this.resultadosVirtuales.set([]);
+  }
+
   public cerrarModalValidar(): void {
     this.evaluacionSeleccionadaParaValidar.set(null);
   }
@@ -2630,7 +2941,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.errorGeneracionTypst.set(null);
     this.resultadoGeneracionTypst.set(null);
     this.jobIdGeneracionTypst.set(null);
-    this.ratioEstudiantesPorVariante.set(1);
+    this.generacionVirtualActual.set(item.modalidad === 'VIRTUAL');
+    this.ratioEstudiantesPorVariante.set(
+      this._configuracionEvaluaciones.configuracion().ratioEstudiantesPorVariante
+    );
 
     // Cargar la nómina de estudiantes en vivo desde el Gateway por groupId
     this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, item.seaGroupId).subscribe({
@@ -2677,6 +2991,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     const estudiantes = this.estudiantesInscritos();
     const letras: ('A' | 'B' | 'C' | 'D' | 'E')[] = ['A', 'B', 'C', 'D', 'E'];
     const variantes = letras.slice(0, cantVariantes);
+    const esVirtual = item.modalidad === 'VIRTUAL';
 
     const jobId = crypto.randomUUID();
     const request: GeneracionTypstRequest = {
@@ -2684,7 +2999,8 @@ export class EvaluacionesDiaComponent implements OnInit {
       rolExamenId: item.id,
       bancoPreguntasId: banco.id,
       variantes,
-      ratioEstudiantesPorVariante: 1
+      ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante(),
+      soloVirtual: esVirtual
     };
 
     this.generandoTypst.set(true);
@@ -2699,7 +3015,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.queuePasoActual.set('Encolando tarea en RabbitMQ...');
     this.queueLogs.set([
       `[${new Date().toLocaleTimeString()}] ⏳ Solicitud #${jobId} encolada`,
-      `[${new Date().toLocaleTimeString()}] 📄 Configuración oficial: 30 preguntas (7 fáciles, 16 medias, 7 difíciles), Oficio, Times New Roman 11 pt`,
+      `[${new Date().toLocaleTimeString()}] ${esVirtual ? '🖥️ Preparación web: 30 preguntas, sin PDF ni cartilla' : '📄 Configuración oficial: 30 preguntas (7 fáciles, 16 medias, 7 difíciles), Oficio, Times New Roman 11 pt'}`,
       `[${new Date().toLocaleTimeString()}] 👥 Alumnos inscritos: ${estudiantes.length}, Variantes: ${variantes.join(', ')}`
     ]);
 
@@ -2723,7 +3039,7 @@ export class EvaluacionesDiaComponent implements OnInit {
               this.generandoTypst.set(false);
               this.errorGeneracionTypst.set(resultado.mensaje || 'Error desconocido en generación.');
               this.queueProgress.set(100);
-              this.queuePasoActual.set('Error al generar el examen PDF');
+              this.queuePasoActual.set(esVirtual ? 'Error al preparar el examen virtual' : 'Error al generar el examen PDF');
               this.queueLogs.update(logs => [
                 ...logs,
                 `[${new Date().toLocaleTimeString()}] ❌ Error: ${resultado.mensaje}`
@@ -2735,21 +3051,27 @@ export class EvaluacionesDiaComponent implements OnInit {
             if (resultado.estado === 'COMPLETADO') {
               this.generandoTypst.set(false);
               this.queueProgress.set(100);
-              this.queuePasoActual.set('¡Examen PDF generado exitosamente!');
+              this.queuePasoActual.set(esVirtual ? '¡Variantes virtuales preparadas!' : '¡Examen PDF generado exitosamente!');
               this.queueJobCompleted.set(true);
               this.queueLogs.update(logs => [
                 ...logs,
                 `[${new Date().toLocaleTimeString()}] ✅ ${resultado.variantes.length} variantes generadas`,
-                `[${new Date().toLocaleTimeString()}] ✅ ${resultado.mapeos.length} cuadernillos listos`
+                `[${new Date().toLocaleTimeString()}] ✅ ${esVirtual ? 'Asignaciones estudiante-variante listas' : `${resultado.mapeos.length} cuadernillos listos`}`
               ]);
 
-              item.etapa = 'Generado';
-              item.estado = 'GENERADO';
+              item.etapa = esVirtual ? 'Validado' : 'Generado';
+              item.estado = esVirtual ? 'VALIDADO' : 'GENERADO';
               item.variantesGeneradas = cantVariantes;
               item.estudiantesInscritosCount = estudiantes.length;
               this.evaluaciones.update(items => [...items]);
-              this._mostrarToast(`${item.codigo}: Examen PDF generado exitosamente.`);
-              this.dialogQueueWorker.set(false);
+              if (esVirtual) {
+                this.queuePasoActual.set('Creando sala y tokens individuales...');
+                this.queueProgress.set(100);
+                this.crearSalaVirtual(item);
+              } else {
+                this._mostrarToast(`${item.codigo}: Examen PDF generado exitosamente.`);
+                this.dialogQueueWorker.set(false);
+              }
             }
           },
           error: err => {
@@ -2773,6 +3095,75 @@ export class EvaluacionesDiaComponent implements OnInit {
         this._mostrarToast(msg, 'error');
       }
     });
+  }
+
+  public esGeneracionVirtualActual(): boolean {
+    return this.generacionVirtualActual();
+  }
+
+  private crearSalaVirtual(item: EvaluacionItemUI): void {
+    this.creandoSalaVirtual.set(true);
+    this.errorGeneracionTypst.set(null);
+    this._http.post<SalaVirtualCreada>('/api/examenes-virtuales/salas', {
+      rolExamenId: item.id,
+      duracionMinutos: this.duracionExamenVirtualMinutos() || 45,
+      graciaIngresoMinutos: 10
+    }).subscribe({
+      next: creada => {
+        this.creandoSalaVirtual.set(false);
+        this.salaVirtualCreada.set(creada.sala);
+        this.accesosVirtuales.set(creada.accesos || []);
+        this.dialogQueueWorker.set(false);
+        this.dialogSalaVirtual.set(true);
+        this._mostrarToast(`${item.codigo}: sala virtual preparada con tokens individuales.`);
+      },
+      error: err => {
+        this.creandoSalaVirtual.set(false);
+        const mensaje = err?.error?.message || err?.error?.error || 'Las variantes se prepararon, pero no se pudo crear la sala virtual.';
+        this.errorGeneracionTypst.set(mensaje);
+        this.queuePasoActual.set('Variantes listas; falta crear la sala');
+        this.queueLogs.update(logs => [...logs, `[${new Date().toLocaleTimeString()}] ❌ ${mensaje}`]);
+        this._mostrarToast(mensaje, 'error');
+      }
+    });
+  }
+
+  public abrirSalaVirtual(): void {
+    const sala = this.salaVirtualCreada();
+    if (!sala || this.creandoSalaVirtual()) return;
+    this.creandoSalaVirtual.set(true);
+    this._http.post<SalaVirtualOperacion>(`/api/examenes-virtuales/salas/${sala.id}/abrir`, {}).subscribe({
+      next: actualizada => {
+        this.salaVirtualCreada.set(actualizada);
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast('Sala abierta. Los estudiantes ya pueden ingresar y esperar al docente.');
+      },
+      error: err => {
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo abrir la sala virtual.', 'error');
+      }
+    });
+  }
+
+  public iniciarSalaVirtual(): void {
+    const sala = this.salaVirtualCreada();
+    if (!sala || sala.estado !== 'ABIERTA' || this.creandoSalaVirtual()) return;
+    this.creandoSalaVirtual.set(true);
+    this._http.post<SalaVirtualOperacion>(`/api/examenes-virtuales/salas/${sala.id}/iniciar`, {}).subscribe({
+      next: actualizada => {
+        this.salaVirtualCreada.set(actualizada);
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast('Examen iniciado. Los estudiantes ya pueden resolver sus variantes.');
+      },
+      error: err => {
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo iniciar el examen virtual.', 'error');
+      }
+    });
+  }
+
+  public cerrarSalaVirtual(): void {
+    this.dialogSalaVirtual.set(false);
   }
 
   public abrirVisorExamenDirecto(): void {
@@ -2889,10 +3280,93 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public abrirBitacora(item: EvaluacionItemUI): void {
     this.evaluacionSeleccionadaParaBitacora.set(item);
+    this.auditoriaBitacora.set(item.auditoria || []);
+    this.errorBitacora.set('');
+    this.cargandoBitacora.set(true);
+    this._rolService.listarAuditoria(item.id).subscribe({
+      next: auditoria => {
+        this.auditoriaBitacora.set(auditoria);
+        const actualizado = { ...item, auditoria };
+        this.evaluacionSeleccionadaParaBitacora.set(actualizado);
+        this.evaluaciones.update(items => items.map(actual =>
+          actual.id === item.id ? actualizado : actual
+        ));
+        this.cargandoBitacora.set(false);
+      },
+      error: () => {
+        this.errorBitacora.set('No se pudo cargar la bitácora de este rol.');
+        this.cargandoBitacora.set(false);
+      }
+    });
   }
 
   public cerrarBitacora(): void {
     this.evaluacionSeleccionadaParaBitacora.set(null);
+    this.auditoriaBitacora.set([]);
+    this.errorBitacora.set('');
+    this.cargandoBitacora.set(false);
+  }
+
+  public ultimaActividad(item: EvaluacionItemUI): AuditoriaRolExamen | undefined {
+    return item.auditoria?.[0];
+  }
+
+  public formatearFechaHoraAuditoria(fecha?: string): string {
+    if (!fecha) return 'Fecha no disponible';
+    const valor = new Date(fecha);
+    if (Number.isNaN(valor.getTime())) return fecha.replace('T', ' ');
+    return new Intl.DateTimeFormat('es-BO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(valor);
+  }
+
+  public descripcionAuditoria(evento: AuditoriaRolExamen): string {
+    const accion = evento.accion || '';
+    if (accion.startsWith('SUSPENSION_ROL_EXAMEN')) return 'Se suspendió el rol de examen';
+    const descripciones: Record<string, string> = {
+      CREACION_ROL_EXAMEN: 'Se creó el rol de examen',
+      ACTUALIZACION_ROL_EXAMEN: 'Se actualizó el rol de examen',
+      VALIDACION_BANCO_PREGUNTAS: 'Se validó el banco de preguntas',
+      REVALIDACION_BANCO_PREGUNTAS: 'Se volvió a validar el banco de preguntas',
+      ELIMINACION_BANCO_PREGUNTAS: 'Se eliminó el banco de preguntas',
+      GENERACION_LOTE_CARTILLAS_OMR: 'Se generaron las marcas OMR',
+      CONFIRMACION_IMPRESION_CARTILLAS_OMR: 'Se confirmó la impresión de las marcas OMR',
+      RESTABLECIMIENTO_A_VALIDADO: 'Se restableció el rol a Validado',
+      TRANSICION_ESTADO: 'Se avanzó el estado del rol'
+    };
+    return descripciones[accion] || accion.replaceAll('_', ' ').toLowerCase()
+      .replace(/^./, letra => letra.toUpperCase());
+  }
+
+  public etapaAuditoria(evento: AuditoriaRolExamen): string {
+    if (!evento.etapaOrigen || evento.etapaOrigen === '-') {
+      return `Estado registrado: ${this.formatearEstadoAuditoria(evento.etapaDestino)}`;
+    }
+    return `${this.formatearEstadoAuditoria(evento.etapaOrigen)} → ${this.formatearEstadoAuditoria(evento.etapaDestino)}`;
+  }
+
+  public detalleAuditoria(evento: AuditoriaRolExamen): string {
+    if (!evento.detallesJson) return '';
+    try {
+      const detalles = JSON.parse(evento.detallesJson) as { motivo?: string };
+      return detalles.motivo ? `Motivo: ${detalles.motivo}` : '';
+    } catch {
+      return '';
+    }
+  }
+
+  private formatearEstadoAuditoria(estado?: string): string {
+    if (!estado) return 'Sin estado';
+    return estado.charAt(0).toUpperCase() + estado.slice(1).toLowerCase();
+  }
+
+  private auditoriaDeEtapa(item: EvaluacionItemUI, etapa: EtapaEvaluacion): AuditoriaRolExamen | undefined {
+    const destino = etapa.toUpperCase();
+    return item.auditoria?.find(evento => evento.etapaDestino?.toUpperCase() === destino);
   }
 
   public abrirEliminarBanco(item: EvaluacionItemUI): void {
@@ -3001,7 +3475,13 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   private _mostrarToast(msg: string, _tipo?: string): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
     this.toastMessage.set(msg);
-    setTimeout(() => this.toastMessage.set(null), 3500);
+    this.toastTimer = setTimeout(() => {
+      this.toastMessage.set(null);
+      this.toastTimer = undefined;
+    }, 3500);
   }
 }

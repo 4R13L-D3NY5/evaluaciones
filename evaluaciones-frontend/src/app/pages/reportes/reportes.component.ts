@@ -145,9 +145,9 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
               <select 
                 [(ngModel)]="filtroModalidad"
                 class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
-                <option value="Todos">Todas (Con y Sin Cartilla)</option>
-                <option value="CON_CARTILLA">Solo Con Cartilla (OMR)</option>
-                <option value="SIN_CARTILLA">Solo Sin Cartilla (Manual)</option>
+                <option value="Todos">Todas las Modalidades</option>
+                <option value="CON_CARTILLA">Solo Con Cartilla</option>
+                <option value="SIN_CARTILLA">Solo Sin Cartilla</option>
               </select>
             </div>
 
@@ -242,11 +242,11 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
                     <td class="p-3 text-center">
                       @if (item.conCartilla) {
                         <span class="bg-purple-100 text-purple-800 text-[9.5px] font-black px-2 py-0.5 rounded uppercase">
-                          OMR Óptico
+                          Con Cartilla
                         </span>
                       } @else {
                         <span class="bg-slate-100 text-slate-800 text-[9.5px] font-black px-2 py-0.5 rounded uppercase">
-                          Manual
+                          Sin Cartilla
                         </span>
                       }
                     </td>
@@ -592,7 +592,7 @@ export class ReporteEvaluacionesComponent {
         'GRUPO': item.grupo,
         'CARRERA': item.carrera,
         'DOCENTE TITULAR': item.docente,
-        'MODALIDAD': item.conCartilla ? 'CON CARTILLA (OMR)' : 'SIN CARTILLA (MANUAL)',
+        'MODALIDAD': item.conCartilla ? 'CON CARTILLA' : 'SIN CARTILLA',
         'HORA RETIRO': item.etapa !== 'Programado' ? '07:45' : '',
         'CANT. ENTREGADA': item.etapa !== 'Programado' ? '45 unid.' : '',
         'FIRMA ENTREGA DOCENTE': item.etapa !== 'Programado' && item.etapa !== 'Generado' ? 'REGISTRADA' : '',

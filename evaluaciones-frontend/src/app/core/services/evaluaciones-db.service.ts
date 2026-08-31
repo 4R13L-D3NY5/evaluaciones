@@ -29,6 +29,7 @@ export interface RolExamenPersistedItem {
   docenteNombre: string;
   docenteCI: string;
   tipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia';
+  version: number;
   estado: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'REVISADO' | 'SUBIDO' | 'RECIBIDO' | 'SUSPENDIDO' | 'PENDIENTE_FECHA';
   conCartilla: boolean;
   modalidad?: ModalidadExamen;
@@ -72,7 +73,7 @@ export interface BancoPreguntasPersisted {
 })
 export class EvaluacionesDbService {
   public getEstudiantesPorVarianteParam(): number {
-    return 1;
+    return 5;
   }
 
   public setEstudiantesPorVarianteParam(_ratio: number): void {

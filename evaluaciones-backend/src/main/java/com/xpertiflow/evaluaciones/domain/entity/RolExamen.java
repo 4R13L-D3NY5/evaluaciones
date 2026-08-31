@@ -66,6 +66,9 @@ public class RolExamen {
     @Column(name = "tipo_parcial", nullable = false)
     private TipoParcial tipoParcial;
 
+    @Column(name = "version", nullable = false)
+    private Integer version;
+
     @Column(name = "modalidad", nullable = false)
     private ModalidadExamen modalidad;
 

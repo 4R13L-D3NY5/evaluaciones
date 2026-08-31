@@ -20,6 +20,7 @@ import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
+import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
@@ -96,7 +97,8 @@ public class GeneracionTypstService {
         mensaje.put("bancoPreguntasId", request.getBancoPreguntasId());
         mensaje.put("variantes", request.getVariantes());
         mensaje.put("ratioEstudiantesPorVariante", request.getRatioEstudiantesPorVariante() != null
-                ? request.getRatioEstudiantesPorVariante() : 1);
+                ? request.getRatioEstudiantesPorVariante() : 5);
+        mensaje.put("soloVirtual", Boolean.TRUE.equals(request.getSoloVirtual()) || rol.getModalidad() == ModalidadExamen.VIRTUAL);
         mensaje.put("outputBasePath", outputBase);
         mensaje.put("estudiantes", obtenerEstudiantesOficiales(rol));
 
@@ -302,6 +304,7 @@ public class GeneracionTypstService {
             variante.setCuotaDificiles(7);
             variante.setPatronClavesJson(dto.getPatronClavesJson());
             variante.setOrdenReactivosIdsJson(dto.getOrdenReactivosIdsJson());
+            variante.setContenidoVirtualJson(dto.getContenidoVirtualJson());
             variante.setArchivoTypstPath(dto.getArchivoTypstPath());
             variante.setArchivoPdfPath(dto.getArchivoPdfPath());
             variante.setArchivoRemarkXlsxPath(dto.getArchivoRemarkXlsxPath());
@@ -343,6 +346,10 @@ public class GeneracionTypstService {
 
         // 5. Transicionar a GENERADO usando la maquina de estados existente
         if (rol.getEstadoFlujo() == EstadoFlujo.VALIDADO) {
+            if (rol.getModalidad() == ModalidadExamen.VIRTUAL) {
+                log.info("Rol virtual {} preparado: se conservan variantes y asignaciones en VALIDADO, sin PDF", rolExamenId);
+                return;
+            }
             TransicionEstadoRequestDto transicion = TransicionEstadoRequestDto.builder()
                     .nuevoEstado(EstadoFlujo.GENERADO)
                     .usuario("Sistema")

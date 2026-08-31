@@ -51,9 +51,16 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
     job_id = payload["jobId"]
     rol_examen_id = payload["rolExamenId"]
     banco_preguntas_id = payload["bancoPreguntasId"]
-    ratio = int(payload.get("ratioEstudiantesPorVariante", config.RATIO_ESTUDIANTES_POR_VARIANTE))
+    ratio_payload = payload.get("ratioEstudiantesPorVariante", config.RATIO_ESTUDIANTES_POR_VARIANTE)
+    try:
+        ratio = int(ratio_payload)
+    except (TypeError, ValueError):
+        ratio = config.RATIO_ESTUDIANTES_POR_VARIANTE
+    if ratio < 1:
+        ratio = config.RATIO_ESTUDIANTES_POR_VARIANTE
     variantes_letras = list(dict.fromkeys(payload.get("variantes", [])))
     output_base = payload.get("outputBasePath", "/app/storage/generados")
+    solo_virtual = bool(payload.get("soloVirtual", False))
 
     rol = db.obtener_rol_examen(rol_examen_id)
     if not rol:
@@ -104,6 +111,7 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
             "semilla": variante["semilla"],
             "patronClavesJson": variante["patronClavesJson"],
             "ordenReactivosIdsJson": variante["ordenReactivosIdsJson"],
+            "contenidoVirtualJson": variante["contenidoVirtualJson"],
             "archivoPdfPath": variante["archivoPdfPath"],
             "archivoTypstPath": variante["archivoTypstPath"],
         })
@@ -114,13 +122,15 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
     mapeos_result = []
     estudiantes_documento = list(zip(estudiantes, asignaciones))
 
-    documento = generator.generar_documento_unificado(
-        estudiantes_documento,
-        variantes_result,
-        preguntas_por_variante,
-        rol,
-        output_base,
-    )
+    documento = {"archivoPdfPath": None, "archivoTypstPath": None}
+    if not solo_virtual:
+        documento = generator.generar_documento_unificado(
+            estudiantes_documento,
+            variantes_result,
+            preguntas_por_variante,
+            rol,
+            output_base,
+        )
 
     for est, letra in estudiantes_documento:
         mapeos_result.append({
@@ -137,7 +147,11 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
         "jobId": job_id,
         "rolExamenId": rol_examen_id,
         "estado": "COMPLETADO",
-        "mensaje": f"Generadas {len(mapeos_result)} evaluaciones en un documento oficial y {len(variantes_result)} variantes",
+        "mensaje": (
+            f"Preparadas {len(mapeos_result)} evaluaciones virtuales y {len(variantes_result)} variantes sin PDF"
+            if solo_virtual else
+            f"Generadas {len(mapeos_result)} evaluaciones en un documento oficial y {len(variantes_result)} variantes"
+        ),
         "variantes": variantes_result,
         "mapeos": mapeos_result,
     }
@@ -150,7 +164,7 @@ def run_local_test() -> None:
         "rolExamenId": "ROL-CPEC18-TA01-1P",
         "bancoPreguntasId": "BANCO-CPEC18-001",
         "variantes": ["A", "B", "C"],
-        "ratioEstudiantesPorVariante": 1,
+        "ratioEstudiantesPorVariante": 5,
         "outputBasePath": os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_output"),
     }
     result = procesar_job(payload)

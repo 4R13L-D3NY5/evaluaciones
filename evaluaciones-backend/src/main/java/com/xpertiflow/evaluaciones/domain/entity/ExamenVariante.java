@@ -45,6 +45,10 @@ public class ExamenVariante {
     @Column(name = "orden_reactivos_ids_json", nullable = false, columnDefinition = "TEXT")
     private String ordenReactivosIdsJson;
 
+    /** Contenido renderizable para modalidad virtual, sin respuestas correctas. */
+    @Column(name = "contenido_virtual_json", columnDefinition = "TEXT")
+    private String contenidoVirtualJson;
+
     @Column(name = "archivo_typst_path", length = 255)
     private String archivoTypstPath;
 

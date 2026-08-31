@@ -70,12 +70,13 @@ La cartilla OMR es un documento separado del examen. El cuadernillo no incluye c
 - Los incisos y su texto no llevan negrita.
 - No se debe forzar un salto de línea después de `___`; el salto se aplica únicamente cuando el texto alcanza el margen derecho.
 - El primer inciso, cuando exista, se presenta debajo del enunciado y no en la línea del número ni de los guiones.
-- Esta regla aplica a selección, premisas, casos prácticos y emparejamiento.
+- Esta regla aplica a selección, premisas, casos prácticos y a las preguntas dependientes de un emparejamiento.
 - Cada nueva sección debe destacarse con una línea superior gruesa, título en negrita y mayúsculas, una instrucción descriptiva y una línea inferior fina.
 - En las instrucciones solo la palabra `INSTRUCCIONES:` se escribe en mayúsculas; el texto descriptivo conserva mayúsculas y minúsculas normales. Las claves de premisas, V/F complejas y emparejamiento preservan sus saltos de línea semánticos.
 - Los bloques de sección deben conservar separación vertical suficiente para que el estudiante identifique con facilidad el cambio de tipo de reactivo.
 - Los casos clínicos o problemas y los emparejamientos deben conservar sus bloques tipo tarjeta con borde; las preguntas internas respetan la numeración y los incisos del formato general.
-- Los enunciados mantienen texto normal, sin negrita, salvo el número de pregunta y sus tres guiones `___`.
+- Los enunciados mantienen texto normal, sin negrita, salvo el número de pregunta y sus tres guiones `___`. El enunciado principal de un emparejamiento se mantiene dentro de su tarjeta de referencia.
+- En `Emparejamiento Ampliado`, el enunciado principal y sus opciones de referencia A-E se imprimen dentro de la tarjeta, sin número de pregunta ni `___`. Las opciones relacionadas del grupo se imprimen después como preguntas numeradas y sí conservan `___`.
 - Verdadero o falso simple no muestra incisos ni opciones impresas; el estudiante responde en el espacio `___` y la clave se conserva únicamente de forma interna para calificación.
 
 ## 6. Variantes y asignación
@@ -141,6 +142,7 @@ Debe conservarse en la base de datos:
 | 2026-08-29 | Recuperación de cabecera institucional, separadores superior/inferior por sección, instrucciones en mayúsculas, numeración con `___` en negrita y tarjetas para casos/emparejamientos en el PDF oficial y la previsualización. |
 | 2026-08-29 | Previsualización PDF real del banco, sin datos ficticios, una sola columna y normalización de etiquetas descriptivas oficiales del Excel. |
 | 2026-08-30 | La aprobación de la previsualización queda bloqueada hasta recorrer todas las páginas del PDF real; se agrega un mensaje explícito y se aclara que las observaciones de opciones se corrigen en el Excel oficial. |
+| 2026-08-30 | El enunciado principal de Emparejamiento Ampliado se presenta dentro de su tarjeta de referencia, sin `___`; las preguntas dependientes mantienen la numeración y los guiones. La previsualización usa los parámetros persistidos de Administración de Evaluaciones. |
 | 2026-08-29 | Un PDF consolidado por rol, un examen por estudiante, inicio en página impar, pie con identidad y paginación reiniciada, ratio 5 y asignación aleatoria. |
 | 2026-08-28 | Times New Roman 11 pt, leading 1 em, separación 1,5 em, incisos con sangría, tres guiones por pregunta y eliminación de cartilla/vista previa. |
 # Nota operativa de cartilla OMR

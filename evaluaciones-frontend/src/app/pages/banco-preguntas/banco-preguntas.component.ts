@@ -7,6 +7,7 @@ import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.servi
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
+import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
@@ -425,7 +426,7 @@ export interface DiaCalendario {
                       </span>
                     </div>
                     <p class="text-xs text-amber-900/90 dark:text-amber-300/90 font-medium leading-relaxed">
-                      El banco de preguntas ha alcanzado el 100% de cuotas válidas. Por normativa institucional, <strong>debes abrir "Previsualizar Examen (Paso 1 Obligatorio)" y recorrer el PDF completo hasta su última página</strong> para verificar la diagramación oficial, fórmulas matemáticas/químicas y enunciados antes de desbloquear la descarga del paquete encriptado (.pkg), la remisión oficial o el registro del banco.
+                      El banco de preguntas ha cumplido las cuotas mínimas. Por normativa institucional, <strong>debes abrir "Previsualizar Examen (Paso 1 Obligatorio)" y recorrer el PDF completo hasta su última página</strong> para verificar la diagramación oficial, fórmulas matemáticas/químicas y enunciados antes de desbloquear la descarga del paquete encriptado (.pkg), la remisión oficial o el registro del banco.
                     </p>
                   </div>
                 </div>
@@ -461,7 +462,7 @@ export interface DiaCalendario {
                     Banco validado, pero el rol no admite nuevos registros
                   </h5>
                   <p class="text-xs text-amber-900/90 dark:text-amber-300/90 font-medium leading-relaxed">
-                    El archivo cumple el 100%, pero el rol está en <strong>{{ rolExamenActivo()?.estadoFlujo }}</strong>. Restablécelo a <strong>VALIDADO</strong> desde Evaluaciones del día antes de aprobar o reemplazar el banco.
+                    El archivo cumple las cuotas mínimas, pero el rol está en <strong>{{ rolExamenActivo()?.estadoFlujo }}</strong>. Restablécelo a <strong>VALIDADO</strong> desde Evaluaciones del día antes de aprobar o reemplazar el banco.
                   </p>
                 </div>
               </div>
@@ -487,11 +488,11 @@ export interface DiaCalendario {
             </div>
 
             <!-- Resumen de Errores si el archivo no es válido -->
-            @if (preguntasConErrores().length > 0) {
+            @if (observacionesValidacion().length > 0 || preguntasConErrores().length > 0) {
               <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 space-y-2 text-xs animate-fade-in">
                 <div class="flex items-center gap-2 font-black text-rose-900">
                   <i class="pi pi-exclamation-triangle text-rose-600"></i>
-                  <span>Se detectaron {{ preguntasConErrores().length }} filas con observaciones que deben corregirse:</span>
+                  <span>Observaciones encontradas que deben corregirse antes de aprobar:</span>
                 </div>
                 <div class="rounded-lg border border-rose-200 bg-white/70 px-3 py-2 text-[11px] leading-relaxed text-rose-900">
                   <strong>¿Dónde corregir la opción?</strong> La aplicación no mueve incisos automáticamente. Corrige la fila en el Excel original,
@@ -500,10 +501,16 @@ export interface DiaCalendario {
                   Luego vuelve a cargar el archivo para ejecutar nuevamente todas las validaciones.
                 </div>
                 <ul class="list-disc pl-5 space-y-1 text-rose-800 text-[11px]">
-                  @for (errItem of preguntasConErrores(); track errItem.fila) {
-                    <li>
-                      <strong>Fila {{ errItem.fila }}:</strong> {{ errItem.errores.join(', ') }} <em>({{ errItem.enunciado ? (errItem.enunciado | slice:0:60) + '...' : 'Sin enunciado' }})</em>
-                    </li>
+                  @for (observacion of observacionesValidacion(); track observacion) {
+                    <li>{{ observacion }}</li>
+                  }
+                  @if (preguntasConErrores().length > 0) {
+                    <li>Hay {{ preguntasConErrores().length }} filas con errores específicos:</li>
+                    @for (errItem of preguntasConErrores(); track errItem.fila) {
+                      <li class="ml-4">
+                        <strong>Fila {{ errItem.fila }}:</strong> {{ errItem.errores.join(', ') }} <em>({{ errItem.enunciado ? (errItem.enunciado | slice:0:60) + '...' : 'Sin enunciado' }})</em>
+                      </li>
+                    }
                   }
                 </ul>
               </div>
@@ -519,7 +526,7 @@ export interface DiaCalendario {
                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Estado del Examen</span>
                 <h3 class="text-base font-black text-foreground mt-0.5">{{ parcialActivo() }}</h3>
                 <p class="text-xs font-bold text-primary font-mono mt-1">
-                  {{ totalPreguntasValidas() }}/{{ totalPreguntasRequeridas() }} preguntas validadas
+                  {{ totalPreguntasValidas() }} preguntas válidas (mínimo {{ totalPreguntasRequeridas() }})
                 </p>
               </div>
               
@@ -527,9 +534,9 @@ export interface DiaCalendario {
                 @if (esBancoTotalmenteValido()) {
                   <div class="bg-emerald-50 border border-emerald-300 p-3 rounded-xl text-center space-y-1">
                     <span class="text-emerald-800 font-black text-xs flex items-center justify-center gap-1">
-                      <i class="pi pi-shield text-emerald-600"></i> EXAMEN 100% APROBADO
+                      <i class="pi pi-shield text-emerald-600"></i> EXAMEN APROBADO
                     </span>
-                    <p class="text-[10px] text-emerald-700">Cuotas cumplidas y reactivos conformes</p>
+                    <p class="text-[10px] text-emerald-700">Cuotas mínimas cumplidas y reactivos conformes</p>
                   </div>
                 } @else {
                   <div class="bg-amber-50 border border-amber-300 p-3 rounded-xl text-center space-y-0.5">
@@ -554,10 +561,10 @@ export interface DiaCalendario {
                 <div>
                   <div class="flex justify-between font-bold text-[11px] mb-1">
                     <span class="text-emerald-700">Fáciles (1)</span>
-                    <span class="font-mono text-foreground">{{ countFaciles() }}/{{ cuotasDificultad().facil }}</span>
+                    <span class="font-mono text-foreground">{{ countFaciles() }}/{{ cuotasDificultad().facil }} mín.</span>
                   </div>
                   <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="(countFaciles() / cuotasDificultad().facil) * 100"></div>
+                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="porcentajeCuota(countFaciles(), cuotasDificultad().facil)"></div>
                   </div>
                 </div>
 
@@ -565,10 +572,10 @@ export interface DiaCalendario {
                 <div>
                   <div class="flex justify-between font-bold text-[11px] mb-1">
                     <span class="text-amber-600">Medias (2)</span>
-                    <span class="font-mono text-foreground">{{ countMedias() }}/{{ cuotasDificultad().medio }}</span>
+                    <span class="font-mono text-foreground">{{ countMedias() }}/{{ cuotasDificultad().medio }} mín.</span>
                   </div>
                   <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-amber-500 rounded-full transition-all duration-500" [style.width.%]="(countMedias() / cuotasDificultad().medio) * 100"></div>
+                    <div class="h-full bg-amber-500 rounded-full transition-all duration-500" [style.width.%]="porcentajeCuota(countMedias(), cuotasDificultad().medio)"></div>
                   </div>
                 </div>
 
@@ -576,17 +583,17 @@ export interface DiaCalendario {
                 <div>
                   <div class="flex justify-between font-bold text-[11px] mb-1">
                     <span class="text-rose-600">Difíciles (3)</span>
-                    <span class="font-mono text-foreground">{{ countDificiles() }}/{{ cuotasDificultad().dificil }}</span>
+                    <span class="font-mono text-foreground">{{ countDificiles() }}/{{ cuotasDificultad().dificil }} mín.</span>
                   </div>
                   <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-rose-500 rounded-full transition-all duration-500" [style.width.%]="(countDificiles() / cuotasDificultad().dificil) * 100"></div>
+                    <div class="h-full bg-rose-500 rounded-full transition-all duration-500" [style.width.%]="porcentajeCuota(countDificiles(), cuotasDificultad().dificil)"></div>
                   </div>
                 </div>
               </div>
 
               <div [class]="cuotaDificultadCumplida() ? 'text-emerald-700' : 'text-amber-700'" class="text-[10px] font-extrabold flex items-center gap-1 pt-1">
                 <i [class]="cuotaDificultadCumplida() ? 'pi pi-check-circle text-xs' : 'pi pi-exclamation-circle text-xs'"></i>
-                <span>{{ cuotaDificultadCumplida() ? '100% de cuotas alcanzadas para este examen' : 'Cuotas incompletas según parcial' }}</span>
+                <span>{{ cuotaDificultadCumplida() ? 'Cuotas mínimas alcanzadas para este examen' : 'Faltan preguntas para completar las cuotas mínimas' }}</span>
               </div>
             </div>
 
@@ -2307,6 +2314,7 @@ export class BancoPreguntasComponent implements OnInit {
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _rolService = inject(RolExamenService);
   private readonly _bancoService = inject(BancoPreguntasService);
+  private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
 
@@ -2380,6 +2388,11 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public ngOnInit(): void {
+    this._configuracionService.cargar().subscribe({
+      error: () => {
+        // Se conservan los valores oficiales predeterminados del servicio.
+      }
+    });
     this._cargarSedes();
   }
 
@@ -2787,15 +2800,42 @@ export class BancoPreguntasComponent implements OnInit {
 
   public cuotaDificultadCumplida = computed(() => {
     const c = this.cuotasDificultad();
-    return this.countFaciles() === c.facil && this.countMedias() === c.medio && this.countDificiles() === c.dificil;
+    return this.countFaciles() >= c.facil && this.countMedias() >= c.medio && this.countDificiles() >= c.dificil;
   });
 
   public esBancoTotalmenteValido = computed(() => {
-    return this.totalPreguntasValidas() === this.totalPreguntasRequeridas() && this.cuotaDificultadCumplida() && this.preguntasConErrores().length === 0;
+    return this.totalPreguntasValidas() >= this.totalPreguntasRequeridas() && this.cuotaDificultadCumplida() && this.preguntasConErrores().length === 0;
   });
 
   public preguntasConErrores = computed(() => {
     return this.preguntasCargadas().filter(p => !p.valido);
+  });
+
+  public observacionesValidacion = computed(() => {
+    const preguntas = this.preguntasCargadas();
+    if (preguntas.length === 0) return [] as string[];
+
+    const observaciones: string[] = [];
+    const cuotas = this.cuotasDificultad();
+    const validas = this.totalPreguntasValidas();
+
+    if (preguntas.length < cuotas.total) {
+      observaciones.push(`Cantidad total: se encontraron ${preguntas.length} reactivos y se requieren como mínimo ${cuotas.total}.`);
+    }
+    if (validas < cuotas.total) {
+      observaciones.push(`Preguntas válidas: hay ${validas} y se requieren como mínimo ${cuotas.total} para aprobar el examen.`);
+    }
+    if (this.countFaciles() < cuotas.facil) {
+      observaciones.push(`Dificultad fácil: hay ${this.countFaciles()} y se requieren como mínimo ${cuotas.facil}.`);
+    }
+    if (this.countMedias() < cuotas.medio) {
+      observaciones.push(`Dificultad media: hay ${this.countMedias()} y se requieren como mínimo ${cuotas.medio}.`);
+    }
+    if (this.countDificiles() < cuotas.dificil) {
+      observaciones.push(`Dificultad difícil: hay ${this.countDificiles()} y se requieren como mínimo ${cuotas.dificil}.`);
+    }
+
+    return observaciones;
   });
 
   public filtroPdfDificultad = signal<'TODAS' | '1' | '2' | '3'>('TODAS');
@@ -2890,6 +2930,10 @@ export class BancoPreguntasComponent implements OnInit {
     if (dif === '1') return 'Fácil';
     if (dif === '3') return 'Difícil';
     return 'Media';
+  }
+
+  public porcentajeCuota(actual: number, minimo: number): number {
+    return minimo > 0 ? Math.min(100, (actual / minimo) * 100) : 0;
   }
 
   public nombreArchivoPaquete = computed(() => {
@@ -3435,7 +3479,7 @@ FECHA Y HORA: ${c.fechaHora}
 • Correo Institucional: ${c.correoDocente}
 
 3. CERTIFICACIÓN DE REACTIVOS Y BANCO:
-• Total de Preguntas Validadas: ${c.totalPreguntas} reactivos conformes (100% de cuotas)
+• Total de Preguntas Validadas: ${c.totalPreguntas} reactivos conformes (cuotas mínimas cumplidas)
 • Archivo del Paquete Encriptado: ${c.nombreArchivoPkg}
 • Sello Criptográfico SHA-256: ${c.hashCriptografico}
 
@@ -3553,13 +3597,23 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   }
 
   private async _crearPdfPreviewOficial(preguntas: PreguntaValidada[]): Promise<Blob> {
-    const ancho = 215.9;
-    const alto = 330.2;
+    const configuracion = this._configuracionService.configuracion();
+    const dimensiones = (configuracion.formatoHoja || '').toUpperCase().includes('A4')
+      ? { ancho: 210, alto: 297 }
+      : { ancho: 215.9, alto: 330.2 };
+    const ancho = dimensiones.ancho;
+    const alto = dimensiones.alto;
     const margen = 20;
     const pieReservado = 18;
-    const interlineado = 11 * 0.8 * 0.352778;
-    const separacionPregunta = 11 * 1.2 * 0.352778;
-    const indentacion = 11 * 0.352778;
+    const tamanoFuente = Number(configuracion.tamanoLetraPt) || 11;
+    const factoresLeading = (configuracion.espaciadoLeading || '').match(/\d+(?:\.\d+)?/g)?.map(Number) || [];
+    const interlineado = tamanoFuente * (factoresLeading[0] || 0.8) * 0.352778;
+    const separacionPregunta = tamanoFuente * (factoresLeading[1] || 1.2) * 0.352778;
+    const indentacion = tamanoFuente * 0.352778;
+    const fuenteConfigurada = (configuracion.tipoLetra || '').toLowerCase();
+    const familiaFuente = fuenteConfigurada.includes('arial')
+      ? 'helvetica'
+      : fuenteConfigurada.includes('courier') ? 'courier' : 'times';
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [ancho, alto], compress: true });
     let pagina = 1;
     let y = margen;
@@ -3583,8 +3637,8 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     });
     const logoData = await cargarLogo();
 
-    const fuente = (estilo: 'normal' | 'bold' | 'italic' = 'normal', tamano = 11) => {
-      doc.setFont('times', estilo);
+    const fuente = (estilo: 'normal' | 'bold' | 'italic' = 'normal', tamano = tamanoFuente) => {
+      doc.setFont(familiaFuente, estilo);
       doc.setFontSize(tamano);
       doc.setTextColor(0, 0, 0);
     };
@@ -3596,7 +3650,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     };
 
     const escribir = (texto: string, x: number, anchoDisponible: number, estilo: 'normal' | 'bold' | 'italic' = 'normal', salto = interlineado): void => {
-      fuente(estilo);
+      fuente(estilo, tamanoFuente);
       // Mantener los saltos semánticos del Excel (premisas, claves y casos)
       // mientras se ajusta cada línea al ancho de la hoja.
       const lineas = (texto || '').split(/\r?\n/).flatMap(linea =>
@@ -3659,7 +3713,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.2);
       doc.rect(margen, y - 3, ancho - margen * 2, altoTarjeta);
-      fuente('normal');
+      fuente('normal', tamanoFuente);
       let tarjetaY = y + interlineado - 1;
       contenido.forEach(linea => {
         doc.text(linea, margen + 4, tarjetaY);
@@ -3670,7 +3724,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
     const escribirPregunta = (numero: number, enunciado: string): void => {
       const prefijo = `${numero}. ___`;
-      fuente('bold');
+      fuente('bold', tamanoFuente);
       const anchoPrefijo = doc.getTextWidth(prefijo) + 1;
       const lineasEnunciado = (enunciado || '').split(/\r?\n/).flatMap((linea, indice) =>
         doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), indice === 0 ? ancho - margen * 2 - anchoPrefijo : ancho - margen * 2) as string[]
@@ -3678,7 +3732,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       const altoPregunta = Math.max(1, lineasEnunciado.length) * interlineado;
       if (y + altoPregunta > alto - margen - pieReservado) nuevaPagina();
       doc.text(prefijo, margen, y);
-      fuente('normal');
+      fuente('normal', tamanoFuente);
       doc.text(lineasEnunciado.length ? lineasEnunciado[0] : '', margen + anchoPrefijo, y);
       y += interlineado;
       lineasEnunciado.slice(1).forEach(linea => {
@@ -3688,13 +3742,13 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     };
 
     const piePagina = () => {
-      fuente('normal', 11);
+      fuente('normal', tamanoFuente);
       doc.text('NOMBRE COMPLETO:', margen, alto - 12);
       // En la previsualización los valores permanecen vacíos. La excepción
       // de 15 pt aplica únicamente al valor del código del estudiante en el
       // examen generado, no a la etiqueta.
       doc.text('CÓDIGO:', margen, alto - 6);
-      fuente('normal', 11);
+      fuente('normal', tamanoFuente);
       doc.text(`PÁG. ${pagina}`, ancho - margen, alto - 6, { align: 'right' });
     };
 
@@ -3706,10 +3760,10 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     if (logoData) {
       doc.addImage(logoData, 'PNG', margen + 7, y + 5, 31, 12);
     } else {
-      fuente('bold');
+      fuente('bold', tamanoFuente);
       doc.text('UNITEPC', margen + cabeceraMitad / 2, y + 11, { align: 'center' });
     }
-    fuente('bold');
+    fuente('bold', tamanoFuente);
     doc.text('UNIVERSIDAD TECNICA PRIVADA COSMOS', margen + cabeceraMitad + (ancho - margen * 2 - cabeceraMitad) / 2, y + 6, { align: 'center' });
     doc.text('GESTION 2-2026', margen + cabeceraMitad + (ancho - margen * 2 - cabeceraMitad) / 2, y + 11, { align: 'center' });
     doc.line(margen + cabeceraMitad + 8, y + 14, ancho - margen - 8, y + 14);
@@ -3723,7 +3777,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     for (let fila = 1; fila < 5; fila++) {
       doc.line(margen, y + fila * (fichaVaciaAlto / 5), ancho - margen, y + fila * (fichaVaciaAlto / 5));
     }
-    fuente('normal');
+    fuente('normal', tamanoFuente);
     const col2 = ancho / 2 + 4;
     const filasFicha = [
       ['NOMBRE:', 'CARRERA:'],
@@ -3739,7 +3793,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     });
     y += fichaVaciaAlto + interlineado;
 
-    fuente('bold');
+    fuente('bold', tamanoFuente);
     doc.text(`CUESTIONARIO DE PREGUNTAS (${preguntas.length})`, ancho / 2, y, { align: 'center' });
     y += interlineado;
     doc.setLineWidth(0.35);
@@ -3747,6 +3801,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     y += interlineado;
 
     let tipoAnterior = '';
+    const tieneTroncoEmparejamiento = preguntas.some(item => item.tipo === 'EMPAREJAMIENTO_TRONCO');
     const medirLineas = (texto: string, anchoDisponible: number): string[] => (
       (texto || '').split(/\r?\n/).flatMap(linea =>
         doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), anchoDisponible) as string[]
@@ -3754,21 +3809,38 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     );
 
     preguntas.forEach((pregunta, indice) => {
-      const tipo = tituloTipo(pregunta.tipo);
+      const tipoSeccion = ['EMPAREJAMIENTO_TRONCO', 'OPCION_EMPAREJAMIENTO'].includes(pregunta.tipo)
+        ? 'EMPAREJAMIENTO_TRONCO'
+        : pregunta.tipo;
+      const tipo = tituloTipo(tipoSeccion);
       if (tipo && tipo !== tipoAnterior) {
-        dibujarSeccion(pregunta.tipo);
+        dibujarSeccion(tipoSeccion);
         if (pregunta.tipo === 'SUBITEM_CASO' || pregunta.tipo === 'CASO_CLINICO_TRONCO') {
           dibujarTarjeta(['CASO CLINICO O PROBLEMA:  RESPONDA LAS PREGUNTAS DEL GRUPO.']);
-        } else if (pregunta.tipo === 'OPCION_EMPAREJAMIENTO' || pregunta.tipo === 'EMPAREJAMIENTO_TRONCO') {
+        } else if (pregunta.tipo === 'OPCION_EMPAREJAMIENTO' && !tieneTroncoEmparejamiento) {
           dibujarTarjeta(['RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:', 'A) ...', 'B) ...', 'C) ...', 'D) ...', 'E) ...']);
         }
         tipoAnterior = tipo;
       }
 
+      // El enunciado principal del emparejamiento es una tarjeta de referencia,
+      // no un reactivo que deba responderse con la marca "___".
+      if (pregunta.tipo === 'EMPAREJAMIENTO_TRONCO') {
+        const opcionesReferencia: Array<[string, string]> = [
+          ['A', pregunta.opcion_a], ['B', pregunta.opcion_b], ['C', pregunta.opcion_c],
+          ['D', pregunta.opcion_d], ['E', pregunta.opcion_e]
+        ].filter(([, texto]) => !!texto?.trim()) as Array<[string, string]>;
+        dibujarTarjeta([
+          pregunta.enunciado || 'RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:',
+          ...opcionesReferencia.map(([letra, texto]) => `${letra}) ${texto}`)
+        ]);
+        return;
+      }
+
       // Reservar el bloque completo antes de dibujarlo para que el número,
       // enunciado e incisos permanezcan juntos en la misma página.
       const prefijo = `${indice + 1}. ___`;
-      fuente('bold');
+      fuente('bold', tamanoFuente);
       const anchoPrefijo = doc.getTextWidth(prefijo) + 1;
       const lineasEnunciado = medirLineas(pregunta.enunciado || '', ancho - margen * 2 - anchoPrefijo);
       const opciones: Array<[string, string]> = pregunta.tipo === 'VERDADERO_O_FALSO_SIMPLE' ? [] : [
@@ -3951,7 +4023,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       return;
     }
     if (!this.esBancoTotalmenteValido()) {
-      this._mostrarToast('El banco todavía no cumple las 60 preguntas y las cuotas 15/30/15.', 'error');
+      this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas 15/30/15.', 'error');
       return;
     }
 

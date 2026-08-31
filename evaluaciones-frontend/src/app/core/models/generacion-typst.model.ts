@@ -36,6 +36,7 @@ export interface GeneracionTypstRequest {
   bancoPreguntasId: string;
   variantes: ('A' | 'B' | 'C' | 'D' | 'E')[];
   ratioEstudiantesPorVariante?: number;
+  soloVirtual?: boolean;
   outputBasePath?: string;
 }
 

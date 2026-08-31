@@ -19,6 +19,7 @@ export interface RolExamenResponse {
   docenteNombre: string;
   docenteCi: string;
   tipoParcial: string;
+  version: number;
   modalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';
   estadoFlujo: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'REVISADO' | 'SUBIDO' | 'RECIBIDO' | 'SUSPENDIDO';
   semana: number;
@@ -53,6 +54,7 @@ export interface RolExamenCreateRequest {
   docenteNombre: string;
   docenteCi: string;
   tipoParcial: string;
+  version?: number;
   modalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';
   semana: number;
   dia: string;
@@ -74,6 +76,18 @@ export interface RestablecerRolRequest {
   motivo: string;
   usuario?: string;
   ipOrigen?: string;
+}
+
+export interface AuditoriaRolExamen {
+  id: number;
+  rolExamenId: string;
+  etapaOrigen: string;
+  etapaDestino: string;
+  accion: string;
+  usuario: string;
+  ipOrigen?: string;
+  detallesJson?: string;
+  fechaEvento?: string;
 }
 
 /**
@@ -164,6 +178,15 @@ export class RolExamenService {
     return this._http.post<RolExamenResponse>(`${this._baseUrl}/${id}/restablecer`, dto).pipe(
       catchError(err => {
         console.error(`[RolExamenService] Error al restablecer el rol ${id}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public listarAuditoria(id: string): Observable<AuditoriaRolExamen[]> {
+    return this._http.get<AuditoriaRolExamen[]>(`${this._baseUrl}/${id}/auditoria`).pipe(
+      catchError(err => {
+        console.error(`[RolExamenService] Error al cargar la bitácora del rol ${id}:`, err);
         return throwError(() => err);
       })
     );

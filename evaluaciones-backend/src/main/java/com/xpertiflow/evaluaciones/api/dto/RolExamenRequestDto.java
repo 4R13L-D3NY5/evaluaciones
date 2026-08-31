@@ -52,6 +52,9 @@ public class RolExamenRequestDto {
     @NotNull
     private TipoParcial tipoParcial;
 
+    /** Opcional en la solicitud: el servidor asigna la siguiente versión disponible. */
+    private Integer version;
+
     @NotNull
     private ModalidadExamen modalidad;
 

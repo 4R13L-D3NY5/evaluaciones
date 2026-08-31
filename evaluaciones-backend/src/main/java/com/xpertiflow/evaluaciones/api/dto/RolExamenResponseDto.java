@@ -28,6 +28,7 @@ public class RolExamenResponseDto {
     private String docenteNombre;
     private String docenteCi;
     private TipoParcial tipoParcial;
+    private Integer version;
     private ModalidadExamen modalidad;
     private EstadoFlujo estadoFlujo;
     private Integer semana;

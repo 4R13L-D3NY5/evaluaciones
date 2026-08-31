@@ -2,7 +2,7 @@ import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
-import { EvaluacionesDbService } from '../../core/services/evaluaciones-db.service';
+import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 
 export interface CampusItem {
   id: number;
@@ -449,9 +449,10 @@ export interface ParcialConfig {
 
                 <button 
                   (click)="guardarConfiguracion()"
-                  class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-xs transition-colors">
-                  <i class="pi pi-save"></i>
-                  <span>Guardar Configuración</span>
+                  [disabled]="guardandoConfiguracion()"
+                  class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-xs transition-colors disabled:opacity-60 disabled:cursor-wait">
+                  <i [class]="guardandoConfiguracion() ? 'pi pi-spin pi-spinner' : 'pi pi-save'"></i>
+                  <span>{{ guardandoConfiguracion() ? 'Guardando...' : 'Guardar Configuración' }}</span>
                 </button>
               </div>
 
@@ -590,11 +591,14 @@ export interface ParcialConfig {
                         [(ngModel)]="ratioEstudiantesPorVariante" 
                         min="1" 
                         max="30"
+                        step="1"
+                        required
+                        (blur)="normalizarRatioConfiguracion()"
                         class="w-24 bg-card border border-border rounded-xl px-3 py-1.5 text-xs font-mono font-bold">
                       <span class="text-xs font-bold text-foreground">estudiantes / variante</span>
                     </div>
                     <p class="text-[10px] text-muted-foreground mt-1">
-                      Para esta fase de pruebas se utilizará 1 estudiante por variante (máx. 5 variantes A–E).
+                      La generación calcula ceil(nómina / ratio) y utiliza como máximo 5 variantes (A–E).
                     </p>
                   </div>
 
@@ -736,6 +740,18 @@ export interface ParcialConfig {
                       <div class="flex items-center gap-2 pt-1 max-w-xs">
                         <input type="number" [(ngModel)]="tiempoMinutosAntesEntrega" class="w-full bg-card border border-border rounded-lg p-2 text-xs font-mono font-bold text-foreground">
                         <span class="text-xs font-bold text-muted-foreground font-mono">min</span>
+                      </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 space-y-1.5">
+                      <label class="block text-xs font-black text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
+                        <i class="pi pi-desktop text-purple-600"></i>
+                        <span>Duración predeterminada del examen virtual</span>
+                      </label>
+                      <p class="text-[11px] text-muted-foreground">Se hereda al crear cada sala virtual. El valor inicial es de 45 minutos.</p>
+                      <div class="flex items-center gap-2 pt-1 max-w-xs">
+                        <input type="number" [(ngModel)]="duracionExamenVirtualMinutos" min="1" max="480" step="1" class="w-full bg-card border border-purple-300 dark:border-purple-700 rounded-lg p-2 text-xs font-mono font-black text-purple-700 dark:text-purple-300">
+                        <span class="text-xs font-bold text-purple-800 dark:text-purple-300 font-mono">minutos</span>
                       </div>
                     </div>
 
@@ -1030,16 +1046,27 @@ export interface ParcialConfig {
 })
 export class AdministracionEvaluacionesComponent {
   public readonly storage = inject(EvaluacionesStorageService);
-  private readonly _db = inject(EvaluacionesDbService);
+  private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
   public readonly Math = Math;
 
-  public ratioEstudiantesPorVariante: number = 1;
+  public ratioEstudiantesPorVariante: number = 5;
+  public guardandoConfiguracion = signal<boolean>(false);
 
   public tabActual = signal<'campus' | 'carreras' | 'usuarios' | 'configuracion' | 'tiempos'>('campus');
   public toastMessage = signal<string | null>(null);
 
   constructor() {
-    this.ratioEstudiantesPorVariante = this._db.getEstudiantesPorVarianteParam();
+    this._configuracionService.cargar().subscribe({
+      next: configuracion => {
+        this.ratioEstudiantesPorVariante = configuracion.ratioEstudiantesPorVariante;
+        this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
+        this.typstFormatoHoja = configuracion.formatoHoja;
+        this.typstFuente = configuracion.tipoLetra;
+        this.typstTamanoFuente = configuracion.tamanoLetraPt;
+        this.typstLeading = configuracion.espaciadoLeading;
+      },
+      error: () => this._mostrarToast('No se pudo cargar la configuración de evaluaciones. Se utilizará el valor por defecto.')
+    });
     // El catálogo operativo debe llegar desde SEA. No mostrar catálogos
     // históricos o de demostración embebidos en el frontend.
     this.listaCampus = [];
@@ -1179,6 +1206,7 @@ export class AdministracionEvaluacionesComponent {
   public tiempoHorasPostPatron = 8;
   public tiempoHorasAntesLista = 24;
   public tiempoHorasCandado72 = 72;
+  public duracionExamenVirtualMinutos = 45;
 
   // Filtros computados
   public campusFiltrados = computed(() => {
@@ -1349,12 +1377,61 @@ export class AdministracionEvaluacionesComponent {
 
   // Acciones Configuración
   public guardarConfiguracion(): void {
-    this._db.setEstudiantesPorVarianteParam(this.ratioEstudiantesPorVariante || 1);
-    this._mostrarToast(`Ratio de ${this.ratioEstudiantesPorVariante} alumno(s) por variante aplicado durante esta sesión.`);
+    this.normalizarRatioConfiguracion();
+    this.guardandoConfiguracion.set(true);
+    this._configuracionService.guardar({
+      ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
+      duracionExamenVirtualMinutos: this.normalizarDuracionVirtual(),
+      formatoHoja: this.typstFormatoHoja,
+      tipoLetra: this.typstFuente,
+      tamanoLetraPt: this.typstTamanoFuente,
+      espaciadoLeading: this.typstLeading
+    }).subscribe({
+      next: configuracion => {
+        this.ratioEstudiantesPorVariante = configuracion.ratioEstudiantesPorVariante;
+        this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
+        this.typstFormatoHoja = configuracion.formatoHoja;
+        this.typstFuente = configuracion.tipoLetra;
+        this.typstTamanoFuente = configuracion.tamanoLetraPt;
+        this.typstLeading = configuracion.espaciadoLeading;
+        this.guardandoConfiguracion.set(false);
+        this._mostrarToast(`Configuración guardada: ${configuracion.formatoHoja}, ${configuracion.tipoLetra} ${configuracion.tamanoLetraPt} pt.`);
+      },
+      error: () => {
+        this.guardandoConfiguracion.set(false);
+        this._mostrarToast('No se pudo guardar la configuración en el servidor.');
+      }
+    });
+  }
+
+  public normalizarRatioConfiguracion(): void {
+    const ratio = Number(this.ratioEstudiantesPorVariante);
+    this.ratioEstudiantesPorVariante = Number.isFinite(ratio)
+      ? Math.min(30, Math.max(1, Math.trunc(ratio)))
+      : 5;
   }
 
   public guardarTiempos(): void {
-    this._mostrarToast(`Configuración de tiempos guardada exitosamente para la gestión ${this.gestionTiempos}.`);
+    this.duracionExamenVirtualMinutos = this.normalizarDuracionVirtual();
+    this._configuracionService.guardar({
+      ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
+      duracionExamenVirtualMinutos: this.duracionExamenVirtualMinutos,
+      formatoHoja: this.typstFormatoHoja,
+      tipoLetra: this.typstFuente,
+      tamanoLetraPt: this.typstTamanoFuente,
+      espaciadoLeading: this.typstLeading
+    }).subscribe({
+      next: configuracion => {
+        this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
+        this._mostrarToast(`Configuración de tiempos guardada exitosamente para la gestión ${this.gestionTiempos}.`);
+      },
+      error: () => this._mostrarToast('No se pudo guardar la configuración de tiempos en el servidor.')
+    });
+  }
+
+  private normalizarDuracionVirtual(): number {
+    const duracion = Number(this.duracionExamenVirtualMinutos);
+    return Number.isFinite(duracion) ? Math.min(480, Math.max(1, Math.trunc(duracion))) : 45;
   }
 
   private _mostrarToast(msg: string): void {

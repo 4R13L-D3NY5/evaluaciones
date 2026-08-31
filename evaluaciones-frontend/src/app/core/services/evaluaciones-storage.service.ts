@@ -23,10 +23,21 @@ export interface DificultadesBanco {
   total: number;
 }
 
+export interface PlanExamenResumen extends DificultadesBanco {
+  clave: string;
+  etiqueta: string;
+  modalidad: string;
+  estado: string;
+  bancoCargado: boolean;
+  tieneRol: boolean;
+  cumple: boolean;
+}
+
 export interface PlanEstudioItem {
   id: number;
   codigo: string;
   nombre: string;
+  semestre: number;
   horas: number;
   docenteNombre: string;
   docenteCi: string;
@@ -38,6 +49,7 @@ export interface PlanEstudioItem {
   preguntas1P: DificultadesBanco;
   preguntas2P: DificultadesBanco;
   preguntasFinal: DificultadesBanco;
+  examenes?: Record<string, PlanExamenResumen>;
   fecha1P: string;
   fecha2P: string;
   fechaFinal: string;

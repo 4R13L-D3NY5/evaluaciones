@@ -1,7 +1,15 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from '../../core/services/evaluaciones-storage.service';
+import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre, PlanExamenResumen } from '../../core/services/evaluaciones-storage.service';
+import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
+import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
+import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
+import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+
+type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
 
 @Component({
   selector: 'sea-plan-estudios',
@@ -56,10 +64,18 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
               <i class="pi pi-building text-primary text-[10px]"></i> Sede Académica
             </label>
             <select 
-              [(ngModel)]="filtroSedeId"
+              [(ngModel)]="filtroSedeCodigo"
+              (ngModelChange)="onSedeChange($event)"
+              [disabled]="cargandoSedes()"
               class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
-              @for (sede of storage.sedes(); track sede.id) {
-                <option [value]="sede.id">{{ sede.nombre }}</option>
+              @if (cargandoSedes()) {
+                <option value="">Cargando sedes...</option>
+              } @else if (sedes().length === 0) {
+                <option value="">No hay sedes disponibles</option>
+              } @else {
+                @for (sede of sedes(); track sede.branchOfficeId) {
+                  <option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>
+                }
               }
             </select>
           </div>
@@ -70,10 +86,18 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
               <i class="pi pi-graduation-cap text-primary text-[10px]"></i> Carrera
             </label>
             <select 
-              [(ngModel)]="filtroCarreraId"
+              [(ngModel)]="filtroCarreraCodigo"
+              (ngModelChange)="onCarreraChange($event)"
+              [disabled]="cargandoCarreras() || !filtroSedeCodigo"
               class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
-              @for (carrera of storage.carreras(); track carrera.id) {
-                <option [value]="carrera.id">{{ carrera.nombre }}</option>
+              @if (cargandoCarreras()) {
+                <option value="">Cargando carreras...</option>
+              } @else if (carreras().length === 0) {
+                <option value="">No hay carreras disponibles</option>
+              } @else {
+                @for (carrera of carreras(); track carrera.careerId) {
+                  <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
+                }
               }
             </select>
           </div>
@@ -162,13 +186,29 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
 
       </div>
 
+      @if (cargandoPlan()) {
+        <div class="bg-card border border-primary/20 rounded-xl p-5 flex items-center gap-3 text-sm text-primary shadow-xs">
+          <i class="pi pi-spin pi-spinner"></i>
+          <span class="font-bold">Cargando plan de estudios y bancos de preguntas registrados...</span>
+        </div>
+      } @else if (errorCarga()) {
+        <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3 text-sm text-rose-800 shadow-xs">
+          <i class="pi pi-exclamation-triangle mt-0.5"></i>
+          <div>
+            <p class="font-black">No se pudo cargar el plan de estudios.</p>
+            <p class="text-xs mt-1">{{ errorCarga() }}</p>
+            <button (click)="recargarPlan()" class="mt-2 text-xs font-black underline">Intentar nuevamente</button>
+          </div>
+        </div>
+      }
+
       <!-- Tarjetas de Estadísticas -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         
         <!-- Total Plan de Estudios -->
         <div class="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
           <div class="space-y-0.5">
-            <span class="text-3xl font-black text-primary font-mono">77</span>
+            <span class="text-3xl font-black text-primary font-mono">{{ totalPlan() }}</span>
             <p class="text-xs font-bold text-muted-foreground">Total Plan de Estudios</p>
           </div>
           <div class="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
@@ -179,7 +219,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
         <!-- Asignadas con Docente -->
         <div class="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
           <div class="space-y-0.5">
-            <span class="text-3xl font-black text-emerald-600 font-mono">51</span>
+            <span class="text-3xl font-black text-emerald-600 font-mono">{{ totalAsignadas() }}</span>
             <p class="text-xs font-bold text-muted-foreground">Asignadas con Docente</p>
           </div>
           <div class="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -190,7 +230,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
         <!-- Vacantes / Por Designar -->
         <div class="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
           <div class="space-y-0.5">
-            <span class="text-3xl font-black text-amber-500 font-mono">26</span>
+            <span class="text-3xl font-black text-amber-500 font-mono">{{ totalSinAsignar() }}</span>
             <p class="text-xs font-bold text-muted-foreground">Vacantes / Por Designar</p>
           </div>
           <div class="h-12 w-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
@@ -237,9 +277,8 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
                       <th class="p-3.5">Plan de Estudios</th>
                       <th class="p-3.5 text-center">Horas</th>
                       <th class="p-3.5">Docente / Grupo</th>
-                      <th class="p-3.5 text-center">Modalidad Cartilla</th>
-                      <th class="p-3.5 text-center">Fecha {{ parcialLabel() }}</th>
-                      <th class="p-3.5 text-center">Estado Examen</th>
+                      <th class="p-3.5 text-center">Modalidad principal</th>
+                      <th class="p-3.5 min-w-[430px]">Información del parcial seleccionado</th>
                       <th class="p-3.5 text-center">Estado</th>
                       <th class="p-3.5 text-right">Acciones</th>
                     </tr>
@@ -290,42 +329,64 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
                           }
                         </td>
 
-                        <!-- Modalidad Cartilla -->
+                        <!-- Modalidad principal -->
                         <td class="p-3.5 text-center">
-                          @if (asig.conCartilla) {
+                          @let modalidadPrincipal = getInformacionParcial(asig)?.modalidad;
+                          @if (asig.asignada && modalidadPrincipal === 'Virtual') {
+                            <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                              <i class="pi pi-desktop text-[9px]"></i> Virtual
+                            </span>
+                          } @else if (asig.asignada && (modalidadPrincipal === 'Con Cartilla' || (!modalidadPrincipal && asig.conCartilla))) {
                             <span class="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                               <i class="pi pi-file-check text-[9px]"></i> Con Cartilla
                             </span>
-                          } @else {
+                          } @else if (asig.asignada) {
                             <span class="bg-muted text-muted-foreground border border-border text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                              <i class="pi pi-file text-[9px]"></i> Sin Cartilla (Físico)
+                              <i class="pi pi-file text-[9px]"></i> Sin Cartilla
+                            </span>
+                          } @else {
+                            <span class="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                              <i class="pi pi-question-circle text-[9px]"></i> Por definir
                             </span>
                           }
                         </td>
 
-                        <!-- Fecha del Parcial Activo -->
-                        <td class="p-3.5 text-center">
-                          <span class="bg-teal-50 border border-teal-200 text-teal-800 font-mono text-[10px] font-bold px-2 py-0.5 rounded-full inline-block">
-                            {{ getFecha(asig) }}
-                          </span>
+                        <!-- Información macro del parcial seleccionado -->
+                        <td class="p-2">
+                          @let info = getInformacionParcial(asig);
+                          @if (info?.tieneRol) {
+                            <div [class]="'flex items-center gap-2 rounded-lg border px-2.5 py-2 ' + (info?.cumple ? 'border-emerald-200 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/50')">
+                              <span class="w-20 shrink-0 text-[10px] font-black text-primary">{{ info?.etiqueta }}</span>
+                              <span class="bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-full px-2 py-0.5 text-[9px] font-black whitespace-nowrap">Rol programado</span>
+                              <span class="text-[10px] font-mono text-foreground whitespace-nowrap">
+                                {{ info?.facil }}F · {{ info?.medio }}M · {{ info?.dificil }}D · {{ info?.total }} total
+                              </span>
+                              <span class="text-[9px] font-bold text-muted-foreground whitespace-nowrap">{{ info?.modalidad }}</span>
+                              @if (info?.cumple) {
+                                <span class="ml-auto bg-emerald-600 text-white text-[10px] font-black rounded-full px-2 py-0.5 whitespace-nowrap">
+                                  <i class="pi pi-check-circle mr-1"></i> OK
+                                </span>
+                              } @else if (!info?.bancoCargado) {
+                                <span class="ml-auto text-amber-700 text-[10px] font-black whitespace-nowrap">Banco pendiente</span>
+                              } @else {
+                                <span class="ml-auto text-amber-700 text-[10px] font-black whitespace-nowrap">Pendiente</span>
+                              }
+                            </div>
+                          } @else {
+                            <div class="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+                              <span class="w-20 shrink-0 text-[10px] font-black text-primary">{{ info?.etiqueta || parcialLabel() }}</span>
+                              <i class="pi pi-info-circle text-amber-600"></i>
+                              <span class="text-[10px] font-black text-amber-800">No tiene rol de examen programado para este parcial</span>
+                            </div>
+                          }
                         </td>
 
-                        <!-- Estado del Examen -->
+                        <!-- Estado del parcial activo -->
                         <td class="p-3.5 text-center">
                           @let est = getEstadoExamen(asig);
-                          @if (est === 'Subido' || est === 'Generado') {
-                            <span class="bg-indigo-900 text-white font-black text-[10px] px-2.5 py-0.5 rounded-md uppercase shadow-2xs">
-                              {{ est }}
-                            </span>
-                          } @else if (est === 'Devuelto') {
-                            <span class="bg-rose-600 text-white font-black text-[10px] px-2.5 py-0.5 rounded-md uppercase shadow-2xs">
-                              Devuelto
-                            </span>
-                          } @else {
-                            <span class="bg-amber-100 text-amber-800 font-bold text-[10px] px-2 py-0.5 rounded-md">
-                              Pendiente
-                            </span>
-                          }
+                          <span class="bg-indigo-900 text-white font-black text-[10px] px-2.5 py-0.5 rounded-md uppercase shadow-2xs">
+                            {{ est }}
+                          </span>
                         </td>
 
                         <!-- Estado de Asignación -->
@@ -344,7 +405,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
                         <!-- Columna Acciones: Abre Modal de Confirmación y Advertencia de Estados -->
                         <td class="p-3.5 text-right">
                           <div class="inline-flex items-center gap-1.5">
-                            @if (asig.conCartilla) {
+                            @if (asig.asignada && asig.conCartilla) {
                               <button 
                                 (click)="solicitarCambioCartilla(asig)"
                                 title="Cambiar a Sin Cartilla (Examen físico/manual)"
@@ -352,7 +413,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
                                 <i class="pi pi-times-circle text-[10px]"></i>
                                 <span>Sin Cartilla</span>
                               </button>
-                            } @else {
+                            } @else if (asig.asignada) {
                               <button 
                                 (click)="solicitarCambioCartilla(asig)"
                                 title="Cambiar a generación digital"
@@ -398,7 +459,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
               @if (itemSeleccionadoParaCambio()?.conCartilla) {
                 <!-- Transición: De Con Cartilla -> Sin Cartilla -->
                 <p class="text-muted-foreground leading-relaxed">
-                  Está a punto de cambiar la modalidad de evaluación a <strong>Sin Cartilla (Examen Físico / Manual)</strong>.
+                  Está a punto de cambiar la modalidad de evaluación a <strong>Sin Cartilla</strong>.
                 </p>
 
                 <div class="bg-amber-500/10 border-l-4 border-amber-500 p-3 rounded-r-lg space-y-1.5">
@@ -415,7 +476,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
               } @else {
                 <!-- Transición: De Sin Cartilla -> Con Cartilla -->
                 <p class="text-muted-foreground leading-relaxed">
-                  Está a punto de activar la modalidad <strong>Generación digital</strong>.
+                  Está a punto de activar la modalidad <strong>Con Cartilla</strong>.
                 </p>
 
                 <div class="bg-indigo-500/10 border-l-4 border-indigo-600 p-3 rounded-r-lg space-y-1.5">
@@ -462,11 +523,21 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre } from
     </div>
   `
 })
-export class PlanEstudiosComponent {
+export class PlanEstudiosComponent implements OnInit {
   public readonly storage = inject(EvaluacionesStorageService);
+  private readonly gateway = inject(UnitepcGatewayService);
+  private readonly rolService = inject(RolExamenService);
+  private readonly bancoService = inject(BancoPreguntasService);
 
-  public filtroSedeId = 1;
-  public filtroCarreraId = 1;
+  public sedes = signal<BranchOffice[]>([]);
+  public carreras = signal<Career[]>([]);
+  public filtroSedeCodigo = '';
+  public filtroCarreraCodigo = '';
+  public cargandoSedes = signal(true);
+  public cargandoCarreras = signal(false);
+  public cargandoPlan = signal(false);
+  public errorCarga = signal<string | null>(null);
+  public planSemestres = signal<PlanEstudioSemestre[]>([]);
   public filtroPlanCurricular = 'todos';
   public busquedaTexto = '';
   public ocultarSinAsignar = false;
@@ -475,19 +546,309 @@ export class PlanEstudiosComponent {
   public toastMessage = signal<string | null>(null);
   public itemSeleccionadoParaCambio = signal<PlanEstudioItem | null>(null);
 
+  private readonly parcialesConfig: Array<{ clave: PlanParcialClave; etiqueta: string }> = [
+    { clave: '1P', etiqueta: '1er Parcial' },
+    { clave: '2P', etiqueta: '2do Parcial' },
+    { clave: 'FINAL', etiqueta: 'Examen Final' },
+    { clave: '2DA_INSTANCIA', etiqueta: '2da Instancia' }
+  ];
+
   private _expandedSemestres = signal<number[]>([1, 2, 3]);
+
+  public totalPlan = computed(() => this.planSemestres().reduce((total, semestre) => total + semestre.asignaturas.length, 0));
+  public totalAsignadas = computed(() => this.planSemestres().reduce(
+    (total, semestre) => total + semestre.asignaturas.filter(asignatura => asignatura.asignada).length, 0
+  ));
+  public totalSinAsignar = computed(() => this.totalPlan() - this.totalAsignadas());
+
+  public ngOnInit(): void {
+    this.cargarSedes();
+  }
+
+  public onSedeChange(codigoSede: string): void {
+    const sede = this.sedes().find(item => item.code === codigoSede);
+    if (!sede) return;
+
+    this.filtroSedeCodigo = sede.code;
+    this.filtroCarreraCodigo = '';
+    this.carreras.set([]);
+    this.planSemestres.set([]);
+    this.cargarCarreras(sede.code);
+  }
+
+  public onCarreraChange(codigoCarrera: string): void {
+    const carrera = this.carreras().find(item => item.careerCode === codigoCarrera);
+    if (!carrera) return;
+
+    this.filtroCarreraCodigo = carrera.careerCode;
+    this.cargarPlanReal(this.filtroSedeCodigo, carrera.careerCode);
+  }
+
+  public recargarPlan(): void {
+    if (this.filtroSedeCodigo && this.filtroCarreraCodigo) {
+      this.cargarPlanReal(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+    } else {
+      this.cargarSedes();
+    }
+  }
+
+  private cargarSedes(): void {
+    this.cargandoSedes.set(true);
+    this.errorCarga.set(null);
+    this.gateway.getBranchOffices().subscribe({
+      next: sedes => {
+        this.sedes.set(sedes || []);
+        this.cargandoSedes.set(false);
+
+        const sedeInicial = sedes.find(sede => sede.code === 'CBA') || sedes[0];
+        if (sedeInicial) {
+          this.filtroSedeCodigo = sedeInicial.code;
+          this.cargarCarreras(sedeInicial.code);
+        } else {
+          this.carreras.set([]);
+          this.planSemestres.set([]);
+          this.errorCarga.set('El catálogo institucional no devolvió ninguna sede.');
+        }
+      },
+      error: () => {
+        this.cargandoSedes.set(false);
+        this.carreras.set([]);
+        this.planSemestres.set([]);
+        this.errorCarga.set('No fue posible consultar las sedes oficiales. Verifica la conexión con SEA.');
+      }
+    });
+  }
+
+  private cargarCarreras(codigoSede: string): void {
+    this.cargandoCarreras.set(true);
+    this.errorCarga.set(null);
+    this.gateway.getCareers(codigoSede).subscribe({
+      next: carreras => {
+        this.carreras.set(carreras || []);
+        this.cargandoCarreras.set(false);
+
+        const carreraInicial = carreras.find(carrera => carrera.careerCode === 'CARSIS') || carreras[0];
+        if (carreraInicial) {
+          this.filtroCarreraCodigo = carreraInicial.careerCode;
+          this.cargarPlanReal(codigoSede, carreraInicial.careerCode);
+        } else {
+          this.planSemestres.set([]);
+          this.errorCarga.set('La sede seleccionada no tiene carreras disponibles en SEA.');
+        }
+      },
+      error: () => {
+        this.cargandoCarreras.set(false);
+        this.planSemestres.set([]);
+        this.errorCarga.set('No fue posible consultar las carreras de la sede seleccionada.');
+      }
+    });
+  }
+
+  private cargarPlanReal(codigoSede: string, codigoCarrera: string): void {
+    if (!codigoSede || !codigoCarrera) return;
+
+    this.cargandoPlan.set(true);
+    this.errorCarga.set(null);
+    const sede = this.sedes().find(item => item.code === codigoSede);
+    const carrera = this.carreras().find(item => item.careerCode === codigoCarrera);
+    const gruposSea$ = sede && carrera
+      ? this.gateway.getGroups(this.gestionParaSea(), sede.branchOfficeId, carrera.careerId).pipe(
+          catchError(() => of([] as GroupItem[]))
+        )
+      : of([] as GroupItem[]);
+
+    forkJoin({
+      cursos: this.gateway.getCourses(codigoSede, codigoCarrera),
+      grupos: gruposSea$,
+      roles: this.rolService.listar(codigoSede, codigoCarrera)
+    }).subscribe({
+      next: ({ cursos, grupos, roles }) => {
+        const consultasBanco = roles.map(rol => this.bancoService.obtenerPorRol(rol.id).pipe(
+          catchError(() => of(null))
+        ));
+
+        if (consultasBanco.length === 0) {
+          this.planSemestres.set(this.construirPlan(cursos, grupos, roles, new Map()));
+          this.cargandoPlan.set(false);
+          return;
+        }
+
+        forkJoin(consultasBanco).subscribe({
+          next: bancos => {
+            const bancosPorRol = new Map<string, BancoPreguntasResponse>();
+            bancos.forEach((banco, indice) => {
+              if (banco) bancosPorRol.set(roles[indice].id, banco);
+            });
+            this.planSemestres.set(this.construirPlan(cursos, grupos, roles, bancosPorRol));
+            this.cargandoPlan.set(false);
+          },
+          error: () => {
+            this.planSemestres.set(this.construirPlan(cursos, grupos, roles, new Map()));
+            this.cargandoPlan.set(false);
+            this.errorCarga.set('Se cargó el plan, pero no fue posible consultar el detalle de los bancos de preguntas.');
+          }
+        });
+      },
+      error: () => {
+        this.cargandoPlan.set(false);
+        this.planSemestres.set([]);
+        this.errorCarga.set('No fue posible consultar las asignaturas y exámenes de la carrera seleccionada.');
+      }
+    });
+  }
+
+  private construirPlan(
+    cursos: Course[],
+    grupos: GroupItem[],
+    roles: RolExamenResponse[],
+    bancosPorRol: Map<string, BancoPreguntasResponse>
+  ): PlanEstudioSemestre[] {
+    const rolesPorCurso = new Map<string, RolExamenResponse[]>();
+    for (const rol of roles) {
+      const llave = rol.seaSyllabusCourseId || rol.materiaCodigo;
+      const actuales = rolesPorCurso.get(llave) || [];
+      actuales.push(rol);
+      rolesPorCurso.set(llave, actuales);
+    }
+
+    const items: PlanEstudioItem[] = [];
+    let id = 1;
+    for (const curso of cursos) {
+      const rolesCurso = rolesPorCurso.get(curso.syllabusCourseId) || [];
+      const gruposCurso = grupos.filter(grupo => grupo.syllabusCourseId === curso.syllabusCourseId);
+
+      // El grupo/docente proviene del catálogo SEA aunque todavía no exista
+      // un rol de examen. Los roles solo complementan el estado del parcial.
+      items.push(this.crearItemPlan(curso, gruposCurso, rolesCurso, id++, bancosPorRol));
+    }
+
+    const porSemestre = new Map<number, PlanEstudioItem[]>();
+    for (const item of items) {
+      const semestre = item.semestre || 0;
+      porSemestre.set(semestre, [...(porSemestre.get(semestre) || []), item]);
+    }
+
+    return [...porSemestre.entries()]
+      .sort(([semestreA], [semestreB]) => semestreA - semestreB)
+      .map(([numero, asignaturas]) => ({
+        numero,
+        nombre: numero > 0 ? `${numero}° Semestre` : 'Sin semestre asignado',
+        horasTotales: asignaturas.reduce((total, item) => total + item.horas, 0),
+        asignaturas
+      }));
+  }
+
+  private crearItemPlan(
+    curso: Course,
+    grupos: GroupItem[],
+    roles: RolExamenResponse[],
+    id: number,
+    bancosPorRol: Map<string, BancoPreguntasResponse> = new Map()
+  ): PlanEstudioItem {
+    const rolPrincipal = roles[0];
+    const grupoPrincipal = grupos[0];
+    const gruposUnicos = grupos.filter((grupo, indice, lista) =>
+      lista.findIndex(item => item.groupId === grupo.groupId) === indice
+    );
+    const gruposLabel = gruposUnicos.map(grupo => grupo.code).filter(Boolean).join(' · ');
+    const docentesGrupo = gruposUnicos.map(grupo => {
+      const rolGrupo = roles.find(rol => (rol.grupo || '').trim() === grupo.code);
+      return rolGrupo?.docenteNombre?.trim()
+        || grupo.teacherName?.trim()
+        || (grupo.teacherIdentityNumber ? `Docente SEA (CI ${grupo.teacherIdentityNumber})` : '');
+    }).filter(Boolean);
+    const docentesRol = roles.map(rol => rol.docenteNombre?.trim()).filter(Boolean) as string[];
+    const docentes = [...new Set(docentesGrupo.length > 0 ? docentesGrupo : docentesRol)];
+    const cisGrupo = gruposUnicos.map(grupo => grupo.teacherIdentityNumber?.trim()).filter(Boolean);
+    const cisRol = roles.map(rol => rol.docenteCi?.trim()).filter(Boolean) as string[];
+    const docentesCi = [...new Set(cisGrupo.length > 0 ? cisGrupo : cisRol)];
+    const gruposMostrar = gruposLabel || [...new Set(roles.map(rol => rol.grupo).filter(Boolean))].join(' · ');
+    const examenes = {} as Record<string, PlanExamenResumen>;
+    for (const parcial of this.parcialesConfig) {
+      const rol = roles.find(item => this.normalizarParcial(item.tipoParcial) === parcial.clave);
+      const banco = rol ? bancosPorRol.get(rol.id) : undefined;
+      const facil = banco?.facilesCount || 0;
+      const medio = banco?.mediasCount || 0;
+      const dificil = banco?.dificilesCount || 0;
+      const total = banco?.totalReactivos || 0;
+      examenes[parcial.clave] = {
+        clave: parcial.clave,
+        etiqueta: parcial.etiqueta,
+        facil,
+        medio,
+        dificil,
+        total,
+        modalidad: rol ? this.getModalidadLabel(rol.modalidad) : 'No registrado',
+        estado: rol?.estadoFlujo || 'Sin examen',
+        bancoCargado: !!banco,
+        tieneRol: !!rol,
+        cumple: !!banco && total === 60 && facil === 15 && medio === 30 && dificil === 15
+      };
+    }
+
+    return {
+      id,
+      codigo: curso.courseCode,
+      nombre: curso.courseName.trim(),
+      semestre: curso.semester || 0,
+      horas: (curso.theoryHours || 0) + (curso.practiceHours || 0),
+      docenteNombre: docentes.join(' · ') || rolPrincipal?.docenteNombre || '',
+      docenteCi: docentesCi.join(' · ') || rolPrincipal?.docenteCi || '',
+      grupo: gruposMostrar || rolPrincipal?.grupo || grupoPrincipal?.code || '',
+      asignada: gruposUnicos.length > 0 || roles.length > 0,
+      esMateriaComun: false,
+      conCartilla: roles.some(rol => rol.modalidad === 'PRESENCIAL_CARTILLA'),
+      progresoDoc: 0,
+      preguntas1P: this.aResumenDificultad(examenes['1P']),
+      preguntas2P: this.aResumenDificultad(examenes['2P']),
+      preguntasFinal: this.aResumenDificultad(examenes['FINAL']),
+      examenes,
+      fecha1P: examenes['1P'].estado === 'Sin examen' ? '—' : (roles.find(rol => this.normalizarParcial(rol.tipoParcial) === '1P')?.fechaDisplay || '—'),
+      fecha2P: examenes['2P'].estado === 'Sin examen' ? '—' : (roles.find(rol => this.normalizarParcial(rol.tipoParcial) === '2P')?.fechaDisplay || '—'),
+      fechaFinal: examenes['FINAL'].estado === 'Sin examen' ? '—' : (roles.find(rol => this.normalizarParcial(rol.tipoParcial) === 'FINAL')?.fechaDisplay || '—'),
+      estadoExamen1P: this.mapEstadoLegacy(examenes['1P'].estado),
+      estadoExamen2P: this.mapEstadoLegacy(examenes['2P'].estado),
+      estadoExamenFinal: this.mapEstadoLegacy(examenes['FINAL'].estado)
+    };
+  }
+
+  private aResumenDificultad(info: PlanExamenResumen): { facil: number; medio: number; dificil: number; total: number } {
+    return { facil: info.facil, medio: info.medio, dificil: info.dificil, total: info.total };
+  }
+
+  private getModalidadLabel(modalidad: string): string {
+    if (modalidad === 'VIRTUAL') return 'Virtual';
+    if (modalidad === 'PRESENCIAL_CARTILLA') return 'Con Cartilla';
+    if (modalidad === 'PRESENCIAL_SIN_CARTILLA') return 'Sin Cartilla';
+    return modalidad || 'No registrada';
+  }
+
+  private normalizarParcial(tipo: string): PlanParcialClave | null {
+    if (tipo === '1er Parcial') return '1P';
+    if (tipo === '2do Parcial') return '2P';
+    if (tipo === 'Final' || tipo === 'Examen Final') return 'FINAL';
+    if (tipo === '2da Instancia') return '2DA_INSTANCIA';
+    return null;
+  }
+
+  private mapEstadoLegacy(estado: string): 'Subido' | 'Devuelto' | 'Pendiente' | 'Generado' {
+    if (estado === 'GENERADO' || estado === 'IMPRESO' || estado === 'ENTREGADO' || estado === 'REVISADO') return 'Generado';
+    if (estado === 'DEVUELTO') return 'Devuelto';
+    if (estado === 'SUBIDO' || estado === 'RECIBIDO') return 'Subido';
+    return 'Pendiente';
+  }
 
   public parcialLabel = computed(() => {
     switch (this.parcialActivo()) {
-      case '1P': return '1P';
-      case '2P': return '2P';
-      case 'FINAL': return 'Final';
-      case '2DA_INSTANCIA': return '2da Inst.';
+      case '1P': return '1er Parcial';
+      case '2P': return '2do Parcial';
+      case 'FINAL': return 'Examen Final';
+      case '2DA_INSTANCIA': return '2da Instancia';
     }
   });
 
   public semestresFiltrados = computed(() => {
-    let list = this.storage.planSemestres();
+    let list = this.planSemestres();
     const query = this.busquedaTexto.trim().toLowerCase();
 
     if (query) {
@@ -534,12 +895,12 @@ export class PlanEstudiosComponent {
   }
 
   public getEstadoExamen(asig: PlanEstudioItem): string {
-    switch (this.parcialActivo()) {
-      case '1P': return asig.estadoExamen1P;
-      case '2P': return asig.estadoExamen2P;
-      case 'FINAL':
-      case '2DA_INSTANCIA': return asig.estadoExamenFinal;
-    }
+    return this.getInformacionParcial(asig)?.estado || 'Pendiente';
+  }
+
+  public getInformacionParcial(asig: PlanEstudioItem): PlanExamenResumen | null {
+    const examenes = asig.examenes || {};
+    return examenes[this.parcialActivo()] || null;
   }
 
   public solicitarCambioCartilla(asig: PlanEstudioItem): void {
@@ -555,13 +916,24 @@ export class PlanEstudiosComponent {
     if (!item) return;
 
     this.storage.toggleCartillaPlan(item.id);
-    const nuevaModalidad = !item.conCartilla ? 'Con Cartilla (Digital)' : 'Sin Cartilla (Físico/Manual)';
+    const nuevaModalidad = !item.conCartilla ? 'Con Cartilla' : 'Sin Cartilla';
     this.itemSeleccionadoParaCambio.set(null);
     this._mostrarToast(`${item.codigo}: Modalidad cambiada a '${nuevaModalidad}'. La secuencia de estados ha sido actualizada.`);
   }
 
   public onGestionChange(gestion: string): void {
     this.storage.setGestionActiva(gestion);
+    if (this.filtroSedeCodigo && this.filtroCarreraCodigo) {
+      this.cargarPlanReal(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+    }
+  }
+
+  /** Convierte el formato visual II-2026 al formato de gestión que usa SEA: 2-2026. */
+  private gestionParaSea(): string {
+    const gestion = this.storage.gestionActiva();
+    const coincidencia = gestion.match(/^(I|II)-(\d{4})$/);
+    if (!coincidencia) return gestion;
+    return `${coincidencia[1] === 'II' ? '2' : '1'}-${coincidencia[2]}`;
   }
 
   public descargarMalla(): void {

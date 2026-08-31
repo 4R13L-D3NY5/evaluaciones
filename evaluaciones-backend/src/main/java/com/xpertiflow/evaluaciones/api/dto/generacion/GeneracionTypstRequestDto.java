@@ -2,6 +2,9 @@ package com.xpertiflow.evaluaciones.api.dto.generacion;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
@@ -25,8 +28,14 @@ public class GeneracionTypstRequestDto {
     @NotEmpty
     private List<String> variantes;
 
-    /** Cantidad máxima de estudiantes que comparte una variante. Modo de pruebas: 1. */
-    private Integer ratioEstudiantesPorVariante = 1;
+    /** Cantidad máxima de estudiantes que comparte una variante. */
+    @NotNull
+    @Min(1)
+    @Max(30)
+    private Integer ratioEstudiantesPorVariante = 5;
+
+    /** En virtual se preparan variantes y contenido web, sin compilar PDF. */
+    private Boolean soloVirtual = false;
 
     private String outputBasePath;
 }

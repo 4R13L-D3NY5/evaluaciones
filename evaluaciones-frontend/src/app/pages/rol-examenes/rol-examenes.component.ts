@@ -10,7 +10,7 @@ import {
   RolExamenResponse,
   RolExamenService
 } from '../../core/services/rol-examen.service';
-import { catchError, forkJoin, map, of } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 
 export type RolExamenItem = RolExamenPersistedItem;
 
@@ -140,8 +140,9 @@ export type RolExamenItem = RolExamenPersistedItem;
               (ngModelChange)="filtroModalidad.set($event)"
               class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
               <option value="Todos">Todas las Modalidades</option>
-              <option value="PRESENCIAL_SIN_CARTILLA">Presencial · Hoja externa</option>
-              <option value="VIRTUAL">Virtual Online</option>
+              <option value="PRESENCIAL_CARTILLA">Con Cartilla</option>
+              <option value="PRESENCIAL_SIN_CARTILLA">Sin Cartilla</option>
+              <option value="VIRTUAL">Virtual</option>
             </select>
           </div>
 
@@ -261,6 +262,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                   <th class="p-3.5 text-center">Grupo</th>
                   <th class="p-3.5">Docente Titular</th>
                   <th class="p-3.5 text-center">Tipo</th>
+                  <th class="p-3.5 text-center">Versión</th>
                   <th class="p-3.5 text-center">Modalidad</th>
                   <th class="p-3.5 text-center">Estado</th>
                   <th class="p-3.5">Fecha Examen</th>
@@ -309,19 +311,26 @@ export type RolExamenItem = RolExamenPersistedItem;
                       </span>
                     </td>
 
+                    <!-- Versión del examen -->
+                    <td class="p-3.5 text-center">
+                      <span class="bg-slate-100 text-slate-700 border border-slate-200 font-black text-[10px] px-2.5 py-0.5 rounded-full">
+                        V{{ row.version || 1 }}
+                      </span>
+                    </td>
+
                     <!-- Modalidad -->
                     <td class="p-3.5 text-center">
                       @if (row.modalidad === 'VIRTUAL') {
                         <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-desktop text-[9px]"></i> Virtual Online
+                          <i class="pi pi-desktop text-[9px]"></i> Virtual
                         </span>
                       } @else if (row.modalidad === 'PRESENCIAL_SIN_CARTILLA' || !row.conCartilla) {
                         <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-file-edit text-[9px]"></i> Presencial · Hoja externa
+                          <i class="pi pi-file text-[9px]"></i> Sin Cartilla
                         </span>
                       } @else {
                         <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <i class="pi pi-file-edit text-[9px]"></i> Presencial · Hoja externa
+                          <i class="pi pi-file-check text-[9px]"></i> Con Cartilla
                         </span>
                       }
                     </td>
@@ -344,7 +353,8 @@ export type RolExamenItem = RolExamenPersistedItem;
                       } @else {
                         <button 
                           (click)="abrirModalEditar(row)"
-                          class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md hover:bg-amber-100 transition-colors cursor-pointer">
+                          [disabled]="!puedeEditarEliminar(row)"
+                          class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                           <i class="pi pi-calendar-plus text-[9px]"></i>
                           <span>Por Programar</span>
                         </button>
@@ -367,7 +377,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                       <div class="inline-flex items-center gap-1.5">
                         <button 
                           (click)="abrirModalEditar(row)"
-                          [disabled]="row.estado !== 'PROGRAMADO'"
+                          [disabled]="!puedeEditarEliminar(row)"
                           title="Editar parámetros del examen"
                           class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                           <i class="pi pi-pencil text-xs"></i>
@@ -375,7 +385,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                         
                         <button 
                           (click)="eliminarExamen(row)"
-                          [disabled]="row.estado !== 'PROGRAMADO'"
+                          [disabled]="!puedeEditarEliminar(row)"
                           title="Eliminar del Rol"
                           class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                           <i class="pi pi-trash text-xs"></i>
@@ -434,7 +444,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                 <div class="text-xs font-bold text-foreground">
                   {{ excelCargadoNombre() || 'Haz clic aquí para seleccionar el archivo Excel (.xlsx)' }}
                 </div>
-                <p class="text-[10px] text-muted-foreground mt-1">Columnas: Código, Materia, Semestre, Grupo, Docente, Fecha, Horario, Aula</p>
+                    <p class="text-[10px] text-muted-foreground mt-1">Hoja “Rol de Examenes”, desde la fila 12: exámenes teóricos y segunda instancia. Modalidad predeterminada: Con Cartilla.</p>
               </div>
 
               @if (excelCargadoNombre()) {
@@ -452,6 +462,36 @@ export type RolExamenItem = RolExamenPersistedItem;
                     <li>{{ error }}</li>
                   }
                 </ul>
+              </div>
+            }
+
+            @if (excelCargadoNombre()) {
+              <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900 space-y-2">
+                <label class="flex items-start gap-2 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    [disabled]="excelItemsImportados().length === 0 || cargando()"
+                    [ngModel]="reemplazarRolesPermitidos()"
+                    (ngModelChange)="reemplazarRolesPermitidos.set($event)"
+                    class="mt-0.5 accent-amber-600 disabled:cursor-not-allowed">
+                  <span [class.opacity-60]="excelItemsImportados().length === 0">
+                    Eliminar y subir nuevamente los roles coincidentes
+                  </span>
+                </label>
+                <p class="pl-5 text-[10px] leading-relaxed">
+                  @if (excelItemsImportados().length > 0) {
+                    Solo se eliminarán roles en <strong>PROGRAMADO</strong> o <strong>VALIDADO</strong>.
+                    Los que estén en <strong>GENERADO</strong> o en una etapa posterior no se tocarán.
+                  } @else {
+                    No está disponible porque el archivo no tiene registros válidos para importar.
+                    Verifica que la sede, carrera y grupos seleccionados correspondan al Excel.
+                  }
+                </p>
+                @if (rolesImportacionReemplazables().length > 0 || rolesImportacionProtegidos().length > 0) {
+                  <p class="pl-5 text-[10px] font-mono">
+                    Reemplazables: {{ rolesImportacionReemplazables().length }} · Protegidos: {{ rolesImportacionProtegidos().length }}
+                  </p>
+                }
               </div>
             }
 
@@ -587,8 +627,9 @@ export type RolExamenItem = RolExamenPersistedItem;
                 <div class="col-span-2">
                   <label class="block font-bold text-muted-foreground mb-1">Modalidad de Examen</label>
                   <select [(ngModel)]="formModalidad" class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary cursor-pointer">
-                    <option value="PRESENCIAL_SIN_CARTILLA">🟩 Presencial (cuadernillo + hoja externa)</option>
-                    <option value="VIRTUAL">🟪 Virtual Online (Resolución Web Sincrónica)</option>
+                    <option value="PRESENCIAL_CARTILLA">🟦 Con Cartilla</option>
+                    <option value="PRESENCIAL_SIN_CARTILLA">🟩 Sin Cartilla</option>
+                    <option value="VIRTUAL">🟪 Virtual</option>
                   </select>
                 </div>
 
@@ -651,6 +692,7 @@ export class RolExamenesComponent implements OnInit {
   public excelCargadoNombre = signal<string | null>(null);
   public excelItemsImportados = signal<RolExamenItem[]>([]);
   public excelErroresImportacion = signal<string[]>([]);
+  public reemplazarRolesPermitidos = signal<boolean>(false);
 
   public dialogFormulario = signal<boolean>(false);
   public itemEditando = signal<RolExamenItem | null>(null);
@@ -661,7 +703,7 @@ export class RolExamenesComponent implements OnInit {
 
   public formTipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' = '1er Parcial';
   public formFecha = '';
-  public formModalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'PRESENCIAL_SIN_CARTILLA';
+  public formModalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'PRESENCIAL_CARTILLA';
 
   // Lista de Exámenes del Rol (Cargada desde la BD persistente)
   public examenes = signal<RolExamenItem[]>([]);
@@ -734,7 +776,16 @@ export class RolExamenesComponent implements OnInit {
       );
     }
 
-    return list;
+    return [...list].sort((a, b) => {
+      const codigo = a.codigo.localeCompare(b.codigo, 'es', { numeric: true, sensitivity: 'base' });
+      if (codigo !== 0) return codigo;
+      const grupo = a.grupo.localeCompare(b.grupo, 'es', { numeric: true, sensitivity: 'base' });
+      if (grupo !== 0) return grupo;
+      const tipoOrden: Record<string, number> = { '1er Parcial': 1, '2do Parcial': 2, 'Final': 3, '2da Instancia': 4 };
+      const tipo = (tipoOrden[a.tipo] || 99) - (tipoOrden[b.tipo] || 99);
+      if (tipo !== 0) return tipo;
+      return (a.version || 1) - (b.version || 1);
+    });
   });
 
   public ngOnInit(): void {
@@ -951,6 +1002,7 @@ export class RolExamenesComponent implements OnInit {
     this.excelCargadoNombre.set(null);
     this.excelItemsImportados.set([]);
     this.excelErroresImportacion.set([]);
+    this.reemplazarRolesPermitidos.set(false);
     this.dialogSubirExcel.set(true);
   }
 
@@ -971,73 +1023,125 @@ export class RolExamenesComponent implements OnInit {
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+        const sheetName = workbook.SheetNames.find(name => this._normalizar(name) === this._normalizar('Rol de Examenes'));
+        if (!sheetName) {
+          this.excelItemsImportados.set([]);
+          this.excelErroresImportacion.set(['No se encontró la hoja “Rol de Examenes”. Verifica que estés usando el archivo oficial de roles.']);
+          this._mostrarToast('El archivo no contiene la hoja oficial “Rol de Examenes”.');
+          return;
+        }
+
+        const worksheet = workbook.Sheets[sheetName];
+        const filas: any[][] = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          raw: true,
+          defval: ''
+        }) as any[][];
 
         const items: RolExamenItem[] = [];
         const errores: string[] = [];
+        const clavesExactasDelArchivo = new Set<string>();
+        const siguienteVersionPorClave = new Map<string, number>();
+        for (const existente of this.examenes()) {
+          const clave = this._claveVersion(existente.seaGroupId, existente.tipo);
+          siguienteVersionPorClave.set(clave, Math.max(siguienteVersionPorClave.get(clave) || 0, existente.version || 1));
+        }
 
-        jsonData.forEach((row, idx) => {
-          const fila = idx + 2;
-          const codigo = String(row['Codigo'] || row['CÓDIGO'] || row['codigo'] || '').trim();
-          const grupoCodigo = String(row['Grupo'] || row['GRUPO'] || '').trim();
-          const rawFecha = String(row['Fecha'] || row['FECHA'] || row['fecha'] || '').trim();
-          let fechaIso = '';
-          let fechaDisp = 'Por Programar';
-          if (rawFecha) {
-            if (rawFecha.includes('/')) {
-              const parts = rawFecha.split('/');
-              if (parts.length === 3) {
-                fechaIso = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                fechaDisp = rawFecha;
-              }
-            } else if (rawFecha.includes('-')) {
-              fechaIso = rawFecha;
-              const p = rawFecha.split('-');
-              fechaDisp = `${p[2]}/${p[1]}/${p[0]}`;
-            }
+        // La plantilla oficial tiene cinco hojas y la hoja de roles empieza en la fila 12.
+        // Como la hoja inicia en B, sheet_to_json devuelve B como índice 0.
+        // Índices relativos: B materia, C código, D semestre, E grupo, F docente,
+        // G:L teóricos y AN:AO segunda instancia.
+        const examenesDeFila = (fila: any[]) => [
+          { tipo: '1er Parcial' as RolExamenItem['tipo'], columnaFecha: 5, columnaHora: 6 },
+          { tipo: '2do Parcial' as RolExamenItem['tipo'], columnaFecha: 7, columnaHora: 8 },
+          { tipo: 'Final' as RolExamenItem['tipo'], columnaFecha: 9, columnaHora: 10 },
+          { tipo: '2da Instancia' as RolExamenItem['tipo'], columnaFecha: 38, columnaHora: 39 }
+        ].map(examen => ({
+          ...examen,
+          fecha: this._leerFechaExcel(fila[examen.columnaFecha]),
+          hora: this._leerHoraExcel(fila[examen.columnaHora])
+        }));
+
+        filas.slice(11).forEach((row, idx) => {
+          const filaExcel = idx + 12;
+          const materiaNombreArchivo = this._textoCelda(row[0]);
+          const codigo = this._textoCelda(row[1]);
+          const grupoCodigo = this._textoCelda(row[3]);
+          const docenteArchivo = this._textoCelda(row[4]);
+
+          // Las filas completamente vacías al final de la plantilla no son errores.
+          if (!materiaNombreArchivo && !codigo && !grupoCodigo && !docenteArchivo) return;
+          if (!codigo) {
+            errores.push(`Fila ${filaExcel}: falta el código de la asignatura.`);
+            return;
           }
 
           const materia = this.materias().find(item => this._normalizar(item.courseCode) === this._normalizar(codigo));
           const grupo = materia
             ? this.grupos().find(item => item.syllabusCourseId === materia.syllabusCourseId && this._normalizar(item.code) === this._normalizar(grupoCodigo))
             : undefined;
-          const tipo = this._normalizarTipoParcial(String(row['Tipo'] || row['TIPO'] || '1er Parcial'));
 
-          if (!materia) errores.push(`Fila ${fila}: la materia '${codigo || '(vacía)'}' no existe en la carrera seleccionada.`);
-          if (materia && !grupo) errores.push(`Fila ${fila}: el grupo '${grupoCodigo || '(vacío)'}' no existe en SEA para ${materia.courseCode}.`);
-          if (!fechaIso) errores.push(`Fila ${fila}: la fecha es obligatoria y debe usar DD/MM/AAAA o AAAA-MM-DD.`);
-          if (!tipo) errores.push(`Fila ${fila}: el tipo de evaluación no es válido.`);
-          if (!materia || !grupo || !fechaIso || !tipo) return;
+          if (!materia) {
+            errores.push(`Fila ${filaExcel}: el código de asignatura '${codigo}' no existe en la carrera seleccionada.`);
+            return;
+          }
+          if (!grupo) {
+            errores.push(`Fila ${filaExcel}: el grupo '${grupoCodigo || '(vacío)'}' no existe en SEA para ${materia.courseCode}.`);
+            return;
+          }
 
           const schedule = grupo.schedules?.[0];
-          const modalidad = this._normalizarModalidad(String(row['Modalidad'] || row['MODALIDAD'] || 'PRESENCIAL_SIN_CARTILLA'));
-          items.push({
-            id: this._crearRolId(grupo.groupId, tipo, fechaIso),
-            seaGroupId: grupo.groupId,
-            seaSyllabusCourseId: materia.syllabusCourseId,
-            sedeCode: sede?.code,
-            careerCode: carrera?.careerCode,
-            codigo: materia.courseCode,
-            materia: materia.courseName,
-            semestre: materia.semester || 1,
-            grupo: grupo.code,
-            tipoClase: grupo.classType || 'TA',
-            docenteNombre: grupo.teacherName || String(row['Docente'] || row['DOCENTE'] || this._nombreDocenteOficial(grupo)),
-            docenteCI: grupo.teacherIdentityNumber || String(row['CI'] || ''),
-            tipo,
-            estado: 'PROGRAMADO',
-            modalidad,
-            conCartilla: modalidad === 'PRESENCIAL_CARTILLA',
-            semana: Number(row['Semana'] || 1),
-            dia: schedule ? this._obtenerNombreDia(schedule.day) : String(row['Dia'] || 'Lunes'),
-            fecha: fechaIso,
-            fechaDisplay: fechaDisp,
-            horario: schedule ? `${schedule.startTime} - ${schedule.endTime}` : String(row['Horario'] || '08:15 - 09:45'),
-            aula: schedule?.classroom || String(row['Aula'] || 'Por definir'),
-            campus: schedule?.campus || String(row['Campus'] || 'Por definir')
-          });
+          let rolesGeneradosEnFila = 0;
+          for (const examen of examenesDeFila(row)) {
+            if (!examen.fecha.iso) {
+              errores.push(`Fila ${filaExcel}: no se registró fecha para ${examen.tipo} de ${materia.courseCode}.`);
+              continue;
+            }
+
+            const claveVersion = this._claveVersion(grupo.groupId, examen.tipo);
+            const claveExacta = `${claveVersion}|${examen.fecha.iso}`;
+            if (clavesExactasDelArchivo.has(claveExacta)) {
+              errores.push(`Fila ${filaExcel}: ${examen.tipo} de ${materia.courseCode} y grupo ${grupo.code} está repetido en el archivo.`);
+              continue;
+            }
+            const version = (siguienteVersionPorClave.get(claveVersion) || 0) + 1;
+            const id = this._crearRolId(grupo.groupId, examen.tipo, examen.fecha.iso, version);
+
+            const horario = examen.hora || (schedule ? `${schedule.startTime} - ${schedule.endTime}` : 'Por definir');
+            items.push({
+              id,
+              seaGroupId: grupo.groupId,
+              seaSyllabusCourseId: materia.syllabusCourseId,
+              sedeCode: sede?.code,
+              careerCode: carrera?.careerCode,
+              codigo: materia.courseCode,
+              materia: materia.courseName,
+              semestre: materia.semester || 1,
+              grupo: grupo.code,
+              tipoClase: grupo.classType || 'TA',
+              docenteNombre: grupo.teacherName || docenteArchivo || this._nombreDocenteOficial(grupo),
+              docenteCI: grupo.teacherIdentityNumber || '',
+              tipo: examen.tipo,
+              version,
+              estado: 'PROGRAMADO',
+              modalidad: 'PRESENCIAL_CARTILLA',
+              conCartilla: true,
+              semana: 1,
+              dia: schedule ? this._obtenerNombreDia(schedule.day) : 'Por definir',
+              fecha: examen.fecha.iso,
+              fechaDisplay: examen.fecha.display,
+              horario,
+              aula: schedule?.classroom || 'Por definir',
+              campus: schedule?.campus || 'Por definir'
+            });
+            clavesExactasDelArchivo.add(claveExacta);
+            siguienteVersionPorClave.set(claveVersion, version);
+            rolesGeneradosEnFila++;
+          }
+
+          if (rolesGeneradosEnFila === 0) {
+            errores.push(`Fila ${filaExcel}: no se pudo generar ningún examen porque faltan fechas o ya existen registros.`);
+          }
         });
 
         this.excelItemsImportados.set(items);
@@ -1055,20 +1159,44 @@ export class RolExamenesComponent implements OnInit {
     const importados = this.excelItemsImportados();
     if (importados.length === 0) return;
 
+    const reemplazables = this.rolesImportacionReemplazables();
+    const protegidos = this.rolesImportacionProtegidos();
+    if (this.reemplazarRolesPermitidos() && reemplazables.length > 0) {
+      const confirmado = window.confirm(
+        `Se eliminarán ${reemplazables.length} roles coincidentes en estado PROGRAMADO o VALIDADO y luego se subirá el Excel. ` +
+        `${protegidos.length} roles en GENERADO o posterior se conservarán. ¿Deseas continuar?`
+      );
+      if (!confirmado) return;
+    }
+
     this.cargando.set(true);
-    forkJoin(importados.map(item => this._rolService.crear(this._toRequest(item)).pipe(
-      map(rol => ({ rol, error: null as unknown })),
-      catchError(error => of({ rol: null as RolExamenResponse | null, error }))
-    ))).subscribe(resultados => {
-      const creados = resultados.filter(resultado => resultado.rol).map(resultado => resultado.rol!);
-      const fallidos = resultados.filter(resultado => resultado.error);
-      this.cargando.set(false);
-      this.cerrarModalSubirExcel();
-      this._cargarRolesOficiales();
-      if (fallidos.length > 0) {
-        this._mostrarToast(`${creados.length} exámenes registrados y ${fallidos.length} rechazados por el servidor.`);
-      } else {
-        this._mostrarToast(`${creados.length} exámenes registrados correctamente en PostgreSQL.`);
+    const eliminar$ = this.reemplazarRolesPermitidos() && reemplazables.length > 0
+      ? forkJoin(reemplazables.map(item => this._rolService.eliminar(item.id)))
+      : of([]);
+
+    eliminar$.pipe(
+      switchMap(() => forkJoin(importados.map(item => this._rolService.crear(this._toRequest(item)).pipe(
+        map(rol => ({ rol, error: null as unknown })),
+        catchError(error => of({ rol: null as RolExamenResponse | null, error }))
+      ))))
+    ).subscribe({
+      next: resultados => {
+        const creados = resultados.filter(resultado => resultado.rol).map(resultado => resultado.rol!);
+        const fallidos = resultados.filter(resultado => resultado.error);
+        this.cargando.set(false);
+        this.cerrarModalSubirExcel();
+        this._cargarRolesOficiales();
+        if (fallidos.length > 0) {
+          this._mostrarToast(`${creados.length} exámenes registrados y ${fallidos.length} rechazados por el servidor.`);
+        } else {
+          const eliminados = this.reemplazarRolesPermitidos() ? ` Se reemplazaron ${reemplazables.length} roles permitidos.` : '';
+          this._mostrarToast(`${creados.length} exámenes registrados correctamente en PostgreSQL.${eliminados}`);
+        }
+      },
+      error: err => {
+        this.cargando.set(false);
+        this._mostrarToast(this._mensajeError(err, 'No se pudieron eliminar los roles permitidos; no se realizó la nueva carga.'));
+        this._cargarRolesOficiales();
       }
     });
   }
@@ -1084,11 +1212,15 @@ export class RolExamenesComponent implements OnInit {
     }
     this.formTipo = '1er Parcial';
     this.formFecha = '';
-    this.formModalidad = 'PRESENCIAL_SIN_CARTILLA';
+    this.formModalidad = 'PRESENCIAL_CARTILLA';
     this.dialogFormulario.set(true);
   }
 
   public abrirModalEditar(item: RolExamenItem): void {
+    if (!this.puedeEditarEliminar(item)) {
+      this._mostrarToast('Solo se pueden editar roles en estado PROGRAMADO o VALIDADO.');
+      return;
+    }
     this.itemEditando.set(item);
     const mat = this.materias().find(m => m.courseCode === item.codigo) || null;
     this.formMateriaObj.set(mat);
@@ -1096,7 +1228,11 @@ export class RolExamenesComponent implements OnInit {
     this.formGrupoObj.set(grp);
     this.formTipo = item.tipo;
     this.formFecha = item.fecha;
-    this.formModalidad = item.modalidad === 'VIRTUAL' ? 'VIRTUAL' : 'PRESENCIAL_SIN_CARTILLA';
+    this.formModalidad = item.modalidad === 'VIRTUAL'
+      ? 'VIRTUAL'
+      : item.modalidad === 'PRESENCIAL_CARTILLA'
+        ? 'PRESENCIAL_CARTILLA'
+        : 'PRESENCIAL_SIN_CARTILLA';
     this.dialogFormulario.set(true);
   }
 
@@ -1136,7 +1272,7 @@ export class RolExamenesComponent implements OnInit {
       }
     }
 
-    const conCartilla = false;
+    const conCartilla = this.formModalidad === 'PRESENCIAL_CARTILLA';
     const edit = this.itemEditando();
     const item: RolExamenItem = {
       id: edit?.id || this._crearRolId(grp.groupId, this.formTipo, this.formFecha),
@@ -1152,6 +1288,7 @@ export class RolExamenesComponent implements OnInit {
       docenteNombre: grp.teacherName || this._nombreDocenteOficial(grp),
       docenteCI: grp.teacherIdentityNumber || '',
       tipo: this.formTipo,
+      version: edit?.version || this._siguienteVersionLocal(grp.groupId, this.formTipo),
       estado: 'PROGRAMADO',
       modalidad: this.formModalidad,
       conCartilla,
@@ -1190,8 +1327,8 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public eliminarExamen(item: RolExamenItem): void {
-    if (item.estado !== 'PROGRAMADO') {
-      this._mostrarToast('Solo se pueden eliminar exámenes en estado PROGRAMADO.');
+    if (!this.puedeEditarEliminar(item)) {
+      this._mostrarToast('Solo se pueden eliminar roles en estado PROGRAMADO o VALIDADO.');
       return;
     }
     if (!window.confirm(`¿Deseas eliminar el examen ${item.codigo} del rol oficial?`)) return;
@@ -1203,6 +1340,25 @@ export class RolExamenesComponent implements OnInit {
       },
       error: err => this._mostrarToast(this._mensajeError(err, 'No se pudo eliminar el examen.'))
     });
+  }
+
+  public puedeEditarEliminar(item: RolExamenItem): boolean {
+    return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
+  }
+
+  public rolesImportacionReemplazables(): RolExamenItem[] {
+    return this.rolesCoincidentesConImportacion()
+      .filter(item => item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO');
+  }
+
+  public rolesImportacionProtegidos(): RolExamenItem[] {
+    return this.rolesCoincidentesConImportacion()
+      .filter(item => item.estado !== 'PROGRAMADO' && item.estado !== 'VALIDADO');
+  }
+
+  private rolesCoincidentesConImportacion(): RolExamenItem[] {
+    const claves = new Set(this.excelItemsImportados().map(item => this._claveVersion(item.seaGroupId, item.tipo)));
+    return this.examenes().filter(item => claves.has(this._claveVersion(item.seaGroupId, item.tipo)));
   }
 
   private _toRequest(item: RolExamenItem): RolExamenCreateRequest {
@@ -1228,6 +1384,7 @@ export class RolExamenesComponent implements OnInit {
       docenteNombre: item.docenteNombre,
       docenteCi: item.docenteCI,
       tipoParcial: item.tipo,
+      version: item.version,
       modalidad: item.modalidad || (item.conCartilla ? 'PRESENCIAL_CARTILLA' : 'PRESENCIAL_SIN_CARTILLA'),
       semana: item.semana,
       dia: item.dia,
@@ -1254,6 +1411,7 @@ export class RolExamenesComponent implements OnInit {
       docenteNombre: rol.docenteNombre,
       docenteCI: rol.docenteCi,
       tipo: rol.tipoParcial as RolExamenItem['tipo'],
+      version: rol.version || 1,
       estado: rol.estadoFlujo as RolExamenItem['estado'],
       modalidad: rol.modalidad,
       conCartilla: rol.modalidad === 'PRESENCIAL_CARTILLA',
@@ -1270,6 +1428,57 @@ export class RolExamenesComponent implements OnInit {
     };
   }
 
+  private _textoCelda(valor: unknown): string {
+    return valor === null || valor === undefined ? '' : String(valor).trim();
+  }
+
+  private _leerFechaExcel(valor: unknown): { iso: string; display: string } {
+    if (valor instanceof Date && !Number.isNaN(valor.getTime())) {
+      const iso = `${valor.getFullYear()}-${String(valor.getMonth() + 1).padStart(2, '0')}-${String(valor.getDate()).padStart(2, '0')}`;
+      return { iso, display: `${String(valor.getDate()).padStart(2, '0')}/${String(valor.getMonth() + 1).padStart(2, '0')}/${valor.getFullYear()}` };
+    }
+
+    if (typeof valor === 'number' && Number.isFinite(valor)) {
+      const partes = XLSX.SSF.parse_date_code(valor);
+      if (partes?.y && partes?.m && partes?.d) {
+        const iso = `${partes.y}-${String(partes.m).padStart(2, '0')}-${String(partes.d).padStart(2, '0')}`;
+        return { iso, display: `${String(partes.d).padStart(2, '0')}/${String(partes.m).padStart(2, '0')}/${partes.y}` };
+      }
+    }
+
+    const texto = this._textoCelda(valor);
+    const fechaLatam = texto.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if (fechaLatam) {
+      const [, dia, mes, anio] = fechaLatam;
+      return {
+        iso: `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`,
+        display: `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${anio}`
+      };
+    }
+
+    const fechaIso = texto.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+    if (fechaIso) {
+      const [, anio, mes, dia] = fechaIso;
+      return {
+        iso: `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`,
+        display: `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${anio}`
+      };
+    }
+
+    return { iso: '', display: 'Por programar' };
+  }
+
+  private _leerHoraExcel(valor: unknown): string {
+    if (typeof valor === 'number' && Number.isFinite(valor)) {
+      const partes = XLSX.SSF.parse_date_code(valor % 1);
+      if (partes) return `${String(partes.H ?? partes.h ?? 0).padStart(2, '0')}:${String(partes.M ?? partes.m ?? 0).padStart(2, '0')}`;
+    }
+
+    const texto = this._textoCelda(valor);
+    const hora = texto.match(/(\d{1,2}):(\d{2})/);
+    return hora ? `${hora[1].padStart(2, '0')}:${hora[2]}` : '';
+  }
+
   private _normalizarTipoParcial(valor: string): RolExamenItem['tipo'] | null {
     const normalizado = this._normalizar(valor);
     if (normalizado === '1er parcial' || normalizado === 'primer parcial') return '1er Parcial';
@@ -1282,17 +1491,28 @@ export class RolExamenesComponent implements OnInit {
   private _normalizarModalidad(valor: string): RolExamenCreateRequest['modalidad'] {
     const normalizado = this._normalizar(valor).replace(/\s+/g, '_');
     if (normalizado === 'virtual') return 'VIRTUAL';
-    if (normalizado === 'presencial_cartilla' || normalizado === 'con_cartilla') return 'PRESENCIAL_SIN_CARTILLA';
+    if (normalizado === 'presencial_cartilla' || normalizado === 'con_cartilla') return 'PRESENCIAL_CARTILLA';
     if (normalizado === 'presencial_sin_cartilla' || normalizado === 'sin_cartilla' || normalizado === 'presencial') return 'PRESENCIAL_SIN_CARTILLA';
-    return 'PRESENCIAL_SIN_CARTILLA';
+    return 'PRESENCIAL_CARTILLA';
   }
 
-  private _crearRolId(groupId: string, tipo: RolExamenItem['tipo'], fecha: string): string {
+  private _claveVersion(groupId: string, tipo: RolExamenItem['tipo']): string {
+    return `${groupId}|${tipo}`;
+  }
+
+  private _siguienteVersionLocal(groupId: string, tipo: RolExamenItem['tipo']): number {
+    return this.examenes()
+      .filter(item => this._claveVersion(item.seaGroupId, item.tipo) === this._claveVersion(groupId, tipo))
+      .reduce((max, item) => Math.max(max, item.version || 1), 0) + 1;
+  }
+
+  private _crearRolId(groupId: string, tipo: RolExamenItem['tipo'], fecha: string, version = 1): string {
     const tipoCodigo = tipo === '1er Parcial' ? '1P'
       : tipo === '2do Parcial' ? '2P'
       : tipo === 'Final' ? 'FIN'
       : '2I';
-    return `ROL-${groupId}-${tipoCodigo}-${fecha}`;
+    const base = `ROL-${groupId}-${tipoCodigo}-${fecha}`;
+    return version <= 1 ? base : `${base}-V${version}`;
   }
 
   private _nombreDocenteOficial(grupo: GroupItem): string {
