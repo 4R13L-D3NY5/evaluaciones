@@ -23,8 +23,10 @@ public class RolExamenMapper {
                 .semestre(dto.getSemestre() != null ? dto.getSemestre() : 1)
                 .grupo(dto.getGrupo())
                 .tipoClase(dto.getTipoClase() != null ? dto.getTipoClase() : "TA")
-                .docenteNombre(dto.getDocenteNombre())
-                .docenteCi(dto.getDocenteCi())
+                // El docente titular se resuelve exclusivamente desde el
+                // grupo oficial del servicio institucional.
+                .docenteNombre(null)
+                .docenteCi(null)
                 .tipoParcial(dto.getTipoParcial())
                 .version(dto.getVersion() != null ? dto.getVersion() : 1)
                 .modalidad(dto.getModalidad())
@@ -52,8 +54,10 @@ public class RolExamenMapper {
         entity.setSemestre(dto.getSemestre() != null ? dto.getSemestre() : 1);
         entity.setGrupo(dto.getGrupo());
         entity.setTipoClase(dto.getTipoClase() != null ? dto.getTipoClase() : "TA");
-        entity.setDocenteNombre(dto.getDocenteNombre());
-        entity.setDocenteCi(dto.getDocenteCi());
+        // No copiar datos de docente enviados por el navegador: el servicio
+        // oficial debe resolverlos antes de guardar el rol.
+        entity.setDocenteNombre(null);
+        entity.setDocenteCi(null);
         entity.setTipoParcial(dto.getTipoParcial());
         entity.setModalidad(dto.getModalidad());
         entity.setConCartilla(dto.getModalidad() == com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen.PRESENCIAL_CARTILLA);
@@ -80,8 +84,8 @@ public class RolExamenMapper {
                 .semestre(entity.getSemestre())
                 .grupo(entity.getGrupo())
                 .tipoClase(entity.getTipoClase())
-                .docenteNombre(entity.getDocenteNombre())
-                .docenteCi(entity.getDocenteCi())
+                .docenteNombre(null)
+                .docenteCi(null)
                 .tipoParcial(entity.getTipoParcial())
                 .version(entity.getVersion() != null ? entity.getVersion() : 1)
                 .modalidad(entity.getModalidad())

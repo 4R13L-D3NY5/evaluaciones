@@ -44,7 +44,6 @@ public class RolExamenRequestDto {
 
     private String tipoClase;
 
-    @NotBlank
     private String docenteNombre;
 
     private String docenteCi;

@@ -57,7 +57,7 @@ public class RolExamen {
     @Column(name = "tipo_clase", length = 20)
     private String tipoClase;
 
-    @Column(name = "docente_nombre", length = 150, nullable = false)
+    @Column(name = "docente_nombre", length = 150)
     private String docenteNombre;
 
     @Column(name = "docente_ci", length = 30)

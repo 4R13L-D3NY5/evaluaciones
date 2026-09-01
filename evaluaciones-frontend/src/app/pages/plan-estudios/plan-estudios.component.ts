@@ -514,7 +514,7 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
 
       <!-- Toast Notificación -->
       @if (toastMessage()) {
-        <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
+        <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
           <i class="pi pi-check-circle text-emerald-400 text-lg"></i>
           <span class="text-xs font-bold">{{ toastMessage() }}</span>
         </div>
@@ -614,7 +614,7 @@ export class PlanEstudiosComponent implements OnInit {
         this.cargandoSedes.set(false);
         this.carreras.set([]);
         this.planSemestres.set([]);
-        this.errorCarga.set('No fue posible consultar las sedes oficiales. Verifica la conexión con SEA.');
+        this.errorCarga.set('No fue posible consultar las sedes oficiales. Verifica la conexión institucional.');
       }
     });
   }
@@ -633,7 +633,7 @@ export class PlanEstudiosComponent implements OnInit {
           this.cargarPlanReal(codigoSede, carreraInicial.careerCode);
         } else {
           this.planSemestres.set([]);
-          this.errorCarga.set('La sede seleccionada no tiene carreras disponibles en SEA.');
+          this.errorCarga.set('La sede seleccionada no tiene carreras disponibles.');
         }
       },
       error: () => {
@@ -755,7 +755,7 @@ export class PlanEstudiosComponent implements OnInit {
       const rolGrupo = roles.find(rol => (rol.grupo || '').trim() === grupo.code);
       return rolGrupo?.docenteNombre?.trim()
         || grupo.teacherName?.trim()
-        || (grupo.teacherIdentityNumber ? `Docente SEA (CI ${grupo.teacherIdentityNumber})` : '');
+        || (grupo.teacherIdentityNumber ? `Nombre no disponible (CI ${grupo.teacherIdentityNumber})` : '');
     }).filter(Boolean);
     const docentesRol = roles.map(rol => rol.docenteNombre?.trim()).filter(Boolean) as string[];
     const docentes = [...new Set(docentesGrupo.length > 0 ? docentesGrupo : docentesRol)];

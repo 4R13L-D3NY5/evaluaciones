@@ -183,6 +183,11 @@ public class BancoPreguntasService {
                 return respuestaFallida(rol, List.of("El mismo banco ya fue registrado para este rol (hash SHA-256 duplicado)."));
             }
 
+            String docenteOficial = rolExamenService.resolverNombreDocenteOficial(rol);
+            if (docenteOficial == null || docenteOficial.isBlank()) {
+                throw new RuntimeException("No se encontró un docente oficial en los servicios institucionales para este rol");
+            }
+
             // Guardar banco
             String bancoId = "BANCO-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
             BancoPreguntas banco = new BancoPreguntas();
@@ -200,7 +205,7 @@ public class BancoPreguntasService {
             banco.setHashSha256Integridad(hash);
             banco.setPaqueteJsonEncriptado(paqueteJson);
             banco.setEstado("VALIDADO");
-            banco.setDocenteAprobador(docenteAprobador != null ? docenteAprobador : rol.getDocenteNombre());
+            banco.setDocenteAprobador(docenteOficial.trim());
             banco.setFechaAprobacion(LocalDateTime.now());
             bancoRepository.save(banco);
 
@@ -212,7 +217,7 @@ public class BancoPreguntasService {
                 reactivoRepository.save(r);
             }
 
-            rolExamenService.validarPorBanco(rol.getId(), hash, docenteAprobador);
+            rolExamenService.validarPorBanco(rol.getId(), hash, docenteOficial.trim());
 
             return CargaBancoResponseDto.builder()
                     .exito(true)

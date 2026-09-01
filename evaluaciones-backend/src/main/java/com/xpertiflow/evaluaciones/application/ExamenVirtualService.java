@@ -3,6 +3,7 @@ package com.xpertiflow.evaluaciones.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertiflow.evaluaciones.api.dto.virtual.*;
+import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
 import com.xpertiflow.evaluaciones.domain.entity.*;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
@@ -31,6 +32,7 @@ public class ExamenVirtualService {
     private final ExamenVarianteRepository varianteRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final RolExamenService rolExamenService;
+    private final ConfiguracionEvaluacionesService configuracionEvaluacionesService;
     private final ObjectMapper objectMapper;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -67,6 +69,9 @@ public class ExamenVirtualService {
         sala.setGraciaIngresoMinutos(Optional.ofNullable(request.getGraciaIngresoMinutos()).orElse(10));
         sala.setPermiteReconexion(Optional.ofNullable(request.getPermiteReconexion()).orElse(true));
         sala.setCreadoPor(usuario == null ? "Sistema" : usuario);
+        String tokenGrupo = generarToken();
+        sala.setTokenGrupoHash(hashToken(tokenGrupo));
+        sala.setTokenGrupoEmitidoEn(ahora);
         salaRepository.save(sala);
 
         for (MapeoEstudianteVariante mapeo : mapeos) {
@@ -93,6 +98,26 @@ public class ExamenVirtualService {
         SalaVirtualCreadaDto respuesta = new SalaVirtualCreadaDto();
         respuesta.setSala(construirSala(sala));
         respuesta.setAccesos(accesos);
+        respuesta.setTokenGrupo(tokenGrupo);
+        return respuesta;
+    }
+
+    /** Emite un token común para una sala. Se devuelve en texto plano solo en esta operación. */
+    @Transactional
+    public TokenGrupoResponseDto emitirTokenGrupo(String salaId, String usuario) {
+        SalaExamenVirtual sala = obtenerSala(salaId);
+        if (!Set.of("PREPARADA", "ABIERTA", "EN_CURSO", "PAUSADA").contains(sala.getEstado())) {
+            throw new RuntimeException("Solo se puede generar un acceso grupal mientras la sala esté disponible");
+        }
+        String token = generarToken();
+        boolean yaExistia = sala.getTokenGrupoHash() != null;
+        sala.setTokenGrupoHash(hashToken(token));
+        sala.setTokenGrupoEmitidoEn(LocalDateTime.now());
+        salaRepository.save(sala);
+        registrarEvento(sala.getId(), null, yaExistia ? "TOKEN_GRUPO_REGENERADO" : "TOKEN_GRUPO_EMITIDO", usuario);
+        TokenGrupoResponseDto respuesta = new TokenGrupoResponseDto();
+        respuesta.setCodigoSala(codigoSalaVisible(sala.getCodigoSala()));
+        respuesta.setTokenGrupo(token);
         return respuesta;
     }
 
@@ -116,15 +141,18 @@ public class ExamenVirtualService {
             throw new RuntimeException("Solo se puede iniciar una sala ABIERTA");
         }
         LocalDateTime ahora = LocalDateTime.now();
+        int cuentaRegresiva = configuracionEvaluacionesService.obtener()
+                .getCuentaRegresivaInicioVirtualSegundos();
+        LocalDateTime inicioProgramado = ahora.plusSeconds(Math.max(0, cuentaRegresiva));
         sala.setEstado("EN_CURSO");
-        sala.setIniciadaEn(ahora);
-        sala.setTerminaEn(ahora.plusMinutes(sala.getDuracionMinutos()));
+        sala.setIniciadaEn(inicioProgramado);
+        sala.setTerminaEn(inicioProgramado.plusMinutes(sala.getDuracionMinutos()));
         sala.setIniciadoPor(usuario);
         salaRepository.save(sala);
         for (IntentoExamenVirtual intento : intentoRepository.findBySalaIdOrderByCodigoEstudianteAsc(salaId)) {
             if (Set.of("VALIDADO", "EN_ESPERA").contains(intento.getEstado())) {
-                intento.setEstado("EN_CURSO");
-                intento.setInicioEn(ahora);
+                intento.setEstado("EN_ESPERA");
+                intento.setInicioEn(null);
                 intento.setUltimaActividadEn(ahora);
                 intentoRepository.save(intento);
             }
@@ -140,6 +168,66 @@ public class ExamenVirtualService {
             throw new RuntimeException("La sala no está abierta para cierre");
         }
         finalizarSala(sala, usuario, "SALA_CERRADA");
+        return construirSala(sala);
+    }
+
+    /**
+     * Reabre una sala durante una incidencia operativa sin borrar las respuestas
+     * que los estudiantes ya hayan guardado.
+     */
+    @Transactional
+    public SalaVirtualResponseDto restablecerSala(String salaId, String usuario, String motivo) {
+        SalaExamenVirtual sala = obtenerSala(salaId);
+        if (!Set.of("ABIERTA", "EN_CURSO", "PAUSADA", "CERRADA", "CALIFICADA").contains(sala.getEstado())) {
+            throw new RuntimeException("La sala todavía no está disponible para restablecer");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new RuntimeException("Indica el motivo del restablecimiento");
+        }
+        String motivoNormalizado = motivo.trim();
+
+        for (IntentoExamenVirtual intento : intentoRepository.findBySalaIdOrderByCodigoEstudianteAsc(sala.getId())) {
+            // El restablecimiento confirmado reabre el examen, pero nunca toca las
+            // respuestas guardadas ni los intentos anulados.
+            if (!"ANULADO".equals(intento.getEstado())) {
+                intento.setEstado("EN_ESPERA");
+                intento.setInicioEn(null);
+                intento.setEnviadoEn(null);
+                intento.setAciertos(null);
+                intento.setNotaSobre30(null);
+                intento.setNotaSobre100(null);
+                intento.setTokenExpiraEn(LocalDateTime.now().plusDays(2));
+                intento.setUltimaActividadEn(LocalDateTime.now());
+                intentoRepository.save(intento);
+            }
+        }
+
+        sala.setEstado("ABIERTA");
+        sala.setIniciadaEn(null);
+        sala.setTerminaEn(null);
+        sala.setCerradaEn(null);
+        sala.setCerradoPor(null);
+        salaRepository.save(sala);
+
+        RolExamen rol = rolRepository.findById(sala.getRolExamenId()).orElse(null);
+        if (rol != null && Set.of(
+                EstadoFlujo.GENERADO,
+                EstadoFlujo.IMPRESO,
+                EstadoFlujo.ENTREGADO,
+                EstadoFlujo.DEVUELTO,
+                EstadoFlujo.REVISADO,
+                EstadoFlujo.SUBIDO,
+                EstadoFlujo.RECIBIDO
+        ).contains(rol.getEstadoFlujo())) {
+            rolExamenService.restablecerAValidado(rol.getId(), RestablecerRolRequestDto.builder()
+                    .motivo(motivoNormalizado)
+                    .usuario(usuario == null ? "Sistema" : usuario)
+                    .ipOrigen("127.0.0.1")
+                    .build());
+        }
+
+        registrarEvento(sala.getId(), null, "SALA_RESTABLECIDA", usuario,
+                "{\"motivo\":\"" + escaparJson(motivoNormalizado) + "\"}");
         return construirSala(sala);
     }
 
@@ -186,6 +274,16 @@ public class ExamenVirtualService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<SalaVirtualResponseDto> consultarUltimaSalaPorRol(String rolExamenId) {
+        rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado"));
+        return salaRepository.findByRolExamenIdOrderByCreadoEnDesc(rolExamenId)
+                .stream()
+                .findFirst()
+                .map(this::construirSala);
+    }
+
+    @Transactional(readOnly = true)
     public List<ResultadoVirtualDto> consultarResultados(String rolExamenId) {
         rolRepository.findById(rolExamenId)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado"));
@@ -198,7 +296,7 @@ public class ExamenVirtualService {
             ResultadoVirtualDto resultado = new ResultadoVirtualDto();
             resultado.setIntentoId(intento.getId());
             resultado.setCodigoEstudiante(intento.getCodigoEstudiante());
-            resultado.setNombreEstudiante(intento.getNombreEstudiante());
+            resultado.setNombreEstudiante(nombreEstudianteActual(intento));
             resultado.setEstado(intento.getEstado());
             resultado.setAciertos(intento.getAciertos());
             resultado.setNotaSobre30(intento.getNotaSobre30() == null ? null : intento.getNotaSobre30().toPlainString());
@@ -215,13 +313,30 @@ public class ExamenVirtualService {
 
     @Transactional
     public AccesoVirtualResponseDto validarAcceso(AccesoVirtualRequestDto request, String ip) {
-        SalaExamenVirtual sala = salaRepository.findByCodigoSala(request.getCodigoSala())
+        SalaExamenVirtual sala = buscarSalaPorCodigo(request.getCodigoSala())
                 .orElseThrow(() -> new RuntimeException("Código de sala inválido"));
         if (!Set.of("ABIERTA", "EN_CURSO").contains(sala.getEstado())) {
             throw new RuntimeException("La sala no está habilitada para recibir estudiantes");
         }
-        IntentoExamenVirtual intento = intentoRepository.findBySalaIdAndTokenHash(sala.getId(), hashToken(request.getToken()))
-                .orElseThrow(() -> new RuntimeException("Token de acceso inválido"));
+        String tokenSesion = request.getToken().trim();
+        String tokenHash = hashToken(tokenSesion);
+        Optional<IntentoExamenVirtual> intentoPorPersona = intentoRepository.findBySalaIdAndTokenHash(sala.getId(), tokenHash);
+        IntentoExamenVirtual intento;
+        if (intentoPorPersona.isPresent()) {
+            intento = intentoPorPersona.get();
+        } else {
+            if (sala.getTokenGrupoHash() == null || !sala.getTokenGrupoHash().equals(tokenHash)) {
+                throw new RuntimeException("El código de sala o el token no son válidos");
+            }
+            if (request.getCodigoEstudiante() == null || request.getCodigoEstudiante().isBlank()) {
+                throw new RuntimeException("Con el acceso grupal debes ingresar tu código de estudiante");
+            }
+            intento = intentoRepository.findBySalaIdAndCodigoEstudiante(sala.getId(), request.getCodigoEstudiante().trim())
+                    .orElseThrow(() -> new RuntimeException("El código de estudiante no pertenece a esta sala"));
+            tokenSesion = generarToken();
+            intento.setTokenSesionHash(hashToken(tokenSesion));
+            intento.setTokenSesionEmitidoEn(LocalDateTime.now());
+        }
         if (intento.getTokenExpiraEn().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("El token de acceso ha vencido");
         }
@@ -235,11 +350,10 @@ public class ExamenVirtualService {
         LocalDateTime ahora = LocalDateTime.now();
         if (intento.getIngresoEn() == null) intento.setIngresoEn(ahora);
         intento.setUltimaActividadEn(ahora);
-        intento.setEstado("EN_CURSO".equals(sala.getEstado()) ? "EN_CURSO" : "EN_ESPERA");
-        if ("EN_CURSO".equals(sala.getEstado())) intento.setInicioEn(sala.getIniciadaEn());
+        sincronizarInicioIntento(sala, intento);
         intentoRepository.save(intento);
         registrarEvento(sala.getId(), intento.getId(), "ESTUDIANTE_INGRESA", ip);
-        return construirAcceso(sala, intento, request.getToken());
+        return construirAcceso(sala, intento, tokenSesion);
     }
 
     @Transactional
@@ -247,6 +361,7 @@ public class ExamenVirtualService {
         IntentoExamenVirtual intento = autenticarIntento(token);
         SalaExamenVirtual sala = obtenerSala(intento.getSalaId());
         verificarTiempo(sala, intento);
+        sincronizarInicioIntento(sala, intento);
         intento.setUltimaActividadEn(LocalDateTime.now());
         intentoRepository.save(intento);
         return construirAcceso(sala, intento, token);
@@ -334,11 +449,58 @@ public class ExamenVirtualService {
                 .orElseThrow(() -> new RuntimeException("Variante asignada no encontrada"));
         AccesoVirtualResponseDto dto = new AccesoVirtualResponseDto();
         dto.setIntentoId(intento.getId()); dto.setTokenSesion(token);
-        dto.setCodigoEstudiante(intento.getCodigoEstudiante()); dto.setNombreEstudiante(intento.getNombreEstudiante());
-        dto.setCodigoSala(sala.getCodigoSala()); dto.setEstadoSala(sala.getEstado()); dto.setEstadoIntento(intento.getEstado());
+        dto.setCodigoEstudiante(intento.getCodigoEstudiante()); dto.setNombreEstudiante(nombreEstudianteActual(intento));
+        dto.setCodigoSala(codigoSalaVisible(sala.getCodigoSala())); dto.setEstadoSala(sala.getEstado()); dto.setEstadoIntento(intento.getEstado());
+        RolExamen rol = rolRepository.findById(sala.getRolExamenId()).orElse(null);
+        if (rol != null) {
+            dto.setInstitucionNombre("UNIVERSIDAD TÉCNICA PRIVADA COSMOS");
+            dto.setSedeNombre(rol.getSedeNombre());
+            dto.setCarreraNombre(rol.getCarreraNombre());
+            dto.setMateriaCodigo(rol.getMateriaCodigo());
+            dto.setMateriaNombre(rol.getMateriaNombre());
+            dto.setGrupo(rol.getGrupo());
+            String docenteOficial = rolExamenService.resolverNombreDocenteOficial(rol);
+            if (docenteOficial != null && !docenteOficial.isBlank()
+                    && !docenteOficial.equalsIgnoreCase(rol.getDocenteNombre())) {
+                rol.setDocenteNombre(docenteOficial);
+                rolRepository.save(rol);
+            }
+            dto.setDocenteNombre(docenteOficial);
+            dto.setTipoParcial(rol.getTipoParcial() == null ? null : rol.getTipoParcial().getValor());
+            dto.setModalidad(rol.getModalidad() == null ? null : rol.getModalidad().getValor());
+            dto.setFecha(rol.getFechaDisplay() != null ? rol.getFechaDisplay() : String.valueOf(rol.getFecha()));
+            dto.setHorario(rol.getHorario());
+            dto.setAula(rol.getAula());
+        }
         dto.setIniciadaEn(texto(sala.getIniciadaEn())); dto.setTerminaEn(texto(sala.getTerminaEn()));
-        dto.setPreguntas("EN_CURSO".equals(sala.getEstado()) ? construirPreguntas(variante) : List.of());
+        dto.setCuentaRegresivaSegundos(cuentaRegresivaRestante(sala));
+        dto.setTiempoRestanteSegundos(tiempoRestante(sala));
+        dto.setPreguntas("EN_CURSO".equals(sala.getEstado()) && examenIniciado(sala) ? construirPreguntas(variante) : List.of());
         return dto;
+    }
+
+    private void sincronizarInicioIntento(SalaExamenVirtual sala, IntentoExamenVirtual intento) {
+        if ("EN_CURSO".equals(sala.getEstado()) && examenIniciado(sala)) {
+            intento.setEstado("EN_CURSO");
+            intento.setInicioEn(sala.getIniciadaEn());
+        } else if ("EN_CURSO".equals(sala.getEstado()) && !Set.of("ENVIADO", "CALIFICADO", "ANULADO").contains(intento.getEstado())) {
+            intento.setEstado("EN_ESPERA");
+            intento.setInicioEn(null);
+        }
+    }
+
+    private boolean examenIniciado(SalaExamenVirtual sala) {
+        return sala.getIniciadaEn() == null || !LocalDateTime.now().isBefore(sala.getIniciadaEn());
+    }
+
+    private long cuentaRegresivaRestante(SalaExamenVirtual sala) {
+        if (!"EN_CURSO".equals(sala.getEstado()) || sala.getIniciadaEn() == null) return 0;
+        return Math.max(0, java.time.Duration.between(LocalDateTime.now(), sala.getIniciadaEn()).getSeconds());
+    }
+
+    private long tiempoRestante(SalaExamenVirtual sala) {
+        if (!"EN_CURSO".equals(sala.getEstado()) || sala.getTerminaEn() == null || !examenIniciado(sala)) return 0;
+        return Math.max(0, java.time.Duration.between(LocalDateTime.now(), sala.getTerminaEn()).getSeconds());
     }
 
     private List<PreguntaVirtualDto> construirPreguntas(ExamenVariante variante) {
@@ -351,8 +513,11 @@ public class ExamenVirtualService {
             int numero = 1;
             for (JsonNode node : root) {
                 PreguntaVirtualDto pregunta = new PreguntaVirtualDto();
-                pregunta.setReactivoId(node.path("id").asInt()); pregunta.setNumeroPregunta(numero++);
-                pregunta.setTipoReactivo(node.path("tipoReactivo").asText(null));
+                pregunta.setReactivoId(node.path("id").asInt());
+                String tipoReactivo = node.path("tipoReactivo").asText(null);
+                pregunta.setTipoReactivo(tipoReactivo);
+                boolean esContexto = Set.of("EMPAREJAMIENTO_TRONCO", "CASO_CLINICO_TRONCO").contains(tipoReactivo);
+                pregunta.setNumeroPregunta(esContexto ? 0 : numero++);
                 pregunta.setGrupoContexto(node.path("grupoContexto").asText(null));
                 pregunta.setEnunciado(node.path("enunciado").asText(""));
                 List<OpcionVirtualDto> opciones = new ArrayList<>();
@@ -373,22 +538,26 @@ public class ExamenVirtualService {
 
     private IntentoExamenVirtual autenticarIntento(String token) {
         if (token == null || token.isBlank()) throw new RuntimeException("Falta el token de examen");
-        return intentoRepository.findByTokenHash(hashToken(token))
+        String hash = hashToken(token);
+        return intentoRepository.findByTokenHash(hash)
+                .or(() -> intentoRepository.findByTokenSesionHash(hash))
                 .orElseThrow(() -> new RuntimeException("Sesión de examen inválida"));
     }
 
     private SalaExamenVirtual obtenerSala(String id) {
-        return salaRepository.findById(id).orElseThrow(() -> new RuntimeException("Sala virtual no encontrada"));
+        return salaRepository.findById(id)
+                .or(() -> buscarSalaPorCodigo(id))
+                .orElseThrow(() -> new RuntimeException("Sala virtual no encontrada"));
     }
 
     private SalaVirtualResponseDto construirSala(SalaExamenVirtual sala) {
         SalaVirtualResponseDto dto = new SalaVirtualResponseDto(); dto.setId(sala.getId()); dto.setRolExamenId(sala.getRolExamenId());
-        dto.setCodigoSala(sala.getCodigoSala()); dto.setEstado(sala.getEstado()); dto.setDuracionMinutos(sala.getDuracionMinutos());
+        dto.setCodigoSala(codigoSalaVisible(sala.getCodigoSala())); dto.setEstado(sala.getEstado()); dto.setDuracionMinutos(sala.getDuracionMinutos());
         dto.setGraciaIngresoMinutos(sala.getGraciaIngresoMinutos()); dto.setIniciadaEn(texto(sala.getIniciadaEn())); dto.setTerminaEn(texto(sala.getTerminaEn()));
         List<ParticipanteVirtualDto> participantes = new ArrayList<>();
         for (IntentoExamenVirtual intento : intentoRepository.findBySalaIdOrderByCodigoEstudianteAsc(sala.getId())) {
             ParticipanteVirtualDto p = new ParticipanteVirtualDto(); p.setIntentoId(intento.getId()); p.setCodigoEstudiante(intento.getCodigoEstudiante());
-            p.setNombreEstudiante(intento.getNombreEstudiante()); p.setEstado(intento.getEstado()); p.setIngresoEn(texto(intento.getIngresoEn())); p.setEnviadoEn(texto(intento.getEnviadoEn()));
+            p.setNombreEstudiante(nombreEstudianteActual(intento)); p.setEstado(intento.getEstado()); p.setIngresoEn(texto(intento.getIngresoEn())); p.setEnviadoEn(texto(intento.getEnviadoEn()));
             p.setAciertos(intento.getAciertos()); p.setNotaSobre100(intento.getNotaSobre100() == null ? null : intento.getNotaSobre100().toPlainString()); participantes.add(p);
         }
         dto.setParticipantes(participantes); return dto;
@@ -409,13 +578,52 @@ public class ExamenVirtualService {
     }
 
     private void registrarEvento(String salaId, String intentoId, String tipo, String usuario) {
-        EventoExamenVirtual evento = new EventoExamenVirtual(); evento.setSalaId(salaId); evento.setIntentoId(intentoId); evento.setTipoEvento(tipo);
-        evento.setUsuario(usuario); evento.setOcurridoEn(LocalDateTime.now()); eventoRepository.save(evento);
+        registrarEvento(salaId, intentoId, tipo, usuario, null);
     }
 
-    private String generarCodigoSala() { String codigo; do { codigo = "SEA-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT); } while (salaRepository.findByCodigoSala(codigo).isPresent()); return codigo; }
+    private void registrarEvento(String salaId, String intentoId, String tipo, String usuario, String detallesJson) {
+        EventoExamenVirtual evento = new EventoExamenVirtual();
+        evento.setSalaId(salaId);
+        evento.setIntentoId(intentoId);
+        evento.setTipoEvento(tipo);
+        evento.setDetallesJson(detallesJson);
+        evento.setUsuario(usuario);
+        evento.setOcurridoEn(LocalDateTime.now());
+        eventoRepository.save(evento);
+    }
+
+    private String escaparJson(String valor) {
+        return valor.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\r", "\\r").replace("\n", "\\n");
+    }
+
+    private Optional<SalaExamenVirtual> buscarSalaPorCodigo(String codigo) {
+        if (codigo == null || codigo.isBlank()) return Optional.empty();
+        String normalizado = codigo.trim().toUpperCase(Locale.ROOT);
+        Optional<SalaExamenVirtual> sala = salaRepository.findByCodigoSala(normalizado);
+        if (sala.isPresent() || !normalizado.startsWith("SALA-")) return sala;
+        // Los códigos antiguos conservan su valor interno para no invalidar
+        // accesos ya compartidos, pero también aceptan la presentación nueva.
+        return salaRepository.findByCodigoSala("SEA-" + normalizado.substring("SALA-".length()));
+    }
+
+    private String codigoSalaVisible(String codigo) {
+        if (codigo != null && codigo.toUpperCase(Locale.ROOT).startsWith("SEA-")) {
+            return "SALA-" + codigo.substring("SEA-".length());
+        }
+        return codigo;
+    }
+
+    private String generarCodigoSala() { String codigo; do { codigo = "SALA-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT); } while (salaRepository.findByCodigoSala(codigo).isPresent()); return codigo; }
     private String generarToken() { byte[] bytes = new byte[32]; secureRandom.nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
     private String hashToken(String token) { try { byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)); StringBuilder out = new StringBuilder(); for (byte b : digest) out.append(String.format("%02x", b)); return out.toString(); } catch (Exception ex) { throw new IllegalStateException(ex); } }
     private String nombreCompleto(MapeoEstudianteVariante m) { return String.join(" ", Arrays.asList(m.getNombres(), m.getApellidoPaterno(), m.getApellidoMaterno())).replaceAll("\\s+", " ").trim(); }
+    private String nombreEstudianteActual(IntentoExamenVirtual intento) {
+        if (intento.getMapeoEstudianteVarianteId() != null) {
+            String nombre = mapeoRepository.findById(intento.getMapeoEstudianteVarianteId()).map(this::nombreCompleto).orElse("");
+            if (!nombre.isBlank()) return nombre;
+        }
+        return intento.getNombreEstudiante();
+    }
     private String texto(LocalDateTime value) { return value == null ? null : value.toString(); }
 }

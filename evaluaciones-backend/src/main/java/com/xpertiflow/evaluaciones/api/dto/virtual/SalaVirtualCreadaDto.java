@@ -5,6 +5,7 @@ import java.util.List;
 public class SalaVirtualCreadaDto {
     private SalaVirtualResponseDto sala;
     private List<AccesoGeneradoDto> accesos;
+    private String tokenGrupo;
     @Data
     public static class AccesoGeneradoDto {
         private String codigoEstudiante;

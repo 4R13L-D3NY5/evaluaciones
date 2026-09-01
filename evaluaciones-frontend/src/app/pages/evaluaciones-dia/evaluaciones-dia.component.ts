@@ -2,8 +2,8 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { forkJoin, Observable, of } from 'rxjs';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
@@ -100,6 +100,12 @@ interface AccesoVirtualGenerado {
 interface SalaVirtualCreada {
   sala: SalaVirtualOperacion;
   accesos: AccesoVirtualGenerado[];
+  tokenGrupo?: string;
+}
+
+interface TokenGrupoVirtual {
+  codigoSala: string;
+  tokenGrupo: string;
 }
 
 interface ResultadoVirtual {
@@ -202,6 +208,7 @@ interface ResultadoVirtual {
             </label>
             <select 
               [(ngModel)]="filtroParcial"
+              (ngModelChange)="cambiarFiltroParcial($event)"
               class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
               <option value="Todos">Todos los Parciales</option>
               <option value="1er Parcial">1er Parcial</option>
@@ -218,6 +225,7 @@ interface ResultadoVirtual {
             </label>
             <select 
               [(ngModel)]="filtroModalidad"
+              (ngModelChange)="cambiarFiltroModalidad($event)"
               class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
               <option value="Todos">Todas</option>
               <option value="PRESENCIAL_CARTILLA">Con Cartilla</option>
@@ -234,6 +242,7 @@ interface ResultadoVirtual {
             <input 
               type="date" 
               [(ngModel)]="filtroFechaInicio" 
+              (ngModelChange)="cambiarFiltroFechaInicio($event)"
               class="w-full bg-muted/70 border border-border rounded-xl px-2 py-1.5 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
           </div>
 
@@ -246,6 +255,7 @@ interface ResultadoVirtual {
               <input 
                 type="date" 
                 [(ngModel)]="filtroFechaFin" 
+                (ngModelChange)="cambiarFiltroFechaFin($event)"
                 class="w-full bg-muted/70 border border-border rounded-xl px-2 py-1.5 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
               <button 
                 (click)="limpiarFiltros()" 
@@ -264,11 +274,12 @@ interface ResultadoVirtual {
             <input 
               type="text" 
               [(ngModel)]="busquedaTexto" 
+              (ngModelChange)="cambiarBusqueda($event)"
               placeholder="Buscar evaluación por código, materia, docente o aula..."
               class="w-full bg-muted/70 border border-border rounded-xl pl-9 pr-8 py-2.5 text-xs font-medium text-foreground outline-none focus:border-primary shadow-2xs">
             <i class="pi pi-search absolute left-3 top-3 text-muted-foreground text-xs"></i>
             @if (busquedaTexto) {
-              <button (click)="busquedaTexto = ''" class="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground text-xs cursor-pointer">
+              <button (click)="busquedaTexto = ''; actualizarFiltros()" class="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground text-xs cursor-pointer">
                 <i class="pi pi-times"></i>
               </button>
             }
@@ -493,6 +504,22 @@ interface ResultadoVirtual {
                     <!-- Acciones -->
                     <td class="p-3.5 text-center">
                       <div class="inline-flex items-center gap-1.5">
+
+                        @if (item.modalidad === 'VIRTUAL') {
+                          <div class="relative group/salaVirtual">
+                            <button
+                              (click)="abrirSalaVirtualDesdeLista(item)"
+                              title="Restablecer examen virtual"
+                              aria-label="Restablecer examen virtual"
+                              class="h-7 w-7 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-refresh text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/salaVirtual:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Restablecer examen virtual</span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
                         
                         <!-- 1. Bitácora -->
                         <div class="relative group/bitacora">
@@ -559,22 +586,6 @@ interface ResultadoVirtual {
                           </div>
                         }
 
-                        @if (puedeEliminarBanco(item)) {
-                          <div class="relative group/eliminarBanco">
-                            <button
-                              (click)="abrirEliminarBanco(item)"
-                              title="Eliminar banco de preguntas"
-                              aria-label="Eliminar banco de preguntas"
-                              class="h-7 w-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 flex items-center justify-center cursor-pointer transition-colors">
-                              <i class="pi pi-trash text-xs"></i>
-                            </button>
-                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/eliminarBanco:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-rose-950 text-rose-100 text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Eliminar banco (escribir ELIMINAR)</span>
-                              <div class="w-2 h-2 bg-rose-950 rotate-45 -mt-1"></div>
-                            </div>
-                          </div>
-                        }
-
                         <!-- 4. Botón Restablecer a Validado -->
                         @if (puedeRestablecer(item)) {
                           <div class="relative group/reestablecer">
@@ -604,7 +615,7 @@ interface ResultadoVirtual {
           <!-- Barra Inferior de Resumen -->
           <div class="p-3.5 border-t border-border bg-muted/20 flex items-center justify-between text-xs text-muted-foreground font-bold">
             <span>Total evaluaciones filtradas: {{ evaluacionesFiltradas().length }}</span>
-            <span class="font-mono text-primary">Sincronizado con SEA · Gestión 2-2026</span>
+            <span class="font-mono text-primary">Sincronizado con el servicio institucional · Gestión 2-2026</span>
           </div>
         }
       </div>
@@ -803,16 +814,24 @@ interface ResultadoVirtual {
 
                 <!-- Lista de Estudiantes (Solo Código + Nombres + Apellidos) -->
                 <div class="bg-muted/30 border border-border rounded-xl p-3 max-h-40 overflow-y-auto space-y-1 text-[11px]">
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    @for (est of estudiantesInscritos(); track est.codigo; let idx = $index) {
-                      <div class="flex items-center gap-2 p-1.5 bg-card rounded-lg border border-border/80 truncate">
-                        <span class="font-mono font-bold text-primary text-[10px] shrink-0">[{{ est.codigo }}]</span>
-                        <span class="font-bold text-foreground truncate uppercase">
-                          {{ est.nombres }} {{ est.apellido1 }} {{ est.apellido2 }}
-                        </span>
-                      </div>
-                    }
-                  </div>
+                  @if (cargandoEstudiantesInscritos()) {
+                    <div class="py-4 text-center font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner mr-1"></i> Consultando la nómina oficial...</div>
+                  } @else if (!estudiantesInscritos().length) {
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center font-bold text-amber-900">
+                      No se encontraron estudiantes inscritos para este grupo. Verifique la asignatura, el grupo y el docente antes de preparar el examen.
+                    </div>
+                  } @else {
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      @for (est of estudiantesInscritos(); track est.codigo; let idx = $index) {
+                        <div class="flex items-center gap-2 p-1.5 bg-card rounded-lg border border-border/80 truncate">
+                          <span class="font-mono font-bold text-primary text-[10px] shrink-0">[{{ est.codigo }}]</span>
+                          <span class="font-bold text-foreground truncate uppercase">
+                            {{ est.nombres }} {{ est.apellido1 }} {{ est.apellido2 }}
+                          </span>
+                        </div>
+                      }
+                    </div>
+                  }
                 </div>
 
                 @if (evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL') {
@@ -847,9 +866,10 @@ interface ResultadoVirtual {
 
               <button 
                 (click)="ejecutarGeneracionVariantes()" 
-                class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-102">
-                <i class="pi" [class.pi-desktop]="evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL'" [class.pi-bolt]="evaluacionSeleccionadaParaParametrizar()?.modalidad !== 'VIRTUAL'"></i>
-                <span>{{ evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL' ? 'Preparar sala virtual y accesos' : 'Generar examen PDF (30 preguntas A-E)' }}</span>
+                [disabled]="consultandoSalaVirtual() || generandoTypst() || cargandoEstudiantesInscritos()"
+                class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-102 disabled:opacity-50 disabled:cursor-wait">
+                <i class="pi" [class.pi-spin]="consultandoSalaVirtual()" [class.pi-spinner]="consultandoSalaVirtual()" [class.pi-desktop]="!consultandoSalaVirtual() && evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL'" [class.pi-bolt]="!consultandoSalaVirtual() && evaluacionSeleccionadaParaParametrizar()?.modalidad !== 'VIRTUAL'"></i>
+                <span>{{ consultandoSalaVirtual() ? 'Consultando sala existente...' : (evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL' ? 'Preparar sala virtual y accesos' : 'Generar examen PDF (30 preguntas A-E)') }}</span>
               </button>
             </div>
 
@@ -864,7 +884,7 @@ interface ResultadoVirtual {
             
             <div class="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-4 flex items-center justify-between border-b border-purple-900">
               <div class="flex items-center gap-2.5">
-                <i class="pi pi-spin pi-cog text-purple-400 text-lg"></i>
+                <i class="pi pi-cog text-purple-400 text-lg" [class.pi-spin]="generandoTypst()"></i>
                 <h3 class="text-sm font-black">{{ esGeneracionVirtualActual() ? 'Preparación de examen virtual' : 'Generación de examen' }} #{{ queueJobId }}</h3>
               </div>
               <span class="text-[10px] font-mono bg-purple-900/60 px-2 py-0.5 rounded text-purple-300 border border-purple-500/30">
@@ -890,8 +910,13 @@ interface ResultadoVirtual {
               </div>
             </div>
 
-            <div class="bg-muted/40 border-t border-border p-4 flex justify-end gap-2">
-              <span class="text-[11px] font-bold text-muted-foreground">{{ esGeneracionVirtualActual() ? 'Se crearán la sala y los accesos individuales; no se generará PDF.' : 'El PDF estará disponible en Documentos al completar la generación.' }}</span>
+            <div class="bg-muted/40 border-t border-border p-4 flex items-center justify-between gap-3">
+              @if (errorGeneracionTypst()) {
+                <span class="text-[11px] font-bold text-rose-700">{{ errorGeneracionTypst() }}</span>
+                <button (click)="cerrarColaGeneracion()" class="shrink-0 px-4 py-2 rounded-xl border border-border bg-card text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
+              } @else {
+                <span class="text-[11px] font-bold text-muted-foreground">{{ esGeneracionVirtualActual() ? 'Se crearán la sala y los accesos individuales; no se generará PDF.' : 'El PDF estará disponible en Documentos al completar la generación.' }}</span>
+              }
             </div>
 
           </div>
@@ -903,7 +928,7 @@ interface ResultadoVirtual {
         <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-purple-200 rounded-2xl max-w-4xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
             <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
-              <div><p class="text-[10px] font-black uppercase tracking-widest text-purple-700">Sala virtual preparada</p><h3 class="text-lg font-black text-foreground">Ingreso organizado por estudiante</h3><p class="text-xs text-muted-foreground">Comparte a cada estudiante únicamente su token. Los tokens se muestran una sola vez.</p></div>
+              <div><p class="text-[10px] font-black uppercase tracking-widest text-purple-700">{{ salaVirtualExistente() ? 'Sala virtual ya generada' : 'Sala virtual preparada' }}</p><h3 class="text-lg font-black text-foreground">Ingreso organizado por estudiante</h3><p class="text-xs text-muted-foreground">{{ salaVirtualExistente() ? 'Se recuperaron los datos guardados de esta sala. Los accesos individuales solo se muestran al crearla por primera vez.' : 'Comparte a cada estudiante únicamente su token. Los tokens se muestran una sola vez.' }}</p></div>
               <button (click)="cerrarSalaVirtual()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
             </div>
             <div class="p-5 space-y-4 overflow-y-auto">
@@ -916,16 +941,72 @@ interface ResultadoVirtual {
                 @if (accesosVirtuales().length) {
                   <div class="rounded-xl border border-amber-200 bg-amber-50 p-4"><p class="text-xs font-black text-amber-950">Tokens individuales</p><p class="mt-1 text-[11px] text-amber-900">Guárdalos o entrégalos individualmente antes de cerrar esta ventana.</p><div class="mt-3 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-amber-200 text-[10px] font-black uppercase text-amber-800"><th class="p-2">Estudiante</th><th class="p-2">Token</th></tr></thead><tbody>@for (acceso of accesosVirtuales(); track acceso.codigoEstudiante) {<tr class="border-b border-amber-100"><td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td><td class="p-2 font-mono break-all">{{ acceso.token }}</td></tr>}</tbody></table></div></div>
                 } @else {
-                  <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-900">Los tokens ya fueron ocultados. La sala continúa disponible.</div>
+                  <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-xs text-indigo-950">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p class="font-black">Acceso para todo el grupo</p>
+                        <p class="mt-1 max-w-2xl text-[11px] text-indigo-800">Los tokens individuales solo se muestran una vez, al crear la sala. Puedes emitir un token grupal nuevo y compartirlo junto con el código de sala.</p>
+                      </div>
+                      @if (!tokenGrupoVirtual()) {
+                        <button (click)="emitirTokenGrupoDesdeLista()" [disabled]="emitiendoTokenGrupoVirtual()" class="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-[11px] font-black text-white hover:bg-indigo-700 cursor-pointer disabled:opacity-50">
+                          <i class="pi" [class.pi-spin]="emitiendoTokenGrupoVirtual()" [class.pi-spinner]="emitiendoTokenGrupoVirtual()" [class.pi-key]="!emitiendoTokenGrupoVirtual()"></i>
+                          {{ emitiendoTokenGrupoVirtual() ? 'Emitiendo...' : 'Emitir token grupal' }}
+                        </button>
+                      }
+                    </div>
+                    @if (tokenGrupoVirtual(); as token) {
+                      <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                        <div><span class="text-[10px] font-black uppercase tracking-wide text-indigo-700">Token grupal</span><div class="mt-1 break-all rounded-xl border border-indigo-200 bg-white px-3 py-2 font-mono text-sm font-black text-indigo-950">{{ token }}</div></div>
+                        <button (click)="copiarTokenGrupoDesdeLista()" class="rounded-xl border border-indigo-300 bg-white px-3 py-2 text-[11px] font-black text-indigo-700 hover:bg-indigo-100 cursor-pointer"><i class="pi pi-copy mr-1"></i>Copiar token</button>
+                      </div>
+                    }
+                  </div>
+                }
+                @if (sala.participantes.length) {
+                  <div class="rounded-xl border border-border bg-muted/20 p-4"><div class="flex items-center justify-between gap-3"><p class="text-xs font-black text-foreground">Estudiantes de la sala</p><span class="text-[10px] font-black text-muted-foreground">{{ sala.participantes.length }} registrados</span></div><div class="mt-3 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-border text-[10px] font-black uppercase text-muted-foreground"><th class="p-2">Código</th><th class="p-2">Estudiante</th><th class="p-2">Estado</th></tr></thead><tbody>@for (participante of sala.participantes; track participante.codigoEstudiante) {<tr class="border-b border-border/70"><td class="p-2 font-mono font-bold">{{ participante.codigoEstudiante }}</td><td class="p-2 font-bold">{{ participante.nombreEstudiante }}</td><td class="p-2">{{ participante.estado }}</td></tr>}</tbody></table></div></div>
                 }
               }
             </div>
             <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2 shrink-0">
               @if (salaVirtualCreada()?.estado === 'PREPARADA') { <button (click)="abrirSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-door-open mr-1"></i> Abrir sala para estudiantes</button> }
               @else if (salaVirtualCreada()?.estado === 'ABIERTA') { <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button> }
-              @else if (salaVirtualCreada()?.estado === 'EN_CURSO') { <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso. El tiempo lo controla el servidor.</span> }
+              @else if (salaVirtualCreada()?.estado === 'EN_CURSO' || salaVirtualCreada()?.estado === 'PAUSADA') { <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso. El tiempo lo controla el servidor.</span><button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer examen</button> }
+              @else if (salaVirtualCreada()?.estado === 'CERRADA' || salaVirtualCreada()?.estado === 'CALIFICADA') { <span class="self-center text-[11px] font-bold text-amber-700">El examen concluyó y puede restablecerse por una incidencia.</span><button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer examen</button> }
               @else { <span class="self-center text-[11px] font-bold text-muted-foreground">La sala ya concluyó.</span> }
               <button (click)="cerrarSalaVirtual()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: MOTIVO DE RESTABLECIMIENTO DE SALA VIRTUAL -->
+      @if (dialogRestablecerSalaVirtual()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-fade-in">
+          <div class="bg-card border border-amber-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <div class="h-9 w-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center"><i class="pi pi-refresh"></i></div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Restablecer examen virtual</h3>
+                  <p class="text-xs text-muted-foreground">{{ salaVirtualCreada()?.codigoSala }}</p>
+                </div>
+              </div>
+              <button (click)="cerrarDialogoRestablecerSalaVirtual()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+              <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 leading-relaxed">
+                La sala volverá a estar disponible para los estudiantes. Se conservarán las respuestas guardadas y el restablecimiento quedará registrado en la bitácora.
+              </div>
+              <label class="block space-y-1.5">
+                <span class="font-black text-foreground">Motivo del restablecimiento</span>
+                <textarea [(ngModel)]="motivoRestablecimientoSalaVirtual" rows="3" placeholder="Ej.: interrupción de internet durante el examen" class="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-xs font-medium text-foreground outline-none focus:border-amber-500"></textarea>
+              </label>
+            </div>
+            <div class="p-4 border-t border-border flex justify-end gap-2">
+              <button (click)="cerrarDialogoRestablecerSalaVirtual()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
+              <button (click)="restablecerSalaVirtual()" [disabled]="!motivoRestablecimientoSalaVirtual.trim() || creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black cursor-pointer disabled:opacity-50">
+                <i class="pi" [class.pi-spin]="creandoSalaVirtual()" [class.pi-spinner]="creandoSalaVirtual()" [class.pi-refresh]="!creandoSalaVirtual()"></i> {{ creandoSalaVirtual() ? 'Restableciendo...' : 'Confirmar restablecimiento' }}
+              </button>
             </div>
           </div>
         </div>
@@ -1765,42 +1846,9 @@ interface ResultadoVirtual {
         </div>
       }
 
-      <!-- MODAL: ELIMINAR BANCO DE PREGUNTAS -->
-      @if (dialogEliminarBanco()) {
-        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div class="bg-card border border-rose-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
-            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
-              <div class="flex items-start gap-3">
-                <div class="h-9 w-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center"><i class="pi pi-trash"></i></div>
-                <div>
-                  <h3 class="text-sm font-black text-foreground">Eliminar banco de preguntas</h3>
-                  <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaParaEliminarBanco()?.codigo }} · {{ evaluacionSeleccionadaParaEliminarBanco()?.materia }}</p>
-                </div>
-              </div>
-              <button (click)="cerrarEliminarBanco()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
-            </div>
-            <div class="p-5 space-y-4 text-xs">
-              <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-900 leading-relaxed">
-                Esta acción eliminará el banco cargado y sus reactivos asociados. El examen volverá a <strong>Programado</strong> para permitir una nueva carga.
-              </div>
-              <label class="block space-y-1.5">
-                <span class="font-black text-foreground">Escribe <code class="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">ELIMINAR</code> para confirmar</span>
-                <input [(ngModel)]="confirmacionEliminarBanco" autocomplete="off" class="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-xs font-black uppercase tracking-wider text-foreground outline-none focus:border-rose-500" placeholder="ELIMINAR">
-              </label>
-            </div>
-            <div class="p-4 border-t border-border flex justify-end gap-2">
-              <button (click)="cerrarEliminarBanco()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
-              <button (click)="confirmarEliminarBanco()" [disabled]="confirmacionEliminarBanco.trim().toUpperCase() !== 'ELIMINAR' || eliminandoBanco()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50">
-                <i class="pi" [class.pi-spin]="eliminandoBanco()" [class.pi-spinner]="eliminandoBanco()" [class.pi-trash]="!eliminandoBanco()"></i> {{ eliminandoBanco() ? 'Eliminando...' : 'Eliminar banco' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      }
-
       <!-- Toast Notificación -->
       @if (toastMessage()) {
-        <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
+        <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
           <i class="pi pi-check-circle text-emerald-400 text-lg"></i>
           <span class="text-xs font-bold">{{ toastMessage() }}</span>
         </div>
@@ -1841,6 +1889,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   public filtroFechaFin: string = this.hoyIso;
 
   public busquedaTexto = '';
+  public filtrosActualizados = signal(0);
   
   // Multi-Selección de Estados
   public estadosSeleccionados = signal<string[]>([]);
@@ -1906,6 +1955,8 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   // Estudiantes
   public estudiantesInscritos = signal<EstudianteInscrito[]>([]);
+  public cargandoEstudiantesInscritos = signal<boolean>(false);
+  public errorEstudiantesInscritos = signal<string | null>(null);
   // Configuración global administrable: cantidad máxima de estudiantes por variante.
   public ratioEstudiantesPorVariante = signal<number>(5);
   public duracionExamenVirtualMinutos = signal<number>(45);
@@ -1952,20 +2003,24 @@ export class EvaluacionesDiaComponent implements OnInit {
   // Operación y resultados del examen virtual.
   public dialogSalaVirtual = signal<boolean>(false);
   public salaVirtualCreada = signal<SalaVirtualOperacion | null>(null);
+  public salaVirtualExistente = signal<boolean>(false);
   public accesosVirtuales = signal<AccesoVirtualGenerado[]>([]);
+  public tokenGrupoVirtual = signal<string | null>(null);
+  public emitiendoTokenGrupoVirtual = signal<boolean>(false);
   public creandoSalaVirtual = signal<boolean>(false);
+  public consultandoSalaVirtual = signal<boolean>(false);
   public generacionVirtualActual = signal<boolean>(false);
   public dialogResultadosVirtuales = signal<boolean>(false);
   public evaluacionSeleccionadaResultados = signal<EvaluacionItemUI | null>(null);
   public resultadosVirtuales = signal<ResultadoVirtual[]>([]);
   public cargandoResultadosVirtuales = signal<boolean>(false);
+  public dialogRestablecerSalaVirtual = signal<boolean>(false);
+  public motivoRestablecimientoSalaVirtual = '';
+  private rolVirtualVerificadoParaGenerar: string | null = null;
+  private grupoSEAActualParaGenerar: string | null = null;
 
-  // Indicador y eliminación protegida del banco cargado por evaluación.
+  // Indicador del banco cargado por evaluación.
   public estadoBancos = signal<Record<string, boolean>>({});
-  public dialogEliminarBanco = signal<boolean>(false);
-  public evaluacionSeleccionadaParaEliminarBanco = signal<EvaluacionItemUI | null>(null);
-  public confirmacionEliminarBanco = '';
-  public eliminandoBanco = signal<boolean>(false);
 
   // Lista viva de evaluaciones
   public evaluaciones = signal<EvaluacionItemUI[]>([]);
@@ -1989,6 +2044,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public evaluacionesFiltradas = computed(() => {
+    this.filtrosActualizados();
     let list = this.evaluaciones();
     const query = this._normalizar(this.busquedaTexto);
     const estados = this.estadosSeleccionados();
@@ -2008,10 +2064,12 @@ export class EvaluacionesDiaComponent implements OnInit {
       list = list.filter(e => estados.includes(e.estado));
     }
 
-    if (this.filtroFechaInicio && this.filtroFechaFin) {
+    if (this.filtroFechaInicio || this.filtroFechaFin) {
       list = list.filter(e => {
         if (!e.fecha) return true;
-        return e.fecha >= this.filtroFechaInicio && e.fecha <= this.filtroFechaFin;
+        const desdeValido = !this.filtroFechaInicio || e.fecha >= this.filtroFechaInicio;
+        const hastaValido = !this.filtroFechaFin || e.fecha <= this.filtroFechaFin;
+        return desdeValido && hastaValido;
       });
     }
 
@@ -2270,10 +2328,6 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public bancoPreguntasCargado(item: EvaluacionItemUI): boolean {
     return item.bancoPreguntasCargado === true || this.estadoBancos()[item.id] === true;
-  }
-
-  public puedeEliminarBanco(item: EvaluacionItemUI): boolean {
-    return this.bancoPreguntasCargado(item) && ['Programado', 'Validado'].includes(item.etapa);
   }
 
   private _cargarEstadoBancos(items: EvaluacionItemUI[]): void {
@@ -2889,6 +2943,28 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.notasOmr.set([]);
   }
 
+  public abrirSalaVirtualDesdeLista(item: EvaluacionItemUI): void {
+    if (item.modalidad !== 'VIRTUAL' || this.consultandoSalaVirtual()) return;
+    this.consultandoSalaVirtual.set(true);
+    this._http.get<SalaVirtualOperacion>(`/api/examenes-virtuales/roles/${item.id}/sala`).subscribe({
+      next: sala => {
+        this.consultandoSalaVirtual.set(false);
+        this.salaVirtualCreada.set(sala);
+        this.salaVirtualExistente.set(true);
+        this.accesosVirtuales.set([]);
+        this.tokenGrupoVirtual.set(null);
+        this.abrirDialogoRestablecerSalaVirtual();
+      },
+      error: err => {
+        this.consultandoSalaVirtual.set(false);
+        this._mostrarToast(
+          err?.error?.message || err?.error?.error || 'Este examen todavía no tiene una sala virtual preparada.',
+          'error'
+        );
+      }
+    });
+  }
+
   public abrirResultadosVirtuales(item: EvaluacionItemUI): void {
     if (!this.puedeMostrarResultadosVirtuales(item)) return;
     this.evaluacionSeleccionadaResultados.set(item);
@@ -2942,14 +3018,33 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.resultadoGeneracionTypst.set(null);
     this.jobIdGeneracionTypst.set(null);
     this.generacionVirtualActual.set(item.modalidad === 'VIRTUAL');
+    this.grupoSEAActualParaGenerar = null;
+    this.estudiantesInscritos.set([]);
+    this.cargandoEstudiantesInscritos.set(true);
+    this.errorEstudiantesInscritos.set(null);
     this.ratioEstudiantesPorVariante.set(
       this._configuracionEvaluaciones.configuracion().ratioEstudiantesPorVariante
     );
 
-    // Cargar la nómina de estudiantes en vivo desde el Gateway por groupId
-    this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, item.seaGroupId).subscribe({
+    // La nómina siempre proviene de SEA. En virtual se vuelve a resolver el
+    // groupId usando asignatura, grupo y docente para corregir roles antiguos
+    // que quedaron asociados a otro grupo con el mismo código (p. ej. TA-01).
+    const groupId$ = item.modalidad === 'VIRTUAL'
+      ? this._resolverGrupoSEA(item)
+      : of(item.seaGroupId);
+    groupId$.pipe(
+      tap(groupId => this.grupoSEAActualParaGenerar = groupId || null),
+      switchMap(groupId => this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, groupId))
+    ).subscribe({
       next: estudiantes => {
         this.estudiantesInscritos.set(estudiantes);
+        this.cargandoEstudiantesInscritos.set(false);
+        this.errorEstudiantesInscritos.set(estudiantes.length ? null : 'No se encontraron estudiantes inscritos para este grupo');
+      },
+      error: err => {
+        this.estudiantesInscritos.set([]);
+        this.cargandoEstudiantesInscritos.set(false);
+        this.errorEstudiantesInscritos.set(err?.message || 'No se pudo consultar la nómina oficial del grupo');
       }
     });
 
@@ -2965,6 +3060,24 @@ export class EvaluacionesDiaComponent implements OnInit {
     });
 
     this.archivoExcelNombre.set(`BANCO_${item.codigo.replace('-', '')}_FINAL_2026.xlsx`);
+  }
+
+  private _resolverGrupoSEA(item: EvaluacionItemUI): Observable<string | undefined> {
+    if (!item.seaSyllabusCourseId) return of(item.seaGroupId);
+
+    return this._gateway.getGroups('2-2026', undefined, undefined, item.seaSyllabusCourseId).pipe(
+      map(grupos => {
+        const delMismoCodigo = (grupos || []).filter(grupo =>
+          grupo.code?.trim().toLowerCase() === item.grupo?.trim().toLowerCase()
+        );
+        const delMismoDocente = item.docenteCI
+          ? delMismoCodigo.find(grupo => grupo.teacherIdentityNumber?.trim() === item.docenteCI.trim())
+          : undefined;
+        const sinDocenteRegistrado = delMismoCodigo.find(grupo => !grupo.teacherIdentityNumber);
+        return (delMismoDocente || sinDocenteRegistrado || delMismoCodigo[0] || grupos?.[0])?.groupId || item.seaGroupId;
+      }),
+      catchError(() => of(item.seaGroupId))
+    );
   }
 
   public cerrarModalParametrizacion(): void {
@@ -2993,11 +3106,51 @@ export class EvaluacionesDiaComponent implements OnInit {
     const variantes = letras.slice(0, cantVariantes);
     const esVirtual = item.modalidad === 'VIRTUAL';
 
+    if (esVirtual && this.rolVirtualVerificadoParaGenerar !== item.id) {
+      if (this.consultandoSalaVirtual()) return;
+      this.consultandoSalaVirtual.set(true);
+      this._http.get<SalaVirtualOperacion>(`/api/examenes-virtuales/roles/${item.id}/sala`).subscribe({
+        next: sala => {
+          this.consultandoSalaVirtual.set(false);
+          this.rolVirtualVerificadoParaGenerar = null;
+          this.salaVirtualCreada.set(sala);
+          this.salaVirtualExistente.set(true);
+          this.accesosVirtuales.set([]);
+          this.tokenGrupoVirtual.set(null);
+          this.dialogSalaVirtual.set(true);
+          this._mostrarToast(`${item.codigo}: ya tiene una sala virtual generada. Se muestran sus datos disponibles.`);
+        },
+        error: err => {
+          this.consultandoSalaVirtual.set(false);
+          if (err?.status === 404) {
+            this.rolVirtualVerificadoParaGenerar = item.id;
+            this.ejecutarGeneracionVariantes();
+            return;
+          }
+          const mensaje = err?.error?.message || err?.error?.error || 'No se pudo consultar la sala virtual existente.';
+          this._mostrarToast(mensaje, 'error');
+        }
+      });
+      return;
+    }
+    this.rolVirtualVerificadoParaGenerar = null;
+
+    if (this.cargandoEstudiantesInscritos()) {
+      this._mostrarToast('Espera a que termine la consulta de estudiantes inscritos antes de continuar.', 'info');
+      return;
+    }
+
+    if (estudiantes.length === 0) {
+      this._mostrarToast(`No se puede ${esVirtual ? 'preparar el examen virtual' : 'generar el examen'} porque no hay estudiantes inscritos para este grupo. Verifica la asignatura, el grupo y el docente.`, 'error');
+      return;
+    }
+
     const jobId = crypto.randomUUID();
     const request: GeneracionTypstRequest = {
       jobId,
       rolExamenId: item.id,
       bancoPreguntasId: banco.id,
+      seaGroupId: this.grupoSEAActualParaGenerar || item.seaGroupId,
       variantes,
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante(),
       soloVirtual: esVirtual
@@ -3035,7 +3188,7 @@ export class EvaluacionesDiaComponent implements OnInit {
           next: resultado => {
             this.resultadoGeneracionTypst.set(resultado);
 
-            if (resultado.estado === 'ERROR') {
+            if (String(resultado.estado || '').startsWith('ERROR')) {
               this.generandoTypst.set(false);
               this.errorGeneracionTypst.set(resultado.mensaje || 'Error desconocido en generación.');
               this.queueProgress.set(100);
@@ -3076,7 +3229,7 @@ export class EvaluacionesDiaComponent implements OnInit {
           },
           error: err => {
             this.generandoTypst.set(false);
-            const msg = err?.message || 'No se pudo obtener el resultado de generación.';
+            const msg = err?.error?.message || err?.error?.error || err?.message || 'No se pudo obtener el resultado de generación.';
             this.errorGeneracionTypst.set(msg);
             this.queueProgress.set(100);
             this.queuePasoActual.set('Error consultando resultado');
@@ -3087,7 +3240,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       },
       error: err => {
         this.generandoTypst.set(false);
-        const msg = err?.message || 'No se pudo iniciar la generación del examen.';
+        const msg = err?.error?.message || err?.error?.error || err?.message || 'No se pudo iniciar la generación del examen.';
         this.errorGeneracionTypst.set(msg);
         this.queueProgress.set(100);
         this.queuePasoActual.set('Error al encolar la tarea');
@@ -3101,6 +3254,11 @@ export class EvaluacionesDiaComponent implements OnInit {
     return this.generacionVirtualActual();
   }
 
+  public cerrarColaGeneracion(): void {
+    if (this.generandoTypst() || this.creandoSalaVirtual()) return;
+    this.dialogQueueWorker.set(false);
+  }
+
   private crearSalaVirtual(item: EvaluacionItemUI): void {
     this.creandoSalaVirtual.set(true);
     this.errorGeneracionTypst.set(null);
@@ -3112,7 +3270,9 @@ export class EvaluacionesDiaComponent implements OnInit {
       next: creada => {
         this.creandoSalaVirtual.set(false);
         this.salaVirtualCreada.set(creada.sala);
+        this.salaVirtualExistente.set(false);
         this.accesosVirtuales.set(creada.accesos || []);
+        this.tokenGrupoVirtual.set(creada.tokenGrupo || null);
         this.dialogQueueWorker.set(false);
         this.dialogSalaVirtual.set(true);
         this._mostrarToast(`${item.codigo}: sala virtual preparada con tokens individuales.`);
@@ -3162,8 +3322,82 @@ export class EvaluacionesDiaComponent implements OnInit {
     });
   }
 
+  public restablecerSalaVirtual(): void {
+    const sala = this.salaVirtualCreada();
+    const motivo = this.motivoRestablecimientoSalaVirtual.trim();
+    if (!sala || !['ABIERTA', 'EN_CURSO', 'PAUSADA', 'CERRADA', 'CALIFICADA'].includes(sala.estado)
+      || !motivo || this.creandoSalaVirtual()) return;
+    this.creandoSalaVirtual.set(true);
+    this._http.post<SalaVirtualOperacion>(`/api/examenes-virtuales/salas/${sala.id}/restablecer`, { motivo }).subscribe({
+      next: actualizada => {
+        this.salaVirtualCreada.set(actualizada);
+        this.creandoSalaVirtual.set(false);
+        this.dialogRestablecerSalaVirtual.set(false);
+        this.motivoRestablecimientoSalaVirtual = '';
+        this.accesosVirtuales.set([]);
+        this.tokenGrupoVirtual.set(null);
+        this.dialogSalaVirtual.set(true);
+        this._mostrarToast('Sala restablecida. Las respuestas guardadas se conservaron; inicia nuevamente cuando estén listos.', 'info');
+      },
+      error: err => {
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo restablecer la sala virtual.', 'error');
+      }
+    });
+  }
+
   public cerrarSalaVirtual(): void {
     this.dialogSalaVirtual.set(false);
+  }
+
+  public abrirDialogoRestablecerSalaVirtual(): void {
+    const sala = this.salaVirtualCreada();
+    if (!sala || !['ABIERTA', 'EN_CURSO', 'PAUSADA', 'CERRADA', 'CALIFICADA'].includes(sala.estado)) {
+      this._mostrarToast('La sala todavía no está disponible para restablecer.', 'error');
+      return;
+    }
+    this.motivoRestablecimientoSalaVirtual = '';
+    this.dialogRestablecerSalaVirtual.set(true);
+  }
+
+  public cerrarDialogoRestablecerSalaVirtual(): void {
+    if (this.creandoSalaVirtual()) return;
+    this.dialogRestablecerSalaVirtual.set(false);
+    this.motivoRestablecimientoSalaVirtual = '';
+  }
+
+  public emitirTokenGrupoDesdeLista(): void {
+    const sala = this.salaVirtualCreada();
+    if (!sala || this.emitiendoTokenGrupoVirtual()) return;
+    const confirmar = window.confirm('Se emitirá un token grupal nuevo y el anterior dejará de funcionar. ¿Deseas continuar?');
+    if (!confirmar) return;
+
+    this.emitiendoTokenGrupoVirtual.set(true);
+    this._http.post<TokenGrupoVirtual>(`/api/examenes-virtuales/salas/${encodeURIComponent(sala.id)}/token-grupo`, {}).subscribe({
+      next: respuesta => {
+        this.tokenGrupoVirtual.set(respuesta.tokenGrupo);
+        this.emitiendoTokenGrupoVirtual.set(false);
+        this._mostrarToast('Token grupal emitido. Compártelo junto con el código de sala.', 'info');
+      },
+      error: err => {
+        this.emitiendoTokenGrupoVirtual.set(false);
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo emitir el token grupal.', 'error');
+      }
+    });
+  }
+
+  public copiarTokenGrupoDesdeLista(): void {
+    const token = this.tokenGrupoVirtual();
+    if (!token) return;
+    const escritura = navigator.clipboard?.writeText(token);
+    if (!escritura) {
+      this._mostrarToast('Selecciona el token y cópialo manualmente.', 'error');
+      return;
+    }
+    escritura.then(
+      () => this._mostrarToast('Token grupal copiado.', 'info'),
+      () => this._mostrarToast('No se pudo copiar automáticamente. Selecciona el token y cópialo.', 'error')
+    );
   }
 
   public abrirVisorExamenDirecto(): void {
@@ -3369,46 +3603,6 @@ export class EvaluacionesDiaComponent implements OnInit {
     return item.auditoria?.find(evento => evento.etapaDestino?.toUpperCase() === destino);
   }
 
-  public abrirEliminarBanco(item: EvaluacionItemUI): void {
-    if (!this.puedeEliminarBanco(item)) {
-      this._mostrarToast('El banco solo se puede eliminar antes de Generado.', 'error');
-      return;
-    }
-    this.evaluacionSeleccionadaParaEliminarBanco.set(item);
-    this.confirmacionEliminarBanco = '';
-    this.dialogEliminarBanco.set(true);
-  }
-
-  public cerrarEliminarBanco(): void {
-    if (this.eliminandoBanco()) return;
-    this.dialogEliminarBanco.set(false);
-    this.evaluacionSeleccionadaParaEliminarBanco.set(null);
-    this.confirmacionEliminarBanco = '';
-  }
-
-  public confirmarEliminarBanco(): void {
-    const item = this.evaluacionSeleccionadaParaEliminarBanco();
-    if (!item || !this.puedeEliminarBanco(item) || this.confirmacionEliminarBanco.trim().toUpperCase() !== 'ELIMINAR' || this.eliminandoBanco()) return;
-
-    this.eliminandoBanco.set(true);
-    this._bancoService.eliminarPorRol(item.id, 'ELIMINAR', 'Sistema').subscribe({
-      next: () => {
-        this.estadoBancos.update(estados => ({ ...estados, [item.id]: false }));
-        this.eliminandoBanco.set(false);
-        this.dialogEliminarBanco.set(false);
-        this.evaluacionSeleccionadaParaEliminarBanco.set(null);
-        this.confirmacionEliminarBanco = '';
-        this._mostrarToast(`${item.codigo}: banco de preguntas eliminado. El examen volvió a Programado.`);
-        this._cargarEvaluaciones();
-      },
-      error: err => {
-        this.eliminandoBanco.set(false);
-        const detalle = err?.error?.message || err?.error?.error || 'No se pudo eliminar el banco de preguntas.';
-        this._mostrarToast(detalle, 'error');
-      }
-    });
-  }
-
   public solicitarReestablecimiento(item: EvaluacionItemUI): void {
     if (!this.puedeRestablecer(item)) {
       this._mostrarToast('Solo se puede restablecer una evaluación posterior a Validado.', 'error');
@@ -3462,6 +3656,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.filtroFechaInicio = '';
     this.filtroFechaFin = '';
     this.filtroParcial = 'Todos';
+    this.actualizarFiltros();
     this._mostrarToast('Mostrando todas las evaluaciones programadas.');
   }
 
@@ -3472,6 +3667,41 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.filtroModalidad = 'Todos';
     this.estadosSeleccionados.set([]);
     this.busquedaTexto = '';
+    this.actualizarFiltros();
+  }
+
+  public actualizarFiltros(): void {
+    this.filtrosActualizados.update(valor => valor + 1);
+  }
+
+  public cambiarFiltroParcial(valor: string): void {
+    this.filtroParcial = valor;
+    this.actualizarFiltros();
+  }
+
+  public cambiarFiltroModalidad(valor: string): void {
+    const modalidades: EvaluacionesDiaComponent['filtroModalidad'][] = [
+      'Todos', 'PRESENCIAL_CARTILLA', 'PRESENCIAL_SIN_CARTILLA', 'VIRTUAL'
+    ];
+    this.filtroModalidad = modalidades.includes(valor as EvaluacionesDiaComponent['filtroModalidad'])
+      ? valor as EvaluacionesDiaComponent['filtroModalidad']
+      : 'Todos';
+    this.actualizarFiltros();
+  }
+
+  public cambiarFiltroFechaInicio(valor: string): void {
+    this.filtroFechaInicio = valor || '';
+    this.actualizarFiltros();
+  }
+
+  public cambiarFiltroFechaFin(valor: string): void {
+    this.filtroFechaFin = valor || '';
+    this.actualizarFiltros();
+  }
+
+  public cambiarBusqueda(valor: string): void {
+    this.busquedaTexto = valor || '';
+    this.actualizarFiltros();
   }
 
   private _mostrarToast(msg: string, _tipo?: string): void {

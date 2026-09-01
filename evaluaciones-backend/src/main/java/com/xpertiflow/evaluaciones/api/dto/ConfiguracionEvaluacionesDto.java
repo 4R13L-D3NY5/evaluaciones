@@ -20,6 +20,11 @@ public class ConfiguracionEvaluacionesDto {
     @Max(480)
     private Integer duracionExamenVirtualMinutos;
 
+    @NotNull
+    @Min(0)
+    @Max(120)
+    private Integer cuentaRegresivaInicioVirtualSegundos;
+
     private String formatoHoja;
 
     private String tipoLetra;

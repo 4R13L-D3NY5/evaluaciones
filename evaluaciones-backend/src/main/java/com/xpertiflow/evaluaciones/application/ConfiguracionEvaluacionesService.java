@@ -16,6 +16,7 @@ public class ConfiguracionEvaluacionesService {
     private static final short CONFIGURACION_ID = 1;
     private static final int RATIO_POR_DEFECTO = 5;
     private static final int DURACION_VIRTUAL_POR_DEFECTO = 45;
+    private static final int CUENTA_REGRESIVA_VIRTUAL_POR_DEFECTO = 15;
     private static final String FORMATO_HOJA_POR_DEFECTO = "Oficio (Folio UNITEPC)";
     private static final String TIPO_LETRA_POR_DEFECTO = "Times New Roman";
     private static final int TAMANO_LETRA_POR_DEFECTO = 11;
@@ -36,6 +37,8 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setRatioEstudiantesPorVariante(request.getRatioEstudiantesPorVariante());
         configuracion.setDuracionExamenVirtualMinutos(request.getDuracionExamenVirtualMinutos() != null
                 ? request.getDuracionExamenVirtualMinutos() : DURACION_VIRTUAL_POR_DEFECTO);
+        configuracion.setCuentaRegresivaInicioVirtualSegundos(request.getCuentaRegresivaInicioVirtualSegundos() != null
+                ? request.getCuentaRegresivaInicioVirtualSegundos() : CUENTA_REGRESIVA_VIRTUAL_POR_DEFECTO);
         configuracion.setFormatoHoja(valorODefecto(request.getFormatoHoja(), FORMATO_HOJA_POR_DEFECTO));
         configuracion.setTipoLetra(valorODefecto(request.getTipoLetra(), TIPO_LETRA_POR_DEFECTO));
         configuracion.setTamanoLetraPt(request.getTamanoLetraPt() != null
@@ -51,6 +54,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setId(CONFIGURACION_ID);
         configuracion.setRatioEstudiantesPorVariante(RATIO_POR_DEFECTO);
         configuracion.setDuracionExamenVirtualMinutos(DURACION_VIRTUAL_POR_DEFECTO);
+        configuracion.setCuentaRegresivaInicioVirtualSegundos(CUENTA_REGRESIVA_VIRTUAL_POR_DEFECTO);
         configuracion.setFormatoHoja(FORMATO_HOJA_POR_DEFECTO);
         configuracion.setTipoLetra(TIPO_LETRA_POR_DEFECTO);
         configuracion.setTamanoLetraPt(TAMANO_LETRA_POR_DEFECTO);
@@ -65,6 +69,8 @@ public class ConfiguracionEvaluacionesService {
         dto.setRatioEstudiantesPorVariante(configuracion.getRatioEstudiantesPorVariante());
         dto.setDuracionExamenVirtualMinutos(configuracion.getDuracionExamenVirtualMinutos() != null
                 ? configuracion.getDuracionExamenVirtualMinutos() : DURACION_VIRTUAL_POR_DEFECTO);
+        dto.setCuentaRegresivaInicioVirtualSegundos(configuracion.getCuentaRegresivaInicioVirtualSegundos() != null
+                ? configuracion.getCuentaRegresivaInicioVirtualSegundos() : CUENTA_REGRESIVA_VIRTUAL_POR_DEFECTO);
         dto.setFormatoHoja(valorODefecto(configuracion.getFormatoHoja(), FORMATO_HOJA_POR_DEFECTO));
         dto.setTipoLetra(valorODefecto(configuracion.getTipoLetra(), TIPO_LETRA_POR_DEFECTO));
         dto.setTamanoLetraPt(configuracion.getTamanoLetraPt() != null

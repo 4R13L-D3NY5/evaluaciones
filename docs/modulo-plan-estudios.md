@@ -46,7 +46,7 @@ Cuando todavía no existe el examen se muestra **Sin examen**. Si existe el exam
 - No se usan sedes, carreras, materias ni bancos ficticios para esta vista.
 - La sede Cochabamba y la carrera de Sistemas solo se usan como selección inicial si están disponibles en el catálogo oficial; el usuario puede cambiar ambas.
 - Si una carrera no tiene roles registrados, sus asignaturas siguen visibles y muestran el grupo/docente entregado por SEA; solo el parcial se muestra como **Sin examen**.
-- Si SEA no devuelve el nombre del docente pero sí su CI, se muestra **Docente SEA (CI ...)** para no confundir una respuesta incompleta del catálogo con una asignación inexistente.
+- El catálogo institucional entrega el nombre del docente en `teacherFullName`; el sistema lo normaliza como nombre del docente para mostrarlo en todas las vistas. Si excepcionalmente no llega el nombre pero sí el CI, se muestra **Nombre no disponible (CI ...)** y no un nombre inventado.
 - La información de cada parcial se construye con el rol y banco que corresponden a esa asignatura; el grupo/docente se conserva desde SEA.
 
 ## Verificación

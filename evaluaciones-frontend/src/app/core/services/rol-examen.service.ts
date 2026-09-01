@@ -51,8 +51,6 @@ export interface RolExamenCreateRequest {
   semestre: number;
   grupo: string;
   tipoClase: string;
-  docenteNombre: string;
-  docenteCi: string;
   tipoParcial: string;
   version?: number;
   modalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';

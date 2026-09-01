@@ -29,6 +29,10 @@ public class IntentoExamenVirtual {
     private String estado = "PENDIENTE";
     @Column(name = "token_hash", nullable = false, unique = true, length = 128)
     private String tokenHash;
+    @Column(name = "token_sesion_hash", unique = true, length = 128)
+    private String tokenSesionHash;
+    @Column(name = "token_sesion_emitido_en")
+    private LocalDateTime tokenSesionEmitidoEn;
     @Column(name = "token_emitido_en", nullable = false)
     private LocalDateTime tokenEmitidoEn;
     @Column(name = "token_expira_en", nullable = false)

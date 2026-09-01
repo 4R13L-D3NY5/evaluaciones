@@ -195,7 +195,7 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
 
             <div class="text-right">
               <span class="bg-purple-100 text-purple-800 text-[10px] font-black px-3 py-1 rounded-full uppercase border border-purple-200">
-                Formato Oficial SEA-DOC-04
+                Formato oficial de seguimiento DOC-04
               </span>
               <span class="text-[10px] text-muted-foreground font-mono block mt-1">Generado: 20/08/2026 17:00</span>
             </div>
@@ -294,7 +294,7 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
               <div class="h-14 border-b border-foreground/30 flex items-end justify-center pb-1">
                 <span class="font-bold text-foreground">Responsable no identificado</span>
               </div>
-              <p class="text-[11px] text-muted-foreground font-bold uppercase">Jefatura de Evaluaciones SEA</p>
+              <p class="text-[11px] text-muted-foreground font-bold uppercase">Jefatura de Evaluaciones</p>
             </div>
             <div class="space-y-2">
               <div class="h-14 border-b border-foreground/30 flex items-end justify-center pb-1">

@@ -25,7 +25,7 @@ Cada fila puede generar hasta cuatro roles:
 
 - La asignatura se valida contra el catálogo oficial de SEA.
 - El grupo se valida contra SEA usando la asignatura y el código del grupo.
-- El docente y el horario oficial de SEA tienen prioridad; si SEA no devuelve el nombre del docente, se utiliza el nombre escrito en la planilla y, como último respaldo, el CI del docente.
+- El docente, su identificador y el grupo oficial se obtienen exclusivamente desde los servicios SEA. Si SEA no devuelve un docente válido, el rol se rechaza o la operación se detiene; nunca se utiliza como respaldo el nombre o CI escrito en la planilla.
 - Las fechas numéricas propias de Excel se convierten a fecha ISO para guardar y a `DD/MM/AAAA` para mostrar.
 - Las horas numéricas de Excel se convierten a `HH:mm`.
 - Todos los roles importados quedan inicialmente en estado `PROGRAMADO`.

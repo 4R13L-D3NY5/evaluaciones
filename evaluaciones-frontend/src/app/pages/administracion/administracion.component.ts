@@ -755,6 +755,18 @@ export interface ParcialConfig {
                       </div>
                     </div>
 
+                    <div class="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-1.5">
+                      <label class="block text-xs font-black text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                        <i class="pi pi-hourglass text-indigo-600"></i>
+                        <span>Cuenta regresiva antes de iniciar el examen virtual</span>
+                      </label>
+                      <p class="text-[11px] text-muted-foreground">Al iniciar el docente, los estudiantes verán este conteo antes de recibir las preguntas. El valor recomendado es de 15 segundos.</p>
+                      <div class="flex items-center gap-2 pt-1 max-w-xs">
+                        <input type="number" [(ngModel)]="cuentaRegresivaInicioVirtualSegundos" min="0" max="120" step="1" class="w-full bg-card border border-indigo-300 dark:border-indigo-700 rounded-lg p-2 text-xs font-mono font-black text-indigo-700 dark:text-indigo-300">
+                        <span class="text-xs font-bold text-indigo-800 dark:text-indigo-300 font-mono">segundos</span>
+                      </div>
+                    </div>
+
                     <!-- Parámetro 2 -->
                     <div class="p-3.5 rounded-xl bg-muted/30 border border-border/70 space-y-1.5">
                       <label class="block text-xs font-black text-foreground">
@@ -1035,7 +1047,7 @@ export interface ParcialConfig {
 
       <!-- Toast Notificación -->
       @if (toastMessage()) {
-        <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
+        <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
           <i class="pi pi-check-circle text-emerald-400 text-lg"></i>
           <span class="text-xs font-bold">{{ toastMessage() }}</span>
         </div>
@@ -1060,6 +1072,7 @@ export class AdministracionEvaluacionesComponent {
       next: configuracion => {
         this.ratioEstudiantesPorVariante = configuracion.ratioEstudiantesPorVariante;
         this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
+        this.cuentaRegresivaInicioVirtualSegundos = configuracion.cuentaRegresivaInicioVirtualSegundos ?? 15;
         this.typstFormatoHoja = configuracion.formatoHoja;
         this.typstFuente = configuracion.tipoLetra;
         this.typstTamanoFuente = configuracion.tamanoLetraPt;
@@ -1206,6 +1219,7 @@ export class AdministracionEvaluacionesComponent {
   public tiempoHorasPostPatron = 8;
   public tiempoHorasAntesLista = 24;
   public tiempoHorasCandado72 = 72;
+  public cuentaRegresivaInicioVirtualSegundos = 15;
   public duracionExamenVirtualMinutos = 45;
 
   // Filtros computados
@@ -1382,6 +1396,7 @@ export class AdministracionEvaluacionesComponent {
     this._configuracionService.guardar({
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
       duracionExamenVirtualMinutos: this.normalizarDuracionVirtual(),
+      cuentaRegresivaInicioVirtualSegundos: this.normalizarCuentaRegresivaVirtual(),
       formatoHoja: this.typstFormatoHoja,
       tipoLetra: this.typstFuente,
       tamanoLetraPt: this.typstTamanoFuente,
@@ -1390,6 +1405,7 @@ export class AdministracionEvaluacionesComponent {
       next: configuracion => {
         this.ratioEstudiantesPorVariante = configuracion.ratioEstudiantesPorVariante;
         this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
+        this.cuentaRegresivaInicioVirtualSegundos = configuracion.cuentaRegresivaInicioVirtualSegundos ?? 15;
         this.typstFormatoHoja = configuracion.formatoHoja;
         this.typstFuente = configuracion.tipoLetra;
         this.typstTamanoFuente = configuracion.tamanoLetraPt;
@@ -1413,9 +1429,11 @@ export class AdministracionEvaluacionesComponent {
 
   public guardarTiempos(): void {
     this.duracionExamenVirtualMinutos = this.normalizarDuracionVirtual();
+    this.cuentaRegresivaInicioVirtualSegundos = this.normalizarCuentaRegresivaVirtual();
     this._configuracionService.guardar({
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
       duracionExamenVirtualMinutos: this.duracionExamenVirtualMinutos,
+      cuentaRegresivaInicioVirtualSegundos: this.cuentaRegresivaInicioVirtualSegundos,
       formatoHoja: this.typstFormatoHoja,
       tipoLetra: this.typstFuente,
       tamanoLetraPt: this.typstTamanoFuente,
@@ -1423,6 +1441,7 @@ export class AdministracionEvaluacionesComponent {
     }).subscribe({
       next: configuracion => {
         this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
+        this.cuentaRegresivaInicioVirtualSegundos = configuracion.cuentaRegresivaInicioVirtualSegundos ?? 15;
         this._mostrarToast(`Configuración de tiempos guardada exitosamente para la gestión ${this.gestionTiempos}.`);
       },
       error: () => this._mostrarToast('No se pudo guardar la configuración de tiempos en el servidor.')
@@ -1432,6 +1451,11 @@ export class AdministracionEvaluacionesComponent {
   private normalizarDuracionVirtual(): number {
     const duracion = Number(this.duracionExamenVirtualMinutos);
     return Number.isFinite(duracion) ? Math.min(480, Math.max(1, Math.trunc(duracion))) : 45;
+  }
+
+  private normalizarCuentaRegresivaVirtual(): number {
+    const segundos = Number(this.cuentaRegresivaInicioVirtualSegundos);
+    return Number.isFinite(segundos) ? Math.min(120, Math.max(0, Math.trunc(segundos))) : 15;
   }
 
   private _mostrarToast(msg: string): void {

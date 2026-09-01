@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flujo de evaluaciones | UNITEPC</title>
+  <style>
+    :root {
+      --ink: #18243d;
+      --muted: #66748f;
+      --purple: #5b2be8;
+      --purple-dark: #321579;
+      --purple-soft: #f1ebff;
+      --cyan: #12a7a1;
+      --cyan-soft: #e8fbf8;
+      --green: #0d9f75;
+      --green-soft: #e9faf3;
+      --orange: #df8816;
+      --orange-soft: #fff5df;
+      --blue-soft: #edf4ff;
+      --line: #dbe3f0;
+      --surface: #ffffff;
+      --background: #f6f8fc;
+      --shadow: 0 18px 50px rgba(38, 48, 83, .10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 85% 0%, rgba(102, 61, 240, .13), transparent 30rem),
+        var(--background);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    .shell { max-width: 1180px; margin: 0 auto; padding: 34px 28px 64px; }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    .brand { display: flex; gap: 14px; align-items: center; }
+    .brand-mark {
+      display: grid; place-items: center; width: 52px; height: 52px;
+      border-radius: 16px; color: white; background: linear-gradient(135deg, #7147ff, #4e20ca);
+      box-shadow: 0 10px 22px rgba(91, 43, 232, .25); font-weight: 700; font-size: 22px;
+    }
+    .eyebrow { margin: 0 0 3px; color: var(--purple); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 5px; font-size: clamp(28px, 4vw, 44px); line-height: 1.05; letter-spacing: -.04em; }
+    .subtitle { max-width: 680px; margin: 0; color: var(--muted); font-size: 15px; }
+    .print-button {
+      border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink);
+      padding: 11px 15px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 5px 15px rgba(38, 48, 83, .05);
+    }
+    .print-button:hover { border-color: var(--purple); color: var(--purple); }
+
+    .hero {
+      display: grid; grid-template-columns: 1.35fr .65fr; gap: 22px; align-items: stretch;
+      margin-bottom: 24px;
+    }
+    .hero-main, .hero-aside, .section-card {
+      background: rgba(255, 255, 255, .92); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow);
+    }
+    .hero-main { padding: 28px; }
+    .hero-main h2 { margin-bottom: 10px; font-size: 23px; }
+    .hero-main p { margin-bottom: 0; color: var(--muted); }
+    .hero-aside { padding: 22px; background: linear-gradient(150deg, #3d207d, #5b2be8); color: white; border-color: transparent; }
+    .hero-aside .eyebrow { color: #d9ccff; }
+    .hero-aside h2 { margin-bottom: 8px; font-size: 20px; }
+    .hero-aside p { margin-bottom: 0; color: #ede7ff; font-size: 14px; }
+    .source-badge { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; padding: 8px 11px; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; color: white; font-size: 12px; font-weight: 700; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 26px; }
+    .metric { padding: 17px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
+    .metric strong { display: block; margin-bottom: 2px; color: var(--purple); font-size: 23px; }
+    .metric span { color: var(--muted); font-size: 12px; font-weight: 600; }
+
+    .section-card { padding: 25px; margin-bottom: 24px; box-shadow: 0 10px 30px rgba(38, 48, 83, .06); }
+    .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin-bottom: 20px; }
+    .section-heading h2 { margin-bottom: 4px; font-size: 22px; }
+    .section-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .common-flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; position: relative; }
+    .common-flow::before {
+      content: ""; position: absolute; top: 28px; left: 7%; right: 7%; height: 2px; background: var(--line); z-index: 0;
+    }
+    .common-step { position: relative; z-index: 1; text-align: center; }
+    .step-number {
+      display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto 12px;
+      color: white; background: var(--purple); border: 7px solid var(--purple-soft); border-radius: 50%; font-size: 18px; font-weight: 800;
+    }
+    .common-step h3 { margin-bottom: 4px; font-size: 13px; }
+    .common-step p { margin: 0; color: var(--muted); font-size: 11px; }
+
+    .tab-list { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+    .tab {
+      border: 1px solid var(--line); border-radius: 999px; padding: 10px 15px; color: var(--ink);
+      background: #fbfcff; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
+    }
+    .tab[aria-selected="true"] { color: white; background: var(--purple); border-color: var(--purple); box-shadow: 0 6px 16px rgba(91, 43, 232, .22); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .route-header {
+      display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px 18px;
+      margin-bottom: 18px; border-radius: 15px; background: var(--purple-soft); border: 1px solid #dfd1ff;
+    }
+    .route-header h3 { margin: 0 0 3px; font-size: 18px; }
+    .route-header p { margin: 0; color: var(--muted); font-size: 12px; }
+    .route-tag { padding: 7px 10px; border-radius: 999px; color: var(--purple); background: white; font-size: 11px; font-weight: 800; white-space: nowrap; }
+
+    .timeline { display: grid; gap: 12px; }
+    .timeline-row { display: grid; grid-template-columns: 44px 150px 1fr; gap: 14px; align-items: start; }
+    .timeline-index {
+      display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px;
+      color: var(--purple); background: var(--purple-soft); font-size: 13px; font-weight: 800;
+    }
+    .actor { padding-top: 7px; color: var(--purple); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+    .timeline-content { padding: 12px 15px; border: 1px solid var(--line); border-radius: 13px; background: #fcfdff; }
+    .timeline-content strong { display: block; margin-bottom: 3px; font-size: 14px; }
+    .timeline-content span { color: var(--muted); font-size: 12px; }
+    .result { display: inline-block; margin-top: 8px; padding: 4px 8px; border-radius: 7px; color: var(--green); background: var(--green-soft); font-size: 11px; font-weight: 800; }
+
+    .notes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .notes-card { padding: 19px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); }
+    .notes-icon { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: 12px; border-radius: 11px; font-weight: 900; }
+    .notes-card:nth-child(1) .notes-icon { color: var(--green); background: var(--green-soft); }
+    .notes-card:nth-child(2) .notes-icon { color: var(--orange); background: var(--orange-soft); }
+    .notes-card:nth-child(3) .notes-icon { color: var(--purple); background: var(--purple-soft); }
+    .notes-card h3 { margin-bottom: 6px; font-size: 15px; }
+    .notes-card p { margin-bottom: 0; color: var(--muted); font-size: 12px; }
+
+    .bottom-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 24px; }
+    .state-line { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+    .state { padding: 8px 10px; border-radius: 9px; color: var(--purple); background: var(--purple-soft); font-size: 11px; font-weight: 800; }
+    .state.final { color: var(--green); background: var(--green-soft); }
+    .arrow { color: #9aa8bf; font-weight: 800; }
+    .rules { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; }
+    .rules li { display: flex; gap: 9px; color: var(--muted); font-size: 13px; }
+    .rules li::before { content: "✓"; flex: 0 0 20px; display: grid; place-items: center; height: 20px; border-radius: 50%; color: var(--green); background: var(--green-soft); font-size: 11px; font-weight: 900; }
+
+    .sequence-wrap { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .sequence-title { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+    .sequence-title h3 { margin: 0; font-size: 16px; }
+    .sequence-title span { color: var(--muted); font-size: 12px; }
+    .sequence-diagram { overflow-x: auto; border: 1px solid var(--line); border-radius: 15px; background: #fbfcff; }
+    .uml-svg { display: block; width: 100%; min-width: 780px; height: auto; }
+    .uml-svg .uml-box { fill: #ffffff; stroke: #d8caff; stroke-width: 1.4; }
+    .uml-svg .uml-title { fill: #321579; font: 700 12px Inter, Arial, sans-serif; }
+    .uml-svg .uml-life { stroke: #b8c4d8; stroke-width: 1.2; stroke-dasharray: 5 5; }
+    .uml-svg .uml-message-line { stroke: #5b2be8; stroke-width: 1.6; }
+    .uml-svg .uml-message-line.return { stroke: #0d9f75; stroke-dasharray: 6 4; }
+    .uml-svg .uml-message { fill: #18243d; font: 500 11px Inter, Arial, sans-serif; }
+    .uml-svg .uml-caption { fill: #66748f; font: 500 10px Inter, Arial, sans-serif; }
+    .seq-actors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; background: var(--purple-soft); border-bottom: 1px solid var(--line); }
+    .seq-actor { padding: 8px 6px; border-radius: 9px; color: var(--purple-dark); background: var(--surface); text-align: center; font-size: 11px; font-weight: 800; }
+    .seq-rows { display: grid; gap: 0; padding: 3px 12px 10px; }
+    .seq-row { display: grid; grid-template-columns: 142px 30px 1fr; gap: 8px; align-items: center; min-height: 45px; border-bottom: 1px dashed var(--line); }
+    .seq-row:last-child { border-bottom: 0; }
+    .seq-from { color: var(--purple); font-size: 11px; font-weight: 800; }
+    .seq-arrow { color: var(--purple); font-size: 21px; line-height: 1; text-align: center; }
+    .seq-message { color: var(--ink); font-size: 12px; }
+    .seq-message em { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; font-style: normal; }
+    .info-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .info-table th { padding: 10px 9px; color: var(--muted); border-bottom: 1px solid var(--line); text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+    .info-table td { padding: 11px 9px; border-bottom: 1px solid #edf0f6; vertical-align: top; }
+    .info-table tr:last-child td { border-bottom: 0; }
+    .info-table strong { color: var(--ink); }
+    .table-responsive { overflow-x: auto; }
+    .table-responsive .info-table { min-width: 620px; }
+    .annex { margin-top: 16px; border-top: 1px solid var(--line); }
+    .annex summary { padding: 16px 0 8px; color: var(--purple); cursor: pointer; font-size: 14px; font-weight: 800; }
+    .annex-content { display: grid; gap: 22px; padding-bottom: 4px; }
+    .annex-content h3 { margin: 0 0 10px; font-size: 15px; }
+    .check-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .check-list { margin: 0; padding: 0; list-style: none; }
+    .check-list li { display: flex; gap: 7px; margin-bottom: 7px; color: var(--muted); font-size: 11px; }
+    .check-list li::before { content: "□"; color: var(--purple); font-size: 14px; line-height: 1; }
+
+    footer { margin-top: 30px; color: var(--muted); text-align: center; font-size: 11px; }
+
+    @media (max-width: 850px) {
+      .hero, .bottom-grid { grid-template-columns: 1fr; }
+      .common-flow { grid-template-columns: repeat(3, 1fr); row-gap: 23px; }
+      .common-flow::before { display: none; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 560px) {
+      .shell { padding: 22px 15px 40px; }
+      .topbar { flex-direction: column; }
+      .hero-main, .hero-aside, .section-card { padding: 19px; border-radius: 17px; }
+      .common-flow { grid-template-columns: repeat(2, 1fr); }
+      .notes-grid { grid-template-columns: 1fr; }
+      .timeline-row { grid-template-columns: 34px 1fr; gap: 9px; }
+      .actor { grid-column: 2; grid-row: 1; padding-top: 0; }
+      .timeline-content { grid-column: 2; grid-row: 2; }
+      .route-header { align-items: flex-start; flex-direction: column; }
+      .state-line { gap: 5px; }
+      .arrow { display: none; }
+      .seq-actors { grid-template-columns: repeat(2, 1fr); }
+      .seq-row { grid-template-columns: 105px 24px 1fr; gap: 6px; }
+      .check-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media print {
+      body { background: white; }
+      .shell { max-width: none; padding: 12px; }
+      .print-button, .tab-list { display: none; }
+      .hero-main, .hero-aside, .section-card, .metric { box-shadow: none; }
+      .tab-panel { display: block !important; break-inside: avoid; margin-top: 20px; }
+      .tab-panel::before { content: attr(data-print-title); display: block; margin-bottom: 8px; font-size: 18px; font-weight: 800; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">✓</div>
+        <div>
+          <p class="eyebrow">UNITEPC · Sistema de evaluaciones</p>
+          <h1>Flujo de uso de evaluaciones</h1>
+          <p class="subtitle">Desde el registro del rol de examen hasta la obtención y consulta de notas.</p>
+        </div>
+      </div>
+      <button class="print-button" type="button" onclick="window.print()">Imprimir / guardar PDF</button>
+    </header>
+
+    <section class="hero" aria-label="Resumen del proceso">
+      <div class="hero-main">
+        <p class="eyebrow">Visión general</p>
+        <h2>Un solo recorrido, tres formas de evaluación</h2>
+        <p>El sistema mantiene una programación común y adapta la ejecución según la modalidad: con cartilla, sin cartilla o virtual. La identificación de asignaturas, grupos, docentes y estudiantes se valida con la fuente institucional oficial.</p>
+      </div>
+      <aside class="hero-aside">
+        <p class="eyebrow">Regla central</p>
+        <h2>La información oficial guía el proceso</h2>
+        <p>El Excel registra la programación. Los datos académicos y de identidad se confirman mediante los servicios institucionales.</p>
+        <span class="source-badge">● Fuente oficial institucional</span>
+      </aside>
+    </section>
+
+    <section class="metrics" aria-label="Datos clave">
+      <div class="metric"><strong>3</strong><span>modalidades de evaluación</span></div>
+      <div class="metric"><strong>V1+</strong><span>versionado de cada rol</span></div>
+      <div class="metric"><strong>60</strong><span>reactivos mínimos del banco</span></div>
+      <div class="metric"><strong>30</strong><span>preguntas por examen generado</span></div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <h2>Flujo común de preparación</h2>
+          <p>Las primeras etapas son iguales para cualquier modalidad.</p>
+        </div>
+      </div>
+      <div class="common-flow">
+        <article class="common-step"><div class="step-number">1</div><h3>Registrar rol</h3><p>Importar programación desde Excel.</p></article>
+        <article class="common-step"><div class="step-number">2</div><h3>Validar datos</h3><p>Confirmar grupo, docente y estudiantes.</p></article>
+        <article class="common-step"><div class="step-number">3</div><h3>Cargar banco</h3><p>Revisar preguntas y cuotas mínimas.</p></article>
+        <article class="common-step"><div class="step-number">4</div><h3>Validar rol</h3><p>Dejar el examen listo para generar.</p></article>
+        <article class="common-step"><div class="step-number">5</div><h3>Generar</h3><p>Crear variantes y asignaciones.</p></article>
+        <article class="common-step"><div class="step-number">6</div><h3>Ejecutar</h3><p>Aplicar el examen y registrar resultados.</p></article>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <h2>Diagrama de secuencia general</h2>
+          <p>Interacción entre los responsables y los servicios institucionales.</p>
+        </div>
+      </div>
+      <div class="sequence-diagram" data-sequence="general" aria-label="Diagrama de secuencia general del registro y preparación">
+        <div class="seq-actors"><span class="seq-actor">Director de carrera</span><span class="seq-actor">Personal de evaluaciones</span><span class="seq-actor">Sistema</span><span class="seq-actor">Servicios institucionales</span></div>
+        <div class="seq-rows">
+          <div class="seq-row"><span class="seq-from">Director → Personal</span><span class="seq-arrow">→</span><span class="seq-message">Entrega el Excel oficial del rol.<em>La hoja de roles se lee desde la fila 12.</em></span></div>
+          <div class="seq-row"><span class="seq-from">Personal → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Selecciona sede, carrera y gestión para importar.</span></div>
+          <div class="seq-row"><span class="seq-from">Sistema → Servicios</span><span class="seq-arrow">→</span><span class="seq-message">Consulta asignaturas, grupos, docentes y nómina oficial.</span></div>
+          <div class="seq-row"><span class="seq-from">Servicios → Sistema</span><span class="seq-arrow">←</span><span class="seq-message">Devuelve datos académicos e identidad confirmados.</span></div>
+          <div class="seq-row"><span class="seq-from">Sistema → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Aplica modalidad, versión V1+ y guarda el rol como PROGRAMADO.</span></div>
+          <div class="seq-row"><span class="seq-from">Personal → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Carga y valida el banco de preguntas.<em>Las cuotas 15/30/15 son mínimos; pueden excederse.</em></span></div>
+          <div class="seq-row"><span class="seq-from">Sistema → Personal</span><span class="seq-arrow">←</span><span class="seq-message">Muestra aceptados, rechazados, observaciones y deja el rol VALIDADO.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card" aria-label="Flujos por modalidad">
+      <div class="section-heading">
+        <div>
+          <h2>Secuencia por modalidad</h2>
+          <p>Seleccione una pestaña para presentar el recorrido específico.</p>
+        </div>
+      </div>
+      <div class="tab-list" role="tablist" aria-label="Modalidades">
+        <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="cartilla" data-tab="cartilla">Con cartilla</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="sin-cartilla" data-tab="sin-cartilla">Sin cartilla</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="virtual" data-tab="virtual">Virtual</button>
+      </div>
+
+      <div class="tab-panel active" id="cartilla" role="tabpanel" data-print-title="Con cartilla">
+        <div class="route-header"><div><h3>Evaluación presencial con lectura OMR</h3><p>El examen y la cartilla se generan por separado.</p></div><span class="route-tag">PDF + OMR</span></div>
+        <div class="timeline">
+          <div class="timeline-row"><div class="timeline-index">1</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Selecciona el rol validado</strong><span>Consulta la nómina oficial y solicita la generación.</span><b class="result">Variantes A–E y mapeo creados</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">2</div><div class="actor">Sistema</div><div class="timeline-content"><strong>Genera examen y cartillas</strong><span>Produce el PDF institucional y las cartillas separadas con el código del estudiante.</span><b class="result">Rol: GENERADO</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">3</div><div class="actor">Evaluaciones / docente</div><div class="timeline-content"><strong>Entrega y recoge el material</strong><span>Evaluaciones entrega el lote al docente; el docente distribuye, recoge los exámenes completados y devuelve todo.</span><b class="result">Rol: DEVUELTO</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">4</div><div class="actor">Evaluador OMR</div><div class="timeline-content"><strong>Procesa el escaneo</strong><span>El sistema identifica código, estudiante y variante; las páginas dudosas pasan a revisión manual.</span><b class="result">Lecturas asociadas al estudiante</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">5</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Revisa y confirma notas</strong><span>Se calculan aciertos, nota sobre 30 y nota sobre 100.</span><b class="result">Rol: REVISADO → RECIBIDO</b></div></div>
+        </div>
+        <div class="sequence-wrap">
+          <div class="sequence-title"><h3>Secuencia con cartilla</h3><span>Aplicación presencial y lectura OMR</span></div>
+          <div class="sequence-diagram" data-sequence="cartilla" aria-label="Diagrama de secuencia con cartilla">
+            <div class="seq-actors"><span class="seq-actor">Evaluaciones</span><span class="seq-actor">Estudiante</span><span class="seq-actor">Procesador OMR</span><span class="seq-actor">Sistema</span></div>
+            <div class="seq-rows">
+              <div class="seq-row"><span class="seq-from">Evaluaciones → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Solicita la generación del examen y de las cartillas.</span></div>
+              <div class="seq-row"><span class="seq-from">Sistema → Estudiante</span><span class="seq-arrow">→</span><span class="seq-message">Entrega examen y cartilla vinculados a su código.</span></div>
+              <div class="seq-row"><span class="seq-from">Estudiante → Evaluaciones</span><span class="seq-arrow">→</span><span class="seq-message">Devuelve el material marcado.</span></div>
+              <div class="seq-row"><span class="seq-from">Evaluaciones → OMR</span><span class="seq-arrow">→</span><span class="seq-message">Carga el escaneo para lectura de marcas.</span></div>
+              <div class="seq-row"><span class="seq-from">OMR → Sistema</span><span class="seq-arrow">←</span><span class="seq-message">Devuelve respuestas, variante y lecturas para calcular notas.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="sin-cartilla" role="tabpanel" data-print-title="Sin cartilla">
+        <div class="route-header"><div><h3>Evaluación presencial sin hoja OMR</h3><p>Se conserva el examen institucional, sin cartilla separada.</p></div><span class="route-tag">PDF + REVISIÓN</span></div>
+        <div class="timeline">
+          <div class="timeline-row"><div class="timeline-index">1</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Selecciona el rol validado</strong><span>Consulta estudiantes, docente y grupo desde la fuente oficial.</span><b class="result">Nómina confirmada</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">2</div><div class="actor">Sistema</div><div class="timeline-content"><strong>Genera cuadernillos</strong><span>Produce variantes A–E y el mapeo de estudiante a variante.</span><b class="result">Rol: GENERADO</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">3</div><div class="actor">Personal / docente</div><div class="timeline-content"><strong>Registra entrega y devolución</strong><span>El examen se aplica presencialmente y vuelve para su revisión.</span><b class="result">Rol: DEVUELTO</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">4</div><div class="actor">Evaluador</div><div class="timeline-content"><strong>Captura o revisa respuestas</strong><span>Se registran respuestas, aciertos y observaciones asociadas al estudiante oficial.</span><b class="result">Revisión manual auditada</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">5</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Confirma resultados</strong><span>La nota se calcula y queda disponible para consulta y remisión institucional.</span><b class="result">Rol: REVISADO → RECIBIDO</b></div></div>
+        </div>
+        <div class="sequence-wrap">
+          <div class="sequence-title"><h3>Secuencia sin cartilla</h3><span>Aplicación presencial y revisión manual</span></div>
+          <div class="sequence-diagram" data-sequence="sin-cartilla" aria-label="Diagrama de secuencia sin cartilla">
+            <div class="seq-actors"><span class="seq-actor">Evaluaciones</span><span class="seq-actor">Estudiante</span><span class="seq-actor">Evaluador</span><span class="seq-actor">Sistema</span></div>
+            <div class="seq-rows">
+              <div class="seq-row"><span class="seq-from">Evaluaciones → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Solicita variantes y cuadernillos PDF.</span></div>
+              <div class="seq-row"><span class="seq-from">Sistema → Estudiante</span><span class="seq-arrow">→</span><span class="seq-message">Entrega el cuadernillo correspondiente.</span></div>
+              <div class="seq-row"><span class="seq-from">Estudiante → Evaluador</span><span class="seq-arrow">→</span><span class="seq-message">Devuelve el examen para revisión.</span></div>
+              <div class="seq-row"><span class="seq-from">Evaluador → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Registra respuestas, aciertos y observaciones.</span></div>
+              <div class="seq-row"><span class="seq-from">Sistema → Evaluaciones</span><span class="seq-arrow">←</span><span class="seq-message">Calcula la nota y deja el resultado auditado.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="virtual" role="tabpanel" data-print-title="Virtual">
+        <div class="route-header"><div><h3>Evaluación virtual con sala y acceso controlado</h3><p>Las respuestas se guardan automáticamente en el servidor.</p></div><span class="route-tag">SALA + TOKEN</span></div>
+        <div class="timeline">
+          <div class="timeline-row"><div class="timeline-index">1</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Prepara la sala virtual</strong><span>El sistema consulta la nómina, crea variantes y asigna accesos.</span><b class="result">Código de sala y token disponibles</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">2</div><div class="actor">Estudiante</div><div class="timeline-content"><strong>Ingresa a la sala</strong><span>Usa el código y token; el sistema valida su pertenencia al grupo.</span><b class="result">Acceso autorizado</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">3</div><div class="actor">Docente</div><div class="timeline-content"><strong>Inicia el examen</strong><span>Se ejecuta la cuenta regresiva configurada y luego se muestran las secciones.</span><b class="result">Examen habilitado</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">4</div><div class="actor">Estudiante</div><div class="timeline-content"><strong>Responde y envía</strong><span>Las respuestas se guardan automáticamente; el envío puede ocurrir antes del vencimiento.</span><b class="result">Intento cerrado o enviado</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">5</div><div class="actor">Sistema</div><div class="timeline-content"><strong>Califica el intento</strong><span>Compara respuestas con la clave de la variante y guarda aciertos y notas.</span><b class="result">Resultados disponibles</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">6</div><div class="actor">Personal autorizado</div><div class="timeline-content"><strong>Restablece si ocurre un incidente</strong><span>Indica el motivo, conserva la trazabilidad y permite continuar cuando corresponde.</span><b class="result">Sala reabierta con auditoría</b></div></div>
+        </div>
+        <div class="sequence-wrap">
+          <div class="sequence-title"><h3>Secuencia virtual</h3><span>Sala, token, cuenta regresiva y calificación automática</span></div>
+          <div class="sequence-diagram" data-sequence="virtual" aria-label="Diagrama de secuencia virtual">
+            <div class="seq-actors"><span class="seq-actor">Personal</span><span class="seq-actor">Estudiante</span><span class="seq-actor">Docente</span><span class="seq-actor">Sistema</span></div>
+            <div class="seq-rows">
+              <div class="seq-row"><span class="seq-from">Personal → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Crea la sala y genera código, token y variantes.</span></div>
+              <div class="seq-row"><span class="seq-from">Estudiante → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Ingresa código y token; se valida su identidad oficial.</span></div>
+              <div class="seq-row"><span class="seq-from">Docente → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Inicia el examen y activa la cuenta regresiva configurada.</span></div>
+              <div class="seq-row"><span class="seq-from">Estudiante → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Responde; el servidor guarda automáticamente y recibe el envío.</span></div>
+              <div class="seq-row"><span class="seq-from">Sistema → Personal</span><span class="seq-arrow">←</span><span class="seq-message">Califica el intento y muestra resultados por estudiante.</span></div>
+              <div class="seq-row"><span class="seq-from">Personal → Sistema</span><span class="seq-arrow">→</span><span class="seq-message">Restablece con motivo cuando un incidente lo requiere.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <h2>¿Cómo se obtienen las notas?</h2>
+          <p>El resultado siempre queda asociado al estudiante y a su variante oficial.</p>
+        </div>
+      </div>
+      <div class="notes-grid">
+        <article class="notes-card"><div class="notes-icon">OMR</div><h3>Con cartilla</h3><p>El procesador lee las marcas, relaciona código y variante, y envía a revisión manual las lecturas dudosas.</p></article>
+        <article class="notes-card"><div class="notes-icon">REV</div><h3>Sin cartilla</h3><p>El evaluador registra respuestas o aciertos y deja observaciones, usuario y fecha de revisión.</p></article>
+        <article class="notes-card"><div class="notes-icon">WEB</div><h3>Virtual</h3><p>El servidor califica el intento al enviarlo o al vencer el tiempo y conserva las respuestas guardadas.</p></article>
+      </div>
+    </section>
+
+    <div class="bottom-grid">
+      <section class="section-card">
+        <div class="section-heading"><div><h2>Estados del rol</h2><p>La modalidad virtual no usa los estados físicos.</p></div></div>
+        <div class="state-line" aria-label="Secuencia de estados">
+          <span class="state">PROGRAMADO</span><span class="arrow">→</span>
+          <span class="state">VALIDADO</span><span class="arrow">→</span>
+          <span class="state">GENERADO</span><span class="arrow">→</span>
+          <span class="state">REVISADO</span><span class="arrow">→</span>
+          <span class="state final">RECIBIDO</span>
+        </div>
+        <p style="margin: 18px 0 0; color: var(--muted); font-size: 12px;">En modalidad presencial se incorporan IMPRESO, ENTREGADO y DEVUELTO. Las acciones quedan registradas en bitácora.</p>
+      </section>
+
+      <section class="section-card">
+        <div class="section-heading"><div><h2>Reglas de control</h2><p>Protegen la integridad del proceso.</p></div></div>
+        <ul class="rules">
+          <li>Docentes y estudiantes se validan con la fuente institucional oficial.</li>
+          <li>Las nuevas importaciones incrementan la versión: V1, V2, V3…</li>
+          <li>Un incidente virtual exige motivo y deja auditoría.</li>
+          <li>Las notas no se reemplazan sin una acción autorizada.</li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <h2>Actores y responsabilidades</h2>
+          <p>Cada participante interviene en un momento concreto del proceso.</p>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="info-table">
+          <thead><tr><th>Actor</th><th>Responsabilidad</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Director de carrera</strong></td><td>Elabora y entrega la programación académica oficial.</td></tr>
+            <tr><td><strong>Personal de evaluaciones</strong></td><td>Importa roles, carga bancos, genera exámenes, controla estados y consulta resultados.</td></tr>
+            <tr><td><strong>Docente titular</strong></td><td>Entrega o valida el banco y, en modalidad virtual, inicia la sala.</td></tr>
+            <tr><td><strong>Evaluador OMR</strong></td><td>Procesa escaneos, revisa lecturas y confirma calificaciones con cartilla.</td></tr>
+            <tr><td><strong>Estudiante</strong></td><td>Resuelve el examen presencial o ingresa a la sala virtual.</td></tr>
+            <tr><td><strong>Servicios institucionales</strong></td><td>Proveen sedes, carreras, asignaturas, grupos, docentes, horarios y estudiantes oficiales.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <h2>Validación, resultados y trazabilidad</h2>
+          <p>Condiciones que se aplican a los tres recorridos.</p>
+        </div>
+      </div>
+      <div class="notes-grid">
+        <article class="notes-card"><div class="notes-icon">01</div><h3>Antes de generar</h3><p>El grupo, la asignatura, el docente y la nómina deben coincidir con la fuente institucional. El banco requiere al menos 60 reactivos.</p></article>
+        <article class="notes-card"><div class="notes-icon">02</div><h3>Cuotas mínimas</h3><p>15 fáciles, 30 medias y 15 difíciles son valores mínimos. Pueden existir reactivos adicionales sin rechazar el banco.</p></article>
+        <article class="notes-card"><div class="notes-icon">03</div><h3>Cálculo de nota</h3><p>Se persisten aciertos, fallos, blancos, estado y variante. La nota se expresa sobre 30 y sobre 100.</p></article>
+      </div>
+      <div class="sequence-wrap">
+        <div class="sequence-title"><h3>Información que se consulta al finalizar</h3><span>Por estudiante</span></div>
+        <div class="table-responsive">
+          <table class="info-table">
+            <thead><tr><th>Modalidad</th><th>Fuente del resultado</th><th>Datos consultables</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Con cartilla</strong></td><td>Lectura OMR persistida</td><td>Código, variante, lecturas, aciertos, nota y revisión manual.</td></tr>
+              <tr><td><strong>Sin cartilla</strong></td><td>Captura o revisión manual</td><td>Respuestas, observaciones, usuario revisor, fecha y notas.</td></tr>
+              <tr><td><strong>Virtual</strong></td><td>Intento virtual calificado</td><td>Respuestas guardadas, aciertos, nota, estado, envío y hora.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <h2>Auditoría y excepciones</h2>
+          <p>Las operaciones sensibles no se realizan sin dejar evidencia.</p>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="info-table">
+          <thead><tr><th>Situación</th><th>Respuesta del sistema</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Docente o grupo no encontrado</strong></td><td>Detener la operación y mostrar observación; no completar con datos locales o genéricos.</td></tr>
+            <tr><td><strong>Banco incompleto</strong></td><td>No validar hasta alcanzar los mínimos configurados.</td></tr>
+            <tr><td><strong>Código OMR dudoso</strong></td><td>Enviar a revisión manual sin asignar por posición.</td></tr>
+            <tr><td><strong>Corte de internet en virtual</strong></td><td>Conservar respuestas guardadas y permitir restablecimiento autorizado con motivo.</td></tr>
+            <tr><td><strong>Reinicio o corrección</strong></td><td>Registrar estado anterior, estado nuevo, usuario, fecha, motivo y rol afectado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <details class="annex">
+        <summary>Ver endpoints principales del flujo</summary>
+        <div class="annex-content">
+          <div class="table-responsive">
+            <table class="info-table">
+              <thead><tr><th>Acción</th><th>Ruta</th></tr></thead>
+              <tbody>
+                <tr><td>Listar roles</td><td><code>GET /api/roles-examen</code></td></tr>
+                <tr><td>Registrar o actualizar rol</td><td><code>POST /api/roles-examen</code> · <code>PUT /api/roles-examen/{id}</code></td></tr>
+                <tr><td>Cambiar estado / bitácora</td><td><code>POST /api/roles-examen/{id}/transicion</code> · <code>GET /api/roles-examen/{id}/auditoria</code></td></tr>
+                <tr><td>Cargar banco / generar examen</td><td><code>POST /api/bancos-preguntas/{rolId}/upload</code> · <code>POST /api/generacion-typst</code></td></tr>
+                <tr><td>Procesar OMR</td><td><code>POST /api/omr/{rolId}/procesar</code></td></tr>
+                <tr><td>Crear y controlar sala</td><td><code>POST /api/examenes-virtuales/salas</code> · <code>POST /api/examenes-virtuales/salas/{id}/iniciar</code></td></tr>
+                <tr><td>Restablecer sala / guardar respuestas</td><td><code>POST /api/examenes-virtuales/salas/{id}/restablecer</code> · <code>PUT /api/examen-virtual/respuestas</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <h2>Checklist de recorrido completo</h2>
+          <p>Lista rápida para verificar que el proceso está listo.</p>
+        </div>
+      </div>
+      <div class="check-grid">
+        <div><h3>Preparación</h3><ul class="check-list"><li>Datos confirmados en la fuente institucional.</li><li>Rol creado con versión y modalidad.</li><li>Banco validado con mínimos 15/30/15.</li><li>Rol en VALIDADO.</li></ul></div>
+        <div><h3>Con cartilla</h3><ul class="check-list"><li>Variantes y cartillas generadas.</li><li>Material impreso, entregado y devuelto.</li><li>Escaneo procesado y revisado.</li><li>Notas confirmadas.</li></ul></div>
+        <div><h3>Sin cartilla</h3><ul class="check-list"><li>Cuadernillos PDF generados.</li><li>Entrega y devolución registradas.</li><li>Respuestas capturadas manualmente.</li><li>Nota confirmada y auditada.</li></ul></div>
+        <div><h3>Virtual</h3><ul class="check-list"><li>Sala, token y variantes creados.</li><li>Acceso del estudiante validado.</li><li>Docente inició y respuestas guardadas.</li><li>Notas disponibles por estudiante.</li></ul></div>
+      </div>
+    </section>
+
+    <footer>UNITEPC · Flujo operativo de evaluaciones · Documento de presentación</footer>
+  </main>
+
+  <script>
+    const sequenceData = {
+      general: {
+        title: "Registro y preparación del rol",
+        actors: ["Director de carrera", "Personal de evaluaciones", "Sistema", "Servicios institucionales"],
+        rows: [
+          { from: 0, to: 1, label: "Entrega el Excel oficial del rol." },
+          { from: 1, to: 2, label: "Selecciona sede, carrera y gestión." },
+          { from: 2, to: 3, label: "Consulta asignaturas, grupos, docentes y nómina." },
+          { from: 3, to: 2, label: "Devuelve los datos oficiales confirmados.", return: true },
+          { from: 2, to: 2, label: "Aplica modalidad, versión V1+ y guarda PROGRAMADO." },
+          { from: 1, to: 2, label: "Carga y valida el banco de preguntas." },
+          { from: 2, to: 1, label: "Muestra resultados y deja el rol VALIDADO.", return: true }
+        ]
+      },
+      cartilla: {
+        title: "Evaluación presencial con cartilla",
+        actors: ["Evaluaciones", "Docente", "Estudiante", "Procesador OMR"],
+        rows: [
+          { from: 0, to: 1, label: "Entrega al docente el lote de exámenes y cartillas." },
+          { from: 1, to: 2, label: "Distribuye el examen y la cartilla al estudiante." },
+          { from: 2, to: 1, label: "Devuelve el examen y la cartilla completados.", return: true },
+          { from: 1, to: 0, label: "Recoge y devuelve todo el material a Evaluaciones.", return: true },
+          { from: 0, to: 3, label: "Carga el escaneo para lectura OMR." },
+          { from: 3, to: 0, label: "Devuelve lecturas, variante y resultados.", return: true }
+        ]
+      },
+      "sin-cartilla": {
+        title: "Evaluación presencial sin cartilla",
+        actors: ["Evaluaciones", "Estudiante", "Evaluador", "Sistema"],
+        rows: [
+          { from: 0, to: 3, label: "Solicita variantes y cuadernillos PDF." },
+          { from: 3, to: 1, label: "Entrega el cuadernillo correspondiente." },
+          { from: 1, to: 2, label: "Devuelve el examen para revisión.", return: true },
+          { from: 2, to: 3, label: "Registra respuestas y observaciones." },
+          { from: 3, to: 0, label: "Calcula la nota y deja resultado auditado.", return: true }
+        ]
+      },
+      virtual: {
+        title: "Evaluación virtual",
+        actors: ["Personal", "Estudiante", "Docente", "Sistema"],
+        rows: [
+          { from: 0, to: 3, label: "Crea sala, código, token y variantes." },
+          { from: 1, to: 3, label: "Ingresa código y token para validarse." },
+          { from: 2, to: 3, label: "Inicia el examen y la cuenta regresiva." },
+          { from: 1, to: 3, label: "Responde y guarda automáticamente." },
+          { from: 3, to: 0, label: "Califica y muestra resultados.", return: true },
+          { from: 0, to: 3, label: "Restablece con motivo si hay un incidente." }
+        ]
+      }
+    };
+
+    function escapeSvgText(value) {
+      return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function wrapSvgText(value, maxLength) {
+      const words = value.split(" ");
+      const lines = [];
+      let line = "";
+      words.forEach((word) => {
+        const candidate = line ? line + " " + word : word;
+        if (candidate.length > maxLength && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = candidate;
+        }
+      });
+      if (line) lines.push(line);
+      return lines.slice(0, 2);
+    }
+
+    function renderSequence(config) {
+      const width = 1000;
+      const headerY = 12;
+      const headerHeight = 34;
+      const rowStart = 86;
+      const rowHeight = 62;
+      const height = rowStart + config.rows.length * rowHeight + 20;
+      const actorX = [125, 375, 625, 875];
+      let svg = '<svg class="uml-svg" role="img" aria-label="' + escapeSvgText(config.title) + '" viewBox="0 0 ' + width + ' ' + height + '" xmlns="http://www.w3.org/2000/svg">';
+      svg += '<title>' + escapeSvgText(config.title) + '</title>';
+      svg += '<defs><marker id="uml-arrow-purple" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#5b2be8"/></marker><marker id="uml-arrow-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#0d9f75"/></marker></defs>';
+      svg += '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="#fbfcff"/>';
+      config.actors.forEach((actor, index) => {
+        svg += '<rect class="uml-box" x="' + (actorX[index] - 106) + '" y="' + headerY + '" width="212" height="' + headerHeight + '" rx="9"/>';
+        svg += '<text class="uml-title" x="' + actorX[index] + '" y="34" text-anchor="middle">' + escapeSvgText(actor) + '</text>';
+        svg += '<line class="uml-life" x1="' + actorX[index] + '" y1="54" x2="' + actorX[index] + '" y2="' + (height - 14) + '"/>';
+      });
+      config.rows.forEach((row, index) => {
+        const y = rowStart + index * rowHeight;
+        const fromX = actorX[row.from];
+        const toX = actorX[row.to];
+        const startX = fromX === toX ? fromX + 2 : (fromX < toX ? fromX + 5 : fromX - 5);
+        const endX = fromX === toX ? toX + 78 : (fromX < toX ? toX - 5 : toX + 5);
+        const marker = row.return ? "uml-arrow-green" : "uml-arrow-purple";
+        const returnClass = row.return ? " return" : "";
+        svg += '<line class="uml-message-line' + returnClass + '" x1="' + startX + '" y1="' + (y + 12) + '" x2="' + endX + '" y2="' + (y + 12) + '" marker-end="url(#' + marker + ')"/>';
+        const lines = wrapSvgText(row.label, 47);
+        const labelX = fromX === toX ? fromX + 132 : (fromX + toX) / 2;
+        lines.forEach((line, lineIndex) => {
+          svg += '<text class="uml-message" x="' + labelX + '" y="' + (y - 4 + lineIndex * 14) + '" text-anchor="middle">' + escapeSvgText(line) + '</text>';
+        });
+        svg += '<text class="uml-caption" x="18" y="' + (y + 16) + '">' + String(index + 1).padStart(2, "0") + '</text>';
+      });
+      svg += '</svg>';
+      return svg;
+    }
+
+    document.querySelectorAll(".sequence-diagram[data-sequence]").forEach((diagram) => {
+      const config = sequenceData[diagram.dataset.sequence];
+      if (config) diagram.innerHTML = renderSequence(config);
+    });
+
+    const tabs = document.querySelectorAll(".tab");
+    const panels = document.querySelectorAll(".tab-panel");
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const target = tab.dataset.tab;
+        tabs.forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
+        panels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,6 +1,8 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { 
   BranchOffice, 
@@ -10,6 +12,7 @@ import {
   Campus, 
   TimeFrame 
 } from '../../core/models/unitepc-gateway.models';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 /**
  * Componente: Catálogo Académico UNITEPC (SEA Gateway Explorer)
@@ -19,7 +22,7 @@ import {
 @Component({
   selector: 'sea-catalogo-unitepc',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
     <div class="space-y-6">
       
@@ -30,10 +33,10 @@ import {
             <div class="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
               <i class="pi pi-building-columns text-base"></i>
             </div>
-            <h2 class="text-2xl font-black tracking-tight text-foreground">Servicios SEA</h2>
+            <h2 class="text-2xl font-black tracking-tight text-foreground">Servicios académicos</h2>
           </div>
           <p class="text-xs text-muted-foreground mt-1">
-            Exploración en vivo de Sedes, Carreras, Materias, Grupos, Docentes, Aulas, Horarios y Campus sincronizados con el Gateway SEA.
+            Exploración en vivo de sedes, carreras, materias, grupos, docentes, aulas, horarios y campus sincronizados con el servicio institucional.
           </p>
         </div>
 
@@ -65,7 +68,7 @@ import {
                 </span>
               </div>
               <p class="text-[11px] text-muted-foreground mt-0.5">
-                Endpoint: <span class="font-mono text-primary">https://gw-dev.unitepc.solutions</span> · ClientId: <span class="font-mono text-foreground font-bold">sea-evaluaciones</span>
+                Conexión institucional: <span class="font-mono text-primary">https://gw-dev.unitepc.solutions</span>
               </p>
             </div>
           </div>
@@ -101,7 +104,7 @@ import {
           [class]="vistaActiva() === 'grupos' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
           class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 transition-colors">
           <i class="pi pi-users"></i>
-          <span>Grupos, Docentes y Horarios ({{ grupos().length }})</span>
+          <span>Grupos, Docentes y Horarios ({{ gruposFiltrados().length }})</span>
         </button>
 
         <button 
@@ -347,12 +350,9 @@ import {
                   <i class="pi pi-users text-primary"></i>
                   <span>Grupos y Carga Docente (Gestión {{ gestionActiva() }})</span>
                 </h3>
-                <p class="text-[11px] text-muted-foreground mt-0.5">
-                  Sede: <strong class="text-foreground">{{ sedeSeleccionada()?.name || 'No seleccionada' }} ({{ sedeSeleccionada()?.code }})</strong> · Carrera: <strong class="text-foreground">{{ carreraSeleccionada()?.careerName || 'No seleccionada' }}</strong>
-                  @if (materiaSeleccionada()) {
-                    · Materia: <strong class="text-primary font-bold">[{{ materiaSeleccionada()?.courseCode }}] {{ materiaSeleccionada()?.courseName }}</strong>
-                  }
-                </p>
+                  <p class="text-[11px] text-muted-foreground mt-0.5">
+                    Consulta los grupos de la gestión activa y filtra por sede, carrera, asignatura, docente o aula.
+                  </p>
               </div>
 
               <!-- Buscador de Grupos -->
@@ -366,24 +366,62 @@ import {
               </div>
             </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-border">
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                  <i class="pi pi-building text-primary text-[10px]"></i> Sede
+                </label>
+                <select
+                  [ngModel]="filtroGrupoSedeId()"
+                  (ngModelChange)="onFiltroGrupoSedeChange($event)"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
+                  <option value="">Todas las sedes</option>
+                  @for (sede of sedes(); track sede.branchOfficeId) {
+                    <option [value]="sede.branchOfficeId">{{ sede.name }} ({{ sede.code }})</option>
+                  }
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                  <i class="pi pi-graduation-cap text-primary text-[10px]"></i> Carrera
+                </label>
+                <select
+                  [ngModel]="filtroGrupoCarreraId()"
+                  (ngModelChange)="onFiltroGrupoCarreraChange($event)"
+                  [disabled]="cargandoCarrerasFiltroGrupos()"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
+                  <option value="">Todas las carreras</option>
+                  @for (carrera of carrerasFiltroGrupos(); track carrera.careerId) {
+                    <option [value]="carrera.careerId">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
+                  }
+                </select>
+              </div>
+
+              <div class="flex items-end">
+                <button
+                  type="button"
+                  (click)="limpiarFiltrosGrupos()"
+                  class="w-full bg-muted hover:bg-border text-muted-foreground hover:text-foreground font-bold text-xs py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  <i class="pi pi-filter-slash"></i>
+                  <span>Limpiar filtros</span>
+                </button>
+              </div>
+            </div>
+
             <!-- Filtro de Materia para Grupos -->
             @if (materias().length > 0) {
-              <div class="flex items-center gap-2 pt-2 border-t border-border overflow-x-auto pb-1 text-xs">
+              <div class="flex flex-col sm:flex-row sm:items-center gap-2 pt-2 border-t border-border text-xs">
                 <span class="text-[10px] font-extrabold uppercase text-muted-foreground whitespace-nowrap">Filtrar por Asignatura:</span>
-                <button 
-                  (click)="seleccionarMateriaFiltroGrupos(null)"
-                  [class]="!materiaSeleccionada() ? 'bg-primary text-white font-bold shadow-2xs' : 'bg-muted hover:bg-muted/80 text-foreground'"
-                  class="px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-colors">
-                  Todas las Asignaturas ({{ materias().length }})
-                </button>
-                @for (mat of materias(); track mat.syllabusCourseId) {
-                  <button 
-                    (click)="seleccionarMateriaFiltroGrupos(mat)"
-                    [class]="materiaSeleccionada()?.syllabusCourseId === mat.syllabusCourseId ? 'bg-primary text-white font-bold shadow-2xs' : 'bg-muted hover:bg-muted/80 text-foreground'"
-                    class="px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-colors font-mono">
-                    {{ mat.courseCode }}
-                  </button>
-                }
+                <div class="w-full sm:max-w-md">
+                  <sea-searchable-select
+                    [options]="materiaFiltroOpciones()"
+                    [value]="materiaSeleccionada()?.syllabusCourseId || ''"
+                    (valueChange)="seleccionarMateriaFiltroPorId($event)"
+                    placeholder="Todas las asignaturas"
+                    searchPlaceholder="Buscar por código o nombre..."
+                    noResultsText="No se encontraron asignaturas." />
+                </div>
               </div>
             }
           </div>
@@ -399,6 +437,84 @@ import {
               No se encontraron grupos para los criterios de búsqueda.
             </div>
           } @else {
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-xs font-bold text-muted-foreground">{{ gruposFiltrados().length }} grupos encontrados</span>
+              <div class="inline-flex items-center gap-1 rounded-xl border border-border bg-card p-1">
+                <button
+                  type="button"
+                  (click)="vistaGrupos.set('tarjetas')"
+                  [class]="vistaGrupos() === 'tarjetas' ? 'bg-primary text-white shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+                  class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors">
+                  <i class="pi pi-th-large"></i> Tarjetas
+                </button>
+                <button
+                  type="button"
+                  (click)="vistaGrupos.set('tabla')"
+                  [class]="vistaGrupos() === 'tabla' ? 'bg-primary text-white shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+                  class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors">
+                  <i class="pi pi-list"></i> Tabla
+                </button>
+              </div>
+            </div>
+
+            @if (vistaGrupos() === 'tabla') {
+              <div class="bg-card border border-border rounded-xl shadow-xs overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[900px]">
+                  <thead>
+                    <tr class="border-b border-border bg-muted/50 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                      <th class="p-3">Grupo</th>
+                      <th class="p-3">Sede</th>
+                      <th class="p-3">Carrera</th>
+                      <th class="p-3">Asignatura</th>
+                      <th class="p-3">Docente titular</th>
+                      <th class="p-3">Horarios y aulas</th>
+                      <th class="p-3 text-center">Estudiantes</th>
+                      <th class="p-3 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border text-xs">
+                    @for (grp of gruposFiltrados(); track grp.groupId) {
+                      <tr class="hover:bg-muted/30 transition-colors align-top">
+                        <td class="p-3">
+                          <div class="font-mono font-black text-primary">{{ grp.code }}</div>
+                          <div class="text-[10px] text-muted-foreground">{{ grp.classType }} · {{ grp.term }}</div>
+                        </td>
+                        <td class="p-3 font-bold text-foreground">{{ nombreSedeGrupo(grp) }}</td>
+                        <td class="p-3 font-bold text-foreground max-w-[190px]">{{ nombreCarreraGrupo(grp) }}</td>
+                        <td class="p-3 max-w-[220px]">
+                          <div class="font-mono font-black text-primary">{{ asignaturaGrupo(grp).codigo }}</div>
+                          <div class="font-bold text-foreground">{{ asignaturaGrupo(grp).nombre }}</div>
+                        </td>
+                        <td class="p-3">
+                          <div class="font-bold text-foreground">{{ docenteGrupo(grp) }}</div>
+                          @if (grp.teacherIdentityNumber) {
+                            <div class="text-[10px] font-mono text-muted-foreground">CI: {{ grp.teacherIdentityNumber }}</div>
+                          }
+                        </td>
+                        <td class="p-3">
+                          @for (sch of grp.schedules || []; track $index) {
+                            <div class="whitespace-nowrap font-mono text-[11px] text-primary">{{ sch.day }} {{ sch.startTime }}–{{ sch.endTime }}</div>
+                            <div class="text-[10px] text-muted-foreground">{{ sch.classroom }} · {{ sch.campus }}</div>
+                          }
+                          @if (!grp.schedules || grp.schedules.length === 0) {
+                            <span class="italic text-muted-foreground">Sin horario registrado</span>
+                          }
+                        </td>
+                        <td class="p-3 text-center font-mono font-bold text-foreground">—</td>
+                        <td class="p-3 text-right">
+                          <button
+                            type="button"
+                            (click)="abrirModalEstudiantes(grp)"
+                            class="bg-primary/10 hover:bg-primary text-primary hover:text-white font-bold text-[10px] py-1.5 px-2.5 rounded-lg inline-flex items-center gap-1 transition-colors">
+                            <i class="pi pi-users"></i> Ver estudiantes
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               @for (grp of gruposFiltrados(); track grp.groupId) {
                 <div class="bg-card border border-border rounded-xl p-4 shadow-xs hover:border-primary/50 transition-all flex flex-col justify-between gap-3">
@@ -421,11 +537,21 @@ import {
                   </div>
 
                   <!-- Docente Asignado -->
+                  <!-- Asignatura oficial asociada al syllabusCourseId del grupo -->
+                  <div class="space-y-1">
+                    <div class="text-[10px] font-extrabold uppercase text-muted-foreground flex items-center gap-1">
+                      <i class="pi pi-book text-primary text-[10px]"></i> Asignatura
+                    </div>
+                    <div class="font-mono font-black text-[11px] text-primary">{{ asignaturaGrupo(grp).codigo }}</div>
+                    <div class="font-bold text-xs text-foreground">{{ asignaturaGrupo(grp).nombre }}</div>
+                  </div>
+
+                  <!-- Docente Asignado -->
                   <div class="space-y-1">
                     <div class="text-[10px] font-extrabold uppercase text-muted-foreground flex items-center gap-1">
                       <i class="pi pi-user text-primary text-[10px]"></i> Docente Titular
                     </div>
-                    <div class="font-bold text-xs text-foreground">{{ grp.teacherName || 'Docente No Asignado' }}</div>
+                    <div class="font-bold text-xs text-foreground">{{ docenteGrupo(grp) }}</div>
                     @if (grp.teacherIdentityNumber) {
                       <div class="text-[10px] font-mono text-muted-foreground">
                         CI: <strong class="text-foreground">{{ grp.teacherIdentityNumber }}</strong>
@@ -469,6 +595,7 @@ import {
                 </div>
               }
             </div>
+            }
           }
 
         </div>
@@ -573,7 +700,7 @@ import {
                     </span>
                   </div>
                   <p class="text-xs text-muted-foreground mt-0.5">
-                    Docente: <strong class="text-foreground">{{ grupoSeleccionado()?.teacherName || 'No Asignado' }}</strong> · Gestión: {{ grupoSeleccionado()?.term }}
+                    Docente: <strong class="text-foreground">{{ docenteGrupo(grupoSeleccionado()) }}</strong> · Gestión: {{ grupoSeleccionado()?.term }}
                   </p>
                 </div>
               </div>
@@ -657,6 +784,7 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   public cargandoCarreras = signal<boolean>(false);
   public cargandoMaterias = signal<boolean>(false);
   public cargandoGrupos = signal<boolean>(false);
+  public cargandoCarrerasFiltroGrupos = signal<boolean>(false);
   public cargandoEstudiantes = signal<boolean>(false);
 
   // Modal Estudiantes
@@ -673,7 +801,23 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
 
   public materias = signal<Course[]>([]);
   public materiaSeleccionada = signal<Course | null>(null);
+  public materiaFiltroOpciones = computed<SearchableSelectOption[]>(() => [
+    { value: '', label: `Todas las asignaturas (${this.materias().length})`, searchText: 'todas' },
+    ...this.materias()
+      .slice()
+      .sort((a, b) => this.compararCodigos(a.courseCode, b.courseCode))
+      .map(materia => ({
+        value: materia.syllabusCourseId,
+        label: `[${materia.courseCode}] ${materia.courseName}`,
+        searchText: `${materia.courseCode} ${materia.courseName}`
+      }))
+  ]);
   public grupos = signal<GroupItem[]>([]);
+  public asignaturasPorGrupo = signal<Record<string, Course>>({});
+  public vistaGrupos = signal<'tarjetas' | 'tabla'>('tarjetas');
+  public filtroGrupoSedeId = signal<string>('');
+  public filtroGrupoCarreraId = signal<string>('');
+  public carrerasFiltroGrupos = signal<Career[]>([]);
   public campusList = signal<Campus[]>([]);
   public timeFrames = signal<TimeFrame[]>([]);
 
@@ -708,12 +852,19 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   });
 
   public gruposFiltrados = computed(() => {
+    const sedeId = this.filtroGrupoSedeId();
+    const carreraId = this.filtroGrupoCarreraId();
     const q = this.busquedaGrupo.trim().toLowerCase();
-    if (!q) return this.grupos();
-    return this.grupos().filter(g => 
+    let grupos = this.grupos();
+    if (sedeId) grupos = grupos.filter(g => g.branchOfficeId === sedeId);
+    if (carreraId) grupos = grupos.filter(g => g.careerId === carreraId);
+    if (!q) return grupos;
+    return grupos.filter(g =>
       (g.teacherName && g.teacherName.toLowerCase().includes(q)) || 
       (g.teacherIdentityNumber && g.teacherIdentityNumber.includes(q)) ||
       (g.code && g.code.toLowerCase().includes(q)) ||
+      this.asignaturaGrupo(g).codigo.toLowerCase().includes(q) ||
+      this.asignaturaGrupo(g).nombre.toLowerCase().includes(q) ||
       (g.schedules && g.schedules.some(s => s.classroom && s.classroom.toLowerCase().includes(q)))
     );
   });
@@ -773,11 +924,17 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
     this._cargarGrupos();
   }
 
+  public seleccionarMateriaFiltroPorId(syllabusCourseId: string): void {
+    const materia = this.materias().find(item => item.syllabusCourseId === syllabusCourseId) || null;
+    this.seleccionarMateriaFiltroGrupos(materia);
+  }
+
   private _cargarSedes(): void {
     this.cargando.set(true);
     this._gateway.getBranchOffices().subscribe({
       next: data => {
         this.sedes.set(data);
+        this._cargarCarrerasFiltroGrupos(data);
         this.cargando.set(false);
         // Seleccionar Cochabamba (CBA) por defecto si existe
         if (!this.sedeSeleccionada() && data.length > 0) {
@@ -808,28 +965,31 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
     this.cargandoMaterias.set(true);
     this._gateway.getCourses(branchCode, careerCode).subscribe({
       next: data => {
-        this.materias.set(data);
+        this.materias.set(data.slice().sort((a, b) => this.compararCodigos(a.courseCode, b.courseCode)));
         this.cargandoMaterias.set(false);
       },
       error: () => this.cargandoMaterias.set(false)
     });
   }
 
+  private compararCodigos(a: string, b: string): number {
+    return (a || '').localeCompare(b || '', 'es', { numeric: true, sensitivity: 'base' });
+  }
+
   private _cargarGrupos(): void {
-    const sede = this.sedeSeleccionada();
-    const carrera = this.carreraSeleccionada();
     const materia = this.materiaSeleccionada();
     const term = this.gestionActiva() || '2-2026';
 
     this.cargandoGrupos.set(true);
     this._gateway.getGroups(
       term,
-      sede?.branchOfficeId,
-      carrera?.careerId,
+      this.filtroGrupoSedeId() || undefined,
+      this.filtroGrupoCarreraId() || undefined,
       materia?.syllabusCourseId
     ).subscribe({
       next: data => {
         this.grupos.set(data || []);
+        this._cargarAsignaturasDeGrupos(data || []);
         this.cargandoGrupos.set(false);
       },
       error: () => {
@@ -837,6 +997,126 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
         this.cargandoGrupos.set(false);
       }
     });
+  }
+
+  private _cargarCarrerasFiltroGrupos(sedes: BranchOffice[] = this.sedes()): void {
+    if (sedes.length === 0) {
+      this.carrerasFiltroGrupos.set([]);
+      return;
+    }
+
+    this.cargandoCarrerasFiltroGrupos.set(true);
+    forkJoin(sedes.map(sede => this._gateway.getCareers(sede.code).pipe(catchError(() => of([] as Career[]))))).subscribe({
+      next: respuestas => {
+        const unicas = new Map<string, Career>();
+        respuestas.flat().forEach(carrera => unicas.set(carrera.careerId, carrera));
+        this.carrerasFiltroGrupos.set([...unicas.values()].sort((a, b) => a.careerName.localeCompare(b.careerName, 'es')));
+        if (this.grupos().length > 0) this._cargarAsignaturasDeGrupos(this.grupos());
+        this.cargandoCarrerasFiltroGrupos.set(false);
+      },
+      error: () => {
+        this.carrerasFiltroGrupos.set([]);
+        this.cargandoCarrerasFiltroGrupos.set(false);
+      }
+    });
+  }
+
+  public onFiltroGrupoSedeChange(branchOfficeId: string): void {
+    this.filtroGrupoSedeId.set(branchOfficeId || '');
+    this.filtroGrupoCarreraId.set('');
+    this.materiaSeleccionada.set(null);
+
+    const sede = this.sedes().find(item => item.branchOfficeId === branchOfficeId);
+    if (sede) {
+      this.cargandoCarrerasFiltroGrupos.set(true);
+      this._gateway.getCareers(sede.code).subscribe({
+        next: carreras => {
+          this.carrerasFiltroGrupos.set(carreras);
+          if (this.grupos().length > 0) this._cargarAsignaturasDeGrupos(this.grupos());
+          this.cargandoCarrerasFiltroGrupos.set(false);
+        },
+        error: () => {
+          this.carrerasFiltroGrupos.set([]);
+          this.cargandoCarrerasFiltroGrupos.set(false);
+        }
+      });
+    } else {
+      this._cargarCarrerasFiltroGrupos();
+    }
+
+    this._cargarGrupos();
+  }
+
+  public onFiltroGrupoCarreraChange(careerId: string): void {
+    this.filtroGrupoCarreraId.set(careerId || '');
+    this.materiaSeleccionada.set(null);
+    this._cargarGrupos();
+  }
+
+  public limpiarFiltrosGrupos(): void {
+    this.filtroGrupoSedeId.set('');
+    this.filtroGrupoCarreraId.set('');
+    this.busquedaGrupo = '';
+    this.materiaSeleccionada.set(null);
+    this._cargarCarrerasFiltroGrupos();
+    this._cargarGrupos();
+  }
+
+  public docenteGrupo(grupo: GroupItem | null): string {
+    const nombre = grupo?.teacherName?.trim();
+    if (nombre) return nombre;
+    if (grupo?.teacherIdentityNumber) return `Nombre no disponible (CI ${grupo.teacherIdentityNumber})`;
+    return 'Sin docente asignado';
+  }
+
+  public nombreSedeGrupo(grupo: GroupItem): string {
+    return this.sedes().find(sede => sede.branchOfficeId === grupo.branchOfficeId)?.name || grupo.branchOfficeId;
+  }
+
+  public nombreCarreraGrupo(grupo: GroupItem): string {
+    return this.carrerasFiltroGrupos().find(carrera => carrera.careerId === grupo.careerId)?.careerName
+      || this.carreras().find(carrera => carrera.careerId === grupo.careerId)?.careerName
+      || grupo.careerId;
+  }
+
+  public asignaturaGrupo(grupo: GroupItem): { codigo: string; nombre: string } {
+    const curso = this.asignaturasPorGrupo()[grupo.groupId]
+      || this.materias().find(materia => materia.syllabusCourseId === grupo.syllabusCourseId);
+    if (curso) return { codigo: curso.courseCode, nombre: curso.courseName };
+    return {
+      codigo: 'SYLLABUS',
+      nombre: grupo.syllabusCourseId ? `${grupo.syllabusCourseId.slice(0, 8)}...` : 'Asignatura no informada'
+    };
+  }
+
+  private _cargarAsignaturasDeGrupos(grupos: GroupItem[]): void {
+    const pares = new Map<string, { sede: BranchOffice; carrera: Career }>();
+    for (const grupo of grupos) {
+      const sede = this.sedes().find(item => item.branchOfficeId === grupo.branchOfficeId);
+      const carrera = this.carrerasFiltroGrupos().find(item => item.careerId === grupo.careerId)
+        || this.carreras().find(item => item.careerId === grupo.careerId);
+      if (sede && carrera) pares.set(`${sede.branchOfficeId}|${carrera.careerId}`, { sede, carrera });
+    }
+    if (pares.size === 0) return;
+
+    forkJoin([...pares.entries()].map(([clave, contexto]) => this._gateway
+      .getCourses(contexto.sede.code, contexto.carrera.careerCode)
+      .pipe(
+        catchError(() => of([] as Course[])),
+        map(asignaturas => ({ clave, asignaturas }))
+      ))).subscribe(resultados => {
+        const porPar = new Map(resultados.map(resultado => [resultado.clave, resultado.asignaturas]));
+        const lookup = { ...this.asignaturasPorGrupo() };
+        for (const grupo of grupos) {
+          const sede = this.sedes().find(item => item.branchOfficeId === grupo.branchOfficeId);
+          const carrera = this.carrerasFiltroGrupos().find(item => item.careerId === grupo.careerId)
+            || this.carreras().find(item => item.careerId === grupo.careerId);
+          const cursos = sede && carrera ? porPar.get(`${sede.branchOfficeId}|${carrera.careerId}`) || [] : [];
+          const curso = cursos.find(item => item.syllabusCourseId === grupo.syllabusCourseId);
+          if (curso) lookup[grupo.groupId] = curso;
+        }
+        this.asignaturasPorGrupo.set(lookup);
+      });
   }
 
   private _cargarInfraestructura(): void {

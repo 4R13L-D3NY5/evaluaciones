@@ -29,6 +29,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -66,6 +67,7 @@ class BancoPreguntasServiceTest {
                 .docenteNombre("Docente Oficial")
                 .estadoFlujo(EstadoFlujo.PROGRAMADO)
                 .build();
+        lenient().when(rolExamenService.resolverNombreDocenteOficial(rol)).thenReturn("Docente SEA");
     }
 
     @Test
@@ -98,7 +100,7 @@ class BancoPreguntasServiceTest {
         assertThat(reactivos).extracting(Reactivo::getBancoId).containsOnly(respuesta.getBancoPreguntasId());
 
         verify(rolExamenService).validarPorBanco(
-                rol.getId(), respuesta.getHashSha256(), "Docente Oficial");
+                rol.getId(), respuesta.getHashSha256(), "Docente SEA");
     }
 
     @Test

@@ -21,6 +21,12 @@ public class SalaExamenVirtual {
     @Column(name = "codigo_sala", nullable = false, unique = true, length = 20)
     private String codigoSala;
 
+    @Column(name = "token_grupo_hash", length = 128)
+    private String tokenGrupoHash;
+
+    @Column(name = "token_grupo_emitido_en")
+    private LocalDateTime tokenGrupoEmitidoEn;
+
     @Column(nullable = false, length = 20)
     private String estado = "PREPARADA";
 

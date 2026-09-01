@@ -26,6 +26,9 @@ public class ConfiguracionEvaluaciones {
     @Column(name = "duracion_examen_virtual_minutos", nullable = false)
     private Integer duracionExamenVirtualMinutos;
 
+    @Column(name = "cuenta_regresiva_inicio_virtual_segundos", nullable = false)
+    private Integer cuentaRegresivaInicioVirtualSegundos;
+
     @Column(name = "formato_hoja", nullable = false, length = 100)
     private String formatoHoja;
 

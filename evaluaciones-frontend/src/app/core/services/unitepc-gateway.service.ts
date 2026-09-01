@@ -138,7 +138,11 @@ export class UnitepcGatewayService {
     if (careerId) params = params.set('careerId', careerId);
     if (syllabusCourseId) params = params.set('syllabusCourseId', syllabusCourseId);
 
-    return this._http.get<GroupItem[]>(`${this._baseUrl}/grupos`, { params }).pipe(
+    return this._http.get<Array<GroupItem & { teacherFullName?: string | null }>>(`${this._baseUrl}/grupos`, { params }).pipe(
+      map(groups => groups.map(group => ({
+        ...group,
+        teacherName: group.teacherName?.trim() || group.teacherFullName?.trim() || null
+      }))),
       catchError(err => {
         console.error(`[UnitepcGatewayService] Error al obtener Grupos para term ${term}:`, err);
         return throwError(() => err);

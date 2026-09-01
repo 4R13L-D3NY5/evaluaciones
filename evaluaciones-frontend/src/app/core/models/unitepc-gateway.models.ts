@@ -49,8 +49,9 @@ export interface GroupItem {
   careerId: string;
   branchOfficeId: string;
   term: string;
-  teacherName: string;
-  teacherIdentityNumber: string;
+  teacherName: string | null;
+  teacherFullName?: string | null;
+  teacherIdentityNumber: string | null;
   groupLinkId: string | null;
   schedules: ScheduleItem[];
   rotations: any | null;

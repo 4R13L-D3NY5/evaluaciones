@@ -12,11 +12,15 @@ import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
+import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +34,11 @@ public class RolExamenService {
     private final RolExamenRepository rolExamenRepository;
     private final AuditoriaEvaluacionRepository auditoriaRepository;
     private final RolExamenMapper mapper;
+    private final UnitepcGatewayClient unitepcGatewayClient;
+
+    private static final long CACHE_GRUPOS_SEA_MILLIS = 60_000L;
+    private volatile List<GroupItemDto> gruposSeaCache = List.of();
+    private volatile long gruposSeaCacheAt;
 
     // Máquina de estados: de -> conjunto de estados permitidos
     private static final Map<EstadoFlujo, Set<EstadoFlujo>> TRANSICIONES_VALIDAS = Map.of(
@@ -75,21 +84,23 @@ public class RolExamenService {
             roles = rolExamenRepository.findAll();
         }
 
-        return roles.stream()
-                .map(mapper::toResponseDto)
-                .collect(Collectors.toList());
+        return mapearRolesConDocenteOficial(roles);
     }
 
     @Transactional(readOnly = true)
     public RolExamenResponseDto obtenerPorId(String id) {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
-        return mapper.toResponseDto(rol);
+        return mapearRolConDocenteOficial(rol);
     }
 
     @Transactional
     public RolExamenResponseDto crear(RolExamenRequestDto dto) {
         normalizarModalidadVigente(dto);
+        RolExamen previsualizacion = mapper.toEntity(dto);
+        GroupItemDto grupoOficial = resolverGrupoOficialDesdeSea(previsualizacion);
+        aplicarDocenteOficial(previsualizacion, grupoOficial);
+        dto.setSeaGroupId(previsualizacion.getSeaGroupId());
         int version = siguienteVersion(dto);
         dto.setVersion(version);
         dto.setId(construirId(dto, version));
@@ -99,6 +110,8 @@ public class RolExamenService {
             dto.setId(construirId(dto, version));
         }
         RolExamen entity = mapper.toEntity(dto);
+        entity.setSeaGroupId(previsualizacion.getSeaGroupId());
+        aplicarDocenteOficial(entity, grupoOficial);
         entity.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
         entity.setFechaDisplay(formatearFecha(dto.getFecha()));
         RolExamen guardado = rolExamenRepository.save(entity);
@@ -120,7 +133,12 @@ public class RolExamenService {
         }
 
         normalizarModalidadVigente(dto);
+        RolExamen previsualizacion = mapper.toEntity(dto);
+        previsualizacion.setId(id);
+        GroupItemDto grupoOficial = resolverGrupoOficialDesdeSea(previsualizacion);
         mapper.updateEntity(dto, rol);
+        rol.setSeaGroupId(previsualizacion.getSeaGroupId());
+        aplicarDocenteOficial(rol, grupoOficial);
         rol.setFechaDisplay(formatearFecha(dto.getFecha()));
         RolExamen guardado = rolExamenRepository.save(rol);
         registrarAuditoria(guardado, rol.getEstadoFlujo(), rol.getEstadoFlujo(),
@@ -132,6 +150,190 @@ public class RolExamenService {
         if (dto.getModalidad() == null) {
             dto.setModalidad(com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen.PRESENCIAL_CARTILLA);
         }
+    }
+
+    private List<RolExamenResponseDto> mapearRolesConDocenteOficial(List<RolExamen> roles) {
+        Map<String, GroupItemDto> gruposOficiales = resolverGruposOficiales(roles);
+        return roles.stream()
+                .map(rol -> mapearRol(rol, gruposOficiales.get(rol.getId())))
+                .collect(Collectors.toList());
+    }
+
+    private RolExamenResponseDto mapearRolConDocenteOficial(RolExamen rol) {
+        Map<String, GroupItemDto> gruposOficiales = resolverGruposOficiales(List.of(rol));
+        return mapearRol(rol, gruposOficiales.get(rol.getId()));
+    }
+
+    public String resolverNombreDocenteOficial(RolExamen rol) {
+        if (rol == null) {
+            return null;
+        }
+        GroupItemDto grupo = resolverGruposOficiales(List.of(rol)).get(rol.getId());
+        return grupo != null && grupo.getTeacherName() != null && !grupo.getTeacherName().isBlank()
+                ? grupo.getTeacherName().trim()
+                : null;
+    }
+
+    /**
+     * Identificador oficial del grupo en SEA. Se usa durante la generación
+     * para que un groupId antiguo no termine consultando estudiantes de otro
+     * grupo con el mismo código (por ejemplo, varios TA-01).
+     */
+    public String resolverGrupoOficial(RolExamen rol) {
+        if (rol == null) {
+            return null;
+        }
+        GroupItemDto grupo = resolverGruposOficiales(List.of(rol)).get(rol.getId());
+        return grupo != null && grupo.getGroupId() != null && !grupo.getGroupId().isBlank()
+                ? grupo.getGroupId()
+                : null;
+    }
+
+    private RolExamenResponseDto mapearRol(RolExamen rol, GroupItemDto grupoOficial) {
+        RolExamenResponseDto dto = mapper.toResponseDto(rol);
+        // Los campos locales del rol nunca son una fuente de presentación.
+        dto.setDocenteNombre(null);
+        dto.setDocenteCi(null);
+        if (grupoOficial != null) {
+            if (grupoOficial.getTeacherName() != null && !grupoOficial.getTeacherName().isBlank()) {
+                dto.setDocenteNombre(grupoOficial.getTeacherName().trim());
+            }
+            if (grupoOficial.getTeacherIdentityNumber() != null
+                    && !grupoOficial.getTeacherIdentityNumber().isBlank()) {
+                dto.setDocenteCi(grupoOficial.getTeacherIdentityNumber().trim());
+            }
+        }
+        return dto;
+    }
+
+    private GroupItemDto resolverGrupoOficialDesdeSea(RolExamen rol) {
+        GroupItemDto grupo = resolverGruposOficiales(List.of(rol)).get(rol.getId());
+        if (grupo == null || grupo.getTeacherName() == null || grupo.getTeacherName().isBlank()) {
+            throw new RuntimeException("No se encontró un docente oficial en los servicios institucionales para la asignatura y grupo seleccionados");
+        }
+        return grupo;
+    }
+
+    private void aplicarDocenteOficial(RolExamen rol, GroupItemDto grupo) {
+        if (grupo == null || grupo.getTeacherName() == null || grupo.getTeacherName().isBlank()) {
+            throw new RuntimeException("El rol debe tener un docente oficial proveniente de los servicios institucionales");
+        }
+        rol.setSeaGroupId(grupo.getGroupId());
+        rol.setDocenteNombre(grupo.getTeacherName().trim());
+        rol.setDocenteCi(grupo.getTeacherIdentityNumber());
+    }
+
+    private Map<String, GroupItemDto> resolverGruposOficiales(List<RolExamen> roles) {
+        List<RolExamen> pendientes = roles.stream()
+                .filter(rol -> rol.getSeaSyllabusCourseId() != null && !rol.getSeaSyllabusCourseId().isBlank())
+                .toList();
+        if (pendientes.isEmpty()) {
+            return Map.of();
+        }
+
+        try {
+            List<GroupItemDto> grupos = obtenerGruposSea();
+            Map<String, GroupItemDto> resultado = new HashMap<>();
+            for (RolExamen rol : pendientes) {
+                GroupItemDto grupo = seleccionarGrupoOficial(rol, grupos);
+                if (grupo != null && grupo.getTeacherName() != null && !grupo.getTeacherName().isBlank()) {
+                    resultado.put(rol.getId(), grupo);
+                }
+            }
+            return resultado;
+        } catch (RuntimeException ex) {
+            return Map.of();
+        }
+    }
+
+    private GroupItemDto seleccionarGrupoOficial(RolExamen rol, List<GroupItemDto> grupos) {
+        if (grupos == null || grupos.isEmpty()) {
+            return null;
+        }
+
+        List<GroupItemDto> candidatos = grupos.stream()
+                .filter(grupo -> mismoTexto(grupo.getSyllabusCourseId(), rol.getSeaSyllabusCourseId()))
+                .filter(grupo -> mismoTexto(grupo.getCode(), rol.getGrupo()))
+                .toList();
+
+        if (candidatos.isEmpty()) {
+            return null;
+        }
+
+        // El groupId solo es confiable si también pertenece a la asignatura
+        // oficial; así no se conserva accidentalmente el grupo de otra materia.
+        GroupItemDto porId = candidatos.stream()
+                .filter(grupo -> mismoTexto(grupo.getGroupId(), rol.getSeaGroupId()))
+                .findFirst()
+                .orElse(null);
+        if (porId != null) {
+            return porId;
+        }
+
+        // Si el rol local quedó con un groupId de otra asignatura, usamos
+        // primero el groupId que ya esté asociado a otro parcial del mismo
+        // curso y grupo. Esto mantiene consistente todo el rol de exámenes.
+        List<RolExamen> rolesRelacionados = rolExamenRepository.findByMateriaCodigoAndGrupo(
+                rol.getMateriaCodigo(), rol.getGrupo());
+        for (RolExamen relacionado : rolesRelacionados) {
+            GroupItemDto porReferenciaLocal = candidatos.stream()
+                    .filter(grupo -> mismoTexto(grupo.getGroupId(), relacionado.getSeaGroupId()))
+                    .findFirst()
+                    .orElse(null);
+            if (porReferenciaLocal != null) {
+                return porReferenciaLocal;
+            }
+        }
+
+        // Como último criterio, relacionamos el horario/campus del rol con la
+        // programación académica de SEA. Nunca se usa el nombre local para
+        // decidir entre docentes, porque puede estar desactualizado.
+        return candidatos.stream()
+                .max(Comparator.comparingInt(grupo -> puntajeCompatibilidad(rol, grupo)))
+                .orElse(null);
+    }
+
+    private int puntajeCompatibilidad(RolExamen rol, GroupItemDto grupo) {
+        if (grupo.getSchedules() == null || grupo.getSchedules().isEmpty()) {
+            return 0;
+        }
+        return grupo.getSchedules().stream().mapToInt(horario -> {
+            int puntaje = 0;
+            if (mismoTexto(horario.getCampus(), rol.getCampus())) {
+                puntaje += 4;
+            }
+            if (mismoTexto(horario.getClassroom(), rol.getAula())) {
+                puntaje += 3;
+            }
+            String horarioRol = rol.getHorario() == null ? "" : rol.getHorario().replace(" ", "");
+            String horarioSea = (horario.getStartTime() == null ? "" : horario.getStartTime())
+                    + "-" + (horario.getEndTime() == null ? "" : horario.getEndTime());
+            if (!horarioRol.isBlank() && horarioRol.equalsIgnoreCase(horarioSea)) {
+                puntaje += 5;
+            }
+            return puntaje;
+        }).max().orElse(0);
+    }
+
+    private List<GroupItemDto> obtenerGruposSea() {
+        long ahora = System.currentTimeMillis();
+        if (ahora - gruposSeaCacheAt < CACHE_GRUPOS_SEA_MILLIS) {
+            return gruposSeaCache;
+        }
+        synchronized (this) {
+            ahora = System.currentTimeMillis();
+            if (ahora - gruposSeaCacheAt < CACHE_GRUPOS_SEA_MILLIS) {
+                return gruposSeaCache;
+            }
+            List<GroupItemDto> grupos = unitepcGatewayClient.getGroups("2-2026", null, null, null);
+            gruposSeaCache = grupos == null ? List.of() : List.copyOf(grupos);
+            gruposSeaCacheAt = ahora;
+            return gruposSeaCache;
+        }
+    }
+
+    private boolean mismoTexto(String primero, String segundo) {
+        return primero != null && segundo != null && primero.trim().equalsIgnoreCase(segundo.trim());
     }
 
     private int siguienteVersion(RolExamenRequestDto dto) {
@@ -192,7 +394,7 @@ public class RolExamenService {
                 origen == EstadoFlujo.PROGRAMADO
                         ? "VALIDACION_BANCO_PREGUNTAS"
                         : "REVALIDACION_BANCO_PREGUNTAS",
-                usuario != null && !usuario.isBlank() ? usuario : rol.getDocenteNombre(),
+                usuario != null && !usuario.isBlank() ? usuario : "Sistema",
                 "127.0.0.1");
         return guardado;
     }

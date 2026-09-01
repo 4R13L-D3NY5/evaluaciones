@@ -116,23 +116,23 @@ public class CartillaOmrService {
         }
 
         if (rol.getSeaGroupId() == null || rol.getSeaGroupId().isBlank()) {
-            throw new IllegalStateException("El rol no tiene grupo SEA para consultar los estudiantes oficiales.");
+            throw new IllegalStateException("El rol no tiene un grupo oficial para consultar los estudiantes.");
         }
 
         List<StudentItemDto> estudiantes;
         try {
             estudiantes = unitepcGatewayClient.getStudentsByGroup(rol.getSeaGroupId());
         } catch (RuntimeException exception) {
-            throw new IllegalStateException("No se pudo consultar la nómina oficial del grupo SEA.", exception);
+            throw new IllegalStateException("No se pudo consultar la nómina oficial del grupo.", exception);
         }
         if (estudiantes == null || estudiantes.isEmpty()) {
-            throw new IllegalStateException("El grupo SEA no tiene estudiantes oficiales inscritos.");
+            throw new IllegalStateException("El grupo no tiene estudiantes oficiales inscritos.");
         }
 
         return estudiantes.stream().map(estudiante -> {
             if (estudiante.getStudentCode() == null || estudiante.getStudentCode().isBlank()
                     || estudiante.getFullName() == null || estudiante.getFullName().isBlank()) {
-                throw new IllegalStateException("La nómina SEA contiene un estudiante sin código o nombre completo.");
+                throw new IllegalStateException("La nómina oficial contiene un estudiante sin código o nombre completo.");
             }
             return new DatosEstudiante(estudiante.getStudentCode().trim(), estudiante.getFullName().trim());
         }).toList();

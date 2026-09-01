@@ -8,7 +8,7 @@ import { RouterModule } from '@angular/router';
   template: `<router-outlet></router-outlet>`
 })
 export class AppComponent {
-  title = 'sea-evaluaciones-ui';
+  title = 'sistema-evaluaciones-ui';
 
   constructor() {
     this.limpiarPersistenciaLocalNoOficial();

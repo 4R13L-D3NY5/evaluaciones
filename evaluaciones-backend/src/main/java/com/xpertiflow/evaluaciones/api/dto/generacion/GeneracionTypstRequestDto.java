@@ -25,6 +25,9 @@ public class GeneracionTypstRequestDto {
     @NotBlank
     private String bancoPreguntasId;
 
+    /** Grupo oficial que ya fue consultado y mostrado en la pantalla de preparación. */
+    private String seaGroupId;
+
     @NotEmpty
     private List<String> variantes;
 

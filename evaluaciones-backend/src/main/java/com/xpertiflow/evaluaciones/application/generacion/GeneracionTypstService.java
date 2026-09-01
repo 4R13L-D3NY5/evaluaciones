@@ -12,7 +12,9 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.DocumentoExamenDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.ConfiguracionGeneracionResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.MapeoResultadoDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.VarianteResultadoDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.TimeFrameDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
@@ -100,7 +102,7 @@ public class GeneracionTypstService {
                 ? request.getRatioEstudiantesPorVariante() : 5);
         mensaje.put("soloVirtual", Boolean.TRUE.equals(request.getSoloVirtual()) || rol.getModalidad() == ModalidadExamen.VIRTUAL);
         mensaje.put("outputBasePath", outputBase);
-        mensaje.put("estudiantes", obtenerEstudiantesOficiales(rol));
+        mensaje.put("estudiantes", obtenerEstudiantesOficiales(rol, request.getSeaGroupId()));
 
         GeneracionTypstResultadoDto estadoInicial = new GeneracionTypstResultadoDto();
         estadoInicial.setJobId(jobId);
@@ -129,21 +131,44 @@ public class GeneracionTypstService {
      * variante se crean recién al persistir el resultado y nunca pueden ser
      * la fuente inicial de estudiantes.
      */
-    private List<Map<String, String>> obtenerEstudiantesOficiales(RolExamen rol) {
+    private List<Map<String, String>> obtenerEstudiantesOficiales(RolExamen rol, String groupIdSolicitado) {
         if (rol.getSeaGroupId() == null || rol.getSeaGroupId().isBlank()) {
-            throw new RuntimeException("El rol no tiene grupo SEA para consultar estudiantes oficiales");
+            throw new RuntimeException("No se puede preparar el examen porque este rol no tiene un grupo oficial asociado");
         }
 
-        List<StudentItemDto> estudiantes = unitepcGatewayClient.getStudentsByGroup(rol.getSeaGroupId());
+        // El groupId enviado por el navegador solo sirve como referencia de
+        // preparación. Se vuelve a validar contra SEA para evitar que un dato
+        // antiguo termine cargando la nómina de otro grupo.
+        String groupIdOficial = resolverGrupoOficial(rol);
+        if (groupIdOficial == null || groupIdOficial.isBlank()) {
+            throw new RuntimeException("No se encontró el grupo oficial en los servicios institucionales; no se puede preparar el examen");
+        }
+        // Algunos roles importados pueden traer un groupId antiguo o de otra
+        // asignatura que usa el mismo código de grupo. Una vez resuelto el
+        // grupo correcto por asignatura, grupo y docente, se deja corregido
+        // también en el rol para las siguientes operaciones.
+        if (groupIdOficial != null && !groupIdOficial.equals(rol.getSeaGroupId())) {
+            rol.setSeaGroupId(groupIdOficial);
+            rolRepository.save(rol);
+        }
+        String docenteOficial = rolExamenService.resolverNombreDocenteOficial(rol);
+        if (docenteOficial == null || docenteOficial.isBlank()) {
+            throw new RuntimeException("No se encontró el docente oficial en los servicios institucionales; no se puede preparar el examen");
+        }
+        if (!docenteOficial.equalsIgnoreCase(rol.getDocenteNombre())) {
+            rol.setDocenteNombre(docenteOficial);
+            rolRepository.save(rol);
+        }
+        List<StudentItemDto> estudiantes = unitepcGatewayClient.getStudentsByGroup(groupIdOficial);
         if (estudiantes == null || estudiantes.isEmpty()) {
-            throw new RuntimeException("El grupo SEA no tiene estudiantes oficiales inscritos");
+            throw new RuntimeException("No se encontraron estudiantes inscritos en la nómina oficial del grupo. Verifique la asignatura, el grupo y el docente");
         }
 
         List<Map<String, String>> resultado = new ArrayList<>();
         for (StudentItemDto estudiante : estudiantes) {
             if (estudiante.getStudentCode() == null || estudiante.getStudentCode().isBlank()
                     || estudiante.getFullName() == null || estudiante.getFullName().isBlank()) {
-                throw new RuntimeException("La nómina SEA contiene un estudiante sin código o nombre completo");
+            throw new RuntimeException("La nómina oficial contiene un estudiante sin código o nombre completo");
             }
             resultado.add(Map.of(
                     "codigo_estudiante", estudiante.getStudentCode(),
@@ -153,6 +178,15 @@ public class GeneracionTypstService {
             ));
         }
         return resultado;
+    }
+
+    /**
+     * Resuelve nuevamente el grupo en SEA por asignatura, código de grupo y
+     * docente. Esto evita que un rol antiguo con TA-01, por ejemplo, consulte
+     * accidentalmente la nómina de otra asignatura que también usa TA-01.
+     */
+    private String resolverGrupoOficial(RolExamen rol) {
+        return rolExamenService.resolverGrupoOficial(rol);
     }
 
     public GeneracionTypstResultadoDto consultarEstado(String jobId) {

@@ -77,7 +77,9 @@ No se permite que dos opciones de una misma fila tengan el mismo texto normaliza
 
 Al aprobarse se guarda el banco, sus reactivos, el JSON de contenido, el nombre del archivo, el hash SHA-256, el rol relacionado, el usuario aprobador y la fecha. Si una validación falla, no se guardan banco, reactivos ni cambio de estado.
 
-En **Lista de Evaluaciones** y en **Gestión y Validación de Evaluaciones** se muestra el indicador `Banco de preguntas cargado` cuando existe un banco persistido para el rol; si no existe, se muestra `Sin banco`. El indicador se consulta por `rolExamenId` en backend, por lo que no depende de datos ficticios ni de `localStorage`. La eliminación exige escribir `ELIMINAR`, solo está disponible en estados `PROGRAMADO` o `VALIDADO`, elimina también los reactivos asociados y devuelve el rol a `PROGRAMADO`. La operación queda registrada en la bitácora.
+En **Lista de Evaluaciones** y en **Gestión y Validación de Evaluaciones** se muestra el indicador `Banco de preguntas cargado` cuando existe un banco persistido para el rol; si no existe, se muestra `Sin banco`. El indicador se consulta por `rolExamenId` en backend, por lo que no depende de datos ficticios ni de `localStorage`. La eliminación exige escribir `ELIMINAR`, solo está disponible en estados `PROGRAMADO` o `VALIDADO`, elimina también los reactivos asociados y devuelve el rol a `PROGRAMADO`. Esta eliminación se realiza únicamente desde **Banco de Preguntas**; la lista de evaluaciones no la ofrece. La operación queda registrada en la bitácora.
+
+Para los exámenes virtuales, la lista ofrece la acción de sala virtual/restablecimiento. Desde allí se puede abrir la sala y restablecerla cuando corresponda, sin mezclar esta operación con la eliminación del banco.
 
 ## 8. Checklist de pruebas
 

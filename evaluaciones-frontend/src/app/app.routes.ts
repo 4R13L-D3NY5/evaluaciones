@@ -25,8 +25,8 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: DashboardComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE', 'VICERRECTOR'])], title: 'Dashboard - Sistema de Evaluaciones' },
-      { path: 'catalogo-academico', component: CatalogoUnitepcComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES'])], title: 'Servicios SEA - Sistema de Evaluaciones' },
-      { path: 'servicios-sea', component: CatalogoUnitepcComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES'])], title: 'Servicios SEA - Sistema de Evaluaciones' },
+      { path: 'catalogo-academico', component: CatalogoUnitepcComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES'])], title: 'Servicios académicos - Sistema de Evaluaciones' },
+      { path: 'servicios-sea', component: CatalogoUnitepcComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES'])], title: 'Servicios académicos - Sistema de Evaluaciones' },
       { path: 'plan-estudios', component: PlanEstudiosComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'DOCENTE'])], title: 'Plan de Estudios - Sistema de Evaluaciones' },
       { path: 'evaluaciones-dia', component: EvaluacionesDiaComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE'])], title: 'Lista de Evaluaciones por Día - Sistema de Evaluaciones' },
       { path: 'salas-virtuales', component: SalaVirtualComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE'])], title: 'Salas virtuales - Sistema de Evaluaciones' },

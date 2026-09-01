@@ -7,6 +7,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { ConfiguracionOmr, OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
@@ -56,7 +57,7 @@ export interface EstudianteOmrItem {
 @Component({
   selector: 'sea-calificacion-omr',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
       <div class="space-y-6">
       
@@ -77,16 +78,16 @@ export interface EstudianteOmrItem {
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5">
-          <select
-            [ngModel]="rolExamenSeleccionado()"
-            (ngModelChange)="rolExamenSeleccionado.set($event)"
-            class="bg-card border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground outline-none focus:border-purple-600"
-            title="Rol oficial que se utilizará para validar códigos y patrón de respuestas">
-            <option value="">Seleccione un rol oficial</option>
-            @for (rol of rolesExamen(); track rol.id) {
-              <option [value]="rol.id">{{ rol.materiaCodigo }} · {{ rol.materiaNombre }} · {{ rol.grupo }} · {{ rol.fecha }}</option>
-            }
-          </select>
+          <div class="w-full sm:w-[360px]">
+            <sea-searchable-select
+              [options]="rolExamenOpciones()"
+              [value]="rolExamenSeleccionado()"
+              (valueChange)="rolExamenSeleccionado.set($event)"
+              [disabled]="cargandoRoles()"
+              placeholder="Seleccione un rol oficial"
+              searchPlaceholder="Buscar por código o materia..."
+              noResultsText="No se encontraron roles oficiales." />
+          </div>
 
           <!-- Input oculto para subir PDF o imágenes -->
           <input 
@@ -904,6 +905,16 @@ export class CalificacionOmrComponent implements OnInit {
   public rolesExamen = signal<RolExamenResponse[]>([]);
   public rolExamenSeleccionado = signal<string>('');
   public cargandoRoles = signal<boolean>(false);
+  public rolExamenOpciones = computed<SearchableSelectOption[]>(() =>
+    this.rolesExamen()
+      .slice()
+      .sort((a, b) => this.compararCodigos(a.materiaCodigo, b.materiaCodigo))
+      .map(rol => ({
+        value: rol.id,
+        label: `${rol.materiaCodigo} · ${rol.materiaNombre} · ${rol.grupo} · ${rol.fecha}`,
+        searchText: `${rol.materiaCodigo} ${rol.materiaNombre} ${rol.grupo} ${rol.fecha}`
+      }))
+  );
   public mensajeOmr = signal<string>('');
   public paginaAlineacionIdx = signal<number>(0);
   public mostrarGuiasAlineacion = signal<boolean>(true);
@@ -1072,10 +1083,11 @@ export class CalificacionOmrComponent implements OnInit {
         // La modalidad no determina si un rol puede calificarse con OMR.
         // Las cartillas son preimpresas y el cotejo usa el mapeo oficial
         // del rol seleccionado, incluso si el rol fue creado sin cartilla.
-        this.rolesExamen.set(roles.filter(rol =>
+        const rolesDisponibles = roles.filter(rol =>
           !['PROGRAMADO', 'VALIDADO'].includes(rol.estadoFlujo) &&
           rol.variantesGeneradasCount > 0
-        ));
+        ).sort((a, b) => this.compararCodigos(a.materiaCodigo, b.materiaCodigo));
+        this.rolesExamen.set(rolesDisponibles);
         const primerRol = this.rolesExamen()[0];
         if (primerRol) {
           this.rolExamenSeleccionado.set(primerRol.id);
@@ -1084,6 +1096,10 @@ export class CalificacionOmrComponent implements OnInit {
       error: () => this.mensajeOmr.set('No se pudieron cargar los roles oficiales de evaluación.'),
       complete: () => this.cargandoRoles.set(false)
     });
+  }
+
+  private compararCodigos(a: string, b: string): number {
+    return (a || '').localeCompare(b || '', 'es', { numeric: true, sensitivity: 'base' });
   }
 
   public moverCaja(dx: number, dy: number): void {
@@ -1677,7 +1693,7 @@ export class CalificacionOmrComponent implements OnInit {
 
     const data: any[][] = [
       ['UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC'],
-      ['ACTA OFICIAL DE CALIFICACIONES OMR - SISTEMA SEA'],
+      ['ACTA OFICIAL DE CALIFICACIONES OMR - SISTEMA DE EVALUACIONES'],
       ['ASIGNATURA:', rol ? `[${rol.materiaCodigo}] ${rol.materiaNombre}` : 'No especificada', 'EVALUACIÓN:', parcial],
       ['DOCENTE:', rol?.docenteNombre || 'No identificado', 'FECHA:', rol?.fecha || new Date().toLocaleDateString()],
       [],

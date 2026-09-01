@@ -34,6 +34,7 @@ export interface GeneracionTypstRequest {
   jobId: string;
   rolExamenId: string;
   bancoPreguntasId: string;
+  seaGroupId?: string;
   variantes: ('A' | 'B' | 'C' | 'D' | 'E')[];
   ratioEstudiantesPorVariante?: number;
   soloVirtual?: boolean;
@@ -43,7 +44,7 @@ export interface GeneracionTypstRequest {
 export interface GeneracionTypstResultado {
   jobId: string;
   rolExamenId: string;
-  estado: 'PENDIENTE' | 'COMPLETADO' | 'ERROR';
+  estado: string;
   mensaje: string;
   variantes: GeneracionTypstVariante[];
   mapeos: GeneracionTypstMapeo[];

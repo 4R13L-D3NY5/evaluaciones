@@ -24,6 +24,9 @@ TIPOLOGIAS_ORDEN = [
     "EMPAREJAMIENTO_TRONCO",
 ]
 
+TIPOS_MACRO = {"EMPAREJAMIENTO_TRONCO", "CASO_CLINICO_TRONCO"}
+TIPOS_HIJO_GRUPAL = {"OPCION_EMPAREJAMIENTO", "SUBITEM_CASO"}
+
 INSTRUCCIONES_POR_TIPO = {
     "SELECCION_MEJOR_RESPUESTA": (
         "SELECCIÓN DE LA MEJOR RESPUESTA",
@@ -141,12 +144,39 @@ def _mayusculas(valor: Any) -> str:
     return str(valor or "").strip().upper()
 
 
+def _es_macro(pregunta: dict[str, Any]) -> bool:
+    return pregunta.get("tipo_reactivo") in TIPOS_MACRO
+
+
+def _clave_grupo(pregunta: dict[str, Any]) -> tuple[str, str] | None:
+    """Identifica el macro y sus hijos sin mezclar grupos de otra tipología."""
+    tipo = pregunta.get("tipo_reactivo")
+    grupo = str(pregunta.get("grupo_contexto") or "").strip().upper()
+    if not grupo:
+        return None
+    if tipo in {"EMPAREJAMIENTO_TRONCO", "OPCION_EMPAREJAMIENTO"}:
+        return ("EMPAREJAMIENTO", grupo)
+    if tipo in {"CASO_CLINICO_TRONCO", "SUBITEM_CASO"}:
+        return ("CASO", grupo)
+    return None
+
+
+def _numero_orden(pregunta: dict[str, Any]) -> int:
+    try:
+        return int(pregunta.get("numero_orden") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[dict[str, Any]]:
     rng = random.Random(seed)
 
-    faciles = [r for r in reactivos if r["nivel_dificultad"] == 1 or r["dificultad"] == "Fácil"]
-    medias = [r for r in reactivos if r["nivel_dificultad"] == 2 or r["dificultad"] == "Medio"]
-    dificiles = [r for r in reactivos if r["nivel_dificultad"] == 3 or r["dificultad"] == "Difícil"]
+    # Los macros de caso/emparejamiento son contexto, no preguntas que el
+    # estudiante pueda responder. Nunca deben consumir una cuota.
+    respondibles = [r for r in reactivos if not _es_macro(r)]
+    faciles = [r for r in respondibles if r["nivel_dificultad"] == 1 or r["dificultad"] == "Fácil"]
+    medias = [r for r in respondibles if r["nivel_dificultad"] == 2 or r["dificultad"] == "Medio"]
+    dificiles = [r for r in respondibles if r["nivel_dificultad"] == 3 or r["dificultad"] == "Difícil"]
 
     def _tomar(lista: list, n: int) -> list:
         if len(lista) < n:
@@ -154,17 +184,62 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
             return lista
         return rng.sample(lista, n)
 
-    seleccionadas = (
+    seleccionadas_respondibles = (
         _tomar(faciles, config.CUOTA_FACILES)
         + _tomar(medias, config.CUOTA_MEDIAS)
         + _tomar(dificiles, config.CUOTA_DIFICILES)
     )
 
-    # Ordenar por tipología para coherencia pedagógica.
-    por_tipo = {tipo: [p for p in seleccionadas if p["tipo_reactivo"] == tipo] for tipo in TIPOLOGIAS_ORDEN}
-    ordenadas = []
+    # Agregar cada macro que sea necesario y colocarlo inmediatamente antes
+    # de sus hijos. Así el PDF y el examen web conservan el contexto del grupo
+    # sin convertirlo en una pregunta adicional.
+    macros_por_grupo = {
+        clave: pregunta
+        for pregunta in sorted(reactivos, key=_numero_orden)
+        if _es_macro(pregunta) and (clave := _clave_grupo(pregunta)) is not None
+    }
+    hijos_por_grupo: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for pregunta in seleccionadas_respondibles:
+        clave = _clave_grupo(pregunta)
+        if clave is not None:
+            hijos_por_grupo.setdefault(clave, []).append(pregunta)
+
+    por_tipo = {
+        tipo: [p for p in seleccionadas_respondibles if p["tipo_reactivo"] == tipo]
+        for tipo in TIPOLOGIAS_ORDEN
+    }
+    ordenadas: list[dict[str, Any]] = []
     for tipo in TIPOLOGIAS_ORDEN:
-        ordenadas.extend(por_tipo[tipo])
+        if tipo in TIPOS_MACRO:
+            continue
+        if tipo in TIPOS_HIJO_GRUPAL:
+            grupos_tipo = [
+                (clave, hijos)
+                for clave, hijos in hijos_por_grupo.items()
+                if hijos and ((tipo == "OPCION_EMPAREJAMIENTO" and clave[0] == "EMPAREJAMIENTO")
+                              or (tipo == "SUBITEM_CASO" and clave[0] == "CASO"))
+            ]
+            grupos_tipo.sort(key=lambda item: min(_numero_orden(hijo) for hijo in item[1]))
+            for clave, hijos in grupos_tipo:
+                macro = macros_por_grupo.get(clave)
+                if macro is not None:
+                    ordenadas.append(macro)
+                ordenadas.extend(sorted(hijos, key=_numero_orden))
+            # Algunos bancos antiguos no traen grupo_contexto en los hijos;
+            # siguen siendo preguntas válidas y no deben desaparecer.
+            ordenadas.extend(
+                pregunta for pregunta in por_tipo[tipo]
+                if _clave_grupo(pregunta) is None
+            )
+        else:
+            ordenadas.extend(por_tipo[tipo])
+
+    # Conserva tipologías nuevas que no estén todavía en TIPOLOGIAS_ORDEN.
+    tipos_conocidos = set(TIPOLOGIAS_ORDEN) | TIPOS_MACRO
+    ordenadas.extend(
+        pregunta for pregunta in seleccionadas_respondibles
+        if pregunta.get("tipo_reactivo") not in tipos_conocidos
+    )
     return ordenadas
 
 
@@ -266,11 +341,17 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]]) -> str:
     """Construye el cuestionario sin datos de estudiante ni etiquetas de variante."""
     typ_code = ""
     current_section = None
-    for idx, p in enumerate(preguntas):
-        num = idx + 1
+    numero_pregunta = 0
+    for p in preguntas:
         tipo = p.get("tipo_reactivo", "")
 
-        seccion_tipo = "OPCION_EMPAREJAMIENTO" if tipo in {"EMPAREJAMIENTO_TRONCO", "OPCION_EMPAREJAMIENTO"} else tipo
+        seccion_tipo = (
+            "OPCION_EMPAREJAMIENTO"
+            if tipo in {"EMPAREJAMIENTO_TRONCO", "OPCION_EMPAREJAMIENTO"}
+            else "SUBITEM_CASO"
+            if tipo in {"CASO_CLINICO_TRONCO", "SUBITEM_CASO"}
+            else tipo
+        )
         if seccion_tipo in INSTRUCCIONES_POR_TIPO and current_section != seccion_tipo:
             current_section = seccion_tipo
             titulo, instruccion = INSTRUCCIONES_POR_TIPO[seccion_tipo]
@@ -308,6 +389,21 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]]) -> str:
 #v(1em)
 '''
             continue
+
+        if tipo == "CASO_CLINICO_TRONCO":
+            typ_code += f'''
+#rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
+  [#text(weight: "bold")[CASO CLINICO O PROBLEMA:]]\\
+  [{_typst_content(str(p.get("enunciado") or "Resuelva el caso planteado y responda cada pregunta del grupo."))}]
+]
+#v(1em)
+'''
+            continue
+
+        # El número visible corresponde únicamente a preguntas respondibles;
+        # el macro ya fue mostrado como contexto de la sección.
+        numero_pregunta += 1
+        num = numero_pregunta
 
         opciones = [] if tipo == "VERDADERO_O_FALSO_SIMPLE" else parsear_opciones(p.get("opciones_json", "[]"))
         enunciado = _typst_content(str(p.get("enunciado", "")))
@@ -422,9 +518,10 @@ def generar_variante(
     seed = config.SEED_POR_VARIANTE.get(letra, 100 + ord(letra))
     preguntas = seleccionar_preguntas(reactivos, seed)
 
-    if len(preguntas) < config.TOTAL_PREGUNTAS:
+    total_respondibles = sum(1 for pregunta in preguntas if not _es_macro(pregunta))
+    if total_respondibles < config.TOTAL_PREGUNTAS:
         raise ValueError(
-            f"No se pudieron seleccionar {config.TOTAL_PREGUNTAS} preguntas para la variante {letra}"
+            f"No se pudieron seleccionar {config.TOTAL_PREGUNTAS} preguntas respondibles para la variante {letra}"
         )
 
     # Barajar opciones de cada pregunta de forma determinística.
@@ -479,9 +576,13 @@ def generar_variante(
 
     patron = {}
     orden_ids = []
-    for idx, p in enumerate(preguntas):
+    numero_pregunta = 0
+    for p in preguntas:
+        if _es_macro(p):
+            continue
+        numero_pregunta += 1
         opciones = parsear_opciones(p.get("opciones_json", "[]"))
-        patron[str(idx + 1)] = _extraer_respuesta_correcta(opciones)
+        patron[str(numero_pregunta)] = _extraer_respuesta_correcta(opciones)
         orden_ids.append(p["id"])
 
     return {

@@ -62,7 +62,7 @@ La cartilla OMR es un documento separado del examen. El cuadernillo no incluye c
 
 ## 5. Cuestionario
 
-- Configuración por defecto vigente: 30 preguntas distribuidas en 7 fáciles, 16 medias y 7 difíciles.
+- Configuración por defecto vigente: 30 preguntas respondibles distribuidas en 7 fáciles, 16 medias y 7 difíciles. Las tarjetas de contexto de casos y emparejamientos no consumen esta cantidad.
 - Después del número de cada pregunta se imprime `___` para que el estudiante marque el inciso elegido.
 - El enunciado inicia de forma continua, en la misma línea después de esos tres guiones.
 - Cada inciso aplicable se imprime en una línea independiente.
@@ -78,6 +78,8 @@ La cartilla OMR es un documento separado del examen. El cuadernillo no incluye c
 - Los enunciados mantienen texto normal, sin negrita, salvo el número de pregunta y sus tres guiones `___`. El enunciado principal de un emparejamiento se mantiene dentro de su tarjeta de referencia.
 - En `Emparejamiento Ampliado`, el enunciado principal y sus opciones de referencia A-E se imprimen dentro de la tarjeta, sin número de pregunta ni `___`. Las opciones relacionadas del grupo se imprimen después como preguntas numeradas y sí conservan `___`.
 - Verdadero o falso simple no muestra incisos ni opciones impresas; el estudiante responde en el espacio `___` y la clave se conserva únicamente de forma interna para calificación.
+- En verdadero o falso complejo, las cuatro afirmaciones de cada pregunta se identifican como `1`, `2`, `3` y `4`; debajo se presenta el grupo de respuestas A-E para que el estudiante marque una sola clave.
+- En emparejamiento ampliado, después de la tarjeta de referencia se presenta el grupo de respuestas A-E debajo de cada pregunta relacionada.
 
 ## 6. Variantes y asignación
 

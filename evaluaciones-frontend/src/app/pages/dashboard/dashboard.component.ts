@@ -43,7 +43,7 @@ interface EstadoMetrica {
           <div class="flex items-center gap-2">
             <span class="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
               <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-              Sistema de Evaluaciones SEA · UNITEPC
+              Sistema de Evaluaciones · UNITEPC
             </span>
             <span class="text-white/60 text-xs">|</span>
             <span class="text-xs text-white/80 font-mono font-bold flex items-center gap-1">
@@ -508,7 +508,7 @@ interface EstadoMetrica {
           <div class="space-y-3">
             <div class="flex items-center gap-2 text-primary font-black text-sm uppercase tracking-wider border-b border-border pb-3">
               <i class="pi pi-shield"></i>
-              <span>Gobernanza y Políticas SEA</span>
+              <span>Gobernanza y políticas institucionales</span>
             </div>
 
             <ul class="space-y-2.5 text-xs text-muted-foreground font-medium">

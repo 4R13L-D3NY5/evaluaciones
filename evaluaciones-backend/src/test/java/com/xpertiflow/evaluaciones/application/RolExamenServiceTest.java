@@ -2,11 +2,13 @@ package com.xpertiflow.evaluaciones.application;
 
 import com.xpertiflow.evaluaciones.api.mapper.RolExamenMapper;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,12 +34,14 @@ class RolExamenServiceTest {
     private AuditoriaEvaluacionRepository auditoriaRepository;
     @Mock
     private RolExamenMapper mapper;
+    @Mock
+    private UnitepcGatewayClient unitepcGatewayClient;
 
     private RolExamenService service;
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, mapper);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, mapper, unitepcGatewayClient);
     }
 
     @Test
@@ -139,5 +144,43 @@ class RolExamenServiceTest {
 
         verify(rolExamenRepository, never()).save(rol);
         verify(auditoriaRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void usaElDocenteOficialCuandoElRolTieneUnGroupIdAntiguo() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-SIS-413-1P")
+                .materiaCodigo("SIS-413")
+                .grupo("TA-01")
+                .seaSyllabusCourseId("COURSE-TELECOM")
+                .seaGroupId("GROUP-ANTIGUO")
+                .docenteNombre("Docente SEA (CI 6452339)")
+                .docenteCi("6452339")
+                .build();
+        RolExamen rolRelacionado = RolExamen.builder()
+                .id("ROL-SIS-413-2P")
+                .materiaCodigo("SIS-413")
+                .grupo("TA-01")
+                .seaGroupId("GROUP-ARIEL")
+                .build();
+
+        GroupItemDto grupoAriel = new GroupItemDto();
+        grupoAriel.setGroupId("GROUP-ARIEL");
+        grupoAriel.setCode("TA-01");
+        grupoAriel.setSyllabusCourseId("COURSE-TELECOM");
+        grupoAriel.setTeacherFullName("ARIEL DENYS CAMARA ARZE");
+        GroupItemDto grupoDeOtraAsignatura = new GroupItemDto();
+        grupoDeOtraAsignatura.setGroupId("GROUP-OTRA-ASIGNATURA");
+        grupoDeOtraAsignatura.setCode("TA-01");
+        grupoDeOtraAsignatura.setSyllabusCourseId("COURSE-OTRA");
+        grupoDeOtraAsignatura.setTeacherFullName("DANIEL CAMACHO PASTOR");
+
+        when(unitepcGatewayClient.getGroups("2-2026", null, null, null))
+                .thenReturn(List.of(grupoDeOtraAsignatura, grupoAriel));
+        when(rolExamenRepository.findByMateriaCodigoAndGrupo("SIS-413", "TA-01"))
+                .thenReturn(List.of(rol, rolRelacionado));
+
+        assertThat(service.resolverNombreDocenteOficial(rol))
+                .isEqualTo("ARIEL DENYS CAMARA ARZE");
     }
 }

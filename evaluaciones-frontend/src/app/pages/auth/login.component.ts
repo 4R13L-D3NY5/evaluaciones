@@ -115,7 +115,7 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
 
         <footer class="sea-login__footer">
-          <span>SEA · Sistema de Evaluaciones</span>
+          <span>Sistema de Evaluaciones · UNITEPC</span>
           <span>Acceso interno</span>
         </footer>
       </section>

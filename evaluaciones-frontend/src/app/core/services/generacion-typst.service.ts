@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError, filter, switchMap, take } from 'rxjs/operators';
+import { catchError, defaultIfEmpty, filter, switchMap, take } from 'rxjs/operators';
 import { interval } from 'rxjs';
 import {
   GeneracionTypstRequest,
@@ -79,7 +79,7 @@ export class GeneracionTypstService {
   }
 
   /**
-   * Polling simple hasta recibir COMPLETADO o ERROR.
+   * Polling simple hasta recibir COMPLETADO o cualquier estado de error.
    * Por defecto consulta cada 2 segundos durante un máximo de 60 intentos.
    */
   public esperarResultado(
@@ -90,8 +90,16 @@ export class GeneracionTypstService {
     return interval(intervalMs).pipe(
       take(maxIntentos),
       switchMap(() => this.consultarResultado(jobId)),
-      filter(resultado => resultado.estado === 'COMPLETADO' || resultado.estado === 'ERROR'),
+      filter(resultado => resultado.estado === 'COMPLETADO' || String(resultado.estado || '').startsWith('ERROR')),
       take(1),
+      defaultIfEmpty({
+        jobId,
+        rolExamenId: '',
+        estado: 'ERROR',
+        mensaje: 'La generación tardó demasiado y no devolvió un resultado. Consulta la información del examen antes de intentar nuevamente.',
+        variantes: [],
+        mapeos: []
+      }),
       catchError(err => throwError(() => err))
     );
   }

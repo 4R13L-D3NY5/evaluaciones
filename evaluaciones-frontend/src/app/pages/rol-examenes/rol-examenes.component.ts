@@ -217,7 +217,7 @@ export type RolExamenItem = RolExamenPersistedItem;
         @if (cargando()) {
           <div class="p-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
             <i class="pi pi-spin pi-spinner text-3xl text-primary"></i>
-            <span class="text-xs font-bold">Consultando materias de SEA...</span>
+            <span class="text-xs font-bold">Consultando materias oficiales...</span>
           </div>
         } @else if (examenesFiltrados().length === 0) {
           
@@ -230,7 +230,7 @@ export type RolExamenItem = RolExamenPersistedItem;
             <div class="max-w-md mx-auto space-y-1">
               <h3 class="text-sm font-black text-foreground">No hay exámenes programados en el rol</h3>
               <p class="text-xs text-muted-foreground">
-                El rol está limpio (0 exámenes). Puedes programar exámenes seleccionando materias de SEA o importar la planilla oficial en formato Excel.
+                El rol está limpio (0 exámenes). Puedes programar exámenes seleccionando materias oficiales o importar la planilla oficial en formato Excel.
               </p>
             </div>
 
@@ -409,7 +409,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                 <i class="pi pi-trash text-xs"></i>
                 <span>Vaciar Rol</span>
               </button>
-              <span class="font-mono text-primary">Guardado en BD · Sincronizado con SEA</span>
+              <span class="font-mono text-primary">Guardado en BD · Sincronizado con el servicio institucional</span>
             </div>
           </div>
         }
@@ -522,7 +522,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                 </div>
                 <div>
                   <h3 class="text-sm font-black text-foreground">{{ itemEditando() ? 'Editar Programación de Examen' : 'Programar Examen en el Rol' }}</h3>
-                  <p class="text-xs text-muted-foreground">Vinculación con SEA y guardado permanente en Base de Datos</p>
+                  <p class="text-xs text-muted-foreground">Vinculación institucional y guardado permanente en Base de Datos</p>
                 </div>
               </div>
 
@@ -535,7 +535,7 @@ export type RolExamenItem = RolExamenPersistedItem;
             <div class="space-y-3">
               <div>
                 <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
-                  <i class="pi pi-book text-primary text-[10px]"></i> 1. Asignatura Oficial (SEA)
+                  <i class="pi pi-book text-primary text-[10px]"></i> 1. Asignatura oficial
                 </label>
                 <select 
                   [ngModel]="formMateriaObj()?.syllabusCourseId"
@@ -572,7 +572,7 @@ export type RolExamenItem = RolExamenPersistedItem;
               <div class="bg-muted/40 border border-border/80 rounded-xl p-3 text-xs space-y-2">
                 <div class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                   <span class="flex items-center gap-1 text-primary">
-                    <i class="pi pi-verified"></i> Datos Sincronizados de SEA
+                    <i class="pi pi-verified"></i> Datos sincronizados
                   </span>
                   <span class="font-mono text-muted-foreground">Grupo: {{ formGrupoObj()?.code || 'TA-01' }}</span>
                 </div>
@@ -580,7 +580,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                 <div class="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span class="text-[10px] text-muted-foreground block font-semibold">Docente Titular:</span>
-                    <span class="font-bold text-foreground">{{ formGrupoObj()?.teacherName || 'Por Designar en SEA' }}</span>
+                    <span class="font-bold text-foreground">{{ formGrupoObj()?.teacherName || 'Por designar' }}</span>
                     @if (formGrupoObj()?.teacherIdentityNumber) {
                       <span class="text-[10px] font-mono text-muted-foreground block">CI: {{ formGrupoObj()?.teacherIdentityNumber }}</span>
                     }
@@ -650,7 +650,7 @@ export type RolExamenItem = RolExamenPersistedItem;
 
       <!-- Toast Notificación -->
       @if (toastMessage()) {
-        <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
+        <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
           <i class="pi pi-check-circle text-emerald-400 text-lg"></i>
           <span class="text-xs font-bold">{{ toastMessage() }}</span>
         </div>
@@ -1067,10 +1067,9 @@ export class RolExamenesComponent implements OnInit {
           const materiaNombreArchivo = this._textoCelda(row[0]);
           const codigo = this._textoCelda(row[1]);
           const grupoCodigo = this._textoCelda(row[3]);
-          const docenteArchivo = this._textoCelda(row[4]);
 
           // Las filas completamente vacías al final de la plantilla no son errores.
-          if (!materiaNombreArchivo && !codigo && !grupoCodigo && !docenteArchivo) return;
+          if (!materiaNombreArchivo && !codigo && !grupoCodigo) return;
           if (!codigo) {
             errores.push(`Fila ${filaExcel}: falta el código de la asignatura.`);
             return;
@@ -1086,7 +1085,7 @@ export class RolExamenesComponent implements OnInit {
             return;
           }
           if (!grupo) {
-            errores.push(`Fila ${filaExcel}: el grupo '${grupoCodigo || '(vacío)'}' no existe en SEA para ${materia.courseCode}.`);
+            errores.push(`Fila ${filaExcel}: el grupo '${grupoCodigo || '(vacío)'}' no existe para ${materia.courseCode}.`);
             return;
           }
 
@@ -1119,7 +1118,7 @@ export class RolExamenesComponent implements OnInit {
               semestre: materia.semester || 1,
               grupo: grupo.code,
               tipoClase: grupo.classType || 'TA',
-              docenteNombre: grupo.teacherName || docenteArchivo || this._nombreDocenteOficial(grupo),
+              docenteNombre: this._nombreDocenteOficial(grupo),
               docenteCI: grupo.teacherIdentityNumber || '',
               tipo: examen.tipo,
               version,
@@ -1255,7 +1254,7 @@ export class RolExamenesComponent implements OnInit {
       return;
     }
     if (!grp) {
-      this._mostrarToast('Selecciona un grupo oficial de SEA para la materia.');
+      this._mostrarToast('Selecciona un grupo oficial para la materia.');
       return;
     }
     if (!this.formFecha) {
@@ -1381,8 +1380,6 @@ export class RolExamenesComponent implements OnInit {
       semestre: item.semestre,
       grupo: item.grupo,
       tipoClase: item.tipoClase,
-      docenteNombre: item.docenteNombre,
-      docenteCi: item.docenteCI,
       tipoParcial: item.tipo,
       version: item.version,
       modalidad: item.modalidad || (item.conCartilla ? 'PRESENCIAL_CARTILLA' : 'PRESENCIAL_SIN_CARTILLA'),
@@ -1516,9 +1513,7 @@ export class RolExamenesComponent implements OnInit {
   }
 
   private _nombreDocenteOficial(grupo: GroupItem): string {
-    return grupo.teacherIdentityNumber
-      ? `Docente SEA (CI ${grupo.teacherIdentityNumber})`
-      : 'Docente por designar';
+    return grupo.teacherName?.trim() || '';
   }
 
   private _mensajeError(error: any, fallback: string): string {

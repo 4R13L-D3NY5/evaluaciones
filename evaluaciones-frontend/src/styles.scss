@@ -121,6 +121,13 @@ div[class*="fixed inset-0"] {
   box-sizing: border-box !important;
 }
 
+.app-toast {
+  position: fixed !important;
+  z-index: 20000 !important;
+  isolation: isolate;
+  pointer-events: auto;
+}
+
 /* ============================================================ */
 /* Print and PDF Export Styles (UNITEPC Quad / OMR Engine)      */
 /* ============================================================ */

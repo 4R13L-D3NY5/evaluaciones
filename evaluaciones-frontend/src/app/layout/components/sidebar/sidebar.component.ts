@@ -44,7 +44,7 @@ export interface MenuItem {
                       @if (seaStatus() === 'online') {
                         <span 
                           (click)="forzarChequeoSea($event)"
-                          title="Gateway SEA Conectado (Último chequeo: {{ getHoraChequeo() }}). Clic para re-verificar."
+                          title="Servicio institucional conectado (Último chequeo: {{ getHoraChequeo() }}). Clic para re-verificar."
                           class="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs hover:scale-105 transition-transform cursor-pointer">
                           <i class="pi pi-arrow-up text-[9px] text-emerald-600 dark:text-emerald-400 font-black"></i>
                           <span>Live</span>
@@ -52,7 +52,7 @@ export interface MenuItem {
                       } @else if (seaStatus() === 'offline') {
                         <span 
                           (click)="forzarChequeoSea($event)"
-                          title="Gateway SEA Desconectado/Caído (Último chequeo: {{ getHoraChequeo() }}). Clic para re-verificar."
+                          title="Servicio institucional desconectado o no disponible (Último chequeo: {{ getHoraChequeo() }}). Clic para re-verificar."
                           class="bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700 text-[10px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs hover:scale-105 transition-transform cursor-pointer animate-pulse">
                           <i class="pi pi-arrow-down text-[9px] text-rose-600 dark:text-rose-400 font-black"></i>
                           <span>Offline</span>
@@ -136,11 +136,11 @@ export class SidebarComponent implements OnInit {
       roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE', 'VICERRECTOR']
     },
     {
-      label: 'Servicios SEA',
+      label: 'Servicios académicos',
       route: '/catalogo-academico',
       icon: 'pi pi-building-columns',
       badge: 'Live',
-      description: 'Sedes, Carreras, Materias, Grupos, Horarios y Campus sincronizados del SEA',
+      description: 'Sedes, carreras, materias, grupos, horarios y campus sincronizados',
       roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']
     },
     {

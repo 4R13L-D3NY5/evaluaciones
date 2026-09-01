@@ -6,6 +6,7 @@ import { catchError, tap } from 'rxjs/operators';
 export interface ConfiguracionEvaluaciones {
   ratioEstudiantesPorVariante: number;
   duracionExamenVirtualMinutos: number;
+  cuentaRegresivaInicioVirtualSegundos: number;
   formatoHoja: string;
   tipoLetra: string;
   tamanoLetraPt: number;
@@ -24,6 +25,7 @@ export class ConfiguracionEvaluacionesService {
   public readonly configuracion = signal<ConfiguracionEvaluaciones>({
     ratioEstudiantesPorVariante: 5,
     duracionExamenVirtualMinutos: 45,
+    cuentaRegresivaInicioVirtualSegundos: 15,
     formatoHoja: 'Oficio (Folio UNITEPC)',
     tipoLetra: 'Times New Roman',
     tamanoLetraPt: 11,

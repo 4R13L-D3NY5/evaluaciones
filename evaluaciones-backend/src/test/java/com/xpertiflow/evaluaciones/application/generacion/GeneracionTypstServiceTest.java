@@ -84,6 +84,8 @@ class GeneracionTypstServiceTest {
         request.setRolExamenId("ROL-001");
         request.setBancoPreguntasId("BANCO-001");
         request.setVariantes(List.of("A", "B", "C"));
+        when(rolExamenService.resolverGrupoOficial(rol)).thenReturn("GROUP-001");
+        when(rolExamenService.resolverNombreDocenteOficial(rol)).thenReturn("DOCENTE OFICIAL");
 
         GeneracionTypstResultadoDto respuesta = service.solicitarGeneracion(request);
 

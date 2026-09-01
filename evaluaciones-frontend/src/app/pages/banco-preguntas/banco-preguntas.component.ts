@@ -8,6 +8,7 @@ import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unite
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
@@ -89,7 +90,7 @@ export interface DiaCalendario {
 @Component({
   selector: 'sea-banco-preguntas',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
     <div class="space-y-6">
       
@@ -205,15 +206,14 @@ export interface DiaCalendario {
                 <label class="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                   <i class="pi pi-book text-purple-700"></i> Asignatura
                 </label>
-                <select 
-                  [ngModel]="asignaturaSeleccionada()?.courseCode"
-                  (ngModelChange)="onAsignaturaChange($event)"
+                <sea-searchable-select
+                  [options]="asignaturaOpciones()"
+                  [value]="asignaturaSeleccionada()?.courseCode || ''"
+                  (valueChange)="onAsignaturaChange($event)"
                   [disabled]="cargandoAsignaturas()"
-                  class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer disabled:opacity-50">
-                  @for (a of asignaturas(); track a.syllabusCourseId) {
-                    <option [value]="a.courseCode">[{{ a.courseCode }}] {{ a.courseName }}</option>
-                  }
-                </select>
+                  placeholder="Seleccione una asignatura"
+                  searchPlaceholder="Buscar por código o nombre..."
+                  noResultsText="No se encontraron asignaturas." />
               </div>
 
               <!-- Select 4: Grupo -->
@@ -228,7 +228,7 @@ export interface DiaCalendario {
                   class="w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground font-semibold focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer disabled:opacity-50">
                   @if (grupos().length > 0) {
                     @for (g of grupos(); track g.groupId) {
-                      <option [value]="g.code">{{ g.code }} — {{ g.teacherName || 'Docente SEA' }}</option>
+                      <option [value]="g.code">{{ g.code }} — {{ g.teacherName || (g.teacherIdentityNumber ? 'Nombre no disponible (CI ' + g.teacherIdentityNumber + ')' : 'Sin docente asignado') }}</option>
                     }
                   } @else {
                     <option value="">Sin grupos oficiales disponibles</option>
@@ -1173,13 +1173,13 @@ export interface DiaCalendario {
                 <div class="grid grid-cols-2 gap-3 bg-muted/40 p-4 rounded-xl border border-border text-[11px]">
                   <div>
                     <span class="text-muted-foreground block text-[10px]">Docente Titular:</span>
-                    <strong class="text-foreground">{{ docenteSesion.nombre }}</strong>
-                    <span class="block text-[10px] text-muted-foreground">C.I.: {{ docenteSesion.ci }}</span>
+                    <strong class="text-foreground">{{ docenteOficialActivo().nombre }}</strong>
+                    <span class="block text-[10px] text-muted-foreground">C.I.: {{ docenteOficialActivo().ci }}</span>
                   </div>
                   <div>
                     <span class="text-muted-foreground block text-[10px]">Correo del Docente:</span>
-                    <strong class="text-foreground font-mono">{{ docenteSesion.correo }}</strong>
-                    <span class="block text-[9px] text-emerald-700 font-bold">Recibirá copia de entrega</span>
+                    <strong class="text-foreground font-mono">{{ docenteOficialActivo().correo }}</strong>
+                    <span class="block text-[9px] text-emerald-700 font-bold">Dato consultado desde SEA</span>
                   </div>
                   <div>
                     <span class="text-muted-foreground block text-[10px]">Paquete Generado:</span>
@@ -1388,7 +1388,7 @@ export interface DiaCalendario {
                     </div>
 
                     <div class="text-right font-mono text-[9px] text-purple-900 font-black uppercase">
-                      <div>SISTEMA DE EVALUACIONES (SEA)</div>
+                      <div>SISTEMA DE EVALUACIONES</div>
                       <div>MOTOR DE DIAGRAMACIÓN OFICIAL</div>
                     </div>
                   </div>
@@ -1441,7 +1441,7 @@ export interface DiaCalendario {
                   </div>
                   <div class="grid grid-cols-12 border-b border-slate-400">
                     <div class="col-span-7 p-1.5 border-r border-slate-400">
-                      <strong>DOCENTE:</strong> <span class="text-slate-800">{{ docenteSesion.nombre }}</span>
+                      <strong>DOCENTE:</strong> <span class="text-slate-800">{{ docenteOficialActivo().nombre }}</span>
                     </div>
                     <div class="col-span-5 p-1.5">
                       <strong>EXAMEN:</strong> <span class="text-slate-800">{{ parcialActivo() }}</span>
@@ -1690,7 +1690,7 @@ export interface DiaCalendario {
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-card border border-border rounded-xl font-mono text-[11px]">
                 <div>
                   <span class="text-muted-foreground text-[10px] block uppercase font-sans font-bold">Docente Certificador:</span>
-                  <strong class="text-foreground">{{ docenteSesion.nombre }}</strong>
+                  <strong class="text-foreground">{{ docenteOficialActivo().nombre }}</strong>
                 </div>
                 <div>
                   <span class="text-muted-foreground text-[10px] block uppercase font-sans font-bold">Total Reactivos:</span>
@@ -2299,7 +2299,7 @@ export interface DiaCalendario {
 
       <!-- Toast Notificación -->
       @if (toastMessage()) {
-        <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
+        <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
           <i [class]="toastType() === 'error' ? 'pi pi-exclamation-triangle text-rose-400' : 'pi pi-check-circle text-emerald-400'" class="text-lg"></i>
           <span class="text-xs font-bold">{{ toastMessage() }}</span>
         </div>
@@ -2334,6 +2334,17 @@ export class BancoPreguntasComponent implements OnInit {
 
   public asignaturas = signal<Course[]>([]);
   public asignaturaSeleccionada = signal<Course | null>(null);
+
+  public asignaturaOpciones = computed<SearchableSelectOption[]>(() =>
+    this.asignaturas()
+      .slice()
+      .sort((a, b) => this.compararCodigos(a.courseCode, b.courseCode))
+      .map(asignatura => ({
+        value: asignatura.courseCode,
+        label: `[${asignatura.courseCode}] ${asignatura.courseName}`,
+        searchText: `${asignatura.courseCode} ${asignatura.courseName}`
+      }))
+  );
 
   public grupos = signal<GroupItem[]>([]);
   public grupoSeleccionado = signal<string>('');
@@ -2375,6 +2386,15 @@ export class BancoPreguntasComponent implements OnInit {
     }
 
     return rolSeleccionado || null;
+  });
+
+  public docenteOficialActivo = computed(() => {
+    const rol = this.rolExamenActivo();
+    return {
+      nombre: rol?.docenteNombre?.trim() || 'Docente no disponible en los servicios institucionales',
+      ci: rol?.docenteCi?.trim() || '—',
+      correo: 'No informado por SEA'
+    };
   });
 
   public rolPuedeCargarBanco = computed(() => {
@@ -2495,16 +2515,21 @@ export class BancoPreguntasComponent implements OnInit {
     this.cargandoAsignaturas.set(true);
     this._gateway.getCourses(branchCode, careerCode).subscribe({
       next: data => {
-        this.asignaturas.set(data);
+        const asignaturasOrdenadas = data.slice().sort((a, b) => this.compararCodigos(a.courseCode, b.courseCode));
+        this.asignaturas.set(asignaturasOrdenadas);
         this.cargandoAsignaturas.set(false);
-        if (data.length > 0) {
-          const materiaConRol = data.find(m => this.rolesOficiales().some(rol => rol.materiaCodigo === m.courseCode));
-          const defaultAsig = materiaConRol || data[0];
+        if (asignaturasOrdenadas.length > 0) {
+          const materiaConRol = asignaturasOrdenadas.find(m => this.rolesOficiales().some(rol => rol.materiaCodigo === m.courseCode));
+          const defaultAsig = materiaConRol || asignaturasOrdenadas[0];
           this.seleccionarAsignatura(defaultAsig);
         }
       },
       error: () => this.cargandoAsignaturas.set(false)
     });
+  }
+
+  private compararCodigos(a: string, b: string): number {
+    return (a || '').localeCompare(b || '', 'es', { numeric: true, sensitivity: 'base' });
   }
 
   public onAsignaturaChange(courseCode: string): void {
@@ -2605,14 +2630,6 @@ export class BancoPreguntasComponent implements OnInit {
   // Estado de generación Typst (Fase 3)
   public toastMessage = signal<string | null>(null);
   public toastType = signal<'success' | 'error'>('success');
-
-  // Datos del Docente en Sesión Activa
-  // NOTA: Valores genéricos hasta que se integre autenticación real.
-  public docenteSesion = {
-    nombre: 'Docente no identificado',
-    ci: '',
-    correo: ''
-  };
 
   // Directorio Institucional de Oficinas de Evaluación por Campus (Múltiples correos por campus)
   public listaCampusEvaluacion: CampusEvaluacion[] = [
@@ -3430,9 +3447,9 @@ export class BancoPreguntasComponent implements OnInit {
       fechaHora: fechaHoraStr,
       campusNombre: campus?.nombre || 'Cochabamba - Campus Colonial',
       correoDestino: campus?.correos ? campus.correos.join(', ') : 'evaluaciones.cochabamba@unitepc.edu.bo',
-      correoDocente: this.docenteSesion.correo,
-      docenteNombre: this.docenteSesion.nombre,
-      docenteCi: this.docenteSesion.ci,
+      correoDocente: this.docenteOficialActivo().correo,
+      docenteNombre: this.docenteOficialActivo().nombre,
+      docenteCi: this.docenteOficialActivo().ci,
       materia: examenRol.materia,
       codigoMateria: examenRol.codigo,
       grupo: examenRol.grupo,
@@ -3459,7 +3476,7 @@ export class BancoPreguntasComponent implements OnInit {
 
   public generarTextoCuerpoCorreo(c: ComprobanteEnvio): string {
     return `========================================================================
-SISTEMA DE EVALUACIONES ACADÉMICAS UNITEPC (SEA)
+SISTEMA DE EVALUACIONES ACADÉMICAS UNITEPC
 REMISIÓN OFICIAL DE BANCO DE PREGUNTAS Y EXAMEN
 ========================================================================
 
@@ -3487,13 +3504,13 @@ FECHA Y HORA: ${c.fechaHora}
 ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observaciones adicionales.'}
 
 ========================================================================
-* NOTA: Adjunto se remite el archivo de paquete (${c.nombreArchivoPkg}) generado por el sistema SEA.
+* NOTA: Adjunto se remite el archivo de paquete (${c.nombreArchivoPkg}) generado por el sistema institucional.
 * Mensaje oficial generado por el Sistema de Evaluaciones UNITEPC.
 ========================================================================`;
   }
 
   public abrirClienteCorreo(c: ComprobanteEnvio): void {
-    const subject = encodeURIComponent(`[SEA-2026] Remisión de Examen: [${c.codigoMateria}] ${c.materia} (${c.parcial}) - ${c.grupo}`);
+    const subject = encodeURIComponent(`[2026] Remisión de examen: [${c.codigoMateria}] ${c.materia} (${c.parcial}) - ${c.grupo}`);
     const body = encodeURIComponent(this.generarTextoCuerpoCorreo(c));
     const to = encodeURIComponent(c.correoDestino);
     const cc = encodeURIComponent(c.correoDocente);
@@ -4028,7 +4045,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     }
 
     this.cargandoBanco.set(true);
-    this._bancoService.cargarPorRol(rol.id, file, rol.docenteNombre).subscribe({
+    this._bancoService.cargarPorRol(rol.id, file).subscribe({
       next: resultado => {
         this.cargandoBanco.set(false);
         if (!resultado.exito) {
@@ -4071,7 +4088,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     if (!rol || !this.rolPuedeEliminarBanco() || this.confirmacionEliminarBancoPersistido.trim().toUpperCase() !== 'ELIMINAR' || this.eliminandoBancoPersistido()) return;
 
     this.eliminandoBancoPersistido.set(true);
-    this._bancoService.eliminarPorRol(rol.id, 'ELIMINAR', this.docenteSesion.nombre).subscribe({
+    this._bancoService.eliminarPorRol(rol.id, 'ELIMINAR').subscribe({
       next: () => {
         this.bancoPersistido.set(null);
         this.archivoExcelSeleccionado.set(null);
@@ -4103,8 +4120,8 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       header: 'UNITEPC-ENCRYPTED-EVAL-PACKAGE-V2',
       parcial: this.parcialActivo(),
       gestion: 'II-2026',
-      docente: this.docenteSesion.nombre,
-      ci: this.docenteSesion.ci,
+      docente: this.docenteOficialActivo().nombre,
+      ci: this.docenteOficialActivo().ci,
       timestamp: new Date().toISOString(),
       checksum: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
       totalPreguntas: preguntasValidas.length,
@@ -4128,7 +4145,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     }
     const encryptedHex = encryptedChars.map(c => c.toString(16).padStart(4, '0')).join('');
 
-    const fileContent = `--- BEGIN UNITEPC ENCRYPTED EVALUATION PACKAGE ---\nVERSION: 2.0\nPARCIAL: ${parcialCode}\nDOCENTE: ${this.docenteSesion.nombre}\nCHECKSUM_SHA256: b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\nDATA:\n${encryptedHex}\n--- END UNITEPC ENCRYPTED EVALUATION PACKAGE ---`;
+    const fileContent = `--- BEGIN UNITEPC ENCRYPTED EVALUATION PACKAGE ---\nVERSION: 2.0\nPARCIAL: ${parcialCode}\nDOCENTE: ${this.docenteOficialActivo().nombre}\nCHECKSUM_SHA256: b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\nDATA:\n${encryptedHex}\n--- END UNITEPC ENCRYPTED EVALUATION PACKAGE ---`;
 
     this.pkgHexData.set(fileContent);
     this.tabPrevisualizacionPkg.set('cifrado');

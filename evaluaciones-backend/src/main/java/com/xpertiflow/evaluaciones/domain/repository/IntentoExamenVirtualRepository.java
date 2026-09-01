@@ -8,5 +8,7 @@ import java.util.Optional;
 public interface IntentoExamenVirtualRepository extends JpaRepository<IntentoExamenVirtual, String> {
     List<IntentoExamenVirtual> findBySalaIdOrderByCodigoEstudianteAsc(String salaId);
     Optional<IntentoExamenVirtual> findBySalaIdAndTokenHash(String salaId, String tokenHash);
+    Optional<IntentoExamenVirtual> findBySalaIdAndCodigoEstudiante(String salaId, String codigoEstudiante);
     Optional<IntentoExamenVirtual> findByTokenHash(String tokenHash);
+    Optional<IntentoExamenVirtual> findByTokenSesionHash(String tokenSesionHash);
 }
