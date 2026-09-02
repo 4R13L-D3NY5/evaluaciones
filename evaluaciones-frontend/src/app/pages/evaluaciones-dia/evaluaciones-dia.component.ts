@@ -21,7 +21,7 @@ import {
   RolExamenResponse,
   AuditoriaRolExamen
 } from '../../core/services/rol-examen.service';
-import { CartillasOmrService, LoteCartillasOmr } from '../../core/services/cartillas-omr.service';
+import { CartillasOmrService, PreparacionCartillasOmr } from '../../core/services/cartillas-omr.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import {
   CalificacionOmrResponse,
@@ -1597,44 +1597,36 @@ interface ResultadoVirtual {
             </div>
             <div class="p-5 space-y-4">
               @if (cargandoCartillas()) {
-                <div class="py-10 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spinner pi-spin text-primary mr-2"></i>Cargando lote de sobreimpresión...</div>
+                <div class="py-10 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spinner pi-spin text-primary mr-2"></i>Consultando nómina oficial...</div>
               } @else {
-                @if (loteCartillasActual(); as lote) {
+                @if (loteCartillasActual(); as preparacion) {
+                  <div class="rounded-xl border border-teal-200 bg-teal-50/40 p-4 text-xs text-teal-900 leading-relaxed">
+                    La nómina se consulta directamente del SEA. Las marcas se generan en memoria únicamente al imprimir; no se guarda el PDF ni un lote de cartillas en el sistema.
+                  </div>
                   <div class="grid grid-cols-3 gap-2 text-center">
-                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Cartillas</span><strong class="text-lg text-foreground">{{ lote.totalCartillas }}</strong></div>
-                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Estado</span><strong class="text-sm" [class.text-emerald-700]="lote.estado === 'IMPRESO'" [class.text-teal-700]="lote.estado === 'GENERADO'">{{ lote.estado }}</strong></div>
+                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Estudiantes</span><strong class="text-lg text-foreground">{{ preparacion.totalCartillas }}</strong></div>
+                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Impresión</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresion === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresion === 'PENDIENTE'">{{ preparacion.estadoImpresion }}</strong></div>
                     <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">1 por página A4</strong></div>
                   </div>
-                  <div class="max-h-40 overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
-                    @for (cartilla of lote.cartillas; track cartilla.id) {
-                      <div class="grid grid-cols-[36px_90px_1fr_auto] gap-2 p-2.5 items-center">
-                        <span class="font-mono text-muted-foreground">{{ cartilla.numeroOrden }}</span>
-                        <span class="font-mono font-bold">{{ cartilla.codigoEstudiante }}</span>
-                        <span class="truncate font-medium">{{ cartilla.nombreCompleto }}</span>
-                        <span class="text-[10px] font-bold" [class.text-emerald-700]="cartilla.estado === 'IMPRESA'" [class.text-teal-700]="cartilla.estado === 'GENERADA'">{{ cartilla.estado }}</span>
+                  <div class="max-h-48 overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
+                    @for (estudiante of preparacion.estudiantes; track estudiante.codigoEstudiante) {
+                      <div class="grid grid-cols-[36px_90px_1fr] gap-2 p-2.5 items-center">
+                        <span class="font-mono text-muted-foreground">{{ estudiante.numeroOrden }}</span>
+                        <span class="font-mono font-bold">{{ estudiante.codigoEstudiante }}</span>
+                        <span class="truncate font-medium">{{ estudiante.nombreCompleto }}</span>
                       </div>
                     }
-                  </div>
-                } @else {
-                  <div class="rounded-xl border border-dashed border-teal-200 bg-teal-50/40 p-5 text-xs text-teal-900 leading-relaxed">
-                    No hay un lote generado. Se generará únicamente la capa de datos: N°, código de materia, grupo, código y nombre completo. No se dibuja la cartilla, la cabecera ni las respuestas.
                   </div>
                 }
               }
             </div>
             <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2">
               <button (click)="cerrarGestionCartillas()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
-              @if (loteCartillasActual(); as lote) {
-                <button (click)="abrirPdfCartillas(lote)" class="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer"><i class="pi pi-file-pdf mr-1.5"></i>Abrir PDF de datos</button>
-                @if (lote.estado !== 'IMPRESO') {
-                  <button (click)="confirmarImpresionCartillas(lote)" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"><i class="pi pi-print mr-1.5"></i>Marcar como impreso</button>
+              @if (loteCartillasActual(); as preparacion) {
+                <button (click)="imprimirCartillas()" [disabled]="generandoCartillas()" class="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-print]="!generandoCartillas()"></i>{{ generandoCartillas() ? 'Preparando impresión...' : 'Imprimir marcas' }}</button>
+                @if (preparacion.estadoImpresion !== 'IMPRESO') {
+                  <button (click)="confirmarImpresionCartillas()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"><i class="pi pi-check mr-1.5"></i>Marcar como impreso</button>
                 }
-                <button (click)="regenerarCartillas()" [disabled]="generandoCartillas()" title="Volver a consultar la nómina oficial y generar un lote actualizado" class="px-4 py-2 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold cursor-pointer disabled:opacity-50">
-                  <i class="pi mr-1.5" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-refresh]="!generandoCartillas()"></i>{{ generandoCartillas() ? 'Actualizando...' : 'Actualizar y regenerar' }}
-                </button>
-              }
-              @if (!loteCartillasActual()) {
-                <button (click)="generarCartillas()" [disabled]="generandoCartillas()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-plus]="!generandoCartillas()"></i> Generar marcas</button>
               }
             </div>
           </div>
@@ -1977,7 +1969,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   public toastMessage = signal<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   public evaluacionSeleccionadaCartillas = signal<EvaluacionItemUI | null>(null);
-  public loteCartillasActual = signal<LoteCartillasOmr | null>(null);
+  public loteCartillasActual = signal<PreparacionCartillasOmr | null>(null);
   public cargandoCartillas = signal<boolean>(false);
   public generandoCartillas = signal<boolean>(false);
 
@@ -2351,10 +2343,10 @@ export class EvaluacionesDiaComponent implements OnInit {
   private _cargarEstadoMarcas(items: EvaluacionItemUI[]): void {
     this.estadoMarcas.set({});
     items.filter(item => this.puedeGestionarCartillas(item)).forEach(item => {
-      this._cartillasOmr.obtenerUltimo(item.id).subscribe({
-        next: lote => this.estadoMarcas.update(estados => ({
+      this._cartillasOmr.obtenerPreparacion(item.id).subscribe({
+        next: preparacion => this.estadoMarcas.update(estados => ({
           ...estados,
-          [item.id]: lote?.estado || 'SIN_GENERAR'
+          [item.id]: preparacion.estadoImpresion
         })),
         error: () => this.estadoMarcas.update(estados => ({
           ...estados,
@@ -2369,14 +2361,14 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.evaluacionSeleccionadaCartillas.set(item);
     this.loteCartillasActual.set(null);
     this.cargandoCartillas.set(true);
-    this._cartillasOmr.obtenerUltimo(item.id).subscribe({
-      next: lote => {
-        this.loteCartillasActual.set(lote);
+    this._cartillasOmr.obtenerPreparacion(item.id).subscribe({
+      next: preparacion => {
+        this.loteCartillasActual.set(preparacion);
         this.cargandoCartillas.set(false);
       },
       error: () => {
         this.cargandoCartillas.set(false);
-        this._mostrarToast('No se pudo consultar el lote de cartillas.', 'error');
+        this._mostrarToast('No se pudo consultar la nómina oficial para las marcas.', 'error');
       }
     });
   }
@@ -2386,56 +2378,46 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.loteCartillasActual.set(null);
   }
 
-  public generarCartillas(): void {
+  public imprimirCartillas(): void {
     const item = this.evaluacionSeleccionadaCartillas();
     if (!item || this.generandoCartillas()) return;
     this.generandoCartillas.set(true);
-    this._cartillasOmr.generar(item.id).subscribe({
-      next: lote => {
-        this.loteCartillasActual.set(lote);
+    const ventana = window.open('', '_blank');
+    this._cartillasOmr.imprimir(item.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        if (ventana) {
+          ventana.location.href = url;
+        } else {
+          window.open(url, '_blank');
+        }
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
         this.generandoCartillas.set(false);
-        this._mostrarToast(`${lote.totalCartillas} sobreimpresiones de datos generadas.`);
+        this._mostrarToast('Marcas generadas temporalmente. Puedes imprimirlas desde la ventana del PDF.');
       },
         error: err => {
+          ventana?.close();
           this.generandoCartillas.set(false);
           this._mostrarToast(
             err?.error?.message || err?.error?.error || err?.message ||
-            'No se pudo generar la sobreimpresión de datos.',
+            'No se pudo preparar la impresión de marcas.',
             'error'
           );
       }
     });
   }
 
-  public regenerarCartillas(): void {
-    const item = this.evaluacionSeleccionadaCartillas();
-    const lote = this.loteCartillasActual();
-    if (!item || !lote || this.generandoCartillas()) return;
-
-    const confirmado = window.confirm(
-      'Se volverá a consultar la nómina oficial y se generará un nuevo lote de marcas. ¿Deseas continuar?'
-    );
-    if (!confirmado) return;
-
-    this.generarCartillas();
-  }
-
-  public confirmarImpresionCartillas(lote: LoteCartillasOmr): void {
+  public confirmarImpresionCartillas(): void {
     const item = this.evaluacionSeleccionadaCartillas();
     if (!item) return;
-    this._cartillasOmr.marcarImpreso(item.id, lote.id).subscribe({
+    this._cartillasOmr.marcarImpresoTemporal(item.id).subscribe({
       next: actualizado => {
         this.loteCartillasActual.set(actualizado);
-        this.estadoMarcas.update(estados => ({ ...estados, [item.id]: actualizado.estado }));
-        this._mostrarToast('Lote de cartillas marcado como impreso.');
+        this.estadoMarcas.update(estados => ({ ...estados, [item.id]: actualizado.estadoImpresion }));
+        this._mostrarToast('La impresión de marcas fue confirmada.');
       },
-      error: () => this._mostrarToast('No se pudo confirmar la impresión del lote.', 'error')
+      error: () => this._mostrarToast('No se pudo confirmar la impresión de marcas.', 'error')
     });
-  }
-
-  public abrirPdfCartillas(lote: LoteCartillasOmr): void {
-    if (!lote.archivoPdfPath) return;
-    window.open(`/api/archivos?path=${encodeURIComponent(lote.archivoPdfPath)}`, '_blank', 'noopener');
   }
 
   public abrirConfiguracionGeneracion(item: EvaluacionItemUI): void {

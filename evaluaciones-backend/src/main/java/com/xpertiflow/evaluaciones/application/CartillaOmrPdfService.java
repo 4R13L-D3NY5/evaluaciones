@@ -10,6 +10,7 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,6 +28,10 @@ public class CartillaOmrPdfService {
     // origen en la esquina superior izquierda.
     private static final float PAGE_WIDTH = 595f;
     private static final float PAGE_HEIGHT = 841f;
+    // Campo oficial "Carrera:" de la cartilla preimpresa. Se ubica en la
+    // franja superior, junto a la etiqueta, no en la casilla de identificación.
+    private static final float CARRERA_X = 190f;
+    private static final float CARRERA_Y = 24f;
     private static final float DATOS_X = 250f;
     // Ajuste de la segunda iteración: el código debe iniciar 10 puntos más
     // a la izquierda dentro de su casilla superior derecha.
@@ -41,7 +46,12 @@ public class CartillaOmrPdfService {
 
     public void generar(Path archivo, RolExamen rol, List<CartillaOmr> cartillas) throws IOException {
         Files.createDirectories(archivo.getParent());
-        try (PDDocument documento = new PDDocument()) {
+        Files.write(archivo, generarBytes(rol, cartillas));
+    }
+
+    public byte[] generarBytes(RolExamen rol, List<CartillaOmr> cartillas) throws IOException {
+        try (ByteArrayOutputStream salida = new ByteArrayOutputStream();
+             PDDocument documento = new PDDocument()) {
             for (CartillaOmr cartilla : cartillas) {
                 PDPage pagina = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
                 documento.addPage(pagina);
@@ -50,7 +60,8 @@ public class CartillaOmrPdfService {
                     dibujarDatos(contenido, rol, cartilla);
                 }
             }
-            documento.save(archivo.toFile());
+            documento.save(salida);
+            return salida.toByteArray();
         }
     }
 
@@ -59,7 +70,7 @@ public class CartillaOmrPdfService {
         // La etiqueta "CARRERA:" ya pertenece a la cartilla preimpresa; aquí
         // solo se agrega el nombre oficial del rol en el espacio superior.
         textoDesdeArriba(contenido, limitar(rol.getCarreraNombre(), 42),
-                DATOS_X + 5f, DATOS_Y + 1f, PDType1Font.HELVETICA_BOLD, CARRERA_TAMANO);
+                CARRERA_X, CARRERA_Y, PDType1Font.HELVETICA_BOLD, CARRERA_TAMANO);
         textoDesdeArriba(contenido, "N° " + cartilla.getNumeroOrden(),
                 DATOS_X + 5f, DATOS_Y + 8f, PDType1Font.HELVETICA_BOLD, 7.2f);
         textoDesdeArriba(contenido, cartilla.getCodigoMateria(),

@@ -1,7 +1,9 @@
 package com.xpertiflow.evaluaciones.application;
 
 import com.xpertiflow.evaluaciones.api.dto.CartillaOmrResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.DatosCartillaOmrDto;
 import com.xpertiflow.evaluaciones.api.dto.LoteCartillasOmrResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.PreparacionCartillasOmrResponseDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.CartillaOmr;
@@ -21,9 +23,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +35,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class CartillaOmrService {
+
+    private static final String ACCION_IMPRESION_MARCAS = "IMPRESION_MARCAS_OMR";
 
     private static final Set<EstadoFlujo> ESTADOS_PERMITIDOS_MARCAS = Set.of(
             EstadoFlujo.PROGRAMADO,
@@ -54,6 +58,61 @@ public class CartillaOmrService {
     @Transactional(readOnly = true)
     public Optional<LoteCartillasOmrResponseDto> obtenerUltimo(String rolExamenId) {
         return loteRepository.findFirstByRolExamenIdOrderByGeneradoEnDesc(rolExamenId).map(this::mapearLote);
+    }
+
+    @Transactional
+    public PreparacionCartillasOmrResponseDto obtenerPreparacion(String rolExamenId) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        validarEstadoParaMarcas(rol);
+        List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
+        Optional<AuditoriaEvaluacion> impresion = auditoriaRepository
+                .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, ACCION_IMPRESION_MARCAS);
+        List<DatosCartillaOmrDto> datos = java.util.stream.IntStream.range(0, estudiantes.size())
+                .mapToObj(indice -> {
+                    DatosEstudiante estudiante = estudiantes.get(indice);
+                    return new DatosCartillaOmrDto(indice + 1, rol.getMateriaCodigo(), rol.getGrupo(),
+                            estudiante.codigo(), estudiante.nombreCompleto());
+                }).toList();
+        return new PreparacionCartillasOmrResponseDto(
+                rol.getId(), rol.getCarreraNombre(), rol.getMateriaCodigo(), rol.getGrupo(),
+                estudiantes.size(), impresion.isPresent() ? "IMPRESO" : "PENDIENTE",
+                impresion.map(AuditoriaEvaluacion::getFechaEvento).orElse(null),
+                impresion.map(AuditoriaEvaluacion::getUsuario).orElse(null), datos);
+    }
+
+    @Transactional
+    public byte[] generarPdfTemporal(String rolExamenId) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        validarEstadoParaMarcas(rol);
+        List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
+        List<CartillaOmr> cartillas = new java.util.ArrayList<>();
+        for (int indice = 0; indice < estudiantes.size(); indice++) {
+            DatosEstudiante estudiante = estudiantes.get(indice);
+            CartillaOmr cartilla = new CartillaOmr();
+            cartilla.setNumeroOrden(indice + 1);
+            cartilla.setCodigoMateria(rol.getMateriaCodigo());
+            cartilla.setGrupo(rol.getGrupo());
+            cartilla.setCodigoEstudiante(estudiante.codigo());
+            cartilla.setNombreCompleto(estudiante.nombreCompleto());
+            cartillas.add(cartilla);
+        }
+        try {
+            return pdfService.generarBytes(rol, cartillas);
+        } catch (IOException exception) {
+            throw new IllegalStateException("No se pudo generar la sobreimpresión temporal de datos OMR", exception);
+        }
+    }
+
+    @Transactional
+    public PreparacionCartillasOmrResponseDto marcarImpresion(String rolExamenId, String usuario) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        validarEstadoParaMarcas(rol);
+        List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
+        registrarAuditoria(rol, ACCION_IMPRESION_MARCAS, usuario, estudiantes.size(), null);
+        return obtenerPreparacion(rolExamenId);
     }
 
     @Transactional

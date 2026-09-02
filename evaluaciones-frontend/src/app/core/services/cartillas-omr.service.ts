@@ -3,14 +3,23 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface CartillaOmr {
-  id: number;
   numeroOrden: number;
   codigoMateria: string;
   grupo: string;
   codigoEstudiante: string;
   nombreCompleto: string;
-  estado: 'GENERADA' | 'IMPRESA' | 'ANULADA';
-  impresaEn?: string;
+}
+
+export interface PreparacionCartillasOmr {
+  rolExamenId: string;
+  carreraNombre: string;
+  materiaCodigo: string;
+  grupo: string;
+  totalCartillas: number;
+  estadoImpresion: 'PENDIENTE' | 'IMPRESO';
+  impresoEn?: string;
+  usuarioImpresion?: string;
+  estudiantes: CartillaOmr[];
 }
 
 export interface LoteCartillasOmr {
@@ -28,6 +37,23 @@ export interface LoteCartillasOmr {
 @Injectable({ providedIn: 'root' })
 export class CartillasOmrService {
   private readonly _http = inject(HttpClient);
+
+  public obtenerPreparacion(rolExamenId: string): Observable<PreparacionCartillasOmr> {
+    return this._http.get<PreparacionCartillasOmr>(`/api/roles-examen/${rolExamenId}/cartillas/preparacion`);
+  }
+
+  public imprimir(rolExamenId: string): Observable<Blob> {
+    return this._http.post(`/api/roles-examen/${rolExamenId}/cartillas/imprimir`, {}, {
+      responseType: 'blob'
+    });
+  }
+
+  public marcarImpresoTemporal(rolExamenId: string): Observable<PreparacionCartillasOmr> {
+    return this._http.post<PreparacionCartillasOmr>(
+      `/api/roles-examen/${rolExamenId}/cartillas/marcar-impreso`,
+      { usuario: 'ADMIN_EVALUACIONES' }
+    );
+  }
 
   public obtenerUltimo(rolExamenId: string): Observable<LoteCartillasOmr | null> {
     return this._http.get<LoteCartillasOmr | null>(`/api/roles-examen/${rolExamenId}/cartillas/ultimo`);

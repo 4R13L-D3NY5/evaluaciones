@@ -114,12 +114,12 @@ export interface EstudianteOmrItem {
           </button>
 
           @if (estadoFlujo() === 'RESULTADOS') {
-            <!-- Botón Exportar Acta Excel -->
+            <!-- Botón Exportar consolidado Excel -->
             <button 
               (click)="exportarActaNotasExcel()"
               class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
               <i class="pi pi-file-excel"></i>
-              <span>Exportar Acta de Notas</span>
+              <span>Exportar Excel de cartillas</span>
             </button>
           }
         </div>
@@ -342,11 +342,11 @@ export interface EstudianteOmrItem {
                       </div>
                     </div>
 
-                    <!-- Campo exclusivo del código preimpreso en la casilla superior derecha -->
-                    <div class="absolute border-2 border-amber-400 bg-amber-300/10 shadow-[0_0_12px_rgba(251,191,36,0.45)] rounded"
-                         style="top: 9%; left: 53%; width: 22%; height: 5%;">
+                    <!-- Campo exclusivo del código del estudiante en el recuadro grande -->
+                    <div class="absolute z-10 border-2 border-amber-400 bg-amber-300/10 shadow-[0_0_12px_rgba(251,191,36,0.55)] rounded"
+                         style="top: 16%; left: 70%; width: 27%; height: 6%;">
                       <span class="absolute -top-5 left-0 bg-amber-600 text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-black whitespace-nowrap">
-                        CÓDIGO DEL ESTUDIANTE
+                        ÁREA CÓDIGO DEL ESTUDIANTE
                       </span>
                     </div>
 
@@ -433,9 +433,9 @@ export interface EstudianteOmrItem {
                     <div class="space-y-2 text-xs">
                       <div class="border border-border rounded-lg p-2 bg-card">
                         <span class="block text-[10px] uppercase font-black text-muted-foreground">Código del estudiante</span>
-                        <span class="font-mono font-black text-foreground">{{ est.codigoLeido ? est.codigo : ((est.codigoOcr?.length || 0) > 0 ? 'No pertenece al rol' : 'No reconocido') }}</span>
+                        <span class="font-mono font-black text-foreground">{{ est.codigo }}</span>
                         @if (!est.codigoLeido && (est.codigoOcr?.length || 0) > 0) {
-                          <span class="block text-[10px] text-amber-700 mt-1">OCR: {{ est.codigoOcr?.join(', ') }}</span>
+                          <span class="block text-[10px] text-amber-700 mt-1">Código leído por OCR; pendiente de validación en la nómina.</span>
                         }
                       </div>
                       <div class="border border-border rounded-lg p-2 bg-card">
@@ -617,7 +617,7 @@ export interface EstudianteOmrItem {
                   <div class="flex items-start justify-between gap-3">
                     <div>
                       <span class="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 dark:bg-purple-950/60 dark:text-purple-300 px-2 py-0.5 rounded-md">
-                        CÓDIGO: {{ est.codigo }} · clave resuelta internamente
+                        CÓDIGO: {{ est.codigo }} · {{ est.codigoLeido ? 'validado en la nómina' : 'leído por OCR' }}
                       </span>
                       <h3 class="text-base font-black text-foreground mt-1">{{ est.nombre }}</h3>
                       <p class="text-xs text-muted-foreground">{{ est.carrera }} · Grupo {{ est.grupo }}</p>
@@ -821,7 +821,7 @@ export interface EstudianteOmrItem {
               <div class="border border-border rounded-xl p-4 space-y-3">
                 <div>
                   <h4 class="text-xs font-black text-foreground uppercase tracking-wide">Zona exclusiva del código del estudiante</h4>
-                  <p class="text-[10px] text-muted-foreground mt-1">Valores normalizados de 0 a 1 sobre la página completa. Ejemplo: 0.53 equivale a 53%.</p>
+                  <p class="text-[10px] text-muted-foreground mt-1">Valores normalizados de 0 a 1 sobre la página completa. La cartilla oficial usa el área numérica del recuadro derecho: X 0.70, Y 0.16, ancho 0.27 y alto 0.06.</p>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <label class="space-y-1"><span class="text-[10px] font-bold text-muted-foreground">X inicio</span><input type="number" min="0" max="1" step="0.001" [ngModel]="configuracionOmr().zonaCodigoX" (ngModelChange)="actualizarConfiguracionOmr('zonaCodigoX', $event)" class="w-full bg-card border border-border rounded-lg px-2.5 py-2 text-xs font-bold" /></label>
@@ -922,10 +922,10 @@ export class CalificacionOmrComponent implements OnInit {
   public rotacionAlineacion = signal<number>(0);
 
   // Coordenadas dinámicas del marco de calibración OMR (%) - Cartilla en Hoja 1 (Margen 2.0 cm)
-  public boxTop = signal<number>(16.9);
-  public boxLeft = signal<number>(1.1);
-  public boxWidth = signal<number>(73.2);
-  public boxHeight = signal<number>(42.7);
+  public boxTop = signal<number>(28.0);
+  public boxLeft = signal<number>(2.8);
+  public boxWidth = signal<number>(94.5);
+  public boxHeight = signal<number>(71.0);
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
@@ -1008,11 +1008,11 @@ export class CalificacionOmrComponent implements OnInit {
       umbralDiferencialDoble: 18,
       umbralBinarioGrilla: 185,
       nivelTintaMarca: 145,
-      zonaCodigoX: 0.53,
-      zonaCodigoY: 0.09,
-      zonaCodigoAncho: 0.22,
-      zonaCodigoAlto: 0.05,
-      escalaOcr: 2.5,
+      zonaCodigoX: 0.70,
+      zonaCodigoY: 0.16,
+      zonaCodigoAncho: 0.27,
+      zonaCodigoAlto: 0.06,
+      escalaOcr: 3,
       radioBusquedaPixeles: 2
     };
   }
@@ -1113,10 +1113,10 @@ export class CalificacionOmrComponent implements OnInit {
   }
 
   public aplicarPresetEscaneoFisico(): void {
-    this.boxTop.set(16.9);
-    this.boxLeft.set(1.1);
-    this.boxWidth.set(73.2);
-    this.boxHeight.set(42.7);
+    this.boxTop.set(28.0);
+    this.boxLeft.set(2.8);
+    this.boxWidth.set(94.5);
+    this.boxHeight.set(71.0);
   }
 
   public aplicarPresetDigital(): void {
@@ -1310,9 +1310,10 @@ export class CalificacionOmrComponent implements OnInit {
         densidades: lectura.detalles?.[indice]?.densidades || []
       };
     });
+    const codigoDetectado = this._obtenerCodigoDetectado(lectura);
     return {
       estudianteId: pagina,
-      codigo: lectura.codigoEstudiante || 'NO RECONOCIDO',
+      codigo: codigoDetectado,
       nombre: lectura.estudianteNombre || 'PENDIENTE DE REVISIÓN MANUAL',
       carrera: rol?.carreraNombre || '',
       grupo: rol?.grupo || '',
@@ -1335,6 +1336,20 @@ export class CalificacionOmrComponent implements OnInit {
       grillaDetectada: !!lectura.grilla && lectura.grilla.ancho > 0 && lectura.grilla.alto > 0,
       respuestasLeidas
     };
+  }
+
+  private _obtenerCodigoDetectado(lectura: OmrLecturaResponse): string {
+    if (lectura.codigoEstudiante) {
+      return lectura.codigoEstudiante;
+    }
+
+    const candidatos = (lectura.codigoOcr || [])
+      .map(candidato => String(candidato).replace(/\D/g, ''))
+      .filter(Boolean);
+    // Los códigos institucionales de estas cartillas tienen siete dígitos.
+    // Si el OCR devolvió una secuencia adicional pegada al código, se prioriza
+    // la candidata de siete dígitos para mostrarla y exportarla.
+    return candidatos.find(candidato => /^\d{7}$/.test(candidato)) || candidatos[0] || 'NO RECONOCIDO';
   }
 
   private _detectarEsquinasFiducialesEnImageData(
@@ -1429,10 +1444,13 @@ export class CalificacionOmrComponent implements OnInit {
 
     // 2. Fallback de alta precisión para Cartilla en Hoja 1 OMR (Margen 2.0 cm)
     return {
-      rx: Math.floor(width * 0.011),
-      ry: Math.floor(height * 0.169),
-      rw: Math.floor(width * 0.732),
-      rh: Math.floor(height * 0.427)
+      // La cabecera mantiene su posición física cuando el escaneo incluye el
+      // talón inferior; por eso estas medidas se calculan con el ancho de la
+      // cartilla y no con el alto total de la imagen.
+      rx: Math.floor(width * 0.028),
+      ry: Math.floor(width * 0.31),
+      rw: Math.floor(width * 0.945),
+      rh: Math.floor(width * 0.78)
     };
   }
 
@@ -1688,37 +1706,31 @@ export class CalificacionOmrComponent implements OnInit {
 
     const rol = this.rolesExamen().find(item => item.id === this.rolExamenSeleccionado());
     const codigoMateria = rol?.materiaCodigo || 'EVALUACION';
-    const parcial = rol?.tipoParcial || 'Parcial';
-    const codigoArchivo = `${codigoMateria}_${parcial}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const codigoArchivo = codigoMateria.replace(/[^a-zA-Z0-9_-]/g, '_');
 
+    // Formato de intercambio solicitado por Evaluaciones: una fila por
+    // cartilla, conservando el código leído por OCR aunque aún no esté
+    // validado contra la nómina del rol.
     const data: any[][] = [
-      ['UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC'],
-      ['ACTA OFICIAL DE CALIFICACIONES OMR - SISTEMA DE EVALUACIONES'],
-      ['ASIGNATURA:', rol ? `[${rol.materiaCodigo}] ${rol.materiaNombre}` : 'No especificada', 'EVALUACIÓN:', parcial],
-      ['DOCENTE:', rol?.docenteNombre || 'No identificado', 'FECHA:', rol?.fecha || new Date().toLocaleDateString()],
-      [],
-      ['Nº', 'CÓDIGO ESTUDIANTE', 'APELLIDOS Y NOMBRES', 'CARRERA', 'GRUPO', 'ACIERTOS (30P)', 'FALLOS', 'BLANCOS', 'DOBLES', 'NOTA FINAL (/100)', 'ESTADO']
+      ['SIGLA_MAT', 'COD_EST', 'NOTA/60']
     ];
 
-    list.forEach((est, idx) => {
+    list.forEach(est => {
       data.push([
-        idx + 1,
+        codigoMateria,
         est.codigo,
-        est.nombre,
-        est.carrera,
-        est.grupo,
-        est.aciertos,
-        est.fallos,
-        est.blancos,
-        est.doblesMarcas,
-        est.nota100,
-        est.aprobado ? 'APROBADO' : 'REPROBADO'
+        est.aciertos
       ]);
     });
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Acta_Calificaciones_OMR');
-    XLSX.writeFile(wb, `ACTA_CALIFICACIONES_OMR_${codigoArchivo}.xlsx`);
+    ws['!cols'] = [
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 12 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, 'Calificaciones');
+    XLSX.writeFile(wb, `CALIFICACIONES_OMR_${codigoArchivo}.xlsx`);
   }
 }

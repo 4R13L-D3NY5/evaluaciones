@@ -2,9 +2,9 @@
 
 ## Alcance de la primera iteración
 
-El módulo prepara la sobreimpresión de cartillas OMR separada del cuadernillo de examen. Genera un PDF con un estudiante por página A4 y registra las cartillas que pertenecen a cada estudiante. El PDF no reproduce la cartilla preimpresa: contiene únicamente los datos operativos que deben caer dentro de sus tres casillas:
+El módulo prepara la sobreimpresión de cartillas OMR separada del cuadernillo de examen. La nómina oficial se consulta siempre al abrir la operación y el PDF se genera bajo demanda en memoria, con un estudiante por página A4. No se guarda el PDF ni se crean lotes de cartillas para la impresión normal. El PDF no reproduce la cartilla preimpresa: contiene únicamente los datos operativos que deben caer dentro de sus tres casillas:
 
-- N° correlativo del lote.
+- N° correlativo de la impresión.
 - Carrera oficial.
 - Código de materia.
 - Grupo.
@@ -17,62 +17,60 @@ La letra de variante no se imprime ni se marca en la cartilla. El sistema mantie
 
 1. El administrador genera el examen oficial, lo que persiste el mapeo confidencial estudiante-variante.
 2. Desde **Lista de Evaluaciones**, abre el icono de cartillas de un rol previo a `ENTREGADO`.
-3. El sistema crea un lote PDF con un estudiante por página A4 y guarda únicamente la capa de datos.
-4. El administrador revisa/abre el PDF e indica **Marcar como impreso** solo cuando el lote salió físicamente de la impresora.
+3. El sistema muestra la nómina oficial y, al pulsar **Imprimir marcas**, genera temporalmente un PDF con un estudiante por página A4 y lo entrega al navegador.
+4. El administrador imprime el documento y selecciona **Marcar como impreso**. Solo queda una auditoría mínima de la confirmación; el PDF no queda almacenado.
 5. En la futura carga OMR se escanea solamente el cuerpo superior de la cartilla. El talón inferior se conserva para el estudiante y se ignora en la lectura.
-6. Si la nómina oficial cambia antes de imprimir, el administrador puede usar **Actualizar y regenerar** para crear un nuevo lote; el lote anterior se conserva como historial.
+6. Si la nómina oficial cambia antes de imprimir, se cierra y se vuelve a abrir la operación para consultar la lista actualizada; al imprimir se genera una nueva copia temporal.
 
 ## Reglas de negocio
 
 | Regla | Aplicación |
 | --- | --- |
-| Precondición | Solo se generan cartillas si ya existen mapeos oficiales de estudiantes, creados al generar el examen. |
+| Precondición | Solo se imprimen marcas para roles habilitados y con nómina oficial disponible; el mapeo estudiante-variante no se imprime. |
 | Disponibilidad | Las marcas se pueden generar y gestionar en `PROGRAMADO`, `VALIDADO`, `GENERADO` e `IMPRESO`; desde `ENTREGADO` en adelante quedan bloqueadas. |
 | Datos impresos | Carrera, N°, código de materia, grupo, código y nombre completo. |
 | Variante | Confidencial e interna; nunca se imprime ni se marca en A-E. |
 | Formato | Una sobreimpresión por página A4, alineada con la cartilla de referencia. No se dibuja cartilla ni talón. |
-| Coordenadas | X/Y del documento, con origen superior izquierdo: datos `250,90`, código `315,90` con desplazamiento efectivo de 10 puntos a la izquierda, nombre `250,120`. El código se imprime a 22 pt y el nombre completo a 10.5 pt. |
-| Impresión | Generar no significa imprimir. La confirmación de impresión es una acción explícita y auditable. |
-| Regeneración | Un lote nuevo reemplaza al anterior como lote vigente para la operación, pero no elimina el historial ni el PDF anterior. |
+| Coordenadas | Carrera en el campo blanco oficial superior (`190,24`); datos `250,90`, código `315,90` con desplazamiento efectivo de 10 puntos a la izquierda, nombre `250,120`. El código se imprime a 22 pt, la carrera a 6.5 pt y el nombre completo a 10.5 pt. |
+| Impresión | El botón **Imprimir marcas** genera el PDF temporalmente en memoria. La confirmación de impresión es una acción explícita y auditable. |
+| Persistencia | La impresión normal no guarda el PDF, la nómina ni cartillas temporales. Solo se conserva la auditoría de la confirmación. |
 | Flujo de examen | La impresión de cartillas no cambia por sí sola el estado del rol; evita avanzar el examen sin haber realizado las demás tareas de impresión/control. |
 | Escaneo | La lectura usa exclusivamente el código preimpreso del estudiante para recuperar la clave correcta; no coteja N°, materia, grupo ni nombre, y el talón inferior no forma parte del área OMR. |
 
 ## Modelo de datos
 
 ```text
-sea_roles_evaluaciones 1 --- N sea_lotes_cartillas_omr 1 --- N sea_cartillas_omr
+sea_roles_evaluaciones 1 --- N sea_auditoria_evaluaciones (confirmaciones de impresión)
           |
           +--- N sea_mapeo_estudiantes_variantes (clave interna por código)
 ```
 
 ### Entidades
 
-- `sea_lotes_cartillas_omr`: identidad, rol, estado, archivo PDF, cantidad y evidencia de impresión.
-- `sea_cartillas_omr`: N°, materia, grupo, código, nombre y estado individual de cada cartilla.
+- `sea_lotes_cartillas_omr` y `sea_cartillas_omr`: estructuras históricas de la primera implementación; ya no se utilizan para la impresión temporal normal.
+- `sea_auditoria_evaluaciones`: confirmación mínima de impresión, usuario, fecha y cantidad consultada.
 - `sea_mapeo_estudiantes_variantes`: asignación confidencial existente. No se duplica la variante en el lote para evitar exposición innecesaria.
 
-Estados del lote: `GENERADO`, `IMPRESO`, `ANULADO`.
-
-Estados de cartilla: `GENERADA`, `IMPRESA`, `ANULADA`.
+Estado operativo de impresión: `PENDIENTE` o `IMPRESO`.
 
 ## API
 
 | Método | Ruta | Uso |
 | --- | --- | --- |
-| GET | `/api/roles-examen/{rolId}/cartillas/ultimo` | Consulta el último lote y sus cartillas. |
-| POST | `/api/roles-examen/{rolId}/cartillas/generar` | Crea un nuevo lote PDF desde los mapeos oficiales. |
-| POST | `/api/roles-examen/{rolId}/cartillas/lotes/{loteId}/marcar-impreso` | Confirma la impresión física del lote. |
+| GET | `/api/roles-examen/{rolId}/cartillas/preparacion` | Consulta la nómina oficial y el estado mínimo de impresión. |
+| POST | `/api/roles-examen/{rolId}/cartillas/imprimir` | Genera el PDF en memoria y lo devuelve al navegador; no guarda archivo. |
+| POST | `/api/roles-examen/{rolId}/cartillas/marcar-impreso` | Registra la confirmación de impresión en auditoría. |
 
-Las acciones generan registros en `sea_auditoria_evaluaciones` con el lote y la cantidad de cartillas involucradas.
+La confirmación genera un registro en `sea_auditoria_evaluaciones` con la cantidad de estudiantes involucrados; no se registra una ruta de PDF temporal.
 
 ## Verificación operativa
 
 1. Generar el examen de un rol y confirmar que existen estudiantes mapeados.
 2. Abrir **Lista de Evaluaciones** y seleccionar el icono de cartillas.
-3. Generar el lote y verificar que el PDF tenga un estudiante por página A4, sin cartilla dibujada ni letras A-E de variante.
+3. Verificar que la lista oficial aparezca sin generar un lote y que **Imprimir marcas** devuelva un PDF con un estudiante por página A4, sin cartilla dibujada ni letras A-E de variante.
 4. Confirmar que cada fila contiene N°, código de materia, grupo, código y nombre completo.
-5. Abrir el PDF desde el modal y validar los datos contra la lista oficial.
-6. Marcar impreso únicamente después de imprimirlo; revisar la auditoría del rol.
+5. Imprimir desde la ventana del PDF y validar los datos contra la lista oficial.
+6. Marcar impreso únicamente después de imprimirlo; revisar que solo quede la auditoría y que no se genere un archivo en `storage/generados`.
 7. En la etapa de OMR, validar que el código leído identifica la clave interna y mostrar la variante confirmada únicamente en la inspección de resultados.
 
 ## Procesamiento OMR con escaneo real

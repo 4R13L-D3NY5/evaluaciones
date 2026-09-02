@@ -1340,12 +1340,6 @@ export interface DiaCalendario {
 
               <!-- El PDF de validación siempre se genera en una sola columna. -->
               <div class="flex flex-wrap items-center gap-2">
-                @if (pdfPreviewUrl()) {
-                  <button (click)="descargarPdfPrevisualizacion()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg border border-white/15 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer">
-                    <i class="pi pi-download"></i>
-                    <span>Descargar PDF</span>
-                  </button>
-                }
                 <button (click)="cerrarModalPrevisualizacionPdf()" class="text-white/80 hover:text-white p-1 text-base cursor-pointer ml-1">
                   <i class="pi pi-times"></i>
                 </button>
@@ -3603,14 +3597,6 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       this._liberarPdfPreview();
       this._mostrarToast('No se pudo generar el PDF oficial de previsualización.', 'error');
     }
-  }
-
-  public descargarPdfPrevisualizacion(): void {
-    if (!this.pdfPreviewObjectUrl) return;
-    const anchor = document.createElement('a');
-    anchor.href = this.pdfPreviewObjectUrl;
-    anchor.download = `PREVISUALIZACION_EXAMEN_${this.parcialActivo().toUpperCase().replace(/\s+/g, '_')}.pdf`;
-    anchor.click();
   }
 
   private async _crearPdfPreviewOficial(preguntas: PreguntaValidada[]): Promise<Blob> {

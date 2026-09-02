@@ -32,17 +32,20 @@ UMBRAL_DIFERENCIAL_DOBLE = 18.0
 # Está normalizada sobre la página completa y ajustada al recuadro superior
 # derecho del código, excluyendo tipo de examen, N°, materia, grupo, nombre y
 # los seriales rojos superior/inferior.
-ZONA_CODIGO_ESTUDIANTE = (0.53, 0.09, 0.75, 0.14)
+# Coordenadas normalizadas sobre la cartilla oficial escaneada. El código del
+# estudiante está en el área numérica del recuadro grande de la cabecera
+# derecha; se excluyen N°, materia, grupo y el serial superior.
+ZONA_CODIGO_ESTUDIANTE = (0.70, 0.16, 0.97, 0.22)
 PARAMETROS_OMR_DEFECTO: dict[str, float] = {
     "umbral_densidad_marca": 70.0,
     "umbral_diferencial_doble": 18.0,
     "umbral_binario_grilla": 185.0,
     "nivel_tinta_marca": 145.0,
-    "zona_codigo_x": 0.53,
-    "zona_codigo_y": 0.09,
-    "zona_codigo_ancho": 0.22,
-    "zona_codigo_alto": 0.05,
-    "escala_ocr": 2.5,
+    "zona_codigo_x": 0.70,
+    "zona_codigo_y": 0.16,
+    "zona_codigo_ancho": 0.27,
+    "zona_codigo_alto": 0.06,
+    "escala_ocr": 3.0,
     "radio_busqueda_pixeles": 2.0,
 }
 
@@ -108,13 +111,24 @@ def _detectar_grilla(gray: np.ndarray, parametros: dict[str, float] | None = Non
     for contorno in contornos:
         x, y, w, h = cv2.boundingRect(contorno)
         aspecto = w / float(h) if h else 0
-        if 0.95 <= aspecto <= 1.55 and w > ancho * 0.48 and h > alto * 0.24 and y < alto * 0.78:
+        # La plantilla oficial tiene un cuadro de respuestas amplio, con un
+        # margen izquierdo pequeño y ubicado debajo de la cabecera. En algunos
+        # escaneos el fondo negro genera contornos falsos que abarcan toda la
+        # página; se descartan exigiendo la posición y proporción del cuadro
+        # real.
+        if (
+            0.95 <= aspecto <= 1.55
+            and w > ancho * 0.75
+            and h > alto * 0.55
+            and ancho * 0.015 <= x <= ancho * 0.08
+            and alto * 0.24 <= y < alto * 0.80
+        ):
             candidatos.append((w * h, x, y, w, h))
     if candidatos:
         _, x, y, w, h = max(candidatos)
         return x, y, w, h
     # Fallback para un recorte de cartilla sin borde recuperable.
-    return int(ancho * .015), int(alto * .125), int(ancho * .54), int(alto * .32)
+    return int(ancho * .028), int(alto * .28), int(ancho * .945), int(alto * .71)
 
 
 def _densidad_centro(
@@ -291,10 +305,15 @@ def _candidatos_codigo(imagen: np.ndarray, parametros: dict[str, float] | None =
     # código del estudiante. No se cotejan grupo, materia ni nombre.
     x1 = parametros["zona_codigo_x"]
     y1 = parametros["zona_codigo_y"]
+    # Algunas cartillas oficiales incluyen un talón inferior y por ello tienen
+    # más alto, pero la cabecera conserva la misma posición física. Se usa como
+    # referencia el alto de una hoja sin talón para que el código no se desplace
+    # hacia abajo al normalizarlo sobre una página más larga.
+    alto_referencia = min(alto, int(ancho * 1.12))
     zonas = [(x1, y1, x1 + parametros["zona_codigo_ancho"], y1 + parametros["zona_codigo_alto"])]
     candidatos: list[str] = []
     for x1, y1, x2, y2 in zonas:
-        recorte = imagen[int(alto * y1):int(alto * y2), int(ancho * x1):int(ancho * x2)]
+        recorte = imagen[int(alto_referencia * y1):int(alto_referencia * y2), int(ancho * x1):int(ancho * x2)]
         if recorte.size == 0:
             continue
         gris = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
@@ -313,7 +332,16 @@ def _candidatos_codigo(imagen: np.ndarray, parametros: dict[str, float] | None =
             )
             # Se extraen secuencias de dígitos aunque Tesseract las devuelva
             # separadas por saltos de línea o espacios.
-            candidatos.extend(re.findall(r"\d{5,12}", texto))
+            secuencias = re.findall(r"\d{5,12}", texto)
+            candidatos.extend(secuencias)
+            # Los bordes del recuadro o restos de la numeración impresa pueden
+            # pegar uno o dos dígitos al código. Se incluyen ventanas de siete
+            # dígitos para recuperar el código institucional real sin aceptar
+            # datos de otras zonas de la cartilla.
+            for secuencia in secuencias:
+                if len(secuencia) > 7:
+                    candidatos.append(secuencia[-7:])
+                    candidatos.append(secuencia[:7])
     return list(dict.fromkeys(candidatos))
 
 
