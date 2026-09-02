@@ -359,7 +359,8 @@ import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/
               <div class="relative w-full sm:w-72">
                 <input 
                   type="text" 
-                  [(ngModel)]="busquedaGrupo" 
+                  [ngModel]="busquedaGrupo()"
+                  (ngModelChange)="busquedaGrupo.set($event)"
                   placeholder="Buscar por docente, CI, aula o grupo..."
                   class="w-full bg-muted/70 border border-border rounded-xl pl-8 pr-3 py-2 text-xs font-medium text-foreground outline-none focus:border-primary">
                 <i class="pi pi-search absolute left-2.5 top-2.5 text-muted-foreground text-xs"></i>
@@ -828,7 +829,7 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   // Filtros de búsqueda
   public busquedaCarrera = '';
   public busquedaMateria = '';
-  public busquedaGrupo = '';
+  public busquedaGrupo = signal<string>('');
 
   private _tokenIntervalId: any = null;
 
@@ -854,19 +855,33 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   public gruposFiltrados = computed(() => {
     const sedeId = this.filtroGrupoSedeId();
     const carreraId = this.filtroGrupoCarreraId();
-    const q = this.busquedaGrupo.trim().toLowerCase();
+    const q = this.normalizarBusqueda(this.busquedaGrupo());
     let grupos = this.grupos();
     if (sedeId) grupos = grupos.filter(g => g.branchOfficeId === sedeId);
     if (carreraId) grupos = grupos.filter(g => g.careerId === carreraId);
     if (!q) return grupos;
-    return grupos.filter(g =>
-      (g.teacherName && g.teacherName.toLowerCase().includes(q)) || 
-      (g.teacherIdentityNumber && g.teacherIdentityNumber.includes(q)) ||
-      (g.code && g.code.toLowerCase().includes(q)) ||
-      this.asignaturaGrupo(g).codigo.toLowerCase().includes(q) ||
-      this.asignaturaGrupo(g).nombre.toLowerCase().includes(q) ||
-      (g.schedules && g.schedules.some(s => s.classroom && s.classroom.toLowerCase().includes(q)))
-    );
+    return grupos.filter(g => {
+      const asignatura = this.asignaturaGrupo(g);
+      const horarios = (g.schedules || []).flatMap(horario => [
+        horario.day,
+        horario.startTime,
+        horario.endTime,
+        horario.classroom,
+        horario.campus
+      ]);
+      const textoBuscable = [
+        g.code,
+        g.groupId,
+        g.classType,
+        g.term,
+        g.teacherName,
+        g.teacherIdentityNumber,
+        asignatura.codigo,
+        asignatura.nombre,
+        ...horarios
+      ].map(valor => this.normalizarBusqueda(valor)).join(' ');
+      return textoBuscable.includes(q);
+    });
   });
 
   public ngOnInit(): void {
@@ -938,8 +953,7 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
         this.cargando.set(false);
         // Seleccionar Cochabamba (CBA) por defecto si existe
         if (!this.sedeSeleccionada() && data.length > 0) {
-          const cba = data.find(s => s.code === 'CBA') || data[0];
-          this.seleccionarSede(cba);
+          this.seleccionarSede(data[0]);
         }
       },
       error: () => this.cargando.set(false)
@@ -979,13 +993,17 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   private _cargarGrupos(): void {
     const materia = this.materiaSeleccionada();
     const term = this.gestionActiva() || '2-2026';
+    const sedeFiltro = this.sedes().find(item => item.branchOfficeId === this.filtroGrupoSedeId());
+    const carreraFiltro = this.carrerasFiltroGrupos().find(item => item.careerId === this.filtroGrupoCarreraId());
 
     this.cargandoGrupos.set(true);
     this._gateway.getGroups(
       term,
       this.filtroGrupoSedeId() || undefined,
       this.filtroGrupoCarreraId() || undefined,
-      materia?.syllabusCourseId
+      materia?.syllabusCourseId,
+      sedeFiltro?.code,
+      carreraFiltro?.careerCode
     ).subscribe({
       next: data => {
         this.grupos.set(data || []);
@@ -1056,7 +1074,7 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
   public limpiarFiltrosGrupos(): void {
     this.filtroGrupoSedeId.set('');
     this.filtroGrupoCarreraId.set('');
-    this.busquedaGrupo = '';
+    this.busquedaGrupo.set('');
     this.materiaSeleccionada.set(null);
     this._cargarCarrerasFiltroGrupos();
     this._cargarGrupos();
@@ -1067,6 +1085,14 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
     if (nombre) return nombre;
     if (grupo?.teacherIdentityNumber) return `Nombre no disponible (CI ${grupo.teacherIdentityNumber})`;
     return 'Sin docente asignado';
+  }
+
+  private normalizarBusqueda(valor: unknown): string {
+    return String(valor ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
   }
 
   public nombreSedeGrupo(grupo: GroupItem): string {

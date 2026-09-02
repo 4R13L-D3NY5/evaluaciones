@@ -1082,7 +1082,7 @@ interface ResultadoVirtual {
               } @else {
                 <div class="border border-border rounded-xl overflow-hidden">
                   <div class="grid grid-cols-[1.5fr_1fr_0.8fr_2fr] gap-3 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                    <span>Job</span><span>Rol</span><span>Estado</span><span>Detalle</span>
+                    <span>Job</span><span>Rol de examen</span><span>Estado</span><span>Detalle</span>
                   </div>
                   <div class="max-h-72 overflow-y-auto divide-y divide-border">
                     @for (tarea of colaGeneracion()?.tareas ?? []; track tarea.jobId) {
@@ -1540,7 +1540,7 @@ interface ResultadoVirtual {
             } @else if (errorBitacora()) {
               <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800">{{ errorBitacora() }}</div>
             } @else if (auditoriaBitacora().length === 0) {
-              <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">Todavía no hay actividades registradas para este rol.</div>
+              <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">Todavía no hay actividades registradas para este rol de examen.</div>
             } @else {
               <div class="max-h-[52vh] overflow-y-auto space-y-2 pr-1">
                 @for (evento of auditoriaBitacora(); track evento.id) {
@@ -2232,9 +2232,8 @@ export class EvaluacionesDiaComponent implements OnInit {
       next: sedes => {
         this.sedes.set(sedes);
         if (sedes.length > 0) {
-          const cba = sedes.find(s => s.code === 'CBA') || sedes[0];
-          this.sedeSeleccionada.set(cba);
-          this._cargarCarreras(cba.code);
+          this.sedeSeleccionada.set(sedes[0]);
+          this._cargarCarreras(sedes[0].code);
         }
       },
       error: () => this.cargando.set(false)
@@ -3261,7 +3260,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       },
       error: () => {
         this.bancoSeleccionado.set(null);
-        this._mostrarToast('No se encontró un banco de preguntas validado para este rol en el servidor.', 'error');
+        this._mostrarToast('No se encontró un banco de preguntas validado para este rol de examen en el servidor.', 'error');
       }
     });
 
@@ -3706,15 +3705,15 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public abrirPatronPdfTypst(): void {
-    this._mostrarToast('El patrón oficial estará disponible cuando exista una generación persistida para el rol.', 'info');
+    this._mostrarToast('El patrón oficial estará disponible cuando exista una generación persistida para el rol de examen.', 'info');
   }
 
   public descargarRemarkExcelOficial(): void {
-    this._mostrarToast('La matriz Remark oficial estará disponible cuando exista una generación persistida para el rol.', 'info');
+    this._mostrarToast('La matriz Remark oficial estará disponible cuando exista una generación persistida para el rol de examen.', 'info');
   }
 
   public abrirListaFirmasPdfTypst(item?: EvaluacionItemUI): void {
-    this._mostrarToast('La lista oficial de firmas estará disponible cuando exista un documento generado para el rol.', 'info');
+    this._mostrarToast('La lista oficial de firmas estará disponible cuando exista un documento generado para el rol de examen.', 'info');
   }
 
   private _urlArchivo(pdfPath: string): string {
@@ -3741,7 +3740,7 @@ export class EvaluacionesDiaComponent implements OnInit {
         this.cargandoBitacora.set(false);
       },
       error: () => {
-        this.errorBitacora.set('No se pudo cargar la bitácora de este rol.');
+        this.errorBitacora.set('No se pudo cargar la bitácora de este rol de examen.');
         this.cargandoBitacora.set(false);
       }
     });
@@ -3782,8 +3781,8 @@ export class EvaluacionesDiaComponent implements OnInit {
       ELIMINACION_BANCO_PREGUNTAS: 'Se eliminó el banco de preguntas',
       GENERACION_LOTE_CARTILLAS_OMR: 'Se generaron las marcas OMR',
       CONFIRMACION_IMPRESION_CARTILLAS_OMR: 'Se confirmó la impresión de las marcas OMR',
-      RESTABLECIMIENTO_A_VALIDADO: 'Se restableció el rol a Validado',
-      TRANSICION_ESTADO: 'Se avanzó el estado del rol'
+      RESTABLECIMIENTO_A_VALIDADO: 'Se restableció el rol de examen a Validado',
+      TRANSICION_ESTADO: 'Se avanzó el estado del rol de examen'
     };
     return descripciones[accion] || accion.replaceAll('_', ' ').toLowerCase()
       .replace(/^./, letra => letra.toUpperCase());

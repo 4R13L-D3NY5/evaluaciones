@@ -1,12 +1,13 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../../core/services/auth.service';
 import { 
   EvaluacionesStorageService, 
-  GestionEvaluacionItem, 
   EtapaEvaluacion 
 } from '../../core/services/evaluaciones-storage.service';
+import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 
 interface SedeMetrica {
   id: number;
@@ -21,12 +22,43 @@ interface SedeMetrica {
 }
 
 interface EstadoMetrica {
-  estado: EtapaEvaluacion;
+  estado: DashboardEtapa;
   cantidad: number;
   porcentaje: number;
   color: string;
   badgeClass: string;
   icon: string;
+}
+
+type DashboardEtapa = EtapaEvaluacion | 'Validado' | 'Suspendido';
+
+interface DashboardRolConfig {
+  titulo: string;
+  descripcion: string;
+  alcance: string;
+  icono: string;
+  accesos: { etiqueta: string; descripcion: string; ruta: string; icono: string }[];
+}
+
+interface DashboardRolMetrica {
+  etiqueta: string;
+  valor: number;
+  detalle: string;
+  icono: string;
+  clase: string;
+}
+
+interface DashboardTurno {
+  id: string;
+  codigo: string;
+  materia: string;
+  grupo: string;
+  docente: string;
+  semestre: number;
+  parcial: string;
+  hora: string;
+  conCartilla: boolean;
+  etapa: DashboardEtapa;
 }
 
 @Component({
@@ -43,36 +75,40 @@ interface EstadoMetrica {
           <div class="flex items-center gap-2">
             <span class="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
               <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-              Sistema de Evaluaciones · UNITEPC
+              Sistema de Evaluaciones · {{ rolUsuario() }}
             </span>
-            <span class="text-white/60 text-xs">|</span>
-            <span class="text-xs text-white/80 font-mono font-bold flex items-center gap-1">
-              <i class="pi pi-bolt text-purple-400"></i> Motor de generación activo
-            </span>
+            @if (!esDocente()) {
+              <span class="text-white/60 text-xs">|</span>
+              <span class="text-xs text-white/80 font-mono font-bold flex items-center gap-1">
+                <i class="pi pi-bolt text-purple-400"></i> Motor de generación activo
+              </span>
+            }
           </div>
 
           <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
-            Panel de Control y Monitoreo Institucional
+            {{ configuracionRol().titulo }}
           </h1>
           <p class="text-xs text-purple-200/80 max-w-2xl font-medium">
-            Seguimiento en tiempo real de generación de exámenes, lectura óptica OMR, trazabilidad de estados y cobertura en sedes.
+            {{ configuracionRol().descripcion }}
           </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-          <!-- Selector de Sede -->
-          <div class="flex items-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-xs transition-colors backdrop-blur-xs">
-            <i class="pi pi-building text-purple-300"></i>
-            <select 
-              [(ngModel)]="filtroSedeDashboard"
-              class="bg-transparent text-white font-bold outline-none cursor-pointer">
-              <option value="0" class="text-slate-900">Todas las Sedes (Nacional)</option>
-              <option value="1" class="text-slate-900">Cochabamba - Colonial</option>
-              <option value="2" class="text-slate-900">Cochabamba - Juan Pablo II</option>
-              <option value="3" class="text-slate-900">Sede La Paz</option>
-              <option value="4" class="text-slate-900">Sede Santa Cruz</option>
-            </select>
-          </div>
+          @if (!esDocente()) {
+            <!-- Selector de Sede -->
+            <div class="flex items-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-xs transition-colors backdrop-blur-xs">
+              <i class="pi pi-building text-purple-300"></i>
+              <select 
+                [(ngModel)]="filtroSedeDashboard"
+                class="bg-transparent text-white font-bold outline-none cursor-pointer">
+                <option value="0" class="text-slate-900">Todas las Sedes (Nacional)</option>
+                <option value="1" class="text-slate-900">Cochabamba - Colonial</option>
+                <option value="2" class="text-slate-900">Cochabamba - Juan Pablo II</option>
+                <option value="3" class="text-slate-900">Sede La Paz</option>
+                <option value="4" class="text-slate-900">Sede Santa Cruz</option>
+              </select>
+            </div>
+          }
 
           <!-- Selector de Gestión -->
           <div class="flex items-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-xs transition-colors backdrop-blur-xs">
@@ -98,6 +134,78 @@ interface EstadoMetrica {
 
       </div>
 
+      <section class="bg-card border border-border rounded-2xl p-6 shadow-2xs space-y-5">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 border-b border-border pb-4">
+          <div class="flex items-start gap-3">
+            <div class="h-11 w-11 rounded-xl bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 flex items-center justify-center shrink-0">
+              <i [class]="configuracionRol().icono" class="text-lg"></i>
+            </div>
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-wider text-primary">Vista personalizada por cargo</span>
+              <h2 class="text-lg font-black text-foreground mt-1">{{ configuracionRol().titulo }}</h2>
+              <p class="text-xs text-muted-foreground mt-1 max-w-3xl">{{ configuracionRol().descripcion }}</p>
+            </div>
+          </div>
+          <div class="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-xs shrink-0">
+            <span class="block text-[9px] font-black uppercase tracking-wider text-primary">Usuario autenticado</span>
+            <strong class="block mt-1 text-foreground">{{ nombreUsuario() }}</strong>
+            <span class="block mt-0.5 text-[10px] text-muted-foreground">{{ rolUsuario() }}</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          @for (metrica of metricasRol(); track metrica.etiqueta) {
+            <div class="rounded-xl border border-border bg-muted/30 p-4">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">{{ metrica.etiqueta }}</span>
+                <i [class]="metrica.icono" [ngClass]="metrica.clase"></i>
+              </div>
+              <strong class="block mt-2 text-2xl font-black font-mono text-foreground">{{ metrica.valor }}</strong>
+              <span class="block mt-1 text-[10px] text-muted-foreground">{{ metrica.detalle }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="rounded-xl border border-border bg-muted/20 p-4">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-lock text-primary"></i>
+              <h3 class="text-xs font-black uppercase tracking-wider text-foreground">Información a tu alcance</h3>
+            </div>
+            <p class="mt-3 text-xs leading-relaxed text-muted-foreground">{{ alcanceUsuario() }}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              @for (sede of sedesUsuario(); track sede) {
+                <span class="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] font-bold text-foreground"><i class="pi pi-building mr-1 text-primary"></i>{{ sede }}</span>
+              } @empty {
+                <span class="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] font-bold text-muted-foreground">Alcance institucional</span>
+              }
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-border bg-muted/20 p-4">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-compass text-primary"></i>
+              <h3 class="text-xs font-black uppercase tracking-wider text-foreground">Accesos directos de tu cargo</h3>
+            </div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+              @for (acceso of configuracionRol().accesos; track acceso.ruta) {
+                <a [routerLink]="acceso.ruta" class="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/40 hover:bg-primary/5">
+                  <i [class]="acceso.icono" class="text-primary"></i>
+                  <span class="min-w-0"><strong class="block text-[11px] text-foreground">{{ acceso.etiqueta }}</strong><small class="block mt-0.5 truncate text-[10px] text-muted-foreground">{{ acceso.descripcion }}</small></span>
+                </a>
+              }
+            </div>
+          </div>
+        </div>
+
+        @if (cargandoResumen()) {
+          <div class="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800"><i class="pi pi-spin pi-spinner"></i> Cargando información académica de tu alcance...</div>
+        } @else if (errorResumen()) {
+          <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800"><i class="pi pi-exclamation-triangle"></i>{{ errorResumen() }}</div>
+        }
+      </section>
+
+      @if (!esDocente()) {
       <!-- 2. GRID DE KPIS EJECUTIVOS CON INDICADORES VISUALES -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
@@ -112,7 +220,7 @@ interface EstadoMetrica {
           <div class="flex items-baseline justify-between">
             <div>
               <span class="text-3xl font-black text-foreground font-mono">{{ totalExamenesFiltrados() }}</span>
-              <span class="text-[11px] font-bold text-muted-foreground block mt-0.5">Asignaturas en rol oficial</span>
+              <span class="text-[11px] font-bold text-muted-foreground block mt-0.5">Asignaturas en rol de examen oficial</span>
             </div>
             <span class="bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-0.5 rounded-full">
               +8.4% vs I-2026
@@ -181,20 +289,22 @@ interface EstadoMetrica {
           </div>
           <div class="flex items-baseline justify-between">
             <div>
-              <span class="text-3xl font-black text-amber-600 dark:text-amber-400 font-mono">{{ storage.kpiResumen().porcentajeCobertura }}%</span>
+              <span class="text-3xl font-black text-amber-600 dark:text-amber-400 font-mono">{{ porcentajeBancos() }}%</span>
               <span class="text-[11px] font-bold text-muted-foreground block mt-0.5">{{ totalReactivosBancos() }} reactivos cifrados</span>
             </div>
             <span class="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full">
-              42/50 Docentes
+              {{ bancosCargadosVisible() }}/{{ rolesExamenesVisibles().length }} roles de examen con banco
             </span>
           </div>
           <div class="w-full bg-muted h-1.5 rounded-full mt-3 overflow-hidden">
-            <div class="bg-amber-500 h-full rounded-full" [style.width.%]="storage.kpiResumen().porcentajeCobertura"></div>
+            <div class="bg-amber-500 h-full rounded-full" [style.width.%]="porcentajeBancos()"></div>
           </div>
         </div>
 
       </div>
+      }
 
+      @if (!esDocente()) {
       <!-- 3. SECCIÓN GRÁFICA PRINCIPAL: PIPELINE DE ESTADOS Y COBERTURA POR SEDE -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -267,10 +377,10 @@ interface EstadoMetrica {
               <div class="flex items-center gap-2">
                 <i class="pi pi-chart-pie text-amber-500"></i>
                 <h3 class="text-sm font-black uppercase tracking-wider text-foreground">
-                  Composición de Reactivos
+                  Cobertura de bancos
                 </h3>
               </div>
-              <span class="text-[10px] font-bold text-muted-foreground uppercase">Bancos Excel</span>
+            <span class="text-[10px] font-bold text-muted-foreground uppercase">Datos del servicio</span>
             </div>
 
             <!-- Donut Chart SVG Renderizado Dinámicamente -->
@@ -284,30 +394,9 @@ interface EstadoMetrica {
                     fill="none"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
-                  <!-- Segmento Fácil (30% - Verde) -->
                   <path
                     class="text-emerald-500 stroke-current transition-all duration-700"
-                    stroke-dasharray="30, 100"
-                    stroke-width="4.5"
-                    stroke-linecap="round"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  <!-- Segmento Medio (50% - Azul/Índigo) -->
-                  <path
-                    class="text-indigo-600 stroke-current transition-all duration-700"
-                    stroke-dasharray="50, 100"
-                    stroke-dashoffset="-30"
-                    stroke-width="4.5"
-                    stroke-linecap="round"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  <!-- Segmento Difícil (20% - Ámbar/Rojo) -->
-                  <path
-                    class="text-rose-500 stroke-current transition-all duration-700"
-                    stroke-dasharray="20, 100"
-                    stroke-dashoffset="-80"
+                    [attr.stroke-dasharray]="porcentajeBancos() + ', 100'"
                     stroke-width="4.5"
                     stroke-linecap="round"
                     fill="none"
@@ -317,8 +406,8 @@ interface EstadoMetrica {
 
                 <!-- Texto Central del Donut -->
                 <div class="absolute flex flex-col items-center justify-center text-center">
-                  <span class="text-2xl font-black text-foreground font-mono">1,840</span>
-                  <span class="text-[9px] font-bold text-muted-foreground uppercase">Reactivos</span>
+                  <span class="text-2xl font-black text-foreground font-mono">{{ porcentajeBancos() }}%</span>
+                  <span class="text-[9px] font-bold text-muted-foreground uppercase">Bancos cargados</span>
                 </div>
               </div>
             </div>
@@ -326,22 +415,22 @@ interface EstadoMetrica {
             <!-- Leyenda de Dificultad -->
             <div class="space-y-2 text-xs pt-3 border-t border-border">
               <div class="flex items-center justify-between font-bold">
-                <span class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                  <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span> Nivel Fácil (30%)
+                  <span class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                  <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span> Bancos cargados
                 </span>
-                <span class="font-mono text-foreground">552 preguntas</span>
+                <span class="font-mono text-foreground">{{ bancosCargadosVisible() }} roles de examen</span>
               </div>
               <div class="flex items-center justify-between font-bold">
                 <span class="flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
-                  <span class="h-2.5 w-2.5 rounded-full bg-indigo-600"></span> Nivel Medio (50%)
+                <span class="h-2.5 w-2.5 rounded-full bg-indigo-600"></span> Roles de examen visibles
                 </span>
-                <span class="font-mono text-foreground">920 preguntas</span>
+                <span class="font-mono text-foreground">{{ rolesExamenesVisibles().length }}</span>
               </div>
               <div class="flex items-center justify-between font-bold">
                 <span class="flex items-center gap-2 text-rose-700 dark:text-rose-400">
-                  <span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span> Nivel Difícil (20%)
+                  <span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span> Pendientes de banco
                 </span>
-                <span class="font-mono text-foreground">368 preguntas</span>
+                <span class="font-mono text-foreground">{{ pendientesBancoVisible() }}</span>
               </div>
             </div>
           </div>
@@ -354,7 +443,9 @@ interface EstadoMetrica {
         </div>
 
       </div>
+      }
 
+      @if (!esDocente()) {
       <!-- 4. COMPARATIVA POR SEDES Y PRÓXIMOS TURNOS DE HOY -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -456,7 +547,9 @@ interface EstadoMetrica {
         </div>
 
       </div>
+      }
 
+      @if (mostrarActividadInstitucional()) {
       <!-- 5. FEED DE ACTIVIDAD EN VIVO & POLÍTICAS DE SEGURIDAD -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -556,31 +649,164 @@ interface EstadoMetrica {
         </div>
 
       </div>
+      }
 
     </div>
   `
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
   public readonly storage = inject(EvaluacionesStorageService);
+  private readonly auth = inject(AuthService);
+  private readonly rolExamenService = inject(RolExamenService);
 
   public filtroSedeDashboard = '0';
+  public readonly rolesExamenesVisibles = signal<RolExamenResponse[]>([]);
+  public readonly cargandoResumen = signal(false);
+  public readonly errorResumen = signal<string | null>(null);
+
+  private readonly configuracionesRol: Record<string, DashboardRolConfig> = {
+    ADMINISTRADOR_SISTEMA: {
+      titulo: 'Resumen institucional completo',
+      descripcion: 'Tienes acceso a la operación completa del sistema: servicios SEA, usuarios, roles de examen, evaluaciones, bancos, OMR y reportes.',
+      alcance: 'Toda la institución: sedes, carreras, grupos y evaluaciones.',
+      icono: 'pi pi-shield',
+      accesos: [
+        { etiqueta: 'Usuarios y accesos', descripcion: 'Cuentas, roles y alcances', ruta: '/usuarios-sistema', icono: 'pi pi-users' },
+        { etiqueta: 'Servicios SEA', descripcion: 'Catálogos académicos oficiales', ruta: '/servicios-sea', icono: 'pi pi-building' },
+        { etiqueta: 'Evaluaciones', descripcion: 'Seguimiento institucional', ruta: '/evaluaciones-dia', icono: 'pi pi-calendar' },
+        { etiqueta: 'Auditoría', descripcion: 'Trazabilidad de operaciones', ruta: '/auditoria', icono: 'pi pi-history' }
+      ]
+    },
+    RESPONSABLE_EVALUACIONES: {
+      titulo: 'Gestión general de evaluaciones',
+      descripcion: 'Consulta y coordina los roles de examen y las evaluaciones de toda la institución, según el ciclo operativo autorizado.',
+      alcance: 'Todas las sedes, carreras y evaluaciones institucionales.',
+      icono: 'pi pi-briefcase',
+      accesos: [
+        { etiqueta: 'Roles de examen', descripcion: 'Programación académica', ruta: '/rol-examenes', icono: 'pi pi-sitemap' },
+        { etiqueta: 'Lista de evaluaciones', descripcion: 'Estados y seguimiento', ruta: '/evaluaciones-dia', icono: 'pi pi-calendar' },
+        { etiqueta: 'Administración', descripcion: 'Parámetros de evaluación', ruta: '/administracion-evaluaciones', icono: 'pi pi-sliders-h' },
+        { etiqueta: 'Reportes', descripcion: 'Resultados y trazabilidad', ruta: '/reporte-evaluaciones', icono: 'pi pi-chart-bar' }
+      ]
+    },
+    PERSONAL_EVALUACIONES: {
+      titulo: 'Operación de evaluaciones asignadas',
+      descripcion: 'Visualiza y opera los roles de examen y evaluaciones correspondientes a las carreras de tus campus asignados.',
+      alcance: 'Carreras de las sedes asignadas por administración.',
+      icono: 'pi pi-file-edit',
+      accesos: [
+        { etiqueta: 'Lista de evaluaciones', descripcion: 'Estados y entregas', ruta: '/evaluaciones-dia', icono: 'pi pi-calendar' },
+        { etiqueta: 'Calificación OMR', descripcion: 'Lectura de cartillas', ruta: '/calificacion-omr', icono: 'pi pi-qrcode' },
+        { etiqueta: 'Salas virtuales', descripcion: 'Seguimiento de sesiones', ruta: '/salas-virtuales', icono: 'pi pi-desktop' }
+      ]
+    },
+    DIRECTOR_CARRERA: {
+      titulo: 'Supervisión de carreras asignadas',
+      descripcion: 'Consulta la programación, los roles de examen y el avance de las evaluaciones de tus carreras.',
+      alcance: 'Carreras y sedes asignadas por administración.',
+      icono: 'pi pi-sitemap',
+      accesos: [
+        { etiqueta: 'Roles de examen', descripcion: 'Programación de tus carreras', ruta: '/rol-examenes', icono: 'pi pi-sitemap' },
+        { etiqueta: 'Plan de estudios', descripcion: 'Materias y grupos', ruta: '/plan-estudios', icono: 'pi pi-book' }
+      ]
+    },
+    DOCENTE: {
+      titulo: 'Mis asignaturas y evaluaciones',
+      descripcion: 'Consulta tus roles de examen, carga el banco de preguntas y da seguimiento a las evaluaciones de tus asignaturas.',
+      alcance: 'Asignaturas y grupos donde SEA reconoce tu CI como docente oficial.',
+      icono: 'pi pi-user',
+      accesos: [
+        { etiqueta: 'Banco de preguntas', descripcion: 'Carga y valida tu banco', ruta: '/banco-preguntas', icono: 'pi pi-database' },
+        { etiqueta: 'Mis roles de examen', descripcion: 'Consulta tu programación', ruta: '/rol-examenes', icono: 'pi pi-sitemap' },
+        { etiqueta: 'Mis evaluaciones', descripcion: 'Revisa el estado de tus exámenes', ruta: '/evaluaciones-dia', icono: 'pi pi-calendar' },
+        { etiqueta: 'Salas virtuales', descripcion: 'Acceso a tus exámenes virtuales', ruta: '/salas-virtuales', icono: 'pi pi-desktop' }
+      ]
+    },
+    VICERRECTOR: {
+      titulo: 'Supervisión de evaluaciones por sede',
+      descripcion: 'Consulta los roles de examen y las evaluaciones de las sedes bajo tu responsabilidad para supervisar el avance académico.',
+      alcance: 'Sedes asignadas por administración.',
+      icono: 'pi pi-chart-bar',
+      accesos: [
+        { etiqueta: 'Reportes', descripcion: 'Resultados consolidados', ruta: '/reporte-evaluaciones', icono: 'pi pi-chart-bar' },
+        { etiqueta: 'Dashboard', descripcion: 'Indicadores de tus sedes', ruta: '/dashboard', icono: 'pi pi-chart-line' }
+      ]
+    }
+  };
+
+  public readonly rolUsuario = computed(() => this.auth.usuario()?.rolNombre || this.configuracionRolActual().titulo);
+  public readonly esDocente = computed(() => this.auth.usuario()?.rol === 'DOCENTE');
+  public readonly mostrarActividadInstitucional = computed(() => ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES'].includes(this.auth.usuario()?.rol || ''));
+  public readonly nombreUsuario = computed(() => this.auth.usuario()?.nombreCompleto || 'Usuario autenticado');
+  public readonly configuracionRol = computed<DashboardRolConfig>(() => this.configuracionRolActual());
+  public readonly sedesUsuario = computed(() => this.auth.usuario()?.sedesAsignadas?.filter(Boolean) || []);
+  public readonly alcanceUsuario = computed(() => {
+    const configuracion = this.configuracionRol();
+    const sedes = this.sedesUsuario();
+    if (!sedes.length) return configuracion.alcance;
+    return `${configuracion.alcance} Sedes asignadas: ${sedes.join(', ')}.`;
+  });
+  public readonly metricasRol = computed<DashboardRolMetrica[]>(() => {
+    const evaluaciones = this.rolesExamenesVisibles();
+    const esDocente = this.auth.usuario()?.rol === 'DOCENTE';
+    const programadas = evaluaciones.filter(item => item.estadoFlujo === 'PROGRAMADO').length;
+    const bancosCargados = evaluaciones.filter(item => item.estadoFlujo !== 'PROGRAMADO').length;
+    const enProceso = evaluaciones.filter(item => ['GENERADO', 'IMPRESO', 'ENTREGADO', 'DEVUELTO', 'PENDIENTE_NOTAS'].includes(item.estadoFlujo)).length;
+    const calificadas = evaluaciones.filter(item => item.estadoFlujo === 'CALIFICADO').length;
+    return [
+      { etiqueta: esDocente ? 'Mis roles de examen' : 'Roles de examen visibles', valor: evaluaciones.length, detalle: 'Filtrados por tu alcance', icono: 'pi pi-sitemap', clase: 'text-primary' },
+      { etiqueta: esDocente ? 'Bancos cargados' : 'En planificación', valor: esDocente ? bancosCargados : programadas, detalle: esDocente ? 'Evaluaciones con contenido registrado' : 'Roles de examen pendientes de preparación', icono: esDocente ? 'pi pi-database' : 'pi pi-calendar', clase: esDocente ? 'text-amber-600' : 'text-purple-600' },
+      { etiqueta: 'En proceso', valor: enProceso, detalle: 'Generación, entrega o devolución', icono: 'pi pi-sync', clase: 'text-blue-600' },
+      { etiqueta: 'Calificadas', valor: calificadas, detalle: 'Evaluaciones cerradas', icono: 'pi pi-check-circle', clase: 'text-emerald-600' }
+    ];
+  });
+
+  public ngOnInit(): void {
+    this.cargarResumenAcademico();
+  }
+
+  private configuracionRolActual(): DashboardRolConfig {
+    return this.configuracionesRol[this.auth.usuario()?.rol || ''] || {
+      titulo: 'Resumen de acceso',
+      descripcion: 'La información se mostrará de acuerdo con los permisos y el alcance académico de tu cuenta.',
+      alcance: 'Alcance definido por administración.',
+      icono: 'pi pi-user',
+      accesos: []
+    };
+  }
+
+  private cargarResumenAcademico(): void {
+    this.cargandoResumen.set(true);
+    this.errorResumen.set(null);
+    this.rolExamenService.listar().subscribe({
+      next: roles => {
+        this.rolesExamenesVisibles.set(roles);
+        this.cargandoResumen.set(false);
+      },
+      error: () => {
+        this.rolesExamenesVisibles.set([]);
+        this.cargandoResumen.set(false);
+        this.errorResumen.set('No se pudo consultar el resumen académico desde el servicio institucional.');
+      }
+    });
+  }
 
   public totalExamenesFiltrados = computed(() => {
-    return this.storage.gestionEvaluaciones().length;
+    return this.rolesExamenesVisibles().length;
   });
 
   public totalExamenesHoy = computed(() => {
     const hoy = new Date();
-    const fechaHoy = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
-    return this.storage.gestionEvaluaciones().filter(e => e.fecha === fechaHoy).length;
+    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    return this.rolesExamenesVisibles().filter(e => e.fecha === fechaHoy).length;
   });
 
   public totalConCartillaHoy = computed(() => {
-    return this.storage.gestionEvaluaciones().filter(e => e.conCartilla).length;
+    return this.rolesExamenesVisibles().filter(e => e.modalidad === 'PRESENCIAL_CARTILLA').length;
   });
 
   public totalSinCartillaHoy = computed(() => {
-    return this.storage.gestionEvaluaciones().filter(e => !e.conCartilla).length;
+    return this.rolesExamenesVisibles().filter(e => e.modalidad !== 'PRESENCIAL_CARTILLA').length;
   });
 
   public porcentajeTurnosHoy = computed(() => {
@@ -589,13 +815,12 @@ export class DashboardComponent {
   });
 
   public totalVariantesGeneradas = computed(() => {
-    const generados = this.storage.gestionEvaluaciones().filter(e => e.etapa !== 'Programado').length;
-    return generados * 4; // 4 variantes A-D por examen
+    return this.rolesExamenesVisibles().reduce((total, item) => total + (item.variantesGeneradasCount || 0), 0);
   });
 
   public porcentajeGenerados = computed(() => {
     const total = this.totalExamenesFiltrados();
-    const listos = this.storage.gestionEvaluaciones().filter(e => e.etapa !== 'Programado').length;
+    const listos = this.rolesExamenesVisibles().filter(e => e.estadoFlujo !== 'PROGRAMADO' && e.estadoFlujo !== 'VALIDADO').length;
     return total > 0 ? Math.round((listos / total) * 100) : 0;
   });
 
@@ -603,22 +828,33 @@ export class DashboardComponent {
     return 0;
   });
 
+  public porcentajeBancos = computed(() => {
+    const total = this.rolesExamenesVisibles().length;
+    const cargados = this.bancosCargadosVisible();
+    return total ? Math.round((cargados / total) * 100) : 0;
+  });
+
+  public bancosCargadosVisible = computed(() => this.rolesExamenesVisibles().filter(item => item.estadoFlujo !== 'PROGRAMADO').length);
+  public pendientesBancoVisible = computed(() => this.rolesExamenesVisibles().filter(item => item.estadoFlujo === 'PROGRAMADO').length);
+
   public metricasEstados = computed<EstadoMetrica[]>(() => {
-    const evals = this.storage.gestionEvaluaciones();
+    const evals = this.rolesExamenesVisibles();
     const total = evals.length || 1;
 
-    const etapas: { estado: EtapaEvaluacion; color: string; badge: string; icon: string }[] = [
-      { estado: 'Programado', color: 'bg-purple-600', badge: 'bg-purple-100 text-purple-800 border border-purple-300', icon: 'pi pi-calendar' },
-      { estado: 'Generado', color: 'bg-indigo-600', badge: 'bg-indigo-100 text-indigo-800 border border-indigo-300', icon: 'pi pi-bolt' },
-      { estado: 'Impreso', color: 'bg-blue-600', badge: 'bg-blue-100 text-blue-800 border border-blue-300', icon: 'pi pi-print' },
-      { estado: 'Entregado', color: 'bg-amber-600', badge: 'bg-amber-100 text-amber-800 border border-amber-300', icon: 'pi pi-send' },
-      { estado: 'Devuelto', color: 'bg-rose-600', badge: 'bg-rose-100 text-rose-800 border border-rose-300', icon: 'pi pi-replay' },
-      { estado: 'Pendiente de notas', color: 'bg-amber-600', badge: 'bg-amber-100 text-amber-800 border border-amber-300', icon: 'pi pi-upload' },
-      { estado: 'Calificado', color: 'bg-emerald-600', badge: 'bg-emerald-100 text-emerald-800 border border-emerald-300', icon: 'pi pi-check-circle' }
+    const etapas: { estado: DashboardEtapa; backend: RolExamenResponse['estadoFlujo']; color: string; badge: string; icon: string }[] = [
+      { estado: 'Programado', backend: 'PROGRAMADO', color: 'bg-purple-600', badge: 'bg-purple-100 text-purple-800 border border-purple-300', icon: 'pi pi-calendar' },
+      { estado: 'Validado', backend: 'VALIDADO', color: 'bg-teal-600', badge: 'bg-teal-100 text-teal-800 border border-teal-300', icon: 'pi pi-verified' },
+      { estado: 'Generado', backend: 'GENERADO', color: 'bg-indigo-600', badge: 'bg-indigo-100 text-indigo-800 border border-indigo-300', icon: 'pi pi-bolt' },
+      { estado: 'Impreso', backend: 'IMPRESO', color: 'bg-blue-600', badge: 'bg-blue-100 text-blue-800 border border-blue-300', icon: 'pi pi-print' },
+      { estado: 'Entregado', backend: 'ENTREGADO', color: 'bg-amber-600', badge: 'bg-amber-100 text-amber-800 border border-amber-300', icon: 'pi pi-send' },
+      { estado: 'Devuelto', backend: 'DEVUELTO', color: 'bg-rose-600', badge: 'bg-rose-100 text-rose-800 border border-rose-300', icon: 'pi pi-replay' },
+      { estado: 'Pendiente de notas', backend: 'PENDIENTE_NOTAS', color: 'bg-amber-600', badge: 'bg-amber-100 text-amber-800 border border-amber-300', icon: 'pi pi-upload' },
+      { estado: 'Calificado', backend: 'CALIFICADO', color: 'bg-emerald-600', badge: 'bg-emerald-100 text-emerald-800 border border-emerald-300', icon: 'pi pi-check-circle' },
+      { estado: 'Suspendido', backend: 'SUSPENDIDO', color: 'bg-slate-600', badge: 'bg-slate-100 text-slate-800 border border-slate-300', icon: 'pi pi-ban' }
     ];
 
     return etapas.map(et => {
-      const count = evals.filter(e => e.etapa === et.estado).length;
+      const count = evals.filter(e => e.estadoFlujo === et.backend).length;
       return {
         estado: et.estado,
         cantidad: count,
@@ -631,22 +867,57 @@ export class DashboardComponent {
   });
 
   public estadisticasSedes = computed<SedeMetrica[]>(() => {
-    return [];
+    const agrupadas = new Map<string, RolExamenResponse[]>();
+    this.rolesExamenesVisibles().forEach(item => {
+      const actuales = agrupadas.get(item.sedeCodigo) || [];
+      agrupadas.set(item.sedeCodigo, [...actuales, item]);
+    });
+
+    return Array.from(agrupadas.entries()).slice(0, 5).map(([codigo, items], index) => {
+      const total = items.length;
+      const generados = items.filter(item => !['PROGRAMADO', 'VALIDADO'].includes(item.estadoFlujo)).length;
+      const impresos = items.filter(item => ['IMPRESO', 'ENTREGADO', 'DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO'].includes(item.estadoFlujo)).length;
+      const devueltos = items.filter(item => ['DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO'].includes(item.estadoFlujo)).length;
+      return {
+        id: index + 1,
+        nombre: items[0].sedeNombre || codigo,
+        ciudad: items[0].campus || codigo,
+        totalExamenes: total,
+        generados,
+        impresos,
+        devueltos,
+        porcentaje: total ? Math.round((generados / total) * 100) : 0,
+        color: ['bg-purple-600', 'bg-blue-600', 'bg-emerald-600', 'bg-amber-500', 'bg-rose-500'][index % 5]
+      };
+    });
   });
 
-  public proximosTurnos = computed<GestionEvaluacionItem[]>(() => {
-    return this.storage.gestionEvaluaciones().slice(0, 5);
+  public proximosTurnos = computed<DashboardTurno[]>(() => {
+    return this.rolesExamenesVisibles().slice(0, 5).map(item => ({
+      id: item.id,
+      codigo: item.materiaCodigo,
+      materia: item.materiaNombre,
+      grupo: item.grupo,
+      docente: item.docenteNombre,
+      semestre: item.semestre,
+      parcial: item.tipoParcial,
+      hora: item.horario,
+      conCartilla: item.modalidad === 'PRESENCIAL_CARTILLA',
+      etapa: this.mapearEstado(item.estadoFlujo)
+    }));
   });
 
-  public getEstadoBadgeClass(etapa: EtapaEvaluacion): string {
+  public getEstadoBadgeClass(etapa: DashboardEtapa): string {
     switch (etapa) {
       case 'Programado': return 'bg-purple-100 text-purple-800 border border-purple-300 font-bold';
+      case 'Validado': return 'bg-teal-100 text-teal-800 border border-teal-300 font-bold';
       case 'Generado': return 'bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold';
       case 'Impreso': return 'bg-blue-100 text-blue-800 border border-blue-300 font-bold';
       case 'Entregado': return 'bg-amber-100 text-amber-800 border border-amber-300 font-bold';
       case 'Devuelto': return 'bg-rose-100 text-rose-800 border border-rose-300 font-bold';
       case 'Pendiente de notas': return 'bg-amber-100 text-amber-800 border border-amber-300 font-bold';
       case 'Calificado': return 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold';
+      case 'Suspendido': return 'bg-slate-100 text-slate-800 border border-slate-300 font-bold';
       default: return 'bg-slate-100 text-slate-800 font-bold';
     }
   }
@@ -660,5 +931,20 @@ export class DashboardComponent {
       case 'Seguridad': return 'pi pi-shield';
       default: return 'pi pi-info-circle';
     }
+  }
+
+  private mapearEstado(estado: RolExamenResponse['estadoFlujo']): DashboardEtapa {
+    const estados: Record<RolExamenResponse['estadoFlujo'], DashboardEtapa> = {
+      PROGRAMADO: 'Programado',
+      VALIDADO: 'Validado',
+      GENERADO: 'Generado',
+      IMPRESO: 'Impreso',
+      ENTREGADO: 'Entregado',
+      DEVUELTO: 'Devuelto',
+      PENDIENTE_NOTAS: 'Pendiente de notas',
+      CALIFICADO: 'Calificado',
+      SUSPENDIDO: 'Suspendido'
+    };
+    return estados[estado];
   }
 }

@@ -55,7 +55,7 @@ export type RolExamenItem = RolExamenPersistedItem;
             (click)="abrirModalAnadirManual()"
             class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
             <i class="pi pi-plus"></i>
-            <span>Añadir Examen al Rol</span>
+            <span>Añadir Examen al Rol de Examen</span>
           </button>
         </div>
       </div>
@@ -228,9 +228,9 @@ export type RolExamenItem = RolExamenPersistedItem;
             </div>
             
             <div class="max-w-md mx-auto space-y-1">
-              <h3 class="text-sm font-black text-foreground">No hay exámenes programados en el rol</h3>
+              <h3 class="text-sm font-black text-foreground">No hay exámenes programados en el rol de examen</h3>
               <p class="text-xs text-muted-foreground">
-                El rol está limpio (0 exámenes). Puedes programar exámenes seleccionando materias oficiales o importar la planilla oficial en formato Excel.
+                El rol de examen está vacío (0 exámenes). Puedes programar exámenes seleccionando materias oficiales o importar la planilla oficial en formato Excel.
               </p>
             </div>
 
@@ -239,7 +239,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                 (click)="abrirModalAnadirManual()"
                 class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
                 <i class="pi pi-plus"></i>
-                <span>Añadir Examen al Rol</span>
+                <span>Añadir Examen al Rol de Examen</span>
               </button>
 
               <button 
@@ -386,7 +386,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                         <button 
                           (click)="eliminarExamen(row)"
                           [disabled]="!puedeEditarEliminar(row)"
-                          title="Eliminar del Rol"
+                          title="Eliminar del rol de examen"
                           class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                           <i class="pi pi-trash text-xs"></i>
                         </button>
@@ -407,7 +407,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                 (click)="vaciarRol()" 
                 class="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer">
                 <i class="pi pi-trash text-xs"></i>
-                <span>Vaciar Rol</span>
+                <span>Vaciar Rol de Examen</span>
               </button>
               <span class="font-mono text-primary">Guardado en BD · Sincronizado con el servicio institucional</span>
             </div>
@@ -475,12 +475,12 @@ export type RolExamenItem = RolExamenPersistedItem;
                     (ngModelChange)="reemplazarRolesPermitidos.set($event)"
                     class="mt-0.5 accent-amber-600 disabled:cursor-not-allowed">
                   <span [class.opacity-60]="excelItemsImportados().length === 0">
-                    Eliminar y subir nuevamente los roles coincidentes
+                    Eliminar y subir nuevamente los roles de examen coincidentes
                   </span>
                 </label>
                 <p class="pl-5 text-[10px] leading-relaxed">
                   @if (excelItemsImportados().length > 0) {
-                    Solo se eliminarán roles en <strong>PROGRAMADO</strong> o <strong>VALIDADO</strong>.
+                    Solo se eliminarán roles de examen en <strong>PROGRAMADO</strong> o <strong>VALIDADO</strong>.
                     Los que estén en <strong>GENERADO</strong> o en una etapa posterior no se tocarán.
                   } @else {
                     No está disponible porque el archivo no tiene registros válidos para importar.
@@ -501,7 +501,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                 [disabled]="excelItemsImportados().length === 0 || cargando()"
                 (click)="procesarImportacionExcel()"
                 class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-                Importar al Rol
+                Importar al Rol de Examen
               </button>
             </div>
 
@@ -521,7 +521,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                   <i class="pi pi-calendar-plus text-base"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-black text-foreground">{{ itemEditando() ? 'Editar Programación de Examen' : 'Programar Examen en el Rol' }}</h3>
+                  <h3 class="text-sm font-black text-foreground">{{ itemEditando() ? 'Editar Programación de Examen' : 'Programar Examen en el Rol de Examen' }}</h3>
                   <p class="text-xs text-muted-foreground">Vinculación institucional y guardado permanente en Base de Datos</p>
                 </div>
               </div>
@@ -878,7 +878,7 @@ export class RolExamenesComponent implements OnInit {
       },
       error: err => {
         this.cargando.set(false);
-        this._mostrarToast(this._mensajeError(err, 'No se pudo vaciar el rol oficial.'));
+        this._mostrarToast(this._mensajeError(err, 'No se pudo vaciar el rol de examen oficial.'));
         this._cargarRolesOficiales();
       }
     });
@@ -890,9 +890,8 @@ export class RolExamenesComponent implements OnInit {
       next: sedes => {
         this.sedes.set(sedes);
         if (sedes.length > 0) {
-          const cba = sedes.find(s => s.code === 'CBA') || sedes[0];
-          this.sedeSeleccionada.set(cba);
-          this._cargarCarreras(cba.code);
+          this.sedeSeleccionada.set(sedes[0]);
+          this._cargarCarreras(sedes[0].code);
         }
       },
       error: () => this.cargando.set(false)
@@ -934,21 +933,16 @@ export class RolExamenesComponent implements OnInit {
       next: materias => {
         this.materias.set(materias);
 
-        this._gateway.getGroups('2-2026', sede.branchOfficeId, carrera.careerId).subscribe({
+        this._gateway.getGroups('2-2026', sede.branchOfficeId, carrera.careerId, undefined, sede.code, carrera.careerCode).subscribe({
           next: grupos => {
             this.grupos.set(grupos);
             this.cargando.set(false);
           },
           error: () => {
-            this._gateway.getGroups('2-2026').subscribe({
-              next: allGroups => {
-                this.grupos.set(allGroups);
-                this.cargando.set(false);
-              },
-              error: () => {
-                this.cargando.set(false);
-              }
-            });
+            // No se usa un listado global de respaldo: podría mostrar grupos
+            // fuera del alcance del director autenticado.
+            this.grupos.set([]);
+            this.cargando.set(false);
           }
         });
       },
@@ -1026,7 +1020,7 @@ export class RolExamenesComponent implements OnInit {
         const sheetName = workbook.SheetNames.find(name => this._normalizar(name) === this._normalizar('Rol de Examenes'));
         if (!sheetName) {
           this.excelItemsImportados.set([]);
-          this.excelErroresImportacion.set(['No se encontró la hoja “Rol de Examenes”. Verifica que estés usando el archivo oficial de roles.']);
+          this.excelErroresImportacion.set(['No se encontró la hoja “Rol de Examenes”. Verifica que estés usando el archivo oficial de roles de examen.']);
           this._mostrarToast('El archivo no contiene la hoja oficial “Rol de Examenes”.');
           return;
         }
@@ -1162,8 +1156,8 @@ export class RolExamenesComponent implements OnInit {
     const protegidos = this.rolesImportacionProtegidos();
     if (this.reemplazarRolesPermitidos() && reemplazables.length > 0) {
       const confirmado = window.confirm(
-        `Se eliminarán ${reemplazables.length} roles coincidentes en estado PROGRAMADO o VALIDADO y luego se subirá el Excel. ` +
-        `${protegidos.length} roles en GENERADO o posterior se conservarán. ¿Deseas continuar?`
+        `Se eliminarán ${reemplazables.length} roles de examen coincidentes en estado PROGRAMADO o VALIDADO y luego se subirá el Excel. ` +
+        `${protegidos.length} roles de examen en GENERADO o posterior se conservarán. ¿Deseas continuar?`
       );
       if (!confirmado) return;
     }
@@ -1188,13 +1182,13 @@ export class RolExamenesComponent implements OnInit {
         if (fallidos.length > 0) {
           this._mostrarToast(`${creados.length} exámenes registrados y ${fallidos.length} rechazados por el servidor.`);
         } else {
-          const eliminados = this.reemplazarRolesPermitidos() ? ` Se reemplazaron ${reemplazables.length} roles permitidos.` : '';
+          const eliminados = this.reemplazarRolesPermitidos() ? ` Se reemplazaron ${reemplazables.length} roles de examen permitidos.` : '';
           this._mostrarToast(`${creados.length} exámenes registrados correctamente en PostgreSQL.${eliminados}`);
         }
       },
       error: err => {
         this.cargando.set(false);
-        this._mostrarToast(this._mensajeError(err, 'No se pudieron eliminar los roles permitidos; no se realizó la nueva carga.'));
+      this._mostrarToast(this._mensajeError(err, 'No se pudieron eliminar los roles de examen permitidos; no se realizó la nueva carga.'));
         this._cargarRolesOficiales();
       }
     });
@@ -1217,7 +1211,7 @@ export class RolExamenesComponent implements OnInit {
 
   public abrirModalEditar(item: RolExamenItem): void {
     if (!this.puedeEditarEliminar(item)) {
-      this._mostrarToast('Solo se pueden editar roles en estado PROGRAMADO o VALIDADO.');
+      this._mostrarToast('Solo se pueden editar roles de examen en estado PROGRAMADO o VALIDADO.');
       return;
     }
     this.itemEditando.set(item);
@@ -1327,10 +1321,10 @@ export class RolExamenesComponent implements OnInit {
 
   public eliminarExamen(item: RolExamenItem): void {
     if (!this.puedeEditarEliminar(item)) {
-      this._mostrarToast('Solo se pueden eliminar roles en estado PROGRAMADO o VALIDADO.');
+      this._mostrarToast('Solo se pueden eliminar roles de examen en estado PROGRAMADO o VALIDADO.');
       return;
     }
-    if (!window.confirm(`¿Deseas eliminar el examen ${item.codigo} del rol oficial?`)) return;
+    if (!window.confirm(`¿Deseas eliminar el examen ${item.codigo} del rol de examen oficial?`)) return;
 
     this._rolService.eliminar(item.id).subscribe({
       next: () => {

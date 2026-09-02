@@ -3,7 +3,8 @@ export type AppRole =
   | 'RESPONSABLE_EVALUACIONES'
   | 'PERSONAL_EVALUACIONES'
   | 'DOCENTE'
-  | 'VICERRECTOR';
+  | 'VICERRECTOR'
+  | 'DIRECTOR_CARRERA';
 
 export interface UsuarioSesion {
   usuario: string;
@@ -11,5 +12,7 @@ export interface UsuarioSesion {
   nombreCompleto: string;
   rol: AppRole;
   rolNombre: string;
+  debeCambiarContrasena: boolean;
   sedesAsignadas: string[];
+  carrerasAsignadas: string[];
 }

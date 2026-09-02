@@ -490,7 +490,7 @@ export class LoginComponent {
   public iniciarSesion(): void {
     this.mensajeError.set(null);
     this.auth.iniciarSesion(this.usuario.trim(), this.contrasena).subscribe({
-      next: () => this._router.navigateByUrl('/dashboard'),
+      next: sesion => this._router.navigateByUrl(sesion.debeCambiarContrasena ? '/cambiar-contrasena' : '/dashboard'),
       error: error => {
         this.mensajeError.set(error?.status === 401
           ? 'El usuario o la contraseña no son válidos.'

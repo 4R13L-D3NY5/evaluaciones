@@ -181,6 +181,27 @@ def _preparar_imagen_typst(imagen_base64: Any, image_dir: str | None, indice: in
     if not datos:
         return None
 
+    # Typst no admite WebP ni GIF en todas las versiones del worker. Las
+    # imágenes pegadas desde el portapapeles suelen llegar precisamente en
+    # esos formatos, por lo que se normalizan a PNG antes de generar el PDF.
+    if mime in {"image/webp", "image/gif"}:
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            return None
+        try:
+            imagen = cv2.imdecode(np.frombuffer(datos, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+            if imagen is None:
+                return None
+            codificada, datos_png = cv2.imencode(".png", imagen)
+            if not codificada:
+                return None
+            datos = datos_png.tobytes()
+            extension = "png"
+        except (cv2.error, ValueError):
+            return None
+
     os.makedirs(image_dir, exist_ok=True)
     huella = hashlib.sha1(entrada.encode("utf-8")).hexdigest()[:12]
     nombre = f"imagen_reactivo_{indice}_{huella}.{extension}"
@@ -193,11 +214,12 @@ def _preparar_imagen_typst(imagen_base64: Any, image_dir: str | None, indice: in
 
 def _ancho_imagen_typst(imagen_base64: Any) -> str:
     """Convierte el metadato interno del selector a un ancho consistente."""
-    tamano = re.search(r"#sea-size=(GRANDE|MEDIANA|PEQUENA)$", str(imagen_base64 or ""), re.IGNORECASE)
+    tamano = re.search(r"#sea-size=(GRANDE|MEDIANA|PEQUENA|MUY_PEQUENA)$", str(imagen_base64 or ""), re.IGNORECASE)
     return {
         "GRANDE": "100%",
         "MEDIANA": "70%",
         "PEQUENA": "45%",
+        "MUY_PEQUENA": "28%",
     }.get((tamano.group(1).upper() if tamano else "MEDIANA"), "70%")
 
 
@@ -408,7 +430,7 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
         tipo = p.get("tipo_reactivo", "")
         imagen_path = _preparar_imagen_typst(p.get("imagen_base64"), image_dir, indice)
         imagen_code = (
-            f'#align(center)[#image("{imagen_path}", width: {_ancho_imagen_typst(p.get("imagen_base64"))})]\\\n'
+            f'#block(width: 100%)[#align(center)[#image("{imagen_path}", width: {_ancho_imagen_typst(p.get("imagen_base64"))})]]\\\n'
             if imagen_path else ""
         )
 
@@ -445,10 +467,16 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
 
         if tipo == "EMPAREJAMIENTO_TRONCO":
             opciones_referencia = parsear_opciones(p.get("opciones_json", "[]"))
+            if not opciones_referencia:
+                opciones_referencia = [
+                    (letra, str(p.get(f"opcion_{letra.lower()}") or ""), False)
+                    for letra in "ABCDE"
+                    if str(p.get(f"opcion_{letra.lower()}") or "").strip()
+                ]
             lineas_tarjeta = [str(p.get("enunciado") or "RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:")]
             lineas_tarjeta.extend(f"{letra}) {texto}" for letra, texto, _ in opciones_referencia)
-            contenido_tarjeta = "\\\\\n  ".join(
-                f'[#text(weight: "regular")[{_typst_content(linea)}]]' for linea in lineas_tarjeta
+            contenido_tarjeta = "\\\n  ".join(
+                f'#text(weight: "regular")[{_typst_content(linea)}]' for linea in lineas_tarjeta
             )
             typ_code += f'''\n#rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
   {contenido_tarjeta}
@@ -482,20 +510,22 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
             typ_code += f'\n#block(breakable: false, spacing: {config.SEPARACION_PREGUNTAS})[\n'
             typ_code += f'  #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}\\\\\n'
             typ_code += imagen_code
+            typ_code += '  #v(0.15em)\n'
             typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
             for indice_afirmacion, (_, texto, _) in enumerate(afirmaciones, start=1):
                 typ_code += f'    #text(weight: "regular")[{indice_afirmacion}) {_typst_content(str(texto))}]\\\\\n'
             typ_code += '  ]\\\\\n'
+            typ_code += '  #v(0.4em)\n'
             typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
             for letra, texto in CLAVE_VF_COMPLEJAS:
                 typ_code += f'    #text(weight: "regular")[{letra}) {_typst_content(texto)}]\\\\\n'
             typ_code += '  ]\n]\n'
             continue
 
-        opciones = [] if tipo == "VERDADERO_O_FALSO_SIMPLE" else (
-            [(letra, "", False) for letra in "ABCDE"]
-            if tipo == "OPCION_EMPAREJAMIENTO"
-            else parsear_opciones(p.get("opciones_json", "[]"))
+        # Las filas hijas de emparejamiento no llevan incisos propios: la
+        # respuesta es la clave A-E de relación y se registra internamente.
+        opciones = [] if tipo in {"VERDADERO_O_FALSO_SIMPLE", "OPCION_EMPAREJAMIENTO"} else parsear_opciones(
+            p.get("opciones_json", "[]")
         )
         typ_code += f'''
 #block(breakable: false, spacing: {config.SEPARACION_PREGUNTAS})[
@@ -595,7 +625,15 @@ def _compilar_typst(typ_path: str, pdf_path: str) -> None:
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
     if config.TYPST_BIN:
         import subprocess
-        subprocess.run([config.TYPST_BIN, "compile", typ_path, pdf_path], check=True, capture_output=True)
+        resultado = subprocess.run(
+            [config.TYPST_BIN, "compile", typ_path, pdf_path],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if resultado.returncode != 0:
+            detalle = (resultado.stderr or resultado.stdout or "Typst no devolvió detalles").strip()
+            raise RuntimeError(f"Typst no pudo compilar el documento: {detalle}")
     else:
         typst.compile(typ_path, output=pdf_path)
 

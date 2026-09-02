@@ -78,6 +78,18 @@ export class AuthService {
     );
   }
 
+  public cambiarContrasena(contrasenaActual: string, contrasenaNueva: string): Observable<UsuarioSesion> {
+    return this._http.post<UsuarioSesion>('/api/auth/cambiar-contrasena', {
+      contrasenaActual,
+      contrasenaNueva
+    }).pipe(
+      tap(sesion => {
+        this.usuario.set(sesion);
+        this._sessionRequest = of(sesion);
+      })
+    );
+  }
+
   public tieneRol(roles: AppRole[]): boolean {
     const usuario = this.usuario();
     return !!usuario && roles.includes(usuario.rol);

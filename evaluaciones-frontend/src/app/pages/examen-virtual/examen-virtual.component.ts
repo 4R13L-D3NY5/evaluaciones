@@ -97,8 +97,8 @@ export class ExamenVirtualComponent implements OnDestroy {
   cuentaRegresiva(): string { return `${this.segundosInicio}`.padStart(2, '0'); }
   imagenBase64SinMetadatos(imagen?: string): string { return (imagen || '').split('#', 1)[0]; }
   alturaImagenPregunta(imagen?: string): number {
-    const tamano = imagen?.match(/#sea-size=(GRANDE|MEDIANA|PEQUENA)$/i)?.[1]?.toUpperCase();
-    return tamano === 'GRANDE' ? 58 : tamano === 'PEQUENA' ? 24 : 36;
+    const tamano = imagen?.match(/#sea-size=(GRANDE|MEDIANA|PEQUENA|MUY_PEQUENA)$/i)?.[1]?.toUpperCase();
+    return tamano === 'GRANDE' ? 58 : tamano === 'MUY_PEQUENA' ? 15 : tamano === 'PEQUENA' ? 24 : 36;
   }
 
   private actualizarVista(data: AccesoVirtual): void {

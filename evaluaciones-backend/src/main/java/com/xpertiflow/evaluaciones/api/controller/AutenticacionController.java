@@ -1,6 +1,7 @@
 package com.xpertiflow.evaluaciones.api.controller;
 
 import com.xpertiflow.evaluaciones.api.dto.auth.LoginRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.auth.CambiarContrasenaRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.SesionUsuarioDto;
 import com.xpertiflow.evaluaciones.application.AutenticacionService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -68,5 +69,13 @@ public class AutenticacionController {
             session.invalidate();
         }
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/cambiar-contrasena")
+    public ResponseEntity<SesionUsuarioDto> cambiarContrasena(
+            @Valid @RequestBody CambiarContrasenaRequestDto request,
+            Authentication authentication) {
+        service.cambiarContrasena(authentication, request.getContrasenaActual(), request.getContrasenaNueva());
+        return ResponseEntity.ok(service.obtenerSesion(authentication));
     }
 }

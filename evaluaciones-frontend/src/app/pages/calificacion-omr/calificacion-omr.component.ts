@@ -84,9 +84,9 @@ export interface EstudianteOmrItem {
               [value]="rolExamenSeleccionado()"
               (valueChange)="rolExamenSeleccionado.set($event)"
               [disabled]="cargandoRoles()"
-              placeholder="Seleccione un rol oficial"
+              placeholder="Seleccione un rol de examen oficial"
               searchPlaceholder="Buscar por código o materia..."
-              noResultsText="No se encontraron roles oficiales." />
+              noResultsText="No se encontraron roles de examen oficiales." />
           </div>
 
           <!-- Input oculto para subir PDF o imágenes -->
@@ -377,7 +377,7 @@ export interface EstudianteOmrItem {
                 </span>
                   <span class="flex items-center gap-1.5 font-bold text-purple-700">
                   <i class="pi pi-id-card text-sm"></i>
-                  <span>Código: validado contra la nómina del rol</span>
+                  <span>Código: validado contra la nómina del rol de examen</span>
                 </span>
               </div>
 
@@ -418,7 +418,7 @@ export interface EstudianteOmrItem {
                     <span class="text-xs font-black text-foreground">Página {{ est.pagina || pageIndex + 1 }}</span>
                     <div class="flex flex-wrap justify-end gap-1.5">
                       <span [class]="est.codigoLeido ? 'bg-emerald-100 text-emerald-800' : ((est.codigoOcr?.length || 0) > 0 ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800')" class="px-2 py-0.5 rounded text-[10px] font-black">
-                        {{ est.codigoLeido ? 'Código validado' : ((est.codigoOcr?.length || 0) > 0 ? 'Código fuera del rol' : 'Código no leído') }}
+                        {{ est.codigoLeido ? 'Código validado' : ((est.codigoOcr?.length || 0) > 0 ? 'Código fuera del rol de examen' : 'Código no leído') }}
                       </span>
                       <span [class]="est.grillaDetectada ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'" class="px-2 py-0.5 rounded text-[10px] font-black">
                         {{ est.grillaDetectada ? 'Grilla detectada' : 'Grilla no detectada' }}
@@ -1102,7 +1102,7 @@ export class CalificacionOmrComponent implements OnInit {
           this.rolExamenSeleccionado.set(primerRol.id);
         }
       },
-      error: () => this.mensajeOmr.set('No se pudieron cargar los roles oficiales de evaluación.'),
+      error: () => this.mensajeOmr.set('No se pudieron cargar los roles de examen oficiales.'),
       complete: () => this.cargandoRoles.set(false)
     });
   }
@@ -1254,7 +1254,7 @@ export class CalificacionOmrComponent implements OnInit {
       return;
     }
     if (!rolId) {
-      this.mensajeOmr.set('Seleccione el rol oficial de evaluación para validar el código del estudiante.');
+      this.mensajeOmr.set('Seleccione el rol de examen oficial para validar el código del estudiante.');
       return;
     }
 

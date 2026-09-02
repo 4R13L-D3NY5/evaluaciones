@@ -131,12 +131,16 @@ export class UnitepcGatewayService {
     term: string = '2-2026',
     branchOfficeId?: string,
     careerId?: string,
-    syllabusCourseId?: string
+    syllabusCourseId?: string,
+    branchOfficeCode?: string,
+    careerCode?: string
   ): Observable<GroupItem[]> {
     let params = new HttpParams().set('term', term);
     if (branchOfficeId) params = params.set('branchOfficeId', branchOfficeId);
     if (careerId) params = params.set('careerId', careerId);
     if (syllabusCourseId) params = params.set('syllabusCourseId', syllabusCourseId);
+    if (branchOfficeCode) params = params.set('branchOfficeCode', branchOfficeCode);
+    if (careerCode) params = params.set('careerCode', careerCode);
 
     return this._http.get<Array<GroupItem & { teacherFullName?: string | null }>>(`${this._baseUrl}/grupos`, { params }).pipe(
       map(groups => groups.map(group => ({

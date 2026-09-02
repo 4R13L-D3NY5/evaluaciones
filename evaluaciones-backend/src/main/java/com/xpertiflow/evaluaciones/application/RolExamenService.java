@@ -16,6 +16,7 @@ import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.CourseDto;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +37,7 @@ public class RolExamenService {
     private final AuditoriaEvaluacionRepository auditoriaRepository;
     private final RolExamenMapper mapper;
     private final UnitepcGatewayClient unitepcGatewayClient;
+    private final AccesoAcademicoService accesoAcademicoService;
 
     private static final long CACHE_GRUPOS_SEA_MILLIS = 60_000L;
     private volatile List<GroupItemDto> gruposSeaCache = List.of();
@@ -69,6 +71,11 @@ public class RolExamenService {
 
     @Transactional(readOnly = true)
     public List<RolExamenResponseDto> listarFiltrado(String sedeCodigo, String carreraCodigo) {
+        return listarFiltrado(sedeCodigo, carreraCodigo, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RolExamenResponseDto> listarFiltrado(String sedeCodigo, String carreraCodigo, Authentication authentication) {
         List<RolExamen> roles;
         boolean tieneSede = sedeCodigo != null && !sedeCodigo.isBlank();
         boolean tieneCarrera = carreraCodigo != null && !carreraCodigo.isBlank();
@@ -83,13 +90,23 @@ public class RolExamenService {
             roles = rolExamenRepository.findAll();
         }
 
-        return mapearRolesConDocenteOficial(roles);
+        return mapearRolesConDocenteOficial(authentication == null
+                ? roles
+                : accesoAcademicoService.filtrarRolesParaUsuario(roles, authentication));
     }
 
     @Transactional(readOnly = true)
     public RolExamenResponseDto obtenerPorId(String id) {
+        return obtenerPorId(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public RolExamenResponseDto obtenerPorId(String id, Authentication authentication) {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
+        if (authentication != null && !accesoAcademicoService.puedeAcceder(rol, authentication)) {
+            throw new org.springframework.security.access.AccessDeniedException("No tienes acceso a esta asignatura o grupo");
+        }
         return mapearRolConDocenteOficial(rol);
     }
 
@@ -121,14 +138,14 @@ public class RolExamenService {
     @Transactional
     public RolExamenResponseDto actualizar(String id, RolExamenRequestDto dto) {
         if (!id.equals(dto.getId())) {
-            throw new RuntimeException("El id del rol no coincide con el id de la solicitud");
+            throw new RuntimeException("El id del rol de examen no coincide con el id de la solicitud");
         }
 
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
 
         if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
-            throw new RuntimeException("Solo se puede editar un rol en estado PROGRAMADO o VALIDADO");
+            throw new RuntimeException("Solo se puede editar un rol de examen en estado PROGRAMADO o VALIDADO");
         }
 
         normalizarModalidadVigente(dto);
@@ -215,7 +232,7 @@ public class RolExamenService {
 
     private void aplicarDocenteOficial(RolExamen rol, GroupItemDto grupo) {
         if (grupo == null || grupo.getTeacherName() == null || grupo.getTeacherName().isBlank()) {
-            throw new RuntimeException("El rol debe tener un docente oficial proveniente de los servicios institucionales");
+            throw new RuntimeException("El rol de examen debe tener un docente oficial proveniente de los servicios institucionales");
         }
         rol.setSeaGroupId(grupo.getGroupId());
         rol.setDocenteNombre(grupo.getTeacherName().trim());
@@ -406,7 +423,7 @@ public class RolExamenService {
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
 
         if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
-            throw new RuntimeException("Solo se puede eliminar un rol en estado PROGRAMADO o VALIDADO");
+            throw new RuntimeException("Solo se puede eliminar un rol de examen en estado PROGRAMADO o VALIDADO");
         }
 
         rolExamenRepository.delete(rol);
@@ -419,8 +436,8 @@ public class RolExamenService {
         EstadoFlujo origen = rol.getEstadoFlujo();
 
         if (origen != EstadoFlujo.PROGRAMADO && origen != EstadoFlujo.VALIDADO) {
-            throw new RuntimeException("No se puede cargar un banco para un rol en estado " + origen.getValor()
-                    + ". Restablezca el rol a VALIDADO antes de reemplazar el banco de preguntas.");
+            throw new RuntimeException("No se puede cargar un banco para un rol de examen en estado " + origen.getValor()
+                    + ". Restablezca el rol de examen a VALIDADO antes de reemplazar el banco de preguntas.");
         }
 
         rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
@@ -446,7 +463,7 @@ public class RolExamenService {
         }
         EstadoFlujo origen = rol.getEstadoFlujo();
         if (origen != EstadoFlujo.PROGRAMADO && origen != EstadoFlujo.VALIDADO) {
-            throw new IllegalStateException("El documento solo se puede cargar cuando el rol está PROGRAMADO o VALIDADO.");
+            throw new IllegalStateException("El documento solo se puede cargar cuando el rol de examen está PROGRAMADO o VALIDADO.");
         }
         rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
         rol.setFechaValidacion(LocalDateTime.now());
@@ -464,7 +481,7 @@ public class RolExamenService {
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
         EstadoFlujo origen = rol.getEstadoFlujo();
         if (origen != EstadoFlujo.PROGRAMADO && origen != EstadoFlujo.VALIDADO) {
-            throw new RuntimeException("El banco solo se puede eliminar cuando el rol está PROGRAMADO o VALIDADO; estado actual: " + origen.getValor());
+            throw new RuntimeException("El banco solo se puede eliminar cuando el rol de examen está PROGRAMADO o VALIDADO; estado actual: " + origen.getValor());
         }
 
         if (origen == EstadoFlujo.VALIDADO) {
@@ -489,7 +506,7 @@ public class RolExamenService {
         EstadoFlujo destino = dto.getNuevoEstado();
 
         if (destino == EstadoFlujo.SUSPENDIDO && origen == EstadoFlujo.SUSPENDIDO) {
-            throw new RuntimeException("El rol ya está suspendido");
+            throw new RuntimeException("El rol de examen ya está suspendido");
         }
 
         boolean transicionVirtualFinal = rol.getModalidad() == ModalidadExamen.VIRTUAL
@@ -535,7 +552,7 @@ public class RolExamenService {
         EstadoFlujo origen = rol.getEstadoFlujo();
         if (!ESTADOS_POSTERIORES_A_VALIDADO.contains(origen)) {
             throw new RuntimeException(
-                    "Solo se puede restablecer un rol cuyo estado sea posterior a VALIDADO; estado actual: "
+                    "Solo se puede restablecer un rol de examen cuyo estado sea posterior a VALIDADO; estado actual: "
                             + origen.getValor());
         }
         if (dto == null || dto.getMotivo() == null || dto.getMotivo().isBlank()) {

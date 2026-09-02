@@ -5,6 +5,7 @@ import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre, PlanE
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
+import { AuthService } from '../../core/services/auth.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -357,7 +358,7 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                           @if (info?.tieneRol) {
                             <div [class]="'flex items-center gap-2 rounded-lg border px-2.5 py-2 ' + (info?.cumple ? 'border-emerald-200 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/50')">
                               <span class="w-20 shrink-0 text-[10px] font-black text-primary">{{ info?.etiqueta }}</span>
-                              <span class="bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-full px-2 py-0.5 text-[9px] font-black whitespace-nowrap">Rol programado</span>
+                              <span class="bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-full px-2 py-0.5 text-[9px] font-black whitespace-nowrap">Rol de examen programado</span>
                               <span class="text-[10px] font-mono text-foreground whitespace-nowrap">
                                 {{ info?.facil }}F · {{ info?.medio }}M · {{ info?.dificil }}D · {{ info?.total }} total
                               </span>
@@ -528,6 +529,7 @@ export class PlanEstudiosComponent implements OnInit {
   private readonly gateway = inject(UnitepcGatewayService);
   private readonly rolService = inject(RolExamenService);
   private readonly bancoService = inject(BancoPreguntasService);
+  private readonly auth = inject(AuthService);
 
   public sedes = signal<BranchOffice[]>([]);
   public carreras = signal<Career[]>([]);
@@ -562,6 +564,7 @@ export class PlanEstudiosComponent implements OnInit {
   public totalSinAsignar = computed(() => this.totalPlan() - this.totalAsignadas());
 
   public ngOnInit(): void {
+    if (this.auth.usuario()?.rol === 'DOCENTE') this.ocultarSinAsignar = true;
     this.cargarSedes();
   }
 
@@ -600,7 +603,7 @@ export class PlanEstudiosComponent implements OnInit {
         this.sedes.set(sedes || []);
         this.cargandoSedes.set(false);
 
-        const sedeInicial = sedes.find(sede => sede.code === 'CBA') || sedes[0];
+        const sedeInicial = sedes[0];
         if (sedeInicial) {
           this.filtroSedeCodigo = sedeInicial.code;
           this.cargarCarreras(sedeInicial.code);
@@ -627,7 +630,7 @@ export class PlanEstudiosComponent implements OnInit {
         this.carreras.set(carreras || []);
         this.cargandoCarreras.set(false);
 
-        const carreraInicial = carreras.find(carrera => carrera.careerCode === 'CARSIS') || carreras[0];
+        const carreraInicial = carreras[0];
         if (carreraInicial) {
           this.filtroCarreraCodigo = carreraInicial.careerCode;
           this.cargarPlanReal(codigoSede, carreraInicial.careerCode);
@@ -652,7 +655,7 @@ export class PlanEstudiosComponent implements OnInit {
     const sede = this.sedes().find(item => item.code === codigoSede);
     const carrera = this.carreras().find(item => item.careerCode === codigoCarrera);
     const gruposSea$ = sede && carrera
-      ? this.gateway.getGroups(this.gestionParaSea(), sede.branchOfficeId, carrera.careerId).pipe(
+      ? this.gateway.getGroups(this.gestionParaSea(), sede.branchOfficeId, carrera.careerId, undefined, sede.code, carrera.careerCode).pipe(
           catchError(() => of([] as GroupItem[]))
         )
       : of([] as GroupItem[]);
@@ -711,9 +714,14 @@ export class PlanEstudiosComponent implements OnInit {
       rolesPorCurso.set(llave, actuales);
     }
 
+    const docente = this.auth.usuario()?.rol === 'DOCENTE';
+    const cursosVisibles = docente
+      ? cursos.filter(curso => grupos.some(grupo => grupo.syllabusCourseId === curso.syllabusCourseId)
+          || roles.some(rol => (rol.seaSyllabusCourseId || rol.materiaCodigo) === curso.syllabusCourseId))
+      : cursos;
     const items: PlanEstudioItem[] = [];
     let id = 1;
-    for (const curso of cursos) {
+    for (const curso of cursosVisibles) {
       const rolesCurso = rolesPorCurso.get(curso.syllabusCourseId) || [];
       const gruposCurso = grupos.filter(grupo => grupo.syllabusCourseId === curso.syllabusCourseId);
 

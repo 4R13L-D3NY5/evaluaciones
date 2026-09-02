@@ -20,13 +20,14 @@ public class BancoPreguntasController {
     private final BancoPreguntasService bancoPreguntasService;
 
     @GetMapping("/{rolExamenId}")
+    @PreAuthorize("@accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     @Operation(summary = "Obtener el banco de preguntas cargado para un rol de examen")
     public ResponseEntity<BancoPreguntasResponseDto> obtenerPorRol(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(bancoPreguntasService.obtenerPorRolExamenId(rolExamenId));
     }
 
     @PostMapping("/{rolExamenId}/upload")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     @Operation(summary = "Cargar y validar banco de preguntas Excel por rol de examen")
     public ResponseEntity<CargaBancoResponseDto> uploadPorRol(
             @PathVariable String rolExamenId,
@@ -50,7 +51,7 @@ public class BancoPreguntasController {
 
     @DeleteMapping("/{rolExamenId}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
-    @Operation(summary = "Eliminar el banco de preguntas cargado para un rol")
+    @Operation(summary = "Eliminar el banco de preguntas cargado para un rol de examen")
     public ResponseEntity<Void> eliminarPorRol(
             @PathVariable String rolExamenId,
             @RequestParam("confirmacion") String confirmacion,

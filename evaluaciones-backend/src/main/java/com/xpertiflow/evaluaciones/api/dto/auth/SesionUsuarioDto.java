@@ -12,5 +12,7 @@ public class SesionUsuarioDto {
     private String nombreCompleto;
     private String rol;
     private String rolNombre;
+    private boolean debeCambiarContrasena;
     private List<String> sedesAsignadas;
+    private List<String> carrerasAsignadas;
 }

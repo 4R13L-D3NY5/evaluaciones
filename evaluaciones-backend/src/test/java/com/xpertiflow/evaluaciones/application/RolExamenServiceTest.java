@@ -36,12 +36,14 @@ class RolExamenServiceTest {
     private RolExamenMapper mapper;
     @Mock
     private UnitepcGatewayClient unitepcGatewayClient;
+    @Mock
+    private AccesoAcademicoService accesoAcademicoService;
 
     private RolExamenService service;
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, mapper, unitepcGatewayClient);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, mapper, unitepcGatewayClient, accesoAcademicoService);
     }
 
     @Test

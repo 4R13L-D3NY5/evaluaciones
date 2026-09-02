@@ -56,7 +56,7 @@ public class BancoPreguntasService {
 
     public BancoPreguntasResponseDto obtenerPorRolExamenId(String rolExamenId) {
         BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId)
-                .orElseThrow(() -> new RuntimeException("No existe banco de preguntas para el rol: " + rolExamenId));
+                .orElseThrow(() -> new RuntimeException("No existe banco de preguntas para el rol de examen: " + rolExamenId));
         return toResponseDto(banco);
     }
 
@@ -105,7 +105,7 @@ public class BancoPreguntasService {
         RolExamen rol = rolOpt.orElseThrow(() -> new RuntimeException(
                 "No existe rol de examen para materia=" + materiaCodigo
                         + ", grupo=" + grupo + ", parcial=" + tipoParcialValor
-                        + ". Debe crearse el rol antes de cargar el banco de preguntas."));
+                        + ". Debe crearse el rol de examen antes de cargar el banco de preguntas."));
 
         return cargarDesdeExcelConRol(rol, file, docenteAprobador);
     }
@@ -184,12 +184,12 @@ public class BancoPreguntasService {
             String hash = calcularSha256(paqueteJson);
 
             if (bancoRepository.existsByRolExamenIdAndHashSha256Integridad(rol.getId(), hash)) {
-                return respuestaFallida(rol, List.of("El mismo banco ya fue registrado para este rol (hash SHA-256 duplicado)."));
+                return respuestaFallida(rol, List.of("El mismo banco ya fue registrado para este rol de examen (hash SHA-256 duplicado)."));
             }
 
             String docenteOficial = rolExamenService.resolverNombreDocenteOficial(rol);
             if (docenteOficial == null || docenteOficial.isBlank()) {
-                throw new RuntimeException("No se encontró un docente oficial en los servicios institucionales para este rol");
+                throw new RuntimeException("No se encontró un docente oficial en los servicios institucionales para este rol de examen");
             }
 
             // Guardar banco
@@ -252,7 +252,7 @@ public class BancoPreguntasService {
         RolExamen rol = rolRepository.findById(rolExamenId)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
         if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
-            throw new IllegalStateException("El banco solo se puede eliminar cuando el rol está PROGRAMADO o VALIDADO; estado actual: "
+            throw new IllegalStateException("El banco solo se puede eliminar cuando el rol de examen está PROGRAMADO o VALIDADO; estado actual: "
                     + rol.getEstadoFlujo().getValor());
         }
 
@@ -312,7 +312,7 @@ public class BancoPreguntasService {
         }
 
         if (!parcial.isBlank() && !parcialCoincide(parcial, parcialEsperado)) {
-            errores.add("Fila " + (rowNum + 1) + ": parcial '" + parcial + "' no coincide con el parcial del rol");
+            errores.add("Fila " + (rowNum + 1) + ": parcial '" + parcial + "' no coincide con el parcial del rol de examen");
         }
 
         int nivelDificultad = 2;
@@ -527,7 +527,7 @@ public class BancoPreguntasService {
         int indiceFragmento = entrada.indexOf('#');
         if (indiceFragmento >= 0) {
             String fragmento = entrada.substring(indiceFragmento);
-            if (!fragmento.matches("(?i)#sea-size=(GRANDE|MEDIANA|PEQUENA)")) {
+            if (!fragmento.matches("(?i)#sea-size=(GRANDE|MEDIANA|PEQUENA|MUY_PEQUENA)")) {
                 errores.add("Fila " + (rowNum + 1) + ": el metadato de tamaño de la imagen no es válido");
                 return null;
             }

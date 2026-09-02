@@ -227,7 +227,7 @@ interface FilaRemark {
               <div class="space-y-1">
                 <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Referencia técnica del escaneo</label>
                 <select [(ngModel)]="rolConciliacionId" (ngModelChange)="seleccionarRolConciliacion($event)" class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer">
-                  <option value="">Selecciona la configuración usada para este escaneo</option>
+                  <option value="">Selecciona el rol de examen usado para este escaneo</option>
                   @for (rol of rolesConciliacionOrdenados(); track rol.id) {
                     <option [value]="rol.id">{{ rol.fecha }} · {{ rol.tipoParcial }} · {{ rol.id }}</option>
                   }
@@ -761,6 +761,9 @@ export class ReporteEvaluacionesComponent {
       this._roles.listar().subscribe({
         next: roles => {
           this.rolesConciliacion.set(roles);
+          if (!this.rolConciliacionId && roles.length > 0) {
+            this.seleccionarRolConciliacion(roles[0].id);
+          }
           this.cargandoRolesConciliacion.set(false);
         },
         error: () => {

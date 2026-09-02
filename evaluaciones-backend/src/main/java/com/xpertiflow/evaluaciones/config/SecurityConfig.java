@@ -15,11 +15,25 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import com.xpertiflow.evaluaciones.infrastructure.security.CambioContrasenaInterceptor;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-public class SecurityConfig {
+public class SecurityConfig implements WebMvcConfigurer {
+
+    private final CambioContrasenaInterceptor cambioContrasenaInterceptor;
+
+    public SecurityConfig(CambioContrasenaInterceptor cambioContrasenaInterceptor) {
+        this.cambioContrasenaInterceptor = cambioContrasenaInterceptor;
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(cambioContrasenaInterceptor);
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {

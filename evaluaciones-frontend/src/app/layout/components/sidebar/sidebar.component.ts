@@ -83,7 +83,7 @@ export interface MenuItem {
             <span>Seguridad de Exámenes</span>
           </div>
           <p class="text-[11px] text-muted-foreground leading-relaxed">
-            Bloqueo de rol activo a 72h. Patrones oficiales cifrados hasta 3h post-inicio.
+            Bloqueo del rol de examen activo a 72h. Patrones oficiales cifrados hasta 3h post-inicio.
           </p>
         </div>
 
@@ -133,7 +133,7 @@ export class SidebarComponent implements OnInit {
       route: '/dashboard',
       icon: 'pi pi-chart-pie',
       description: 'Métricas, KPIs y estadísticas generales de evaluaciones',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE', 'VICERRECTOR']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE', 'VICERRECTOR', 'DIRECTOR_CARRERA']
     },
     {
       label: 'Servicios académicos',
@@ -148,7 +148,7 @@ export class SidebarComponent implements OnInit {
       route: '/plan-estudios',
       icon: 'pi pi-book',
       description: 'Asignaturas, docentes y estado de banco por carrera',
-      roles: ['RESPONSABLE_EVALUACIONES', 'DOCENTE']
+      roles: ['RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA']
     },
     {
       label: 'Lista de Evaluaciones por Día',
@@ -156,7 +156,7 @@ export class SidebarComponent implements OnInit {
       icon: 'pi pi-calendar-clock',
       badge: 'Hoy',
       description: 'Exámenes del día, horarios y generación de paquetes',
-      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE']
+      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']
     },
     {
       label: 'Salas Virtuales',
@@ -200,7 +200,7 @@ export class SidebarComponent implements OnInit {
       route: '/rol-examenes',
       icon: 'pi pi-calendar',
       description: 'Calendarización, grilla semanal y subida de Excel',
-      roles: ['RESPONSABLE_EVALUACIONES']
+      roles: ['RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA']
     },
     {
       label: 'Auditoría & Bitácora',
@@ -209,6 +209,14 @@ export class SidebarComponent implements OnInit {
       badge: 'Seguridad',
       description: 'Seguimiento de accesos, terminales MAC, IPs públicas y trazabilidad',
       roles: ['ADMINISTRADOR_SISTEMA']
+    },
+    {
+      label: 'Usuarios y accesos',
+      route: '/usuarios-sistema',
+      icon: 'pi pi-users',
+      badge: 'Seguridad',
+      description: 'Cuentas, roles y alcance por sede y carrera',
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES']
     }
   ];
 

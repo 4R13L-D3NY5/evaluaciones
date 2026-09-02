@@ -424,37 +424,13 @@
 
 #block(breakable: false, spacing: 1.2em)[
   #box[#text(weight: "bold")[28. #raw("___", block: false)]] #h(0.25em)#raw("Pregunta difícil número 7", block: false)\
-  #v(0.15em)
-  #block(inset: (left: 1em))[
-    #text(weight: "regular")[A) #raw("", block: false)]\
-    #text(weight: "regular")[B) #raw("", block: false)]\
-    #text(weight: "regular")[C) #raw("", block: false)]\
-    #text(weight: "regular")[D) #raw("", block: false)]\
-    #text(weight: "regular")[E) #raw("", block: false)]\
-  ]
 ]
 
 #block(breakable: false, spacing: 1.2em)[
   #box[#text(weight: "bold")[29. #raw("___", block: false)]] #h(0.25em)#raw("Pregunta difícil número 6", block: false)\
-  #v(0.15em)
-  #block(inset: (left: 1em))[
-    #text(weight: "regular")[A) #raw("", block: false)]\
-    #text(weight: "regular")[B) #raw("", block: false)]\
-    #text(weight: "regular")[C) #raw("", block: false)]\
-    #text(weight: "regular")[D) #raw("", block: false)]\
-    #text(weight: "regular")[E) #raw("", block: false)]\
-  ]
 ]
 
 #block(breakable: false, spacing: 1.2em)[
   #box[#text(weight: "bold")[30. #raw("___", block: false)]] #h(0.25em)#raw("Pregunta difícil número 5", block: false)\
-  #v(0.15em)
-  #block(inset: (left: 1em))[
-    #text(weight: "regular")[A) #raw("", block: false)]\
-    #text(weight: "regular")[B) #raw("", block: false)]\
-    #text(weight: "regular")[C) #raw("", block: false)]\
-    #text(weight: "regular")[D) #raw("", block: false)]\
-    #text(weight: "regular")[E) #raw("", block: false)]\
-  ]
 ]
 

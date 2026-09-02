@@ -132,7 +132,7 @@ public class GeneracionTypstService {
      */
     private List<Map<String, String>> obtenerEstudiantesOficiales(RolExamen rol, String groupIdSolicitado) {
         if (rol.getSeaGroupId() == null || rol.getSeaGroupId().isBlank()) {
-            throw new RuntimeException("No se puede preparar el examen porque este rol no tiene un grupo oficial asociado");
+            throw new RuntimeException("No se puede preparar el examen porque este rol de examen no tiene un grupo oficial asociado");
         }
 
         // El groupId enviado por el navegador solo sirve como referencia de
@@ -203,7 +203,7 @@ public class GeneracionTypstService {
 
         ExamenVariante variante = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, "A")
                 .orElseGet(() -> varianteRepository.findByRolExamenId(rolExamenId).stream().findFirst()
-                        .orElseThrow(() -> new RuntimeException("No existe un examen generado para el rol")));
+                        .orElseThrow(() -> new RuntimeException("No existe un examen generado para el rol de examen")));
 
         if (variante.getArchivoPdfPath() == null || variante.getArchivoPdfPath().isBlank()) {
             throw new RuntimeException("El examen generado no tiene un PDF disponible");

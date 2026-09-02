@@ -177,7 +177,7 @@ public class CartillaOmrService {
 
         String groupIdOficial = resolverGrupoOficialParaMarcas(rol);
         if (groupIdOficial == null || groupIdOficial.isBlank()) {
-            throw new IllegalStateException("El rol no tiene un grupo oficial para consultar los estudiantes.");
+            throw new IllegalStateException("El rol de examen no tiene un grupo oficial para consultar los estudiantes.");
         }
 
         List<StudentItemDto> estudiantes;

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,25 +30,26 @@ public class RolExamenController {
     @Operation(summary = "Listar roles de examen, opcionalmente filtrados por sede y/o carrera")
     public ResponseEntity<List<RolExamenResponseDto>> listar(
             @RequestParam(required = false) String sedeCodigo,
-            @RequestParam(required = false) String carreraCodigo) {
-        return ResponseEntity.ok(rolExamenService.listarFiltrado(sedeCodigo, carreraCodigo));
+            @RequestParam(required = false) String carreraCodigo,
+            Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.listarFiltrado(sedeCodigo, carreraCodigo, authentication));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Obtener un rol de examen por ID")
-    public ResponseEntity<RolExamenResponseDto> obtener(@PathVariable String id) {
-        return ResponseEntity.ok(rolExamenService.obtenerPorId(id));
+    public ResponseEntity<RolExamenResponseDto> obtener(@PathVariable String id, Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.obtenerPorId(id, authentication));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
     @Operation(summary = "Crear un nuevo rol de examen")
     public ResponseEntity<RolExamenResponseDto> crear(@Valid @RequestBody RolExamenRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(rolExamenService.crear(dto));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
     @Operation(summary = "Actualizar un rol de examen programado o validado")
     public ResponseEntity<RolExamenResponseDto> actualizar(
             @PathVariable String id,
@@ -56,7 +58,7 @@ public class RolExamenController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
     @Operation(summary = "Eliminar un rol de examen programado o validado")
     public ResponseEntity<Void> eliminar(@PathVariable String id) {
         rolExamenService.eliminar(id);
@@ -74,7 +76,7 @@ public class RolExamenController {
 
     @PostMapping("/{id}/restablecer")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
-    @Operation(summary = "Restablecer un rol posterior a VALIDADO a VALIDADO")
+    @Operation(summary = "Restablecer un rol de examen posterior a VALIDADO a VALIDADO")
     public ResponseEntity<RolExamenResponseDto> restablecerAValidado(
             @PathVariable String id,
             @Valid @RequestBody RestablecerRolRequestDto dto) {

@@ -23,7 +23,7 @@ public class CartillaOmrController {
     private final CartillaOmrService cartillaOmrService;
 
     @GetMapping("/ultimo")
-    @Operation(summary = "Obtener el último lote de cartillas del rol")
+    @Operation(summary = "Obtener el último lote de cartillas del rol de examen")
     public ResponseEntity<LoteCartillasOmrResponseDto> obtenerUltimo(@PathVariable String rolExamenId) {
         return cartillaOmrService.obtenerUltimo(rolExamenId)
                 .map(ResponseEntity::ok)

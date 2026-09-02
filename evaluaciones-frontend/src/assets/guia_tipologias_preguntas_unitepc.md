@@ -21,8 +21,8 @@ Cada reactivo en la hoja **Banco** se estructura en las siguientes columnas. `im
 | **I** | espuesta_correcta | Clave o letra de la opción correcta | A, B, C, D, E (o vacía en encabezados) |
 | **J** | dificultad | Nivel taxonómico del reactivo | 1 (Fácil), 2 (Medio), 3 (Difícil) |
 | **K** | parcial | Tipo de evaluación programada | 1P, 2P, EF, 2T |
-| **L** | observaciones | Diagnóstico automático de consistencia | OK o detalle de faltantes (Falta revisar...) |
-| **M** | imagen_base64 | Imagen opcional para mostrar debajo del enunciado en el examen virtual | Data URI `data:image/png;base64,...` o Base64 puro; PNG, JPEG, WEBP o GIF; máximo 512 KB. La herramienta puede agregar `#sea-size=GRANDE`, `#sea-size=MEDIANA` o `#sea-size=PEQUENA` para conservar el tamaño visual sin otra columna |
+| **L** | imagen_base64 | Imagen opcional para mostrar debajo del enunciado en el examen virtual | Data URI `data:image/png;base64,...` o Base64 puro; PNG, JPEG, WEBP o GIF; máximo 512 KB. La herramienta puede agregar `#sea-size=GRANDE`, `#sea-size=MEDIANA`, `#sea-size=PEQUENA` o `#sea-size=MUY_PEQUENA` para conservar el tamaño visual sin otra columna |
+| **M** | observaciones | Diagnóstico automático de consistencia | No editar; se calcula automáticamente |
 
 ### Imagen opcional en Base64
 
@@ -30,7 +30,9 @@ Agregue la columna `imagen_base64` en la hoja **Banco** para mostrar una imagen 
 
 `data:image/png;base64,iVBORw0KGgoAAAANSUhEUg...`
 
-También se acepta Base64 puro, que se interpreta como PNG. La imagen se valida y se muestra automáticamente debajo del enunciado en el examen virtual. Por el límite de una celda de Excel, la cadena no debe superar 32767 caracteres y la imagen decodificada no debe superar 512 KB. El previsualizador permite elegir Grande, Mediana (predeterminada) o Pequeña y conserva esa elección en el fragmento de la data URI; no se agrega una columna de tamaño.
+El tamaño puede conservarse en el mismo valor mediante uno de estos metadatos: `#sea-size=GRANDE`, `#sea-size=MEDIANA` (predeterminado), `#sea-size=PEQUENA` o `#sea-size=MUY_PEQUENA`.
+
+También se acepta Base64 puro, que se interpreta como PNG. La imagen se valida y se muestra automáticamente debajo del enunciado en el examen virtual. Por el límite de una celda de Excel, la cadena no debe superar 32767 caracteres y la imagen decodificada no debe superar 512 KB. El previsualizador permite elegir Grande, Mediana (predeterminada), Pequeña o Muy pequeña y conserva esa elección en el fragmento de la data URI; no se agrega una columna de tamaño.
 
 ---
 

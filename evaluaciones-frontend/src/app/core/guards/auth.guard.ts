@@ -38,3 +38,18 @@ export const roleGuard = (roles: AppRole[]): CanActivateFn => () => {
     catchError(() => of(router.createUrlTree(['/login'])))
   );
 };
+
+export const passwordGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  return auth.restaurarSesion().pipe(
+    map(usuario => {
+      if (!usuario) return router.createUrlTree(['/login']);
+      return usuario.debeCambiarContrasena
+        ? router.createUrlTree(['/cambiar-contrasena'])
+        : true;
+    }),
+    catchError(() => of(router.createUrlTree(['/login'])))
+  );
+};

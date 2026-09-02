@@ -41,7 +41,7 @@ export interface PreguntaValidada {
   errores: string[];
 }
 
-type TamanoImagen = 'GRANDE' | 'MEDIANA' | 'PEQUENA';
+type TamanoImagen = 'GRANDE' | 'MEDIANA' | 'PEQUENA' | 'MUY_PEQUENA';
 
 export interface ExamenDocenteCronograma {
   id: string;
@@ -252,7 +252,7 @@ export interface DiaCalendario {
               <div [class]="rolPuedeCargarBanco() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950'">
                 <div class="flex items-center gap-2">
                   <i [class]="rolPuedeCargarBanco() ? 'pi pi-database' : 'pi pi-lock'"></i>
-                  <span><strong>Rol oficial:</strong> {{ rol.id }} · {{ rol.fechaDisplay }}</span>
+                  <span><strong>Rol de examen oficial:</strong> {{ rol.id }} · {{ rol.fechaDisplay }}</span>
                 </div>
                 <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
               </div>
@@ -285,13 +285,13 @@ export interface DiaCalendario {
               @if (!rolPuedeCargarBanco()) {
                 <div class="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950">
                   <i class="pi pi-info-circle mt-0.5"></i>
-                  <span>Este rol ya está en <strong>{{ rol.estadoFlujo }}</strong>. Para reemplazar o volver a registrar el banco, primero debes restablecerlo a <strong>VALIDADO</strong> desde Evaluaciones del día, indicando el motivo.</span>
+                <span>Este rol de examen ya está en <strong>{{ rol.estadoFlujo }}</strong>. Para reemplazar o volver a registrar el banco, primero debes restablecerlo a <strong>VALIDADO</strong> desde Evaluaciones del día, indicando el motivo.</span>
                 </div>
               }
             } @else {
               <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                 <i class="pi pi-exclamation-triangle"></i>
-                <span>No existe un rol oficial para esta materia, grupo y parcial. Regístralo antes de cargar el banco.</span>
+                <span>No existe un rol de examen oficial para esta materia, grupo y parcial. Regístralo antes de cargar el banco.</span>
               </div>
             }
           </div>
@@ -305,7 +305,7 @@ export interface DiaCalendario {
                 </div>
                 <div>
                   <h3 class="text-base font-black text-foreground">Cargar examen sin cartilla</h3>
-                  <p class="text-xs text-muted-foreground mt-1">El docente debe subir el examen oficial en formato .doc o .docx. Al registrarlo, el rol queda en <strong>Validado</strong> para que Evaluaciones gestione su impresión y entrega.</p>
+                  <p class="text-xs text-muted-foreground mt-1">El docente debe subir el examen oficial en formato .doc o .docx. Al registrarlo, el rol de examen queda en <strong>Validado</strong> para que Evaluaciones gestione su impresión y entrega.</p>
                 </div>
               </div>
 
@@ -321,7 +321,7 @@ export interface DiaCalendario {
 
               <div (click)="triggerFileInput()" (dragover)="onDragOver($event)" (drop)="onDropFile($event)" [class]="rolPuedeCargarBanco() ? 'border-2 border-dashed border-emerald-300 hover:border-emerald-600 rounded-2xl p-8 text-center space-y-3 bg-emerald-50/40 hover:bg-emerald-50 transition-all cursor-pointer' : 'border-2 border-dashed border-amber-300 rounded-2xl p-8 text-center space-y-3 bg-amber-50/60 opacity-80 cursor-not-allowed'">
                 <div class="h-14 w-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto"><i class="pi pi-file-word"></i></div>
-                <div><div class="text-sm font-black text-foreground">{{ archivoSinCartillaSeleccionado()?.name || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar el examen .doc o .docx' : 'Carga bloqueada: restablezca el rol a Validado') }}</div><p class="text-xs text-muted-foreground mt-1">Máximo 50 MB. Se conserva el archivo oficial y se calcula su huella de integridad.</p></div>
+                <div><div class="text-sm font-black text-foreground">{{ archivoSinCartillaSeleccionado()?.name || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar el examen .doc o .docx' : 'Carga bloqueada: restablezca el rol de examen a Validado') }}</div><p class="text-xs text-muted-foreground mt-1">Máximo 50 MB. Se conserva el archivo oficial y se calcula su huella de integridad.</p></div>
               </div>
 
               <div class="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
@@ -504,10 +504,10 @@ export interface DiaCalendario {
                 </div>
                 <div class="space-y-1 flex-1">
                   <h5 class="text-xs font-black text-amber-950 dark:text-amber-200 uppercase tracking-tight">
-                    Banco validado, pero el rol no admite nuevos registros
+                    Banco validado, pero el rol de examen no admite nuevos registros
                   </h5>
                   <p class="text-xs text-amber-900/90 dark:text-amber-300/90 font-medium leading-relaxed">
-                    El archivo cumple las cuotas mínimas, pero el rol está en <strong>{{ rolExamenActivo()?.estadoFlujo }}</strong>. Restablécelo a <strong>VALIDADO</strong> desde Evaluaciones del día antes de aprobar o reemplazar el banco.
+                    El archivo cumple las cuotas mínimas, pero el rol de examen está en <strong>{{ rolExamenActivo()?.estadoFlujo }}</strong>. Restablécelo a <strong>VALIDADO</strong> desde Evaluaciones del día antes de aprobar o reemplazar el banco.
                   </p>
                 </div>
               </div>
@@ -524,7 +524,7 @@ export interface DiaCalendario {
               </div>
               <div>
                 <div class="text-sm font-black text-foreground">
-                  {{ nombreArchivoCargado() || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol debe estar PROGRAMADO o VALIDADO') }}
+                  {{ nombreArchivoCargado() || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol de examen debe estar PROGRAMADO o VALIDADO') }}
                 </div>
                 <p class="text-xs text-muted-foreground mt-1">
                   Validación instantánea de tipos de reactivos, cuotas de dificultad y fórmulas matemáticas/químicas.
@@ -2400,7 +2400,7 @@ export interface DiaCalendario {
             </div>
             <div class="p-5 space-y-4 text-xs">
               <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-900 leading-relaxed">
-                Se eliminarán el banco y sus reactivos asociados. El rol volverá a <strong>PROGRAMADO</strong> para permitir una nueva carga.
+                Se eliminarán el banco y sus reactivos asociados. El rol de examen volverá a <strong>PROGRAMADO</strong> para permitir una nueva carga.
               </div>
               <label class="block space-y-1.5">
                 <span class="font-black text-foreground">Escribe <code class="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">ELIMINAR</code> para confirmar</span>
@@ -2552,8 +2552,7 @@ export class BancoPreguntasComponent implements OnInit {
         this.sedes.set(data);
         this.cargandoSedes.set(false);
         if (data.length > 0) {
-          const cba = data.find(s => s.code === 'CBA') || data[0];
-          this.seleccionarSede(cba);
+          this.seleccionarSede(data[0]);
         }
       },
       error: () => this.cargandoSedes.set(false)
@@ -2582,8 +2581,7 @@ export class BancoPreguntasComponent implements OnInit {
         this.carreras.set(data);
         this.cargandoCarreras.set(false);
         if (data.length > 0) {
-          const defaultCarrera = data.find(c => c.careerCode === 'CONT-COMPL' || c.careerName.includes('Contadur')) || data[0];
-          this.seleccionarCarrera(defaultCarrera);
+          this.seleccionarCarrera(data[0]);
         }
       },
       error: () => this.cargandoCarreras.set(false)
@@ -2635,7 +2633,7 @@ export class BancoPreguntasComponent implements OnInit {
       error: err => {
         this.rolesOficiales.set([]);
         this.listaExamenesDocente = [];
-        this._mostrarToast(err?.error?.error || 'No se pudieron cargar los roles oficiales.', 'error');
+        this._mostrarToast(err?.error?.error || 'No se pudieron cargar los roles de examen oficiales.', 'error');
       }
     });
   }
@@ -2686,7 +2684,7 @@ export class BancoPreguntasComponent implements OnInit {
     this.cargandoGrupos.set(true);
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
-    this._gateway.getGroups('2-2026', sede?.branchOfficeId, carrera?.careerId, syllabusCourseId).subscribe({
+    this._gateway.getGroups('2-2026', sede?.branchOfficeId, carrera?.careerId, syllabusCourseId, sede?.code, carrera?.careerCode).subscribe({
       next: data => {
         this.grupos.set(data);
         this.cargandoGrupos.set(false);
@@ -2742,10 +2740,11 @@ export class BancoPreguntasComponent implements OnInit {
   public tamanosImagen: Array<{ valor: TamanoImagen; etiqueta: string }> = [
     { valor: 'GRANDE', etiqueta: 'Grande' },
     { valor: 'MEDIANA', etiqueta: 'Mediana' },
-    { valor: 'PEQUENA', etiqueta: 'Pequeña' }
+    { valor: 'PEQUENA', etiqueta: 'Pequeña' },
+    { valor: 'MUY_PEQUENA', etiqueta: 'Muy pequeña' }
   ];
   public alturaImagenPrevisualizacion = computed(() => {
-    const alturas: Record<TamanoImagen, number> = { GRANDE: 58, MEDIANA: 36, PEQUENA: 24 };
+    const alturas: Record<TamanoImagen, number> = { GRANDE: 58, MEDIANA: 36, PEQUENA: 24, MUY_PEQUENA: 15 };
     return alturas[this.tamanoImagen()];
   });
   public imagenBase64ParaCopiar = computed(() => {
@@ -3184,7 +3183,7 @@ export class BancoPreguntasComponent implements OnInit {
   // ============================================================
   public triggerFileInput(): void {
     if (!this.rolPuedeCargarBanco()) {
-      this._mostrarToast('El rol ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
+      this._mostrarToast('El rol de examen ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
       return;
     }
     this.fileInputRef.nativeElement.click();
@@ -3341,7 +3340,7 @@ export class BancoPreguntasComponent implements OnInit {
     event.preventDefault();
     event.stopPropagation();
     if (!this.rolPuedeCargarBanco()) {
-      this._mostrarToast('El rol ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
+      this._mostrarToast('El rol de examen ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
       return;
     }
     if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
@@ -3367,7 +3366,7 @@ export class BancoPreguntasComponent implements OnInit {
 
   public procesarArchivoSinCartilla(file: File): void {
     if (!this.esSinCartillaActivo() || !this.rolPuedeCargarBanco()) {
-      this._mostrarToast('El examen sin cartilla solo se puede cargar cuando el rol está PROGRAMADO o VALIDADO.', 'error');
+      this._mostrarToast('El examen sin cartilla solo se puede cargar cuando el rol de examen está PROGRAMADO o VALIDADO.', 'error');
       return;
     }
     const nombre = file.name.toLowerCase();
@@ -3424,7 +3423,7 @@ export class BancoPreguntasComponent implements OnInit {
 
   public async procesarArchivoExcelReal(file: File): Promise<void> {
     if (!this.rolPuedeCargarBanco()) {
-      this._mostrarToast('El rol ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
+      this._mostrarToast('El rol de examen ya avanzó en el flujo. Restablécelo a VALIDADO antes de registrar otro banco.', 'error');
       return;
     }
     this.archivoExcelSeleccionado.set(file);
@@ -3761,7 +3760,7 @@ export class BancoPreguntasComponent implements OnInit {
     const entrada = valor.trim();
     const fragmento = entrada.indexOf('#');
     const contenido = fragmento >= 0 ? entrada.slice(0, fragmento) : entrada;
-    const tamano = fragmento >= 0 && /#sea-size=(GRANDE|MEDIANA|PEQUENA)$/i.test(entrada)
+    const tamano = fragmento >= 0 && /#sea-size=(GRANDE|MEDIANA|PEQUENA|MUY_PEQUENA)$/i.test(entrada)
       ? `#sea-size=${entrada.slice(fragmento + 10).toUpperCase()}`
       : '';
     if (/^data:image\/(png|jpeg|webp|gif);base64,/i.test(contenido)) {
@@ -3777,7 +3776,7 @@ export class BancoPreguntasComponent implements OnInit {
     if (entrada.length > 32767) return ['La imagen_base64 supera el límite de 32767 caracteres de una celda Excel'];
     const fragmento = entrada.indexOf('#');
     const contenido = fragmento >= 0 ? entrada.slice(0, fragmento) : entrada;
-    if (fragmento >= 0 && !/#sea-size=(GRANDE|MEDIANA|PEQUENA)$/i.test(entrada)) {
+    if (fragmento >= 0 && !/#sea-size=(GRANDE|MEDIANA|PEQUENA|MUY_PEQUENA)$/i.test(entrada)) {
       return ['El metadato de tamaño de la imagen no es válido'];
     }
     let payload = contenido;
@@ -3843,7 +3842,7 @@ export class BancoPreguntasComponent implements OnInit {
     const examenRol = rolActivo ? this._mapearRolACronograma(rolActivo) : undefined;
     if (!examenRol) {
       this.enviandoCorreo.set(false);
-      this._mostrarToast('Selecciona un rol oficial antes de preparar el envío.', 'error');
+      this._mostrarToast('Selecciona un rol de examen oficial antes de preparar el envío.', 'error');
       return;
     }
     const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
@@ -3881,7 +3880,7 @@ export class BancoPreguntasComponent implements OnInit {
       // 2. Abrir la aplicación de correo del usuario (mailto)
       this.abrirClienteCorreo(comprobante);
 
-      this._mostrarToast('Plantilla y paquete preparados con los datos registrados del rol oficial.');
+      this._mostrarToast('Plantilla y paquete preparados con los datos registrados del rol de examen oficial.');
     }, 600);
   }
 
@@ -4027,8 +4026,15 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     const pieReservado = 18;
     const tamanoFuente = Number(configuracion.tamanoLetraPt) || 11;
     const factoresLeading = (configuracion.espaciadoLeading || '').match(/\d+(?:\.\d+)?/g)?.map(Number) || [];
-    const interlineado = tamanoFuente * (factoresLeading[0] || 0.8) * 0.352778;
-    const separacionPregunta = tamanoFuente * (factoresLeading[1] || 1.2) * 0.352778;
+    // jsPDF no usa el mismo interlineado interno que Typst cuando recibe un
+    // arreglo de líneas. Usamos una separación explícita para conservar la
+    // legibilidad del formato oficial y evitar solapamientos.
+    const interlineadoBase = tamanoFuente * (factoresLeading[0] || 0.8) * 0.352778;
+    const interlineado = Math.max(interlineadoBase, 4.3);
+    const separacionPregunta = Math.max(
+      tamanoFuente * (factoresLeading[1] || 1.2) * 0.352778,
+      5.8
+    );
     const indentacion = tamanoFuente * 0.352778;
     const fuenteConfigurada = (configuracion.tipoLetra || '').toLowerCase();
     const familiaFuente = fuenteConfigurada.includes('arial')
@@ -4089,8 +4095,8 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       });
     };
     const porcentajeAnchoImagen = (valor?: string): number => {
-      const tamano = valor?.match(/#sea-size=(GRANDE|MEDIANA|PEQUENA)$/i)?.[1]?.toUpperCase();
-      return tamano === 'GRANDE' ? 1 : tamano === 'PEQUENA' ? 0.45 : 0.70;
+      const tamano = valor?.match(/#sea-size=(GRANDE|MEDIANA|PEQUENA|MUY_PEQUENA)$/i)?.[1]?.toUpperCase();
+      return tamano === 'GRANDE' ? 1 : tamano === 'MUY_PEQUENA' ? 0.28 : tamano === 'PEQUENA' ? 0.45 : 0.70;
     };
     const dimensionesImagen = (imagen: { width: number; height: number }, valor?: string): { width: number; height: number } => {
       const anchoDisponible = (ancho - margen * 2) * porcentajeAnchoImagen(valor);
@@ -4101,7 +4107,9 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       if (!imagen) return 0;
       const tamano = dimensionesImagen(imagen, valor);
       if (y + tamano.height > alto - margen - pieReservado) nuevaPagina();
-      doc.addImage(imagen.dataUrl, 'PNG', margen, y, tamano.width, tamano.height, undefined, 'FAST');
+      const anchoUtil = ancho - margen * 2;
+      const x = margen + (anchoUtil - tamano.width) / 2;
+      doc.addImage(imagen.dataUrl, 'PNG', x, y, tamano.width, tamano.height, undefined, 'FAST');
       y += tamano.height + interlineado * 0.35;
       return tamano.height + interlineado * 0.35;
     };
@@ -4127,8 +4135,12 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       );
       const altoTexto = Math.max(1, lineas.length) * salto;
       if (y + altoTexto > alto - margen - pieReservado) nuevaPagina();
-      doc.text(lineas.length ? lineas : [''], x, y);
-      y += altoTexto;
+      // Dibujar línea por línea evita que el interlineado automático de
+      // jsPDF desplace el texto más de lo reservado y provoque solapamientos.
+      (lineas.length ? lineas : ['']).forEach(linea => {
+        doc.text(linea, x, y);
+        y += salto;
+      });
     };
 
     const tituloTipo = (tipo: string): string => {
@@ -4343,12 +4355,15 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
         const altoEnunciadoComplejo = Math.max(1, lineasEnunciadoComplejo.length) * interlineado;
         const dimensionesComplejo = imagenPregunta ? dimensionesImagen(imagenPregunta, pregunta.imagen_base64) : null;
         const altoImagenComplejo = dimensionesComplejo ? dimensionesComplejo.height + interlineado * 0.35 : 0;
-        const altoComplejo = altoEnunciadoComplejo + altoImagenComplejo + altoAfirmaciones + altoClave + separacionPregunta;
+        const altoComplejo = altoEnunciadoComplejo + altoImagenComplejo + altoAfirmaciones + altoClave
+          + interlineado * 0.15 + interlineado * 0.4 + separacionPregunta;
         if (y + altoComplejo > alto - margen - pieReservado) nuevaPagina();
 
         escribirPregunta(numeroPregunta, pregunta.enunciado || '');
         dibujarImagenPregunta(imagenPregunta, pregunta.imagen_base64);
+        y += interlineado * 0.15;
         afirmaciones.forEach(texto => escribir(texto, margen + indentacion, ancho - margen * 2 - indentacion, 'normal'));
+        y += interlineado * 0.4;
         claveVfComplejas.forEach(([letra, texto]) => escribir(`${letra}) ${texto}`, margen + indentacion, ancho - margen * 2 - indentacion, 'normal'));
         y += separacionPregunta;
         continue;
@@ -4360,9 +4375,9 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       fuente('bold', tamanoFuente);
       const anchoPrefijo = doc.getTextWidth(prefijo) + 1;
       const lineasEnunciado = medirLineas(pregunta.enunciado || '', ancho - margen * 2 - anchoPrefijo);
-      const opciones: Array<[string, string]> = pregunta.tipo === 'VERDADERO_O_FALSO_SIMPLE' ? [] : pregunta.tipo === 'OPCION_EMPAREJAMIENTO'
-        ? [['A', ''], ['B', ''], ['C', ''], ['D', ''], ['E', '']]
-        : [
+      // En emparejamiento las filas hijas solo llevan el enunciado y la
+      // clave de relación; no deben imprimirse incisos A-E vacíos.
+      const opciones: Array<[string, string]> = ['VERDADERO_O_FALSO_SIMPLE', 'OPCION_EMPAREJAMIENTO'].includes(pregunta.tipo) ? [] : [
           ['A', pregunta.opcion_a], ['B', pregunta.opcion_b], ['C', pregunta.opcion_c],
           ['D', pregunta.opcion_d], ['E', pregunta.opcion_e]
         ].filter(([, texto]) => !!texto?.trim()) as Array<[string, string]>;
@@ -4377,6 +4392,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       escribirPregunta(numeroPregunta, pregunta.enunciado || '');
       dibujarImagenPregunta(imagenPregunta, pregunta.imagen_base64);
 
+      if (opciones.length) y += interlineado * 0.15;
       opciones.forEach(([letra, texto]) => escribir(`${letra}) ${texto}`, margen + indentacion, ancho - margen * 2 - indentacion, 'normal'));
       y += separacionPregunta;
     }
@@ -4533,11 +4549,11 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     const rol = this.rolExamenActivo();
     const file = this.archivoExcelSeleccionado();
     if (!rol) {
-      this._mostrarToast('No existe un rol oficial para la selección actual.', 'error');
+      this._mostrarToast('No existe un rol de examen oficial para la selección actual.', 'error');
       return;
     }
     if (!this.rolPuedeCargarBanco()) {
-      this._mostrarToast(`El rol está en ${rol.estadoFlujo}. Restablécelo a VALIDADO antes de registrar el banco.`, 'error');
+      this._mostrarToast(`El rol de examen está en ${rol.estadoFlujo}. Restablécelo a VALIDADO antes de registrar el banco.`, 'error');
       return;
     }
     if (!file) {
@@ -4575,7 +4591,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
   public abrirEliminarBancoPersistido(): void {
     if (!this.rolPuedeEliminarBanco()) {
-      this._mostrarToast('El banco solo se puede eliminar cuando el rol está PROGRAMADO o VALIDADO.', 'error');
+      this._mostrarToast('El banco solo se puede eliminar cuando el rol de examen está PROGRAMADO o VALIDADO.', 'error');
       return;
     }
     this.confirmacionEliminarBancoPersistido = '';
@@ -4606,7 +4622,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
         const sede = this.sedeSeleccionada();
         const carrera = this.carreraSeleccionada();
         if (sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
-        this._mostrarToast('Banco de preguntas eliminado. El rol volvió a PROGRAMADO.');
+          this._mostrarToast('Banco de preguntas eliminado. El rol de examen volvió a PROGRAMADO.');
       },
       error: err => {
         this.eliminandoBancoPersistido.set(false);
