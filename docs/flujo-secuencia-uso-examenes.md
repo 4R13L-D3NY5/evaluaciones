@@ -77,10 +77,9 @@ El banco tiene como mínimo 60 reactivos, pero cada examen generado utiliza la c
 | `GENERADO` | Variantes, mapeos y documentos generados. | Continuar con impresión o control virtual. |
 | `IMPRESO` | Documentos físicos confirmados como impresos. | Entregar a estudiantes. |
 | `ENTREGADO` | Exámenes entregados o sala presencial ejecutada. | Recibir/devolver material. |
-| `DEVUELTO` | Material físico devuelto para revisión. | Calificar y revisar. |
-| `REVISADO` | Resultados revisados y confirmados. | Subir o remitir resultados. |
-| `SUBIDO` | Resultados enviados al destino institucional. | Confirmar recepción. |
-| `RECIBIDO` | Resultados recibidos y cerrados. | Consultar bitácora y reportes. |
+| `DEVUELTO` | Material físico devuelto para revisión. | Habilitar la carga o lectura de notas. |
+| `PENDIENTE_NOTAS` | Se esperan las notas del docente o el procesamiento OMR. | Registrar resultados y calificar. |
+| `CALIFICADO` | Resultados confirmados y notas persistidas. | Consultar bitácora y resultados. |
 
 La modalidad virtual utiliza el mismo rol, pero no recorre los estados físicos `IMPRESO`, `ENTREGADO` y `DEVUELTO`.
 
@@ -120,8 +119,9 @@ sequenceDiagram
     Sistema->>Sistema: Calcula aciertos y notas
     Personal->>Sistema: Corrige lecturas excepcionales si corresponde
     Personal->>Sistema: Confirma resultados
-    Sistema-->>Personal: Rol REVISADO y notas persistidas
-    Personal->>Sistema: Sube resultados y confirma recepción
+    Sistema-->>Personal: Rol PENDIENTE_NOTAS
+    Personal->>Sistema: Confirma resultados OMR
+    Sistema-->>Personal: Rol CALIFICADO y notas persistidas
 ```
 
 ### 5.2. Obtención de la nota
@@ -177,8 +177,8 @@ sequenceDiagram
     Revision->>Sistema: Ingresa aciertos/respuestas y observaciones
     Sistema->>Sistema: Calcula nota sobre 30 y sobre 100
     Personal->>Sistema: Revisa y confirma
-    Sistema-->>Personal: Rol REVISADO
-    Personal->>Sistema: Sube resultados y confirma recepción
+    Sistema-->>Personal: Rol PENDIENTE_NOTAS
+    Note over Docente,Sistema: La carga de notas del docente queda pendiente de implementación
 ```
 
 ### 6.2. Regla de calificación
@@ -193,7 +193,7 @@ Para cerrar este flujo con notas, la captura debe registrar al menos:
 - Observaciones del evaluador.
 - Usuario y fecha de revisión.
 
-La nota debe usar las mismas fórmulas del examen con cartilla. Si todavía no existe una captura manual habilitada para esta modalidad, el sistema debe mantener el rol en `DEVUELTO` o `REVISADO` sin inventar una nota; la implementación pendiente es la pantalla de carga/revisión manual y su endpoint de persistencia.
+La nota debe usar las mismas fórmulas del examen con cartilla. Mientras no exista la captura manual habilitada para esta modalidad, el rol permanece en `PENDIENTE_NOTAS` sin inventar una nota; queda pendiente la pantalla de carga/revisión manual y su endpoint de persistencia.
 
 ## 7. Modalidad virtual
 
@@ -228,7 +228,7 @@ sequenceDiagram
     Estudiante->>Sistema: Envía examen o espera vencimiento
     Sistema->>Sistema: Califica el intento
     Docente->>Sistema: Cierra la sala
-    Sistema-->>Personal: Resultados disponibles
+    Sistema-->>Personal: Resultados disponibles y rol CALIFICADO
     Personal->>Sistema: Consulta notas y respuestas
 ```
 
@@ -264,7 +264,7 @@ nota_sobre_30  = aciertos × 30 / 30
 nota_sobre_100 = aciertos × 100 / 30
 ```
 
-Al cerrar la sala, el rol virtual pasa a `REVISADO`. No utiliza los estados físicos `IMPRESO`, `ENTREGADO` ni `DEVUELTO`.
+Al cerrar la sala, el rol virtual pasa a `CALIFICADO`. No utiliza los estados físicos `GENERADO`, `IMPRESO`, `ENTREGADO`, `DEVUELTO` ni `PENDIENTE_NOTAS`.
 
 ## 8. Consulta final de resultados
 
@@ -360,4 +360,3 @@ Excepciones que deben detener o dejar en revisión:
 - [ ] Respuestas guardadas.
 - [ ] Sala cerrada o tiempo vencido.
 - [ ] Notas automáticas consultables por estudiante.
-

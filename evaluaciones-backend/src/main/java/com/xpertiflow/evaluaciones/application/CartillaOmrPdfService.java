@@ -37,6 +37,7 @@ public class CartillaOmrPdfService {
     private static final float DATOS_Y = 90f;
     private static final float NOMBRE_Y = 120f;
     private static final float NOMBRE_TAMANO = 10.5f;
+    private static final float CARRERA_TAMANO = 6.5f;
 
     public void generar(Path archivo, RolExamen rol, List<CartillaOmr> cartillas) throws IOException {
         Files.createDirectories(archivo.getParent());
@@ -46,15 +47,19 @@ public class CartillaOmrPdfService {
                 documento.addPage(pagina);
 
                 try (PDPageContentStream contenido = new PDPageContentStream(documento, pagina)) {
-                    dibujarDatos(contenido, cartilla);
+                    dibujarDatos(contenido, rol, cartilla);
                 }
             }
             documento.save(archivo.toFile());
         }
     }
 
-    private void dibujarDatos(PDPageContentStream contenido, CartillaOmr cartilla) throws IOException {
+    private void dibujarDatos(PDPageContentStream contenido, RolExamen rol, CartillaOmr cartilla) throws IOException {
         // Casilla superior izquierda: N°, materia y grupo en líneas separadas.
+        // La etiqueta "CARRERA:" ya pertenece a la cartilla preimpresa; aquí
+        // solo se agrega el nombre oficial del rol en el espacio superior.
+        textoDesdeArriba(contenido, limitar(rol.getCarreraNombre(), 42),
+                DATOS_X + 5f, DATOS_Y + 1f, PDType1Font.HELVETICA_BOLD, CARRERA_TAMANO);
         textoDesdeArriba(contenido, "N° " + cartilla.getNumeroOrden(),
                 DATOS_X + 5f, DATOS_Y + 8f, PDType1Font.HELVETICA_BOLD, 7.2f);
         textoDesdeArriba(contenido, cartilla.getCodigoMateria(),

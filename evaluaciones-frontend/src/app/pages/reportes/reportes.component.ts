@@ -266,14 +266,14 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
 
                     <!-- Bloque Devolución (Recepción) -->
                     <td class="p-3 text-center font-mono font-bold text-emerald-700 bg-emerald-50/30 dark:bg-emerald-950/10">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? '10:20' : '___:___' }}
+                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '10:20' : '___:___' }}
                     </td>
                     <td class="p-3 text-center font-mono font-bold text-emerald-700 bg-emerald-50/30 dark:bg-emerald-950/10">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? '42 resueltas' : '____' }}
+                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '42 resueltas' : '____' }}
                     </td>
                     <td class="p-3 text-center bg-emerald-50/30 dark:bg-emerald-950/10">
                       <div class="h-8 border-b border-dashed border-emerald-300 flex items-center justify-center text-[10px] text-emerald-400 italic">
-                        {{ item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? 'Sello Jefatura' : 'Firma Jefatura' }}
+                        {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? 'Sello Jefatura' : 'Firma Jefatura' }}
                       </div>
                     </td>
 
@@ -439,19 +439,19 @@ type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR'
                     <td class="p-3 text-foreground font-medium uppercase">{{ item.docente }}</td>
                     <td class="p-3 text-center font-mono font-bold">45</td>
                     <td class="p-3 text-center font-mono font-black text-purple-700">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? '42 (100%)' : '0' }}
+                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '42 (100%)' : '0' }}
                     </td>
                     <td class="p-3 text-center font-mono font-black text-foreground">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? '74.5' : '--' }}
+                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '74.5' : '--' }}
                     </td>
                     <td class="p-3 text-center font-mono font-bold text-emerald-600">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? '38 (90%)' : '--' }}
+                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '38 (90%)' : '--' }}
                     </td>
                     <td class="p-3 text-center font-mono font-bold text-rose-600">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? '4 (10%)' : '--' }}
+                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '4 (10%)' : '--' }}
                     </td>
                     <td class="p-3 text-center">
-                      @if (item.etapa === 'Subido' || item.etapa === 'Recibido') {
+                      @if (item.etapa === 'Calificado') {
                         <span class="bg-emerald-100 text-emerald-800 text-[9.5px] font-black px-2 py-0.5 rounded uppercase flex items-center justify-center gap-1">
                           <i class="pi pi-check"></i> SINCRONIZADO
                         </span>
@@ -566,9 +566,8 @@ export class ReporteEvaluacionesComponent {
       case 'Impreso': return 'bg-blue-100 text-blue-800 border border-blue-300 font-bold';
       case 'Entregado': return 'bg-amber-100 text-amber-800 border border-amber-300 font-bold';
       case 'Devuelto': return 'bg-rose-100 text-rose-800 border border-rose-300 font-bold';
-      case 'Revisado': return 'bg-teal-100 text-teal-800 border border-teal-300 font-bold';
-      case 'Subido': return 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold';
-      case 'Recibido': return 'bg-slate-100 text-slate-800 border border-slate-300 font-bold';
+      case 'Pendiente de notas': return 'bg-amber-100 text-amber-800 border border-amber-300 font-bold';
+      case 'Calificado': return 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold';
       default: return 'bg-slate-100 text-slate-800 font-bold';
     }
   }
@@ -596,9 +595,9 @@ export class ReporteEvaluacionesComponent {
         'HORA RETIRO': item.etapa !== 'Programado' ? '07:45' : '',
         'CANT. ENTREGADA': item.etapa !== 'Programado' ? '45 unid.' : '',
         'FIRMA ENTREGA DOCENTE': item.etapa !== 'Programado' && item.etapa !== 'Generado' ? 'REGISTRADA' : '',
-        'HORA DEVOLUCIÓN': item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? '10:20' : '',
-        'CANT. CARTILLAS DEVUELTAS': item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? '42' : '',
-        'FIRMA RECEPCIÓN JEFATURA': item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? 'SELLO OFICIAL' : '',
+        'HORA DEVOLUCIÓN': item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '10:20' : '',
+        'CANT. CARTILLAS DEVUELTAS': item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '42' : '',
+        'FIRMA RECEPCIÓN JEFATURA': item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? 'SELLO OFICIAL' : '',
         'ESTADO ACTUAL': item.etapa
       }));
     } else if (tipo === 'COBERTURA_BANCOS') {
@@ -625,9 +624,9 @@ export class ReporteEvaluacionesComponent {
         'GRUPO': item.grupo,
         'DOCENTE TITULAR': item.docente,
         'ESTUDIANTES INSCRITOS': 45,
-        'CARTILLAS LEÍDAS': item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? 42 : 0,
-        'PROMEDIO NOTA': item.etapa === 'Devuelto' || item.etapa === 'Revisado' || item.etapa === 'Subido' || item.etapa === 'Recibido' ? 74.5 : '--',
-        'ESTADO SINCRONIZACIÓN': item.etapa === 'Subido' || item.etapa === 'Recibido' ? 'SINCRONIZADO' : 'PENDIENTE'
+        'CARTILLAS LEÍDAS': item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? 42 : 0,
+        'PROMEDIO NOTA': item.etapa === 'Calificado' ? 74.5 : '--',
+        'ESTADO SINCRONIZACIÓN': item.etapa === 'Calificado' ? 'CALIFICADO' : 'PENDIENTE'
       }));
     } else {
       fileName = `Bitacora_Auditoria_Seguridad_${gestion}.xlsx`;

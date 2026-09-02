@@ -10,7 +10,7 @@ import { ConfiguracionOmr, OmrLecturaResponse, OmrProcesamientoService } from '.
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
 }
 
 export interface DetallePreguntaOmr {
@@ -1206,7 +1206,7 @@ export class CalificacionOmrComponent implements OnInit {
             canvas.width = viewport.width;
 
             if (context) {
-              await page.render({ canvasContext: context, viewport, canvas: canvas }).promise;
+              await page.render({ canvasContext: context, viewport }).promise;
               renderedPages.push(canvas.toDataURL('image/png'));
             }
           }

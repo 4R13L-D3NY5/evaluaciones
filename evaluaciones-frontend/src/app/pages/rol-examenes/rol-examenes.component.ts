@@ -990,8 +990,8 @@ export class RolExamenesComponent implements OnInit {
       case 'IMPRESO': return 'bg-indigo-600 text-white';
       case 'ENTREGADO': return 'bg-cyan-700 text-white';
       case 'DEVUELTO': return 'bg-amber-600 text-white';
-      case 'REVISADO': return 'bg-emerald-600 text-white';
-      case 'SUBIDO': return 'bg-teal-600 text-white';
+      case 'PENDIENTE_NOTAS': return 'bg-amber-600 text-white';
+      case 'CALIFICADO': return 'bg-emerald-600 text-white';
       case 'SUSPENDIDO': return 'bg-rose-600 text-white';
       default: return 'bg-slate-600 text-white';
     }

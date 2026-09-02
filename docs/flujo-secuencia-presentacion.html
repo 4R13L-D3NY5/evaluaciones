@@ -313,7 +313,7 @@
           <div class="timeline-row"><div class="timeline-index">2</div><div class="actor">Sistema</div><div class="timeline-content"><strong>Genera examen y cartillas</strong><span>Produce el PDF institucional y las cartillas separadas con el código del estudiante.</span><b class="result">Rol: GENERADO</b></div></div>
           <div class="timeline-row"><div class="timeline-index">3</div><div class="actor">Evaluaciones / docente</div><div class="timeline-content"><strong>Entrega y recoge el material</strong><span>Evaluaciones entrega el lote al docente; el docente distribuye, recoge los exámenes completados y devuelve todo.</span><b class="result">Rol: DEVUELTO</b></div></div>
           <div class="timeline-row"><div class="timeline-index">4</div><div class="actor">Evaluador OMR</div><div class="timeline-content"><strong>Procesa el escaneo</strong><span>El sistema identifica código, estudiante y variante; las páginas dudosas pasan a revisión manual.</span><b class="result">Lecturas asociadas al estudiante</b></div></div>
-          <div class="timeline-row"><div class="timeline-index">5</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Revisa y confirma notas</strong><span>Se calculan aciertos, nota sobre 30 y nota sobre 100.</span><b class="result">Rol: REVISADO → RECIBIDO</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">5</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Revisa y confirma notas</strong><span>Se calculan aciertos, nota sobre 30 y nota sobre 100.</span><b class="result">Rol: PENDIENTE_NOTAS → CALIFICADO</b></div></div>
         </div>
         <div class="sequence-wrap">
           <div class="sequence-title"><h3>Secuencia con cartilla</h3><span>Aplicación presencial y lectura OMR</span></div>
@@ -337,7 +337,7 @@
           <div class="timeline-row"><div class="timeline-index">2</div><div class="actor">Sistema</div><div class="timeline-content"><strong>Genera cuadernillos</strong><span>Produce variantes A–E y el mapeo de estudiante a variante.</span><b class="result">Rol: GENERADO</b></div></div>
           <div class="timeline-row"><div class="timeline-index">3</div><div class="actor">Personal / docente</div><div class="timeline-content"><strong>Registra entrega y devolución</strong><span>El examen se aplica presencialmente y vuelve para su revisión.</span><b class="result">Rol: DEVUELTO</b></div></div>
           <div class="timeline-row"><div class="timeline-index">4</div><div class="actor">Evaluador</div><div class="timeline-content"><strong>Captura o revisa respuestas</strong><span>Se registran respuestas, aciertos y observaciones asociadas al estudiante oficial.</span><b class="result">Revisión manual auditada</b></div></div>
-          <div class="timeline-row"><div class="timeline-index">5</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Confirma resultados</strong><span>La nota se calcula y queda disponible para consulta y remisión institucional.</span><b class="result">Rol: REVISADO → RECIBIDO</b></div></div>
+          <div class="timeline-row"><div class="timeline-index">5</div><div class="actor">Evaluaciones</div><div class="timeline-content"><strong>Confirma resultados</strong><span>La nota se calcula y queda disponible para consulta.</span><b class="result">Rol: PENDIENTE_NOTAS → CALIFICADO</b></div></div>
         </div>
         <div class="sequence-wrap">
           <div class="sequence-title"><h3>Secuencia sin cartilla</h3><span>Aplicación presencial y revisión manual</span></div>
@@ -402,8 +402,8 @@
           <span class="state">PROGRAMADO</span><span class="arrow">→</span>
           <span class="state">VALIDADO</span><span class="arrow">→</span>
           <span class="state">GENERADO</span><span class="arrow">→</span>
-          <span class="state">REVISADO</span><span class="arrow">→</span>
-          <span class="state final">RECIBIDO</span>
+          <span class="state">PENDIENTE_NOTAS</span><span class="arrow">→</span>
+          <span class="state final">CALIFICADO</span>
         </div>
         <p style="margin: 18px 0 0; color: var(--muted); font-size: 12px;">En modalidad presencial se incorporan IMPRESO, ENTREGADO y DEVUELTO. Las acciones quedan registradas en bitácora.</p>
       </section>

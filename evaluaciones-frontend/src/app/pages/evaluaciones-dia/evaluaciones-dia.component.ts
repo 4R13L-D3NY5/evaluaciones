@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { forkJoin, Observable, of } from 'rxjs';
+import { forkJoin, Observable, of, throwError } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -39,7 +39,7 @@ import {
 } from '../../core/models/generacion-typst.model';
 
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
 }
 
 function fechaIsoLocal(fecha: Date = new Date()): string {
@@ -49,7 +49,7 @@ function fechaIsoLocal(fecha: Date = new Date()): string {
   return `${anio}-${mes}-${dia}`;
 }
 
-export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Revisado' | 'Subido' | 'Recibido';
+export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Pendiente de notas' | 'Calificado';
 
 export interface StepDef {
   key: EtapaEvaluacion;
@@ -1629,6 +1629,9 @@ interface ResultadoVirtual {
                 @if (lote.estado !== 'IMPRESO') {
                   <button (click)="confirmarImpresionCartillas(lote)" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"><i class="pi pi-print mr-1.5"></i>Marcar como impreso</button>
                 }
+                <button (click)="regenerarCartillas()" [disabled]="generandoCartillas()" title="Volver a consultar la nómina oficial y generar un lote actualizado" class="px-4 py-2 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold cursor-pointer disabled:opacity-50">
+                  <i class="pi mr-1.5" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-refresh]="!generandoCartillas()"></i>{{ generandoCartillas() ? 'Actualizando...' : 'Actualizar y regenerar' }}
+                </button>
               }
               @if (!loteCartillasActual()) {
                 <button (click)="generarCartillas()" [disabled]="generandoCartillas()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-plus]="!generandoCartillas()"></i> Generar marcas</button>
@@ -1713,7 +1716,7 @@ interface ResultadoVirtual {
         </div>
       }
 
-      <!-- MODAL: CALIFICACIÓN OMR PARA PASAR A REVISADO -->
+      <!-- MODAL: CALIFICACIÓN OMR PARA PASAR A CALIFICADO -->
       @if (dialogCalificacionOmr()) {
         <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-border rounded-2xl max-w-5xl w-full max-h-[94vh] shadow-2xl overflow-hidden flex flex-col">
@@ -1721,7 +1724,7 @@ interface ResultadoVirtual {
               <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center"><i class="pi pi-check-square text-lg text-purple-200"></i></div>
                 <div>
-                  <h3 class="text-sm font-black">Calificación OMR · pasar a Revisado</h3>
+                  <h3 class="text-sm font-black">Calificación OMR · pasar a Calificado</h3>
                   <p class="text-[11px] text-white/70">{{ evaluacionSeleccionadaOmr()?.codigo }} · {{ evaluacionSeleccionadaOmr()?.grupo }} · el patrón se toma de la asignación interna.</p>
                 </div>
               </div>
@@ -1754,7 +1757,7 @@ interface ResultadoVirtual {
                 @if (resultadoCalificacionOmr(); as resultado) {
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div class="text-xs font-black text-foreground">Inspección del lote · {{ resultado.totalPaginas || resultado.resultados?.length || 0 }} páginas</div>
-                  <span class="text-[10px] font-black px-2.5 py-1 rounded-full" [class.bg-emerald-100]="todasPaginasCalificadas(resultado)" [class.text-emerald-800]="todasPaginasCalificadas(resultado)" [class.bg-amber-100]="!todasPaginasCalificadas(resultado)" [class.text-amber-900]="!todasPaginasCalificadas(resultado)">{{ todasPaginasCalificadas(resultado) ? 'LISTO PARA REVISADO' : 'REQUIERE REVISIÓN MANUAL' }}</span>
+                  <span class="text-[10px] font-black px-2.5 py-1 rounded-full" [class.bg-emerald-100]="todasPaginasCalificadas(resultado)" [class.text-emerald-800]="todasPaginasCalificadas(resultado)" [class.bg-amber-100]="!todasPaginasCalificadas(resultado)" [class.text-amber-900]="!todasPaginasCalificadas(resultado)">{{ todasPaginasCalificadas(resultado) ? 'LISTO PARA CALIFICAR' : 'REQUIERE REVISIÓN MANUAL' }}</span>
                 </div>
                 <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-2.5 text-[11px] text-indigo-950">
                   <i class="pi pi-pencil mr-1.5"></i>
@@ -1809,7 +1812,7 @@ interface ResultadoVirtual {
             <div class="p-4 border-t border-border flex flex-wrap items-center justify-end gap-2 shrink-0">
               <button (click)="cerrarCalificacionOmr()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
               @if (resultadoCalificacionOmr(); as resultado) {
-                <button (click)="confirmarCalificacionYRevisado(resultado)" [disabled]="!todasPaginasCalificadas(resultado) || guardandoCalificacionOmr()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="guardandoCalificacionOmr()" [class.pi-spinner]="guardandoCalificacionOmr()" [class.pi-check]="!guardandoCalificacionOmr()"></i> {{ guardandoCalificacionOmr() ? 'Guardando ajustes...' : 'Guardar resultados y pasar a Revisado' }}</button>
+                <button (click)="confirmarCalificacion(resultado)" [disabled]="!todasPaginasCalificadas(resultado) || guardandoCalificacionOmr()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="guardandoCalificacionOmr()" [class.pi-spinner]="guardandoCalificacionOmr()" [class.pi-check]="!guardandoCalificacionOmr()"></i> {{ guardandoCalificacionOmr() ? 'Guardando ajustes...' : 'Guardar resultados y pasar a Calificado' }}</button>
               }
             </div>
           </div>
@@ -1895,10 +1898,11 @@ export class EvaluacionesDiaComponent implements OnInit {
   public estadosSeleccionados = signal<string[]>([]);
 
   public readonly listaEtapas: string[] = [
-    'Programado', 'Validado', 'Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'
+    'Programado', 'Validado', 'Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'
   ];
 
-  // Flujo oficial único (9 pasos), independiente de la hoja de respuestas externa.
+  // Flujo oficial único. Pendiente de notas habilita la carga de resultados
+  // del docente; Calificado es el estado final para cualquier modalidad.
   public readonly flujoOficial: StepDef[] = [
     { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
     { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
@@ -1906,9 +1910,8 @@ export class EvaluacionesDiaComponent implements OnInit {
     { key: 'Impreso', label: 'Impreso', icon: 'pi pi-print' },
     { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
     { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
-    { key: 'Revisado', label: 'Revisado', icon: 'pi pi-check' },
-    { key: 'Subido', label: 'Subido', icon: 'pi pi-upload' },
-    { key: 'Recibido', label: 'Recibido', icon: 'pi pi-inbox' }
+    { key: 'Pendiente de notas', label: 'Pendiente de notas', icon: 'pi pi-upload' },
+    { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
   ];
 
   // Modales
@@ -2282,22 +2285,21 @@ export class EvaluacionesDiaComponent implements OnInit {
       case 'IMPRESO': return 'Impreso';
       case 'ENTREGADO': return 'Entregado';
       case 'DEVUELTO': return 'Devuelto';
-      case 'REVISADO': return 'Revisado';
-      case 'SUBIDO': return 'Subido';
-      case 'RECIBIDO': return 'Recibido';
+      case 'PENDIENTE_NOTAS': return 'Pendiente de notas';
+      case 'CALIFICADO': return 'Calificado';
       default: return 'Programado';
     }
   }
 
   public puedeRestablecer(item: EvaluacionItemUI): boolean {
     if (item.modalidad === 'VIRTUAL') return false;
-    return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido']
+    return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado']
       .includes(item.etapa);
   }
 
   public puedeMostrarDocumento(item: EvaluacionItemUI): boolean {
     if (item.modalidad === 'VIRTUAL') return false;
-    return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido']
+    return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado']
       .includes(item.etapa);
   }
 
@@ -2310,16 +2312,16 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public puedeMostrarConfiguracion(item: EvaluacionItemUI): boolean {
     return item.modalidad === 'VIRTUAL'
-      ? ['Validado', 'Revisado'].includes(item.etapa)
-      : ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'].includes(item.etapa);
+      ? ['Validado', 'Calificado'].includes(item.etapa)
+      : ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa);
   }
 
   public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
-    return item.modalidad !== 'VIRTUAL' && ['Revisado', 'Subido', 'Recibido'].includes(item.etapa);
+    return item.modalidad === 'PRESENCIAL_CARTILLA' && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
   }
 
   public puedeMostrarResultadosVirtuales(item: EvaluacionItemUI): boolean {
-    return item.modalidad === 'VIRTUAL' && item.etapa === 'Revisado';
+    return item.modalidad === 'VIRTUAL' && item.etapa === 'Calificado';
   }
 
   public marcaImpresa(item: EvaluacionItemUI): boolean {
@@ -2405,6 +2407,19 @@ export class EvaluacionesDiaComponent implements OnInit {
     });
   }
 
+  public regenerarCartillas(): void {
+    const item = this.evaluacionSeleccionadaCartillas();
+    const lote = this.loteCartillasActual();
+    if (!item || !lote || this.generandoCartillas()) return;
+
+    const confirmado = window.confirm(
+      'Se volverá a consultar la nómina oficial y se generará un nuevo lote de marcas. ¿Deseas continuar?'
+    );
+    if (!confirmado) return;
+
+    this.generarCartillas();
+  }
+
   public confirmarImpresionCartillas(lote: LoteCartillasOmr): void {
     const item = this.evaluacionSeleccionadaCartillas();
     if (!item) return;
@@ -2487,7 +2502,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       return [
         { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
         { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
-        { key: 'Revisado', label: 'Revisado', icon: 'pi pi-check' }
+        { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
       ];
     }
     return this.flujoOficial;
@@ -2497,6 +2512,12 @@ export class EvaluacionesDiaComponent implements OnInit {
     const pasos = this.getPasosFlujo(item).map(p => p.key);
     const currentIdx = pasos.indexOf(item.etapa);
     const pasoIdx = pasos.indexOf(pasoKey);
+
+    if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
+        && item.etapa === 'Pendiente de notas'
+        && pasoKey === 'Calificado') {
+      return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
+    }
 
     if (pasoIdx < currentIdx) {
       return 'bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold hover:bg-emerald-100';
@@ -2534,7 +2555,8 @@ export class EvaluacionesDiaComponent implements OnInit {
     if (pasoIdx === currentIdx + 1) {
       if (st.key === 'Validado') return 'Clic para Validar y Encriptar Examen de Docente';
       if (st.key === 'Generado') return 'Clic para generar el examen PDF (30 preguntas A-E)';
-      if (item.modalidad === 'VIRTUAL' && st.key === 'Revisado') return 'Preparar sala virtual, variantes y tokens de acceso';
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') return 'Preparar sala virtual, variantes y tokens de acceso';
+      if (st.key === 'Pendiente de notas') return 'Habilita la carga de notas del docente o el procesamiento OMR';
       return `Clic para avanzar a: ${st.label}`;
     }
     return `Pendiente: ${st.label}`;
@@ -2555,18 +2577,23 @@ export class EvaluacionesDiaComponent implements OnInit {
       return;
     }
 
-    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Revisado' && item.etapa === 'Validado') {
+    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado' && item.etapa === 'Validado') {
       this.abrirModalParametrizacion(item);
       return;
     }
 
-    if (pasoKey === 'Revisado' && item.etapa === 'Devuelto') {
+    if (pasoKey === 'Calificado' && item.etapa === 'Pendiente de notas' && item.modalidad === 'PRESENCIAL_CARTILLA') {
       this.abrirCalificacionOmr(item);
       return;
     }
 
+    if (pasoKey === 'Calificado' && item.etapa === 'Pendiente de notas' && item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+      this._mostrarToast('La carga manual de notas para exámenes sin cartilla está pendiente de implementación.', 'error');
+      return;
+    }
+
     if (pasoIdx === currentIdx + 1) {
-      const nuevoEstado = pasoKey.toUpperCase() as RolExamenResponse['estadoFlujo'];
+      const nuevoEstado = this.estadoBackendParaEtapa(pasoKey);
       this._rolService.transicionarEstado(item.id, {
         nuevoEstado,
         usuario: 'ADMIN_EVALUACIONES'
@@ -2581,8 +2608,22 @@ export class EvaluacionesDiaComponent implements OnInit {
     }
   }
 
+  private estadoBackendParaEtapa(etapa: EtapaEvaluacion): RolExamenResponse['estadoFlujo'] {
+    const estados: Record<EtapaEvaluacion, RolExamenResponse['estadoFlujo']> = {
+      'Programado': 'PROGRAMADO',
+      'Validado': 'VALIDADO',
+      'Generado': 'GENERADO',
+      'Impreso': 'IMPRESO',
+      'Entregado': 'ENTREGADO',
+      'Devuelto': 'DEVUELTO',
+      'Pendiente de notas': 'PENDIENTE_NOTAS',
+      'Calificado': 'CALIFICADO'
+    };
+    return estados[etapa];
+  }
+
   public abrirCalificacionOmr(item: EvaluacionItemUI): void {
-    if (item.etapa !== 'Devuelto') return;
+    if (item.etapa !== 'Devuelto' && item.etapa !== 'Pendiente de notas') return;
     this.evaluacionSeleccionadaOmr.set(item);
     this.archivoOmrSeleccionado.set(null);
     this.resultadoCalificacionOmr.set(null);
@@ -2659,7 +2700,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       if (!contexto) continue;
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
-      await pagina.render({ canvas, canvasContext: contexto, viewport }).promise;
+      await pagina.render({ canvasContext: contexto, viewport }).promise;
       paginas.push(canvas.toDataURL('image/jpeg', 0.86));
       pagina.cleanup();
       canvas.width = 1;
@@ -2708,7 +2749,7 @@ export class EvaluacionesDiaComponent implements OnInit {
         this.paginaPreviewOmr.set(resultado.resultados?.[0]?.pagina ?? null);
         this.errorCalificacionOmr.set(resultado.estado !== 'COMPLETADO');
         this.mensajeCalificacionOmr.set(resultado.estado === 'COMPLETADO'
-          ? 'Lectura OMR completada. Revise cada página antes de pasar la evaluación a Revisado.'
+          ? 'Lectura OMR completada. Revise cada página antes de pasar la evaluación a Calificado.'
           : resultado.mensaje || 'El motor OMR no pudo completar la lectura.');
       },
       error: () => {
@@ -2875,7 +2916,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       && paginas.every(pagina => !!this.codigoOmr(pagina) && pagina.codigoValidado === true && !!pagina.grilla);
   }
 
-  public confirmarCalificacionYRevisado(resultado: OmrJobResponse): void {
+  public confirmarCalificacion(resultado: OmrJobResponse): void {
     const item = this.evaluacionSeleccionadaOmr();
     if (!item || !this.todasPaginasCalificadas(resultado) || this.guardandoCalificacionOmr()) return;
 
@@ -2889,7 +2930,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     }));
     this.guardandoCalificacionOmr.set(true);
     forkJoin(ajustes.map(ajuste => this._omrService.ajustarCalificacion(item.id, ajuste))).subscribe({
-      next: () => this._transicionarARevisado(item),
+      next: () => this._transicionarACalificado(item),
       error: err => {
         this.guardandoCalificacionOmr.set(false);
         this.errorCalificacionOmr.set(true);
@@ -2898,9 +2939,9 @@ export class EvaluacionesDiaComponent implements OnInit {
     });
   }
 
-  private _transicionarARevisado(item: EvaluacionItemUI): void {
+  private _transicionarACalificado(item: EvaluacionItemUI): void {
     this._rolService.transicionarEstado(item.id, {
-      nuevoEstado: 'REVISADO',
+      nuevoEstado: 'CALIFICADO',
       usuario: 'ADMIN_EVALUACIONES'
     }).subscribe({
       next: rolActualizado => {
@@ -2909,12 +2950,12 @@ export class EvaluacionesDiaComponent implements OnInit {
         this.guardandoCalificacionOmr.set(false);
         this.dialogCalificacionOmr.set(false);
         this.evaluacionSeleccionadaOmr.set(null);
-        this._mostrarToast(`${item.codigo}: resultados confirmados y evaluación pasada a Revisado.`);
+        this._mostrarToast(`${item.codigo}: resultados confirmados y evaluación pasada a Calificado.`);
       },
       error: err => {
         this.guardandoCalificacionOmr.set(false);
         this.errorCalificacionOmr.set(true);
-        this.mensajeCalificacionOmr.set(err?.error?.message || 'Los resultados se guardaron, pero no se pudo pasar la evaluación a Revisado.');
+        this.mensajeCalificacionOmr.set(err?.error?.message || 'Los resultados se guardaron, pero no se pudo pasar la evaluación a Calificado.');
       }
     });
   }
@@ -3026,15 +3067,15 @@ export class EvaluacionesDiaComponent implements OnInit {
       this._configuracionEvaluaciones.configuracion().ratioEstudiantesPorVariante
     );
 
-    // La nómina siempre proviene de SEA. En virtual se vuelve a resolver el
-    // groupId usando asignatura, grupo y docente para corregir roles antiguos
-    // que quedaron asociados a otro grupo con el mismo código (p. ej. TA-01).
-    const groupId$ = item.modalidad === 'VIRTUAL'
-      ? this._resolverGrupoSEA(item)
-      : of(item.seaGroupId);
+    // La nómina siempre proviene de SEA. Se resuelve el grupo para todas las
+    // modalidades, porque los roles antiguos pueden conservar un groupId
+    // vacío o desactualizado, especialmente cuando existen varios TA-01.
+    const groupId$ = this._resolverGrupoSEA(item);
     groupId$.pipe(
       tap(groupId => this.grupoSEAActualParaGenerar = groupId || null),
-      switchMap(groupId => this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, groupId))
+      switchMap(groupId => groupId
+        ? this._studentService.getEstudiantesPorMateriaYGrupo(item.codigo, item.grupo, groupId)
+        : throwError(() => new Error('No se encontró el grupo oficial en SEA para esta evaluación')))
     ).subscribe({
       next: estudiantes => {
         this.estudiantesInscritos.set(estudiantes);
@@ -3063,20 +3104,27 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   private _resolverGrupoSEA(item: EvaluacionItemUI): Observable<string | undefined> {
-    if (!item.seaSyllabusCourseId) return of(item.seaGroupId);
+    const syllabusCourseId$ = item.seaSyllabusCourseId
+      ? of(item.seaSyllabusCourseId)
+      : this._gateway.getCourses(item.sedeCode || '', item.careerCode || '').pipe(
+          map(cursos => cursos.find(curso =>
+            curso.courseCode?.trim().toLowerCase() === item.codigo?.trim().toLowerCase()
+          )?.syllabusCourseId)
+        );
 
-    return this._gateway.getGroups('2-2026', undefined, undefined, item.seaSyllabusCourseId).pipe(
+    return syllabusCourseId$.pipe(
+      switchMap(syllabusCourseId => this._gateway.getGroups('2-2026', undefined, undefined, syllabusCourseId)),
       map(grupos => {
         const delMismoCodigo = (grupos || []).filter(grupo =>
           grupo.code?.trim().toLowerCase() === item.grupo?.trim().toLowerCase()
         );
+        const porIdPersistido = delMismoCodigo.find(grupo => grupo.groupId === item.seaGroupId);
         const delMismoDocente = item.docenteCI
           ? delMismoCodigo.find(grupo => grupo.teacherIdentityNumber?.trim() === item.docenteCI.trim())
           : undefined;
-        const sinDocenteRegistrado = delMismoCodigo.find(grupo => !grupo.teacherIdentityNumber);
-        return (delMismoDocente || sinDocenteRegistrado || delMismoCodigo[0] || grupos?.[0])?.groupId || item.seaGroupId;
+        return (porIdPersistido || delMismoDocente || delMismoCodigo[0])?.groupId || item.seaGroupId;
       }),
-      catchError(() => of(item.seaGroupId))
+      catchError(() => of(item.seaGroupId || undefined))
     );
   }
 

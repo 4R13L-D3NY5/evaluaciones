@@ -215,9 +215,8 @@ public class ExamenVirtualService {
                 EstadoFlujo.IMPRESO,
                 EstadoFlujo.ENTREGADO,
                 EstadoFlujo.DEVUELTO,
-                EstadoFlujo.REVISADO,
-                EstadoFlujo.SUBIDO,
-                EstadoFlujo.RECIBIDO
+                EstadoFlujo.PENDIENTE_NOTAS,
+                EstadoFlujo.CALIFICADO
         ).contains(rol.getEstadoFlujo())) {
             rolExamenService.restablecerAValidado(rol.getId(), RestablecerRolRequestDto.builder()
                     .motivo(motivoNormalizado)
@@ -261,7 +260,7 @@ public class ExamenVirtualService {
         if (rol != null && rol.getModalidad() == ModalidadExamen.VIRTUAL
                 && rol.getEstadoFlujo() == EstadoFlujo.VALIDADO) {
             rolExamenService.transicionarEstado(rol.getId(), com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto.builder()
-                    .nuevoEstado(EstadoFlujo.REVISADO)
+                    .nuevoEstado(EstadoFlujo.CALIFICADO)
                     .usuario(usuario == null ? "Sistema" : usuario)
                     .ipOrigen("127.0.0.1")
                     .build());

@@ -10,7 +10,7 @@ Documento para continuar el desarrollo en otro equipo. Incluye arquitectura, sta
 El **Sistema de Evaluaciones (SEA / SISA)** automatiza el ciclo completo de exámenes presenciales de UNITEPC:
 
 ```
-PROGRAMADO → VALIDADO → GENERADO → IMPRESO → ENTREGADO → DEVUELTO → REVISADO → SUBIDO → RECIBIDO
+PROGRAMADO → VALIDADO → GENERADO → IMPRESO → ENTREGADO → DEVUELTO → PENDIENTE_NOTAS → CALIFICADO
 ```
 
 Actualmente el backend Spring Boot + frontend Angular + worker Python Typst ya generan exámenes reales en PDF a partir de un banco de preguntas Excel de 60 reactivos.

@@ -30,7 +30,7 @@ export interface RolExamenPersistedItem {
   docenteCI: string;
   tipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia';
   version: number;
-  estado: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'REVISADO' | 'SUBIDO' | 'RECIBIDO' | 'SUSPENDIDO' | 'PENDIENTE_FECHA';
+  estado: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'PENDIENTE_NOTAS' | 'CALIFICADO' | 'SUSPENDIDO' | 'PENDIENTE_FECHA';
   conCartilla: boolean;
   modalidad?: ModalidadExamen;
   semana: number;

@@ -16,7 +16,7 @@ import { jsPDF } from 'jspdf';
 import * as pdfjsLib from 'pdfjs-dist';
 
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
 }
 
 export interface PreguntaValidada {
@@ -3906,7 +3906,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
-      await pagina.render({ canvas, canvasContext: contexto, viewport }).promise;
+      await pagina.render({ canvasContext: contexto, viewport }).promise;
       paginas.push(canvas.toDataURL('image/png'));
 
       // Liberar el buffer gráfico de cada página antes de continuar con la siguiente.

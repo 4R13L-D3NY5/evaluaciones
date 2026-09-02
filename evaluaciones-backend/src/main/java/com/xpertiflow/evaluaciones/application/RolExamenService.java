@@ -13,6 +13,7 @@ import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.CourseDto;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -47,9 +48,8 @@ public class RolExamenService {
             EstadoFlujo.GENERADO, Set.of(EstadoFlujo.IMPRESO, EstadoFlujo.SUSPENDIDO),
             EstadoFlujo.IMPRESO, Set.of(EstadoFlujo.ENTREGADO, EstadoFlujo.SUSPENDIDO),
             EstadoFlujo.ENTREGADO, Set.of(EstadoFlujo.DEVUELTO, EstadoFlujo.SUSPENDIDO),
-            EstadoFlujo.DEVUELTO, Set.of(EstadoFlujo.REVISADO, EstadoFlujo.SUSPENDIDO),
-            EstadoFlujo.REVISADO, Set.of(EstadoFlujo.SUBIDO, EstadoFlujo.SUSPENDIDO),
-            EstadoFlujo.SUBIDO, Set.of(EstadoFlujo.RECIBIDO, EstadoFlujo.SUSPENDIDO),
+            EstadoFlujo.DEVUELTO, Set.of(EstadoFlujo.PENDIENTE_NOTAS, EstadoFlujo.SUSPENDIDO),
+            EstadoFlujo.PENDIENTE_NOTAS, Set.of(EstadoFlujo.CALIFICADO, EstadoFlujo.SUSPENDIDO),
             EstadoFlujo.SUSPENDIDO, Set.of(EstadoFlujo.PROGRAMADO)
     );
 
@@ -58,9 +58,8 @@ public class RolExamenService {
             EstadoFlujo.IMPRESO,
             EstadoFlujo.ENTREGADO,
             EstadoFlujo.DEVUELTO,
-            EstadoFlujo.REVISADO,
-            EstadoFlujo.SUBIDO,
-            EstadoFlujo.RECIBIDO
+            EstadoFlujo.PENDIENTE_NOTAS,
+            EstadoFlujo.CALIFICADO
     );
 
     @Transactional(readOnly = true)
@@ -225,7 +224,7 @@ public class RolExamenService {
 
     private Map<String, GroupItemDto> resolverGruposOficiales(List<RolExamen> roles) {
         List<RolExamen> pendientes = roles.stream()
-                .filter(rol -> rol.getSeaSyllabusCourseId() != null && !rol.getSeaSyllabusCourseId().isBlank())
+                .filter(rol -> rol != null)
                 .toList();
         if (pendientes.isEmpty()) {
             return Map.of();
@@ -251,10 +250,26 @@ public class RolExamenService {
             return null;
         }
 
+        String syllabusCourseId = rol.getSeaSyllabusCourseId();
         List<GroupItemDto> candidatos = grupos.stream()
-                .filter(grupo -> mismoTexto(grupo.getSyllabusCourseId(), rol.getSeaSyllabusCourseId()))
                 .filter(grupo -> mismoTexto(grupo.getCode(), rol.getGrupo()))
+                .filter(grupo -> syllabusCourseId == null || syllabusCourseId.isBlank()
+                        || mismoTexto(grupo.getSyllabusCourseId(), syllabusCourseId))
                 .toList();
+
+        // Si el identificador guardado pertenece a una versión antigua del
+        // catálogo, se vuelve a obtener la asignatura desde SEA antes de
+        // escoger el grupo. Nunca se usa el docente local para completar ese
+        // dato.
+        if (candidatos.isEmpty() && syllabusCourseId != null && !syllabusCourseId.isBlank()) {
+            String syllabusCourseIdActual = resolverSyllabusCourseIdDesdeCatalogo(rol);
+            if (syllabusCourseIdActual != null && !syllabusCourseIdActual.isBlank()) {
+                candidatos = grupos.stream()
+                        .filter(grupo -> mismoTexto(grupo.getCode(), rol.getGrupo()))
+                        .filter(grupo -> mismoTexto(grupo.getSyllabusCourseId(), syllabusCourseIdActual))
+                        .toList();
+            }
+        }
 
         if (candidatos.isEmpty()) {
             return null;
@@ -291,6 +306,29 @@ public class RolExamenService {
         return candidatos.stream()
                 .max(Comparator.comparingInt(grupo -> puntajeCompatibilidad(rol, grupo)))
                 .orElse(null);
+    }
+
+    /**
+     * Los roles antiguos pueden no tener guardado el syllabusCourseId. En
+     * ese caso se recupera desde el catálogo SEA usando el código oficial de
+     * la asignatura antes de buscar el grupo. Así no se consulta la nómina
+     * con un groupId local antiguo o de otra materia.
+     */
+    private String resolverSyllabusCourseIdDesdeCatalogo(RolExamen rol) {
+        if (rol.getMateriaCodigo() == null || rol.getMateriaCodigo().isBlank()) {
+            return null;
+        }
+        try {
+            List<CourseDto> cursos = unitepcGatewayClient.getCourses(rol.getSedeCodigo(), rol.getCarreraCodigo());
+            return cursos == null ? null : cursos.stream()
+                    .filter(curso -> mismoTexto(curso.getCourseCode(), rol.getMateriaCodigo()))
+                    .map(CourseDto::getSyllabusCourseId)
+                    .filter(id -> id != null && !id.isBlank())
+                    .findFirst()
+                    .orElse(null);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private int puntajeCompatibilidad(RolExamen rol, GroupItemDto grupo) {
@@ -435,7 +473,7 @@ public class RolExamenService {
 
         boolean transicionVirtualFinal = rol.getModalidad() == ModalidadExamen.VIRTUAL
                 && (origen == EstadoFlujo.VALIDADO || origen == EstadoFlujo.GENERADO)
-                && destino == EstadoFlujo.REVISADO;
+                && destino == EstadoFlujo.CALIFICADO;
         Set<EstadoFlujo> permitidos = TRANSICIONES_VALIDAS.getOrDefault(origen, Set.of());
         if (!transicionVirtualFinal && !permitidos.contains(destino)) {
             throw new RuntimeException(

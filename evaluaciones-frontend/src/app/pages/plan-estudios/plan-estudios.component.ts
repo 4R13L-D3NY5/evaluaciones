@@ -486,7 +486,7 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                   </div>
                   <ul class="list-disc list-inside text-indigo-900/90 text-[11px] space-y-1 font-medium">
                     <li>El encargado de evaluaciones subirá el archivo Excel con las preguntas y fórmulas.</li>
-                    <li>El ciclo requerirá: <strong>Programado $\rightarrow$ Generado $\rightarrow$ Impreso $\rightarrow$ Entregado $\rightarrow$ Devuelto $\rightarrow$ Revisado $\rightarrow$ Subido $\rightarrow$ Recibido</strong>.</li>
+                    <li>El ciclo requerirá: <strong>Programado $\rightarrow$ Generado $\rightarrow$ Impreso $\rightarrow$ Entregado $\rightarrow$ Devuelto $\rightarrow$ Pendiente de notas $\rightarrow$ Calificado</strong>.</li>
                   </ul>
                 </div>
               }
@@ -831,10 +831,11 @@ export class PlanEstudiosComponent implements OnInit {
     return null;
   }
 
-  private mapEstadoLegacy(estado: string): 'Subido' | 'Devuelto' | 'Pendiente' | 'Generado' {
-    if (estado === 'GENERADO' || estado === 'IMPRESO' || estado === 'ENTREGADO' || estado === 'REVISADO') return 'Generado';
+  private mapEstadoLegacy(estado: string): 'Calificado' | 'Devuelto' | 'Pendiente' | 'Generado' {
+    if (estado === 'GENERADO' || estado === 'IMPRESO' || estado === 'ENTREGADO') return 'Generado';
     if (estado === 'DEVUELTO') return 'Devuelto';
-    if (estado === 'SUBIDO' || estado === 'RECIBIDO') return 'Subido';
+    if (estado === 'PENDIENTE_NOTAS') return 'Pendiente';
+    if (estado === 'CALIFICADO') return 'Calificado';
     return 'Pendiente';
   }
 

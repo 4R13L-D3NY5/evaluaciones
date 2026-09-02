@@ -5,6 +5,7 @@
 El módulo prepara la sobreimpresión de cartillas OMR separada del cuadernillo de examen. Genera un PDF con un estudiante por página A4 y registra las cartillas que pertenecen a cada estudiante. El PDF no reproduce la cartilla preimpresa: contiene únicamente los datos operativos que deben caer dentro de sus tres casillas:
 
 - N° correlativo del lote.
+- Carrera oficial.
 - Código de materia.
 - Grupo.
 - Código del estudiante.
@@ -19,6 +20,7 @@ La letra de variante no se imprime ni se marca en la cartilla. El sistema mantie
 3. El sistema crea un lote PDF con un estudiante por página A4 y guarda únicamente la capa de datos.
 4. El administrador revisa/abre el PDF e indica **Marcar como impreso** solo cuando el lote salió físicamente de la impresora.
 5. En la futura carga OMR se escanea solamente el cuerpo superior de la cartilla. El talón inferior se conserva para el estudiante y se ignora en la lectura.
+6. Si la nómina oficial cambia antes de imprimir, el administrador puede usar **Actualizar y regenerar** para crear un nuevo lote; el lote anterior se conserva como historial.
 
 ## Reglas de negocio
 
@@ -26,11 +28,12 @@ La letra de variante no se imprime ni se marca en la cartilla. El sistema mantie
 | --- | --- |
 | Precondición | Solo se generan cartillas si ya existen mapeos oficiales de estudiantes, creados al generar el examen. |
 | Disponibilidad | Las marcas se pueden generar y gestionar en `PROGRAMADO`, `VALIDADO`, `GENERADO` e `IMPRESO`; desde `ENTREGADO` en adelante quedan bloqueadas. |
-| Datos impresos | N°, código de materia, grupo, código y nombre completo. |
+| Datos impresos | Carrera, N°, código de materia, grupo, código y nombre completo. |
 | Variante | Confidencial e interna; nunca se imprime ni se marca en A-E. |
 | Formato | Una sobreimpresión por página A4, alineada con la cartilla de referencia. No se dibuja cartilla ni talón. |
 | Coordenadas | X/Y del documento, con origen superior izquierdo: datos `250,90`, código `315,90` con desplazamiento efectivo de 10 puntos a la izquierda, nombre `250,120`. El código se imprime a 22 pt y el nombre completo a 10.5 pt. |
 | Impresión | Generar no significa imprimir. La confirmación de impresión es una acción explícita y auditable. |
+| Regeneración | Un lote nuevo reemplaza al anterior como lote vigente para la operación, pero no elimina el historial ni el PDF anterior. |
 | Flujo de examen | La impresión de cartillas no cambia por sí sola el estado del rol; evita avanzar el examen sin haber realizado las demás tareas de impresión/control. |
 | Escaneo | La lectura usa exclusivamente el código preimpreso del estudiante para recuperar la clave correcta; no coteja N°, materia, grupo ni nombre, y el talón inferior no forma parte del área OMR. |
 
@@ -107,7 +110,7 @@ La pantalla **Calificación Óptica OMR** debe seleccionar primero un rol con va
 
 Al terminar el procesamiento, la pantalla presenta cada página en una fila de dos zonas: a la izquierda la previsualización de la página escaneada y a la derecha la lista de respuestas en dos columnas. Cada pregunta muestra la respuesta leída y su estado (`Correcta`, `Incorrecta`, `Doble`, `Blanco` o `Sin patrón`), además del código detectado, la variante confirmada y los aciertos/notas calculados. La interfaz normaliza las lecturas a incisos `A`–`E` (o combina dos incisos únicamente cuando se detecta doble marca); la clave oficial siempre se trata como un solo inciso. Una página sin código válido permanece en revisión manual y no se asigna a un estudiante por el orden del PDF.
 
-El código se puede escribir manualmente cuando el OCR no lo reconoce. El botón **Validar código y recalibrar** solicita confirmación y coteja el código contra la nómina oficial del grupo; si pertenece al rol, recupera el patrón de su variante, recalcula las respuestas y persiste el resultado. El botón final para pasar a `REVISADO` solo se habilita cuando todas las páginas tienen grilla y código validado.
+El código se puede escribir manualmente cuando el OCR no lo reconoce. El botón **Validar código y recalibrar** solicita confirmación y coteja el código contra la nómina oficial del grupo; si pertenece al rol, recupera el patrón de su variante, recalcula las respuestas y persiste el resultado. El botón final para pasar a `CALIFICADO` solo se habilita cuando todas las páginas tienen grilla y código validado.
 
 La guía de alineación visual utiliza por defecto la geometría del escaneo de referencia: grilla principal aproximada en `top 16,9 %`, `left 1,1 %`, `width 73,2 %`, `height 42,7 %`; el recuadro exclusivo de código `top 9 %`, `left 53 %`, `width 22 %`, `height 5 %` se resalta por separado para verificarlo antes de procesar.
 

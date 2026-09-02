@@ -53,9 +53,9 @@ export interface PlanEstudioItem {
   fecha1P: string;
   fecha2P: string;
   fechaFinal: string;
-  estadoExamen1P: 'Subido' | 'Devuelto' | 'Pendiente' | 'Generado';
-  estadoExamen2P: 'Subido' | 'Devuelto' | 'Pendiente' | 'Generado';
-  estadoExamenFinal: 'Subido' | 'Devuelto' | 'Pendiente' | 'Generado';
+  estadoExamen1P: 'Calificado' | 'Devuelto' | 'Pendiente' | 'Generado';
+  estadoExamen2P: 'Calificado' | 'Devuelto' | 'Pendiente' | 'Generado';
+  estadoExamenFinal: 'Calificado' | 'Devuelto' | 'Pendiente' | 'Generado';
 }
 
 export type EtapaEvaluacion = 
@@ -64,9 +64,8 @@ export type EtapaEvaluacion =
   | 'Impreso' 
   | 'Entregado' 
   | 'Devuelto' 
-  | 'Revisado' 
-  | 'Subido' 
-  | 'Recibido';
+  | 'Pendiente de notas'
+  | 'Calificado';
 
 export interface BitacoraRegistro {
   estado: EtapaEvaluacion;
@@ -440,13 +439,13 @@ export class EvaluacionesStorageService {
   public getSiguienteEtapa(item: GestionEvaluacionItem): EtapaEvaluacion | null {
     if (item.conCartilla) {
       const flujoConCartilla: EtapaEvaluacion[] = [
-        'Programado', 'Generado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'
+        'Programado', 'Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'
       ];
       const idx = flujoConCartilla.indexOf(item.etapa);
       return idx >= 0 && idx < flujoConCartilla.length - 1 ? flujoConCartilla[idx + 1] : null;
     } else {
       const flujoSinCartilla: EtapaEvaluacion[] = [
-        'Programado', 'Impreso', 'Entregado', 'Devuelto', 'Revisado', 'Subido', 'Recibido'
+        'Programado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'
       ];
       const idx = flujoSinCartilla.indexOf(item.etapa);
       return idx >= 0 && idx < flujoSinCartilla.length - 1 ? flujoSinCartilla[idx + 1] : null;

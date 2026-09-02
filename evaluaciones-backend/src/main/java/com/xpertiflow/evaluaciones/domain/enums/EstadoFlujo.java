@@ -10,9 +10,8 @@ public enum EstadoFlujo {
     IMPRESO("IMPRESO"),
     ENTREGADO("ENTREGADO"),
     DEVUELTO("DEVUELTO"),
-    REVISADO("REVISADO"),
-    SUBIDO("SUBIDO"),
-    RECIBIDO("RECIBIDO"),
+    PENDIENTE_NOTAS("PENDIENTE_NOTAS"),
+    CALIFICADO("CALIFICADO"),
     SUSPENDIDO("SUSPENDIDO");
 
     private final String valor;

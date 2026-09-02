@@ -49,6 +49,7 @@ public class CartillaOmrService {
     private final CartillaOmrPdfService pdfService;
     private final AppProperties appProperties;
     private final UnitepcGatewayClient unitepcGatewayClient;
+    private final RolExamenService rolExamenService;
 
     @Transactional(readOnly = true)
     public Optional<LoteCartillasOmrResponseDto> obtenerUltimo(String rolExamenId) {
@@ -115,13 +116,14 @@ public class CartillaOmrService {
             return mapeados;
         }
 
-        if (rol.getSeaGroupId() == null || rol.getSeaGroupId().isBlank()) {
+        String groupIdOficial = resolverGrupoOficialParaMarcas(rol);
+        if (groupIdOficial == null || groupIdOficial.isBlank()) {
             throw new IllegalStateException("El rol no tiene un grupo oficial para consultar los estudiantes.");
         }
 
         List<StudentItemDto> estudiantes;
         try {
-            estudiantes = unitepcGatewayClient.getStudentsByGroup(rol.getSeaGroupId());
+            estudiantes = unitepcGatewayClient.getStudentsByGroup(groupIdOficial);
         } catch (RuntimeException exception) {
             throw new IllegalStateException("No se pudo consultar la nómina oficial del grupo.", exception);
         }
@@ -135,7 +137,34 @@ public class CartillaOmrService {
                 throw new IllegalStateException("La nómina oficial contiene un estudiante sin código o nombre completo.");
             }
             return new DatosEstudiante(estudiante.getStudentCode().trim(), estudiante.getFullName().trim());
-        }).toList();
+        }).sorted(Comparator.comparing(DatosEstudiante::codigo)).toList();
+    }
+
+    /**
+     * El rol puede conservar un groupId antiguo, especialmente cuando existen
+     * varios grupos con el mismo código (por ejemplo, TA-01). Las marcas deben
+     * usar la misma resolución oficial por asignatura, grupo y docente que la
+     * generación del examen. Si el gateway no está disponible, se conserva el
+     * groupId ya persistido para que el mensaje de error sea el de la consulta
+     * oficial y no uno de selección local.
+     */
+    private String resolverGrupoOficialParaMarcas(RolExamen rol) {
+        String groupIdPersistido = rol.getSeaGroupId();
+        String groupIdOficial = null;
+        try {
+            groupIdOficial = rolExamenService.resolverGrupoOficial(rol);
+        } catch (RuntimeException ignored) {
+            // Se usa el identificador persistido como respaldo de conectividad.
+        }
+
+        if (groupIdOficial == null || groupIdOficial.isBlank()) {
+            groupIdOficial = groupIdPersistido;
+        }
+        if (groupIdOficial != null && !groupIdOficial.equals(rol.getSeaGroupId())) {
+            rol.setSeaGroupId(groupIdOficial);
+            rolExamenRepository.save(rol);
+        }
+        return groupIdOficial;
     }
 
     @Transactional

@@ -21,7 +21,7 @@ export interface RolExamenResponse {
   tipoParcial: string;
   version: number;
   modalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';
-  estadoFlujo: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'REVISADO' | 'SUBIDO' | 'RECIBIDO' | 'SUSPENDIDO';
+  estadoFlujo: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'PENDIENTE_NOTAS' | 'CALIFICADO' | 'SUSPENDIDO';
   semana: number;
   dia: string;
   fecha: string;

@@ -68,9 +68,8 @@ public class GeneracionTypstService {
             EstadoFlujo.IMPRESO,
             EstadoFlujo.ENTREGADO,
             EstadoFlujo.DEVUELTO,
-            EstadoFlujo.REVISADO,
-            EstadoFlujo.SUBIDO,
-            EstadoFlujo.RECIBIDO
+            EstadoFlujo.PENDIENTE_NOTAS,
+            EstadoFlujo.CALIFICADO
     );
 
     public GeneracionTypstResultadoDto solicitarGeneracion(GeneracionTypstRequestDto request) {

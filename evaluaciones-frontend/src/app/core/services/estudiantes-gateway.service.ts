@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 import { UnitepcGatewayService } from './unitepc-gateway.service';
 import { GroupStudentItem } from '../models/unitepc-gateway.models';
 
@@ -39,10 +39,6 @@ export class EstudiantesGatewayService {
         // Evaluaciones respecto al catálogo oficial de Servicios SEA.
         return (items || []).map(item => this._mapGatewayStudentToInscrito(item));
       }),
-      catchError(err => {
-        console.warn(`[EstudiantesGatewayService] No se pudo consultar SEA para grupo ${groupId}:`, err);
-        return of([]);
-      })
     );
   }
 

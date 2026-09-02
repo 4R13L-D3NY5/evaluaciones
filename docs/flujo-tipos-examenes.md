@@ -30,9 +30,8 @@ flowchart TB
         C3 -->|Imprimir PDF y cartilla| C4[Impreso]
         C4 -->|Registrar entrega| C5[Entregado]
         C5 -->|Registrar devolución| C6[Devuelto]
-        C6 -->|⚙ Escaneado + parámetros OMR| C7[Revisado]
-        C7 -->|Subir resultados| C8[Subido]
-        C8 -->|Confirmar recepción| C9[Recibido]
+        C6 -->|Preparar calificación| C7[Pendiente de notas]
+        C7 -->|⚙ Escaneado + parámetros OMR| C8[Calificado]
     end
 
     subgraph SIN_CARTILLA[Presencial sin cartilla]
@@ -42,9 +41,8 @@ flowchart TB
         S3 -->|Imprimir cuadernillos| S4[Impreso]
         S4 -->|Registrar entrega| S5[Entregado]
         S5 -->|Registrar devolución| S6[Devuelto]
-        S6 -->|Revisión del examen| S7[Revisado]
-        S7 -->|Subir resultados| S8[Subido]
-        S8 -->|Confirmar recepción| S9[Recibido]
+        S6 -->|Habilitar carga docente| S7[Pendiente de notas]
+        S7 -->|Carga manual pendiente| S8[Calificado]
     end
 
     subgraph VIRTUAL[Examen virtual]
@@ -55,14 +53,14 @@ flowchart TB
         V4 -->|Abrir sala| V5[Sala abierta]
         V5 -->|Docente inicia| V6[En curso]
         V6 -->|Vence el tiempo o se cierra| V7[Intentos calificados]
-        V7 -->|Automático| V8[Revisado]
+        V7 -->|Automático| V8[Calificado]
     end
 
     classDef config fill:#fff4d6,stroke:#d97706,stroke-width:2px,color:#78350f;
     classDef estado fill:#f3e8ff,stroke:#7e22ce,stroke-width:1.5px,color:#3b0764;
     classDef operativo fill:#ecfdf5,stroke:#059669,stroke-width:1.5px,color:#064e3b;
     class CONFIG,C2,C3,C6,S2,S3,V2,V3 config;
-    class C1,C2,C3,C4,C5,C6,C7,C8,C9,S1,S2,S3,S4,S5,S6,S7,S8,S9,V1,V2,V8 estado;
+    class C1,C2,C3,C4,C5,C6,C7,C8,S1,S2,S3,S4,S5,S6,S7,S8,V1,V2,V8 estado;
     class V3,V4,V5,V6,V7 operativo;
 ```
 
@@ -73,12 +71,12 @@ flowchart TB
 | Todas | `Programado → Validado` | Rol de examen oficial, grupo, asignatura, docente, horario y banco de preguntas cargado/validado. La validación encripta el examen del docente. |
 | Con cartilla | `Validado → Generado` | Ratio de estudiantes por variante, nómina oficial de SEA y parámetros de diagramación. Se generan variantes, PDF y mapeo estudiante-variante. |
 | Sin cartilla | `Validado → Generado` | Ratio de estudiantes por variante, nómina oficial de SEA y parámetros de diagramación. Se generan variantes y cuadernillos PDF, sin cartilla OMR. |
-| Con cartilla | `Devuelto → Revisado` | Escaneado de respuestas, lectura OMR y revisión de las marcas antes de confirmar la calificación. |
-| Sin cartilla | `Devuelto → Revisado` | Revisión del examen por el mecanismo definido para esa evaluación; no se utiliza la cartilla ni la lectura OMR específica. |
+| Con cartilla | `Devuelto → Pendiente de notas → Calificado` | El estado intermedio habilita el procesamiento OMR; la confirmación de lecturas pasa a calificado. |
+| Sin cartilla | `Devuelto → Pendiente de notas → Calificado` | El estado intermedio queda preparado para la futura carga manual de notas del docente. |
 | Virtual | `Validado → Preparar variantes y sala` | Ratio institucional, nómina oficial de SEA, banco validado y duración del examen. No se genera PDF. |
 | Virtual | `Sala preparada → Sala abierta` | El personal autorizado publica la sala y comparte el código de sala y cada token individual. |
 | Virtual | `Sala abierta → En curso` | El docente verifica el ingreso de los estudiantes y pulsa **Iniciar examen**. El servidor fija el tiempo oficial. |
-| Virtual | `En curso → Revisado` | No requiere una transición manual del rol: al vencer la duración o cerrar la sala, el sistema guarda/califica los intentos y pasa el examen a **Revisado**. |
+| Virtual | `En curso → Calificado` | No requiere una transición manual del rol: al vencer la duración o cerrar la sala, el sistema guarda/califica los intentos y pasa el examen a **Calificado**. |
 
 ## Configuración administrativa que afecta el flujo
 
@@ -108,6 +106,6 @@ El sistema utiliza como máximo cinco variantes: **A, B, C, D y E**. Por ejemplo
 | Sala y tokens | No | No | Sí |
 | Inicio controlado por docente | No aplica | No aplica | Sí |
 | Tiempo controlado por servidor | No | No | Sí |
-| Estado final | Recibido | Recibido | Revisado |
+| Estado final | Calificado | Pendiente de notas* | Calificado |
 
-> En el examen virtual, el estado **Revisado** se alcanza después de cerrar la sala y calificar los intentos. La acción de preparar la sala se inicia desde **Validado**, aunque la preparación no cambie todavía el estado oficial del rol.
+> En el examen virtual, el estado **Calificado** se alcanza después de cerrar la sala y calificar los intentos. La acción de preparar la sala se inicia desde **Validado**, aunque la preparación no cambie todavía el estado oficial del rol. *Sin cartilla permanecerá en **Pendiente de notas** hasta implementar la carga docente.*
