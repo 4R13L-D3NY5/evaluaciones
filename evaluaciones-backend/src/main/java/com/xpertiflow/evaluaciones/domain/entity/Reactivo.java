@@ -38,6 +38,9 @@ public class Reactivo {
     @Column(name = "enunciado", nullable = false, columnDefinition = "TEXT")
     private String enunciado;
 
+    @Column(name = "imagen_base64", columnDefinition = "TEXT")
+    private String imagenBase64;
+
     @Column(name = "opciones_json", nullable = false, columnDefinition = "TEXT")
     private String opcionesJson;
 

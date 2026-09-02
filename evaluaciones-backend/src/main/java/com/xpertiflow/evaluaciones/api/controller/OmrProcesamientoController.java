@@ -30,6 +30,13 @@ public class OmrProcesamientoController {
         return ResponseEntity.accepted().body(omrProcesamientoService.solicitar(rolExamenId, archivo));
     }
 
+    @PostMapping("/{rolExamenId}/procesar-lectura")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @Operation(summary = "Leer código y respuestas de un escaneo para conciliación")
+    public ResponseEntity<JsonNode> procesarLectura(@PathVariable String rolExamenId, @RequestParam("file") MultipartFile archivo) {
+        return ResponseEntity.accepted().body(omrProcesamientoService.solicitarLecturaConciliacion(rolExamenId, archivo));
+    }
+
     @GetMapping("/jobs/{jobId}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Consultar el resultado de lectura OMR")

@@ -48,6 +48,10 @@ public class BancoPreguntasService {
     private static final int MIN_HIJOS_AGRUPADOS = 2;
     private static final int MAX_HIJOS_AGRUPADOS = 10;
     private static final long MAX_ARCHIVO_BYTES = 10L * 1024L * 1024L;
+    private static final int MAX_IMAGEN_BASE64_CHARS = 32767;
+    private static final int MAX_IMAGEN_BYTES = 512 * 1024;
+    private static final Set<String> MIME_IMAGENES_PERMITIDOS = Set.of(
+            "image/png", "image/jpeg", "image/webp", "image/gif");
     private static final Set<String> ERRORES_FORMULA = Set.of("#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#N/A");
 
     public BancoPreguntasResponseDto obtenerPorRolExamenId(String rolExamenId) {
@@ -270,6 +274,7 @@ public class BancoPreguntasService {
         String tipo = valor(row, columnas, "tipo", evaluador);
         String grupo = valor(row, columnas, "grupo", evaluador);
         String enunciado = valor(row, columnas, "enunciado", evaluador);
+        String imagenBase64 = normalizarImagenBase64(valor(row, columnas, "imagen_base64", evaluador), rowNum, errores);
         String respuestaOriginal = valor(row, columnas, "respuesta_correcta", evaluador);
         String dificultadStr = valor(row, columnas, "dificultad", evaluador);
         String parcial = valor(row, columnas, "parcial", evaluador);
@@ -382,6 +387,7 @@ public class BancoPreguntasService {
             Reactivo r = new Reactivo();
             r.setTipoReactivo(tipoNormalizado);
             r.setEnunciado(enunciado);
+            r.setImagenBase64(imagenBase64);
             r.setOpcionesJson(toJson(opciones));
             r.setRespuestaCorrecta(respuesta);
             r.setNivelDificultad(nivelDificultad);
@@ -451,7 +457,7 @@ public class BancoPreguntasService {
     }
 
     private boolean filaVacia(Row row, Map<String, Integer> columnas, FormulaEvaluator evaluador) {
-        List<String> campos = List.of("tipo", "grupo", "enunciado", "opcion_a", "opcion_b", "opcion_c", "opcion_d", "opcion_e", "respuesta_correcta", "dificultad", "parcial", "peso");
+        List<String> campos = List.of("tipo", "grupo", "enunciado", "imagen_base64", "opcion_a", "opcion_b", "opcion_c", "opcion_d", "opcion_e", "respuesta_correcta", "dificultad", "parcial", "peso");
         return campos.stream().allMatch(campo -> valor(row, columnas, campo, evaluador).isBlank());
     }
 
@@ -466,6 +472,7 @@ public class BancoPreguntasService {
             case "tipo", "tipo_reactivo", "tipo_de_reactivo" -> "tipo";
             case "grupo", "grupo_contexto" -> "grupo";
             case "enunciado", "pregunta" -> "enunciado";
+            case "imagen", "imagen_base64", "imagen_base_64", "imagen_data_uri", "imagen_data" -> "imagen_base64";
             case "opcion_a", "opciona", "a" -> "opcion_a";
             case "opcion_b", "opcionb", "b" -> "opcion_b";
             case "opcion_c", "opcionc", "c" -> "opcion_c";
@@ -503,6 +510,60 @@ public class BancoPreguntasService {
             if (valor.toUpperCase(Locale.ROOT).contains(errorFormula)) {
                 errores.add("Fila " + (rowNum + 1) + ": " + campo + " contiene el error de fórmula " + errorFormula);
             }
+        }
+    }
+
+    private String normalizarImagenBase64(String valor, int rowNum, List<String> errores) {
+        if (valor == null || valor.isBlank()) return null;
+
+        String entrada = valor.trim();
+        if (entrada.length() > MAX_IMAGEN_BASE64_CHARS) {
+            errores.add("Fila " + (rowNum + 1) + ": imagen_base64 supera el máximo permitido de "
+                    + MAX_IMAGEN_BASE64_CHARS + " caracteres (límite de una celda Excel)");
+            return null;
+        }
+
+        String sufijoTamano = "";
+        int indiceFragmento = entrada.indexOf('#');
+        if (indiceFragmento >= 0) {
+            String fragmento = entrada.substring(indiceFragmento);
+            if (!fragmento.matches("(?i)#sea-size=(GRANDE|MEDIANA|PEQUENA)")) {
+                errores.add("Fila " + (rowNum + 1) + ": el metadato de tamaño de la imagen no es válido");
+                return null;
+            }
+            sufijoTamano = "#sea-size=" + fragmento.substring("#sea-size=".length()).toUpperCase(Locale.ROOT);
+            entrada = entrada.substring(0, indiceFragmento);
+        }
+
+        String mime = "image/png";
+        String payload = entrada;
+        if (entrada.regionMatches(true, 0, "data:", 0, 5)) {
+            int separador = entrada.indexOf(',');
+            if (separador < 0) {
+                errores.add("Fila " + (rowNum + 1) + ": imagen_base64 debe usar el formato data:image/...;base64,...");
+                return null;
+            }
+            String metadata = entrada.substring(5, separador).toLowerCase(Locale.ROOT);
+            int puntoYComa = metadata.indexOf(';');
+            mime = puntoYComa > 0 ? metadata.substring(0, puntoYComa) : metadata;
+            if (!metadata.contains(";base64") || !MIME_IMAGENES_PERMITIDOS.contains(mime)) {
+                errores.add("Fila " + (rowNum + 1) + ": formato de imagen no permitido; use PNG, JPEG, WEBP o GIF en Base64");
+                return null;
+            }
+            payload = entrada.substring(separador + 1);
+        }
+
+        payload = payload.replaceAll("\\s+", "");
+        try {
+            byte[] bytes = Base64.getDecoder().decode(payload);
+            if (bytes.length == 0 || bytes.length > MAX_IMAGEN_BYTES) {
+                errores.add("Fila " + (rowNum + 1) + ": la imagen debe pesar entre 1 byte y 512 KB");
+                return null;
+            }
+            return "data:" + mime + ";base64," + payload + sufijoTamano;
+        } catch (IllegalArgumentException ex) {
+            errores.add("Fila " + (rowNum + 1) + ": imagen_base64 no contiene una codificación Base64 válida");
+            return null;
         }
     }
 

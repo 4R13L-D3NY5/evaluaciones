@@ -8,5 +8,6 @@ public class PreguntaVirtualDto {
     private String tipoReactivo;
     private String grupoContexto;
     private String enunciado;
+    private String imagenBase64;
     private List<OpcionVirtualDto> opciones;
 }

@@ -438,6 +438,27 @@ public class RolExamenService {
     }
 
     @Transactional
+    public RolExamen validarPorDocumentoSinCartilla(String id, String hash, String usuario) {
+        RolExamen rol = rolExamenRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
+        if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_SIN_CARTILLA) {
+            throw new IllegalStateException("La carga de un documento .doc solo corresponde a exámenes sin cartilla.");
+        }
+        EstadoFlujo origen = rol.getEstadoFlujo();
+        if (origen != EstadoFlujo.PROGRAMADO && origen != EstadoFlujo.VALIDADO) {
+            throw new IllegalStateException("El documento solo se puede cargar cuando el rol está PROGRAMADO o VALIDADO.");
+        }
+        rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
+        rol.setFechaValidacion(LocalDateTime.now());
+        rol.setHashEncriptacion(hash);
+        RolExamen guardado = rolExamenRepository.save(rol);
+        registrarAuditoria(guardado, origen, EstadoFlujo.VALIDADO,
+                origen == EstadoFlujo.PROGRAMADO ? "VALIDACION_EXAMEN_SIN_CARTILLA" : "REEMPLAZO_EXAMEN_SIN_CARTILLA",
+                usuarioValido(usuario), "127.0.0.1");
+        return guardado;
+    }
+
+    @Transactional
     public RolExamen revertirPorEliminacionBanco(String id, String usuario) {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
@@ -474,8 +495,14 @@ public class RolExamenService {
         boolean transicionVirtualFinal = rol.getModalidad() == ModalidadExamen.VIRTUAL
                 && (origen == EstadoFlujo.VALIDADO || origen == EstadoFlujo.GENERADO)
                 && destino == EstadoFlujo.CALIFICADO;
+        boolean transicionSinCartillaAImpreso = rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA
+                && origen == EstadoFlujo.VALIDADO
+                && destino == EstadoFlujo.IMPRESO;
         Set<EstadoFlujo> permitidos = TRANSICIONES_VALIDAS.getOrDefault(origen, Set.of());
-        if (!transicionVirtualFinal && !permitidos.contains(destino)) {
+        if (rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA && destino == EstadoFlujo.GENERADO) {
+            throw new RuntimeException("Los exámenes sin cartilla no requieren generación de variantes ni PDF.");
+        }
+        if (!transicionVirtualFinal && !transicionSinCartillaAImpreso && !permitidos.contains(destino)) {
             throw new RuntimeException(
                     String.format("Transición no permitida de %s a %s", origen, destino));
         }
@@ -567,6 +594,10 @@ public class RolExamenService {
                 .replace("\"", "\\\"")
                 .replace("\r", "\\r")
                 .replace("\n", "\\n");
+    }
+
+    private String usuarioValido(String usuario) {
+        return usuario == null || usuario.isBlank() ? "SISTEMA" : usuario.trim();
     }
 
     private String formatearFecha(LocalDateTime fecha) {

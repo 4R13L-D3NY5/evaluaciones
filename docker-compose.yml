@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ---------------------------------------------------------------------------
   # Base de Datos PostgreSQL 16
@@ -79,6 +77,12 @@ services:
       - ./storage:/app/storage
     networks:
       - eval-network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
 
   # ---------------------------------------------------------------------------
   # Frontend Angular (servido por Nginx con build de producción)
@@ -90,7 +94,8 @@ services:
     container_name: evaluaciones-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "${FRONTEND_PORT:-4200}:80"
     networks:
@@ -106,9 +111,12 @@ services:
     container_name: evaluaciones-worker-typst
     restart: unless-stopped
     depends_on:
-      - rabbitmq
-      - backend
-      - db
+      rabbitmq:
+        condition: service_started
+      db:
+        condition: service_started
+      backend:
+        condition: service_healthy
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
@@ -138,9 +146,12 @@ services:
     container_name: evaluaciones-worker-omr
     restart: unless-stopped
     depends_on:
-      - rabbitmq
-      - backend
-      - db
+      rabbitmq:
+        condition: service_started
+      db:
+        condition: service_started
+      backend:
+        condition: service_healthy
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672

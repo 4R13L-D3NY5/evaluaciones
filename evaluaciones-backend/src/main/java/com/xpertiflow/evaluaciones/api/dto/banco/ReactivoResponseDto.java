@@ -14,6 +14,7 @@ public class ReactivoResponseDto {
     private String dificultad;
     private Integer nivelDificultad;
     private String enunciado;
+    private String imagenBase64;
     private String respuestaCorrecta;
     private BigDecimal pesoPuntos;
     private String grupoContexto;

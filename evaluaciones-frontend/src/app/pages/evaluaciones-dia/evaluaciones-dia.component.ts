@@ -23,6 +23,7 @@ import {
 } from '../../core/services/rol-examen.service';
 import { CartillasOmrService, PreparacionCartillasOmr } from '../../core/services/cartillas-omr.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
+import { ExamenSinCartillaService, NotaDocente as NotaDocenteSinCartilla } from '../../core/services/examen-sin-cartilla.service';
 import {
   CalificacionOmrResponse,
   AjustarCalificacionOmrRequest,
@@ -565,6 +566,22 @@ interface ResultadoVirtual {
                             </button>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/notas:flex flex-col items-center z-50 pointer-events-none">
                               <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Notas OMR /30 y /100</span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
+                        @if (puedeMostrarNotasDocente(item)) {
+                          <div class="relative group/notasDocente">
+                            <button
+                              (click)="abrirNotasDocente(item)"
+                              title="Cargar notas del docente"
+                              aria-label="Cargar notas del docente"
+                              class="h-7 w-7 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-pencil text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/notasDocente:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">{{ item.etapa === 'Pendiente de notas' ? 'Cargar notas del docente' : 'Ver notas registradas' }}</span>
                               <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                             </div>
                           </div>
@@ -1841,6 +1858,57 @@ interface ResultadoVirtual {
         </div>
       }
 
+      <!-- MODAL: CARGA DE NOTAS DEL DOCENTE PARA SIN CARTILLA -->
+      @if (dialogNotasDocente()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-amber-200 rounded-2xl max-w-5xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Examen presencial sin cartilla</p>
+                <h3 class="text-lg font-black text-foreground">{{ evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas' ? 'Carga de notas por estudiante' : 'Reporte de notas registradas' }}</h3>
+                <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotasDocente()?.codigo }} · {{ evaluacionSeleccionadaNotasDocente()?.materia }} · {{ evaluacionSeleccionadaNotasDocente()?.grupo }}</p>
+              </div>
+              <button (click)="cerrarNotasDocente()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="p-5 overflow-y-auto space-y-4">
+              <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-950">
+                <i class="pi pi-info-circle mr-1.5"></i>
+                {{ evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas' ? 'Registre la nota sobre 30 de cada estudiante de la nómina oficial. Al guardar todas las notas, la evaluación pasará a Calificado.' : 'Las notas se calcularon y guardaron tomando como fuente la nómina oficial de los servicios institucionales.' }}
+              </div>
+              @if (cargandoNotasDocente()) {
+                <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-xl text-amber-700"></i><p class="mt-2">Consultando nómina oficial y notas...</p></div>
+              } @else if (notasDocente().length === 0) {
+                <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">No se pudo obtener la nómina oficial del grupo.</div>
+              } @else {
+                <div class="border border-border rounded-xl overflow-hidden">
+                  <div class="grid grid-cols-[55px_1fr_150px_150px] gap-3 bg-muted/60 px-4 py-3 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Nota /30</span><span>Nota /100</span></div>
+                  <div class="divide-y divide-border">
+                    @for (nota of notasDocente(); track nota.codigoEstudiante; let idx = $index) {
+                      <div class="grid grid-cols-[55px_1fr_150px_150px] gap-3 px-4 py-3 items-center text-xs">
+                        <span class="font-mono text-muted-foreground">{{ idx + 1 }}</span>
+                        <span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground uppercase">{{ nota.estudianteNombreCompleto }}</span></span>
+                        <input type="number" min="0" max="30" step="0.01" [value]="nota.notaSobre30 ?? ''" (input)="editarNotaDocente(nota.codigoEstudiante, $any($event.target).value)" [disabled]="evaluacionSeleccionadaNotasDocente()?.etapa !== 'Pendiente de notas' || guardandoNotasDocente()" class="rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs font-black text-foreground outline-none focus:border-amber-500 disabled:bg-muted disabled:cursor-not-allowed" placeholder="0–30" />
+                        <span class="rounded-lg bg-emerald-50 px-3 py-2 font-mono text-xs font-black text-emerald-800">{{ nota.notaSobre100 ?? '—' }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+            <div class="p-4 border-t border-border flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <span class="text-[10px] text-muted-foreground">{{ notasDocenteConCarga() }} de {{ notasDocente().length }} notas registradas</span>
+              <div class="flex gap-2">
+                <button (click)="imprimirReporteNotasDocente()" [disabled]="!notasDocente().length" class="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-black cursor-pointer disabled:opacity-40"><i class="pi pi-print mr-1"></i> Imprimir reporte</button>
+                <button (click)="cerrarNotasDocente()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button>
+                @if (evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas') {
+                  <button (click)="guardarNotasDocente()" [disabled]="!notasDocenteCompletas() || guardandoNotasDocente()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="guardandoNotasDocente()" [class.pi-spinner]="guardandoNotasDocente()" [class.pi-check]="!guardandoNotasDocente()"></i> {{ guardandoNotasDocente() ? 'Guardando...' : 'Guardar y calificar' }}</button>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
@@ -1862,6 +1930,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   private readonly _cartillasOmr = inject(CartillasOmrService);
   private readonly _omrService = inject(OmrProcesamientoService);
   private readonly _configuracionEvaluaciones = inject(ConfiguracionEvaluacionesService);
+  private readonly _sinCartillaService = inject(ExamenSinCartillaService);
 
   // Sedes y Carreras desde SEA Gateway
   public sedes = signal<BranchOffice[]>([]);
@@ -1994,6 +2063,13 @@ export class EvaluacionesDiaComponent implements OnInit {
   public evaluacionSeleccionadaNotas = signal<EvaluacionItemUI | null>(null);
   public notasOmr = signal<CalificacionOmrResponse[]>([]);
   public cargandoNotasOmr = signal<boolean>(false);
+
+  // Carga manual de notas para exámenes sin cartilla.
+  public dialogNotasDocente = signal<boolean>(false);
+  public evaluacionSeleccionadaNotasDocente = signal<EvaluacionItemUI | null>(null);
+  public notasDocente = signal<NotaDocenteSinCartilla[]>([]);
+  public cargandoNotasDocente = signal<boolean>(false);
+  public guardandoNotasDocente = signal<boolean>(false);
 
   // Operación y resultados del examen virtual.
   public dialogSalaVirtual = signal<boolean>(false);
@@ -2289,6 +2365,11 @@ export class EvaluacionesDiaComponent implements OnInit {
       .includes(item.etapa);
   }
 
+  public puedeMostrarNotasDocente(item: EvaluacionItemUI): boolean {
+    return item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
+      && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
+  }
+
   public puedeMostrarDocumento(item: EvaluacionItemUI): boolean {
     if (item.modalidad === 'VIRTUAL') return false;
     return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado']
@@ -2487,6 +2568,17 @@ export class EvaluacionesDiaComponent implements OnInit {
         { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
       ];
     }
+    if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+      return [
+        { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
+        { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
+        { key: 'Impreso', label: 'Impreso', icon: 'pi pi-print' },
+        { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
+        { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
+        { key: 'Pendiente de notas', label: 'Pendiente de notas', icon: 'pi pi-upload' },
+        { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
+      ];
+    }
     return this.flujoOficial;
   }
 
@@ -2550,6 +2642,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     const pasoIdx = pasos.indexOf(pasoKey);
 
     if (pasoKey === 'Validado' && item.etapa === 'Programado') {
+      if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+        this._mostrarToast('Para validar un examen sin cartilla, el docente debe cargar primero el archivo .doc desde Banco de preguntas.', 'error');
+        return;
+      }
       this.evaluacionSeleccionadaParaValidar.set(item);
       return;
     }
@@ -2570,7 +2666,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     }
 
     if (pasoKey === 'Calificado' && item.etapa === 'Pendiente de notas' && item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
-      this._mostrarToast('La carga manual de notas para exámenes sin cartilla está pendiente de implementación.', 'error');
+      this.abrirNotasDocente(item);
       return;
     }
 
@@ -2964,6 +3060,93 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.dialogNotasOmr.set(false);
     this.evaluacionSeleccionadaNotas.set(null);
     this.notasOmr.set([]);
+  }
+
+  public abrirNotasDocente(item: EvaluacionItemUI): void {
+    if (!this.puedeMostrarNotasDocente(item)) return;
+    this.evaluacionSeleccionadaNotasDocente.set(item);
+    this.notasDocente.set([]);
+    this.cargandoNotasDocente.set(true);
+    this.dialogNotasDocente.set(true);
+    this._sinCartillaService.listarNotas(item.id).subscribe({
+      next: notas => {
+        this.notasDocente.set(notas);
+        this.cargandoNotasDocente.set(false);
+      },
+      error: err => {
+        this.cargandoNotasDocente.set(false);
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo consultar la nómina oficial y sus notas.', 'error');
+      }
+    });
+  }
+
+  public cerrarNotasDocente(): void {
+    if (this.guardandoNotasDocente()) return;
+    this.dialogNotasDocente.set(false);
+    this.evaluacionSeleccionadaNotasDocente.set(null);
+    this.notasDocente.set([]);
+  }
+
+  public editarNotaDocente(codigoEstudiante: string, valor: string): void {
+    const nota = valor === '' ? null : Number(valor);
+    this.notasDocente.update(notas => notas.map(actual => actual.codigoEstudiante === codigoEstudiante
+      ? { ...actual, notaSobre30: Number.isFinite(nota) ? nota : null, notaSobre100: Number.isFinite(nota) ? Number(((nota! * 100) / 30).toFixed(2)) : null }
+      : actual));
+  }
+
+  public notasDocenteConCarga(): number {
+    return this.notasDocente().filter(nota => nota.notaSobre30 !== null && nota.notaSobre30 !== undefined).length;
+  }
+
+  public notasDocenteCompletas(): boolean {
+    const notas = this.notasDocente();
+    return notas.length > 0 && notas.every(nota => nota.notaSobre30 !== null
+      && nota.notaSobre30 !== undefined
+      && Number.isFinite(Number(nota.notaSobre30))
+      && Number(nota.notaSobre30) >= 0
+      && Number(nota.notaSobre30) <= 30);
+  }
+
+  public guardarNotasDocente(): void {
+    const item = this.evaluacionSeleccionadaNotasDocente();
+    if (!item || item.etapa !== 'Pendiente de notas' || !this.notasDocenteCompletas() || this.guardandoNotasDocente()) return;
+    this.guardandoNotasDocente.set(true);
+    const notas = this.notasDocente().map(nota => ({
+      codigoEstudiante: nota.codigoEstudiante,
+      notaSobre30: Number(nota.notaSobre30)
+    }));
+    this._sinCartillaService.guardarNotas(item.id, notas, 'DOCENTE').subscribe({
+      next: guardadas => {
+        this.notasDocente.set(guardadas);
+        this.guardandoNotasDocente.set(false);
+        const actualizado = { ...item, etapa: 'Calificado' as EtapaEvaluacion, estado: 'CALIFICADO' as const };
+        this.evaluaciones.update(items => items.map(actual => actual.id === item.id ? actualizado : actual));
+        this.evaluacionSeleccionadaNotasDocente.set(actualizado);
+        this._mostrarToast(`${item.codigo}: notas guardadas y evaluación pasada a Calificado.`);
+      },
+      error: err => {
+        this.guardandoNotasDocente.set(false);
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudieron guardar las notas del docente.', 'error');
+      }
+    });
+  }
+
+  public imprimirReporteNotasDocente(): void {
+    const item = this.evaluacionSeleccionadaNotasDocente();
+    const notas = this.notasDocente();
+    if (!item || !notas.length) return;
+    const ventana = window.open('', '_blank', 'width=1000,height=750');
+    if (!ventana) {
+      this._mostrarToast('El navegador bloqueó la ventana del reporte. Permita las ventanas emergentes.', 'error');
+      return;
+    }
+    const filas = notas.map((nota, indice) => `<tr><td>${indice + 1}</td><td>${this.escapeHtml(nota.codigoEstudiante)}</td><td>${this.escapeHtml(nota.estudianteNombreCompleto)}</td><td>${nota.notaSobre30 ?? '—'}</td><td>${nota.notaSobre100 ?? '—'}</td></tr>`).join('');
+    ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de notas ${this.escapeHtml(item.codigo)}</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:32px}h1{font-size:20px;margin:0 0 6px}p{color:#53627b;font-size:12px;margin:4px 0 20px}.meta{border:1px solid #d9e1ef;padding:12px;border-radius:8px;margin-bottom:18px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d9e1ef;padding:9px;text-align:left}th{background:#eef3fa;text-transform:uppercase;font-size:10px}td:nth-child(1),td:nth-child(4),td:nth-child(5){text-align:center}@media print{body{padding:0}}</style></head><body><h1>Reporte de notas — examen sin cartilla</h1><p>Sistema de Evaluaciones</p><div class="meta"><strong>${this.escapeHtml(item.codigo)} — ${this.escapeHtml(item.materia)}</strong><br>Grupo: ${this.escapeHtml(item.grupo)} · Parcial: ${this.escapeHtml(item.tipo)} · Docente: ${this.escapeHtml(item.docenteNombre || '—')}<br>Estado: ${this.escapeHtml(item.etapa)}</div><table><thead><tr><th>N°</th><th>Código</th><th>Estudiante</th><th>Nota /30</th><th>Nota /100</th></tr></thead><tbody>${filas}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
+    ventana.document.close();
+  }
+
+  private escapeHtml(valor: string): string {
+    return String(valor ?? '').replace(/[&<>'"]/g, caracter => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[caracter] || caracter));
   }
 
   public abrirSalaVirtualDesdeLista(item: EvaluacionItemUI): void {

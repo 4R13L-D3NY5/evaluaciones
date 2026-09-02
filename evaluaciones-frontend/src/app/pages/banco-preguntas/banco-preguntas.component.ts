@@ -8,6 +8,7 @@ import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unite
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
+import { DocumentoSinCartilla, ExamenSinCartillaService } from '../../core/services/examen-sin-cartilla.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -24,6 +25,7 @@ export interface PreguntaValidada {
   tipo: string;
   grupo: string;
   enunciado: string;
+  imagen_base64?: string;
   opcion_a: string;
   opcion_b: string;
   opcion_c: string;
@@ -38,6 +40,8 @@ export interface PreguntaValidada {
   valido: boolean;
   errores: string[];
 }
+
+type TamanoImagen = 'GRANDE' | 'MEDIANA' | 'PEQUENA';
 
 export interface ExamenDocenteCronograma {
   id: string;
@@ -98,8 +102,15 @@ export interface DiaCalendario {
       <input 
         #fileInput 
         type="file" 
-        accept=".xlsx,.xls" 
+        [accept]="esSinCartillaActivo() ? '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document' : '.xlsx,.xls'"
         (change)="onFileSelected($event)" 
+        class="hidden" />
+
+      <input
+        #imageInput
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        (change)="onImageSelected($event)"
         class="hidden" />
 
       <!-- Cabecera Limpia del Módulo -->
@@ -285,6 +296,40 @@ export interface DiaCalendario {
             }
           </div>
           
+          @if (esSinCartillaActivo()) {
+            <!-- Flujo específico: examen presencial sin cartilla -->
+            <div class="bg-card border border-emerald-200 rounded-2xl p-6 shadow-xs space-y-5">
+              <div class="flex items-start gap-3 border-b border-emerald-100 pb-4">
+                <div class="h-11 w-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl shrink-0">
+                  <i class="pi pi-file-edit"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-black text-foreground">Cargar examen sin cartilla</h3>
+                  <p class="text-xs text-muted-foreground mt-1">El docente debe subir el examen oficial en formato .doc o .docx. Al registrarlo, el rol queda en <strong>Validado</strong> para que Evaluaciones gestione su impresión y entrega.</p>
+                </div>
+              </div>
+
+              @if (documentoSinCartilla(); as documento) {
+                <div class="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-950">
+                  <div class="flex items-start gap-2">
+                    <i class="pi pi-check-circle text-emerald-700 mt-0.5"></i>
+                    <div><strong class="block">Documento registrado y validado</strong><span class="text-[10px]">{{ documento.nombreArchivo }} · {{ formatearTamanoDocumento(documento.tamanoBytes) }} · {{ documento.cargadoPor }}</span></div>
+                  </div>
+                  <button (click)="abrirDocumentoSinCartilla()" class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-[10px] font-black text-emerald-800 hover:bg-emerald-100 cursor-pointer"><i class="pi pi-download mr-1"></i> Descargar examen</button>
+                </div>
+              }
+
+              <div (click)="triggerFileInput()" (dragover)="onDragOver($event)" (drop)="onDropFile($event)" [class]="rolPuedeCargarBanco() ? 'border-2 border-dashed border-emerald-300 hover:border-emerald-600 rounded-2xl p-8 text-center space-y-3 bg-emerald-50/40 hover:bg-emerald-50 transition-all cursor-pointer' : 'border-2 border-dashed border-amber-300 rounded-2xl p-8 text-center space-y-3 bg-amber-50/60 opacity-80 cursor-not-allowed'">
+                <div class="h-14 w-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto"><i class="pi pi-file-word"></i></div>
+                <div><div class="text-sm font-black text-foreground">{{ archivoSinCartillaSeleccionado()?.name || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar el examen .doc o .docx' : 'Carga bloqueada: restablezca el rol a Validado') }}</div><p class="text-xs text-muted-foreground mt-1">Máximo 50 MB. Se conserva el archivo oficial y se calcula su huella de integridad.</p></div>
+              </div>
+
+              <div class="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                <button (click)="limpiarArchivoSinCartilla()" [disabled]="!archivoSinCartillaSeleccionado() || cargandoDocumentoSinCartilla()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer disabled:opacity-40">Limpiar</button>
+                <button (click)="subirDocumentoSinCartilla()" [disabled]="!archivoSinCartillaSeleccionado() || !rolPuedeCargarBanco() || cargandoDocumentoSinCartilla()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="cargandoDocumentoSinCartilla()" [class.pi-spinner]="cargandoDocumentoSinCartilla()" [class.pi-check]="!cargandoDocumentoSinCartilla()"></i> {{ cargandoDocumentoSinCartilla() ? 'Subiendo y validando...' : 'Subir y validar examen' }}</button>
+              </div>
+            </div>
+          } @else {
           <!-- Barra Superior de Acciones y Recursos del Examen -->
           <div class="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -484,8 +529,88 @@ export interface DiaCalendario {
                 <p class="text-xs text-muted-foreground mt-1">
                   Validación instantánea de tipos de reactivos, cuotas de dificultad y fórmulas matemáticas/químicas.
                 </p>
+                <p class="text-xs text-indigo-700 mt-1">
+                  Puedes agregar la columna opcional <code>imagen_base64</code> para mostrar una imagen debajo de la pregunta en el examen virtual.
+                </p>
               </div>
             </div>
+
+            @if (!esSinCartillaActivo()) {
+              <section class="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-5 shadow-xs space-y-4">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h4 class="flex items-center gap-2 text-sm font-black text-indigo-950">
+                      <i class="pi pi-image text-indigo-700"></i>
+                      Imagen de apoyo para una pregunta
+                    </h4>
+                    <p class="mt-1 max-w-3xl text-[11px] leading-relaxed text-indigo-900/75">
+                      Arrastra una imagen para convertirla a Base64 y revisar cómo se verá dentro de una hoja de 8,5 × 13 pulgadas. El tamaño mediano se usa por defecto.
+                    </p>
+                  </div>
+                  @if (imagenBase64Generada()) {
+                    <button (click)="limpiarImagenBase64(); $event.stopPropagation()" type="button" class="shrink-0 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer">
+                      <i class="pi pi-trash mr-1"></i> Limpiar
+                    </button>
+                  }
+                </div>
+
+                <div class="grid gap-4 lg:grid-cols-[minmax(240px,0.75fr)_minmax(320px,1.25fr)]">
+                  <div
+                    (click)="triggerImageInput()"
+                    (dragover)="onImageDragOver($event)"
+                    (drop)="onImageDrop($event)"
+                    (paste)="onImagePaste($event)"
+                    tabindex="0"
+                    class="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-indigo-300 bg-white/80 p-5 text-center transition hover:border-indigo-600 hover:bg-white focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-xl text-indigo-700">
+                      <i [class]="procesandoImagen() ? 'pi pi-spin pi-spinner' : 'pi pi-upload'"></i>
+                    </div>
+                    <p class="mt-3 text-xs font-black text-indigo-950">
+                      {{ procesandoImagen() ? 'Preparando imagen...' : (imagenNombre() || 'Haz clic o arrastra una imagen aquí') }}
+                    </p>
+                    <p class="mt-1 text-[10px] text-indigo-900/65">PNG, JPG, WEBP o GIF · también puedes pegar con Ctrl + V</p>
+                    @if (errorImagen()) {
+                      <p class="mt-2 text-[11px] font-bold text-rose-700">{{ errorImagen() }}</p>
+                    }
+                  </div>
+
+                  <div class="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
+                    <div class="mx-auto w-36 rounded-lg border border-indigo-200 bg-slate-200 p-2 shadow-inner" style="aspect-ratio: 8.5 / 13">
+                      @if (imagenBase64Generada(); as imagen) {
+                        <div class="flex h-full w-full items-center justify-center bg-white p-3 shadow-sm">
+                          <img [src]="imagen" alt="Previsualización de imagen en hoja 8,5 x 13" class="max-w-full object-contain" [style.max-height.%]="alturaImagenPrevisualizacion()" />
+                        </div>
+                      } @else {
+                        <div class="flex h-full items-center justify-center bg-white p-3 text-center text-[10px] font-bold text-slate-400">Vista de hoja 8,5 × 13</div>
+                      }
+                    </div>
+
+                    <div class="space-y-3">
+                      <div>
+                        <p class="text-[10px] font-black uppercase tracking-wide text-indigo-900">Tamaño de visualización</p>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                          @for (tamano of tamanosImagen; track tamano.valor) {
+                            <button type="button" (click)="tamanoImagen.set(tamano.valor)" [class]="tamanoImagen() === tamano.valor ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-indigo-200 bg-white text-indigo-800 hover:bg-indigo-100'" class="rounded-lg border px-3 py-2 text-[11px] font-black cursor-pointer">
+                              {{ tamano.etiqueta }}{{ tamano.valor === 'MEDIANA' ? ' (predeterminado)' : '' }}
+                            </button>
+                          }
+                        </div>
+                      </div>
+                      <div>
+                        <div class="mb-1 flex items-center justify-between gap-2">
+                          <label class="text-[10px] font-black uppercase tracking-wide text-indigo-900">Base64 listo para copiar</label>
+                          <button type="button" (click)="copiarImagenBase64()" [disabled]="!imagenBase64Generada()" title="Copiar Base64" aria-label="Copiar Base64" class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">
+                            <i class="pi pi-copy text-xs"></i>
+                          </button>
+                        </div>
+                        <textarea [value]="imagenBase64ParaCopiar()" readonly rows="4" placeholder="Aquí aparecerá el texto Base64 de la imagen" class="w-full resize-none rounded-xl border border-indigo-200 bg-white px-3 py-2 font-mono text-[10px] text-slate-700 outline-none focus:border-indigo-500"></textarea>
+                        <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/65">Pega este valor en la columna <code>imagen_base64</code> del Excel. El tamaño se conserva como metadato de la data URI, sin agregar otra columna.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            }
 
             <!-- Resumen de Errores si el archivo no es válido -->
             @if (observacionesValidacion().length > 0 || preguntasConErrores().length > 0) {
@@ -516,7 +641,6 @@ export interface DiaCalendario {
               </div>
             }
           </div>
-
           <!-- Paneles de Métricas y Balance del Examen -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
             
@@ -704,6 +828,7 @@ export interface DiaCalendario {
 
                           <td class="p-2.5 font-medium text-foreground">
                             <div class="line-clamp-2" [title]="p.enunciado">{{ p.enunciado }}</div>
+                            @if (p.imagen_base64) { <span class="mt-1 inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700"><i class="pi pi-image"></i> Imagen adjunta</span> }
                             @if (p.formulaTypst) {
                               <span class="text-[9px] font-mono text-purple-700 bg-purple-50 px-1 py-0.5 rounded border border-purple-200 mt-1 inline-block">
                                 Fórmula: {{ p.formulaTypst }}
@@ -759,6 +884,7 @@ export interface DiaCalendario {
                 </div>
               </div>
             }
+          }
 
         </div>
       }
@@ -2309,11 +2435,16 @@ export class BancoPreguntasComponent implements OnInit {
   private readonly _rolService = inject(RolExamenService);
   private readonly _bancoService = inject(BancoPreguntasService);
   private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
+  private readonly _sinCartillaService = inject(ExamenSinCartillaService);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
+  @ViewChild('imageInput') public imageInputRef!: ElementRef<HTMLInputElement>;
 
   // Archivo Excel original para subir al backend
   public archivoExcelSeleccionado = signal<File | null>(null);
+  public archivoSinCartillaSeleccionado = signal<File | null>(null);
+  public documentoSinCartilla = signal<DocumentoSinCartilla | null>(null);
+  public cargandoDocumentoSinCartilla = signal<boolean>(false);
 
   // Pestaña activa: 'validador' (default) o 'calendario'
   public tabActiva = signal<'validador' | 'calendario'>('validador');
@@ -2395,6 +2526,10 @@ export class BancoPreguntasComponent implements OnInit {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     return estado === 'PROGRAMADO' || estado === 'VALIDADO';
   });
+
+  public esSinCartillaActivo(): boolean {
+    return this.rolExamenActivo()?.modalidad === 'PRESENCIAL_SIN_CARTILLA';
+  }
 
   public rolPuedeEliminarBanco = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
@@ -2599,6 +2734,25 @@ export class BancoPreguntasComponent implements OnInit {
 
   public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>('1er Parcial');
   public nombreArchivoCargado = signal<string | null>(null);
+  public imagenBase64Generada = signal<string | null>(null);
+  public imagenNombre = signal<string | null>(null);
+  public tamanoImagen = signal<TamanoImagen>('MEDIANA');
+  public procesandoImagen = signal<boolean>(false);
+  public errorImagen = signal<string>('');
+  public tamanosImagen: Array<{ valor: TamanoImagen; etiqueta: string }> = [
+    { valor: 'GRANDE', etiqueta: 'Grande' },
+    { valor: 'MEDIANA', etiqueta: 'Mediana' },
+    { valor: 'PEQUENA', etiqueta: 'Pequeña' }
+  ];
+  public alturaImagenPrevisualizacion = computed(() => {
+    const alturas: Record<TamanoImagen, number> = { GRANDE: 58, MEDIANA: 36, PEQUENA: 24 };
+    return alturas[this.tamanoImagen()];
+  });
+  public imagenBase64ParaCopiar = computed(() => {
+    const imagen = this.imagenBase64Generada();
+    if (!imagen) return '';
+    return this.agregarTamanoImagen(imagen, this.tamanoImagen());
+  });
   public cargandoBanco = signal<boolean>(false);
   public bancoPersistido = signal<BancoPreguntasResponse | null>(null);
   public cargandoBancoPersistido = signal<boolean>(false);
@@ -2990,8 +3144,19 @@ export class BancoPreguntasComponent implements OnInit {
   private _cargarBancoPersistido(): void {
     const rol = this.rolExamenActivo();
     this.bancoPersistido.set(null);
+    this.documentoSinCartilla.set(null);
+    this.archivoSinCartillaSeleccionado.set(null);
     this.cargandoBancoPersistido.set(false);
     if (!rol) return;
+
+    if (rol.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+      this.cargandoBancoPersistido.set(true);
+      this._sinCartillaService.obtenerDocumento(rol.id).pipe(catchError(() => of(null))).subscribe(documento => {
+        this.documentoSinCartilla.set(documento);
+        this.cargandoBancoPersistido.set(false);
+      });
+      return;
+    }
 
     this.cargandoBancoPersistido.set(true);
     this._bancoService.obtenerPorRol(rol.id).pipe(
@@ -3025,6 +3190,148 @@ export class BancoPreguntasComponent implements OnInit {
     this.fileInputRef.nativeElement.click();
   }
 
+  public triggerImageInput(): void {
+    this.imageInputRef?.nativeElement.click();
+  }
+
+  public onImageDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  public onImageDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const file = event.dataTransfer?.files?.[0];
+    if (file) void this.procesarImagenBase64(file);
+  }
+
+  public onImagePaste(event: ClipboardEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const item = Array.from(event.clipboardData?.items || [])
+      .find(entrada => entrada.kind === 'file' && entrada.type.startsWith('image/'));
+    const file = item?.getAsFile();
+    if (file) {
+      void this.procesarImagenBase64(file);
+    } else {
+      this.errorImagen.set('El portapapeles no contiene una imagen. Copia primero una imagen y vuelve a intentarlo.');
+    }
+  }
+
+  public onImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) void this.procesarImagenBase64(file);
+  }
+
+  public async procesarImagenBase64(file: File): Promise<void> {
+    this.errorImagen.set('');
+    const formatosPermitidos = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+    if (!formatosPermitidos.includes(file.type)) {
+      this.errorImagen.set('Selecciona una imagen PNG, JPG, WEBP o GIF.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      this.errorImagen.set('La imagen original supera el límite de 10 MB.');
+      return;
+    }
+
+    this.procesandoImagen.set(true);
+    try {
+      const dataUrl = await this.optimizarImagenParaExcel(file);
+      this.imagenBase64Generada.set(this.quitarTamanoImagen(dataUrl));
+      this.imagenNombre.set(file.name);
+      this.tamanoImagen.set('MEDIANA');
+      this._mostrarToast('Imagen convertida a Base64 y optimizada para Excel.');
+    } catch (error) {
+      this.errorImagen.set(error instanceof Error ? error.message : 'No se pudo convertir la imagen.');
+      this.imagenBase64Generada.set(null);
+      this.imagenNombre.set(null);
+    } finally {
+      this.procesandoImagen.set(false);
+      if (this.imageInputRef?.nativeElement) this.imageInputRef.nativeElement.value = '';
+    }
+  }
+
+  public limpiarImagenBase64(): void {
+    this.imagenBase64Generada.set(null);
+    this.imagenNombre.set(null);
+    this.errorImagen.set('');
+    if (this.imageInputRef?.nativeElement) this.imageInputRef.nativeElement.value = '';
+  }
+
+  public copiarImagenBase64(): void {
+    const contenido = this.imagenBase64ParaCopiar();
+    if (!contenido) return;
+    navigator.clipboard?.writeText(contenido).then(
+      () => this._mostrarToast('Base64 copiado al portapapeles.'),
+      () => this._mostrarToast('No se pudo copiar automáticamente. Selecciona el texto manualmente.', 'error')
+    );
+  }
+
+  private agregarTamanoImagen(dataUrl: string, tamano: TamanoImagen): string {
+    const base = this.quitarTamanoImagen(dataUrl);
+    return `${base}#sea-size=${tamano}`;
+  }
+
+  private quitarTamanoImagen(dataUrl: string): string {
+    return (dataUrl || '').split('#', 1)[0];
+  }
+
+  private leerImagenComoDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => resolve(String(lector.result || ''));
+      lector.onerror = () => reject(new Error('No se pudo leer la imagen seleccionada.'));
+      lector.readAsDataURL(file);
+    });
+  }
+
+  private cargarImagenParaCanvas(dataUrl: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const imagen = new Image();
+      imagen.onload = () => resolve(imagen);
+      imagen.onerror = () => reject(new Error('El archivo no contiene una imagen válida.'));
+      imagen.src = dataUrl;
+    });
+  }
+
+  private async optimizarImagenParaExcel(file: File): Promise<string> {
+    const original = await this.leerImagenComoDataUrl(file);
+    if (original.length <= 32767 && file.size <= 512 * 1024) return original;
+
+    const imagen = await this.cargarImagenParaCanvas(original);
+    const dimensiones = [1600, 1400, 1200, 1000, 800, 640, 520, 420, 340, 280, 220, 180, 140, 110, 80];
+    const calidades = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42, 0.34, 0.26, 0.2, 0.15];
+    let mejorResultado = '';
+
+    for (const maximo of dimensiones) {
+      const escala = Math.min(1, maximo / Math.max(imagen.naturalWidth, imagen.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(imagen.naturalWidth * escala));
+      canvas.height = Math.max(1, Math.round(imagen.naturalHeight * escala));
+      const contexto = canvas.getContext('2d');
+      if (!contexto) continue;
+      contexto.fillStyle = '#ffffff';
+      contexto.fillRect(0, 0, canvas.width, canvas.height);
+      contexto.drawImage(imagen, 0, 0, canvas.width, canvas.height);
+
+      for (const calidad of calidades) {
+        const candidatos = [
+          canvas.toDataURL('image/webp', calidad),
+          canvas.toDataURL('image/jpeg', calidad)
+        ].sort((a, b) => a.length - b.length);
+        const resultado = candidatos[0];
+        if (!mejorResultado || resultado.length < mejorResultado.length) mejorResultado = resultado;
+        if (resultado.length <= 32767) return resultado;
+      }
+    }
+
+    if (mejorResultado.length <= 32767) return mejorResultado;
+    throw new Error('No se pudo reducir la imagen al límite de una celda Excel. Usa una imagen más pequeña.');
+  }
+
   public onDragOver(event: DragEvent): void {
     event.preventDefault();
     event.stopPropagation();
@@ -3039,15 +3346,80 @@ export class BancoPreguntasComponent implements OnInit {
     }
     if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
       const file = event.dataTransfer.files[0];
-      this.procesarArchivoExcelReal(file);
+      if (this.esSinCartillaActivo()) {
+        this.procesarArchivoSinCartilla(file);
+      } else {
+        this.procesarArchivoExcelReal(file);
+      }
     }
   }
 
   public onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-      this.procesarArchivoExcelReal(input.files[0]);
+      if (this.esSinCartillaActivo()) {
+        this.procesarArchivoSinCartilla(input.files[0]);
+      } else {
+        this.procesarArchivoExcelReal(input.files[0]);
+      }
     }
+  }
+
+  public procesarArchivoSinCartilla(file: File): void {
+    if (!this.esSinCartillaActivo() || !this.rolPuedeCargarBanco()) {
+      this._mostrarToast('El examen sin cartilla solo se puede cargar cuando el rol está PROGRAMADO o VALIDADO.', 'error');
+      return;
+    }
+    const nombre = file.name.toLowerCase();
+    if (!nombre.endsWith('.doc') && !nombre.endsWith('.docx')) {
+      this._mostrarToast('Solo se aceptan documentos .doc o .docx para un examen sin cartilla.', 'error');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      this._mostrarToast('El documento supera el límite máximo de 50 MB.', 'error');
+      return;
+    }
+    this.archivoSinCartillaSeleccionado.set(file);
+  }
+
+  public limpiarArchivoSinCartilla(): void {
+    this.archivoSinCartillaSeleccionado.set(null);
+    if (this.fileInputRef?.nativeElement) this.fileInputRef.nativeElement.value = '';
+  }
+
+  public subirDocumentoSinCartilla(): void {
+    const rol = this.rolExamenActivo();
+    const file = this.archivoSinCartillaSeleccionado();
+    if (!rol || !file || !this.esSinCartillaActivo() || !this.rolPuedeCargarBanco() || this.cargandoDocumentoSinCartilla()) return;
+
+    this.cargandoDocumentoSinCartilla.set(true);
+    this._sinCartillaService.cargarDocumento(rol.id, file, 'DOCENTE').subscribe({
+      next: documento => {
+        this.documentoSinCartilla.set(documento);
+        this.archivoSinCartillaSeleccionado.set(null);
+        this.cargandoDocumentoSinCartilla.set(false);
+        this._mostrarToast('Examen sin cartilla cargado y validado correctamente.');
+        const sede = this.sedeSeleccionada();
+        const carrera = this.carreraSeleccionada();
+        if (sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
+      },
+      error: err => {
+        this.cargandoDocumentoSinCartilla.set(false);
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo cargar el examen sin cartilla.', 'error');
+      }
+    });
+  }
+
+  public abrirDocumentoSinCartilla(): void {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.documentoSinCartilla()) return;
+    window.open(this._sinCartillaService.urlDocumento(rol.id), '_blank');
+  }
+
+  public formatearTamanoDocumento(bytes: number): string {
+    if (!bytes) return '0 KB';
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
   public async procesarArchivoExcelReal(file: File): Promise<void> {
@@ -3125,6 +3497,7 @@ export class BancoPreguntasComponent implements OnInit {
         const tipoClave = tipoUpper.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           .replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
         const enunciadoRaw = getVal(['enunciado', 'ENUNCIADO']);
+        const imagenBase64 = getVal(['imagen_base64', 'imagen base64', 'imagen', 'imagen_data_uri']);
         const grupoRaw = getVal(['grupo', 'GRUPO']);
         let opA = getVal(['opcion_a', 'opcion a', 'A', 'a']);
         let opB = getVal(['opcion_b', 'opcion b', 'B', 'b']);
@@ -3133,7 +3506,7 @@ export class BancoPreguntasComponent implements OnInit {
         let opE = getVal(['opcion_e', 'opcion e', 'E', 'e']);
         let respRaw = getVal(['respuesta_correcta', 'respuesta', 'RESPUESTA']).trim().toUpperCase();
         const difRaw = getVal(['dificultad', 'DIFICULTAD', 'nivel_dificultad']).trim().toUpperCase();
-        const hayDatos = [tipoRaw, grupoRaw, enunciadoRaw, opA, opB, opC, opD, opE, respRaw, difRaw, getVal(['parcial', 'PARCIAL']), getVal(['peso', 'PESO'])].some(valor => valor.trim() !== '');
+        const hayDatos = [tipoRaw, grupoRaw, enunciadoRaw, imagenBase64, opA, opB, opC, opD, opE, respRaw, difRaw, getVal(['parcial', 'PARCIAL']), getVal(['peso', 'PESO'])].some(valor => valor.trim() !== '');
         if (!hayDatos) return;
 
         // Normalizar Tipo de Pregunta Oficial UNITEPC
@@ -3202,6 +3575,7 @@ export class BancoPreguntasComponent implements OnInit {
 
         if (grupoRaw.length > 100) errores.push('El grupo supera el máximo de 100 caracteres');
         if (enunciadoRaw.length > 10000) errores.push('El enunciado supera el máximo de 10000 caracteres');
+        errores.push(...this.validarImagenBase64Excel(imagenBase64));
         if ([opA, opB, opC, opD, opE].some(opcion => opcion.length > 2000)) {
           errores.push('Una opción supera el máximo de 2000 caracteres');
         }
@@ -3298,6 +3672,7 @@ export class BancoPreguntasComponent implements OnInit {
           tipo: tipoNorm,
           grupo: grupoRaw,
           enunciado: enunciadoRaw || (tipoNorm === 'EMPAREJAMIENTO_TRONCO' ? 'De la lista de opciones, seleccione la respuesta correcta para cada enunciado' : ''),
+          imagen_base64: this.normalizarImagenBase64Excel(imagenBase64),
           opcion_a: opA,
           opcion_b: opB,
           opcion_c: opC,
@@ -3340,6 +3715,7 @@ export class BancoPreguntasComponent implements OnInit {
       case 'tipo': case 'tipo_reactivo': case 'tipo_de_reactivo': return 'tipo';
       case 'grupo': case 'grupo_contexto': return 'grupo';
       case 'enunciado': case 'pregunta': return 'enunciado';
+      case 'imagen': case 'imagen_base64': case 'imagen_base_64': case 'imagen_data_uri': case 'imagen_data': return 'imagen_base64';
       case 'opcion_a': case 'opciona': case 'a': return 'opcion_a';
       case 'opcion_b': case 'opcionb': case 'b': return 'opcion_b';
       case 'opcion_c': case 'opcionc': case 'c': return 'opcion_c';
@@ -3378,6 +3754,47 @@ export class BancoPreguntasComponent implements OnInit {
     return ['#REF!', '#DIV/0!', '#VALUE!', '#NAME?', '#N/A'].some(error => mayusculas.includes(error))
       || (valor.match(/\$/g) || []).length % 2 !== 0
       || [...valor].some(caracter => /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(caracter));
+  }
+
+  private normalizarImagenBase64Excel(valor: string): string | undefined {
+    if (!valor?.trim()) return undefined;
+    const entrada = valor.trim();
+    const fragmento = entrada.indexOf('#');
+    const contenido = fragmento >= 0 ? entrada.slice(0, fragmento) : entrada;
+    const tamano = fragmento >= 0 && /#sea-size=(GRANDE|MEDIANA|PEQUENA)$/i.test(entrada)
+      ? `#sea-size=${entrada.slice(fragmento + 10).toUpperCase()}`
+      : '';
+    if (/^data:image\/(png|jpeg|webp|gif);base64,/i.test(contenido)) {
+      const separador = contenido.indexOf(',');
+      return `${contenido.slice(0, separador + 1)}${contenido.slice(separador + 1).replace(/\s+/g, '')}${tamano}`;
+    }
+    return `data:image/png;base64,${contenido.replace(/\s+/g, '')}${tamano}`;
+  }
+
+  private validarImagenBase64Excel(valor: string): string[] {
+    if (!valor?.trim()) return [];
+    const entrada = valor.trim();
+    if (entrada.length > 32767) return ['La imagen_base64 supera el límite de 32767 caracteres de una celda Excel'];
+    const fragmento = entrada.indexOf('#');
+    const contenido = fragmento >= 0 ? entrada.slice(0, fragmento) : entrada;
+    if (fragmento >= 0 && !/#sea-size=(GRANDE|MEDIANA|PEQUENA)$/i.test(entrada)) {
+      return ['El metadato de tamaño de la imagen no es válido'];
+    }
+    let payload = contenido;
+    if (/^data:/i.test(contenido)) {
+      const separador = contenido.indexOf(',');
+      if (separador < 0 || !/^data:image\/(png|jpeg|webp|gif);base64,/i.test(contenido.slice(0, separador + 1))) {
+        return ['La imagen debe ser una data URI Base64 PNG, JPEG, WEBP o GIF'];
+      }
+      payload = contenido.slice(separador + 1);
+    }
+    try {
+      const binario = atob(payload.replace(/\s+/g, ''));
+      if (!binario.length || binario.length > 512 * 1024) return ['La imagen debe pesar entre 1 byte y 512 KB'];
+      return [];
+    } catch {
+      return ['La imagen_base64 no contiene una codificación Base64 válida'];
+    }
   }
 
   private huellaTextoExcel(valor: string): string {
@@ -3639,6 +4056,55 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       imagen.src = '/assets/logo_unitepc_clean.png';
     });
     const logoData = await cargarLogo();
+    const imagenesPdf = new Map<string, { dataUrl: string; width: number; height: number }>();
+    const cargarImagenPregunta = (valor?: string): Promise<{ dataUrl: string; width: number; height: number } | null> => {
+      const contenido = (valor || '').split('#', 1)[0];
+      if (!contenido) return Promise.resolve(null);
+      const guardada = imagenesPdf.get(contenido);
+      if (guardada) return Promise.resolve(guardada);
+      return new Promise(resolve => {
+        const imagen = new Image();
+        imagen.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = imagen.naturalWidth || 1;
+          canvas.height = imagen.naturalHeight || 1;
+          const contexto = canvas.getContext('2d');
+          if (!contexto) {
+            resolve(null);
+            return;
+          }
+          contexto.fillStyle = '#ffffff';
+          contexto.fillRect(0, 0, canvas.width, canvas.height);
+          contexto.drawImage(imagen, 0, 0);
+          const resultado = {
+            dataUrl: canvas.toDataURL('image/png'),
+            width: canvas.width,
+            height: canvas.height
+          };
+          imagenesPdf.set(contenido, resultado);
+          resolve(resultado);
+        };
+        imagen.onerror = () => resolve(null);
+        imagen.src = contenido;
+      });
+    };
+    const porcentajeAnchoImagen = (valor?: string): number => {
+      const tamano = valor?.match(/#sea-size=(GRANDE|MEDIANA|PEQUENA)$/i)?.[1]?.toUpperCase();
+      return tamano === 'GRANDE' ? 1 : tamano === 'PEQUENA' ? 0.45 : 0.70;
+    };
+    const dimensionesImagen = (imagen: { width: number; height: number }, valor?: string): { width: number; height: number } => {
+      const anchoDisponible = (ancho - margen * 2) * porcentajeAnchoImagen(valor);
+      const escala = Math.min(1, anchoDisponible / imagen.width);
+      return { width: imagen.width * escala, height: imagen.height * escala };
+    };
+    const dibujarImagenPregunta = (imagen: { dataUrl: string; width: number; height: number } | null, valor?: string): number => {
+      if (!imagen) return 0;
+      const tamano = dimensionesImagen(imagen, valor);
+      if (y + tamano.height > alto - margen - pieReservado) nuevaPagina();
+      doc.addImage(imagen.dataUrl, 'PNG', margen, y, tamano.width, tamano.height, undefined, 'FAST');
+      y += tamano.height + interlineado * 0.35;
+      return tamano.height + interlineado * 0.35;
+    };
 
     const fuente = (estilo: 'normal' | 'bold' | 'italic' = 'normal', tamano = tamanoFuente) => {
       doc.setFont(familiaFuente, estilo);
@@ -3796,22 +4262,32 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     });
     y += fichaVaciaAlto + interlineado;
 
+    const totalRespondibles = preguntas.filter(item => !['EMPAREJAMIENTO_TRONCO', 'CASO_CLINICO_TRONCO'].includes(item.tipo)).length;
     fuente('bold', tamanoFuente);
-    doc.text(`CUESTIONARIO DE PREGUNTAS (${preguntas.length})`, ancho / 2, y, { align: 'center' });
+    doc.text(`CUESTIONARIO DE PREGUNTAS (${totalRespondibles})`, ancho / 2, y, { align: 'center' });
     y += interlineado;
     doc.setLineWidth(0.35);
     doc.line(margen, y, ancho - margen, y);
     y += interlineado;
 
     let tipoAnterior = '';
+    let numeroPregunta = 0;
     const tieneTroncoEmparejamiento = preguntas.some(item => item.tipo === 'EMPAREJAMIENTO_TRONCO');
     const medirLineas = (texto: string, anchoDisponible: number): string[] => (
       (texto || '').split(/\r?\n/).flatMap(linea =>
         doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), anchoDisponible) as string[]
       )
     );
+    const claveVfComplejas: Array<[string, string]> = [
+      ['A', '1, 2 y 3 son verdaderas.'],
+      ['B', '1 y 3 son verdaderas.'],
+      ['C', '2 y 4 son verdaderas.'],
+      ['D', 'Solo 4 es verdadera.'],
+      ['E', 'Todas son verdaderas.']
+    ];
 
-    preguntas.forEach((pregunta, indice) => {
+    for (const pregunta of preguntas) {
+      const imagenPregunta = await cargarImagenPregunta(pregunta.imagen_base64);
       const tipoSeccion = ['EMPAREJAMIENTO_TRONCO', 'OPCION_EMPAREJAMIENTO'].includes(pregunta.tipo)
         ? 'EMPAREJAMIENTO_TRONCO'
         : pregunta.tipo;
@@ -3837,30 +4313,73 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
           pregunta.enunciado || 'RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:',
           ...opcionesReferencia.map(([letra, texto]) => `${letra}) ${texto}`)
         ]);
-        return;
+        dibujarImagenPregunta(imagenPregunta, pregunta.imagen_base64);
+        continue;
+      }
+
+      if (pregunta.tipo === 'CASO_CLINICO_TRONCO') {
+        dibujarTarjeta([
+          'CASO CLINICO O PROBLEMA:',
+          pregunta.enunciado || 'Resuelva el caso planteado y responda cada pregunta del grupo.'
+        ]);
+        dibujarImagenPregunta(imagenPregunta, pregunta.imagen_base64);
+        continue;
+      }
+
+      numeroPregunta++;
+
+      if (pregunta.tipo === 'VERDADERO_O_FALSO_COMPLEJAS') {
+        const afirmaciones = [pregunta.opcion_a, pregunta.opcion_b, pregunta.opcion_c, pregunta.opcion_d]
+          .filter(Boolean)
+          .map((texto, indiceAfirmacion) => `${indiceAfirmacion + 1}) ${texto}`);
+        const altoAfirmaciones = afirmaciones.reduce((total, texto) =>
+          total + Math.max(1, medirLineas(texto, ancho - margen * 2 - indentacion).length) * interlineado, 0);
+        const altoClave = claveVfComplejas.reduce((total, [letra, texto]) =>
+          total + Math.max(1, medirLineas(`${letra}) ${texto}`, ancho - margen * 2 - indentacion).length) * interlineado, 0);
+        const prefijoComplejo = `${numeroPregunta}. ___`;
+        fuente('bold', tamanoFuente);
+        const anchoPrefijoComplejo = doc.getTextWidth(prefijoComplejo) + 1;
+        const lineasEnunciadoComplejo = medirLineas(pregunta.enunciado || '', ancho - margen * 2 - anchoPrefijoComplejo);
+        const altoEnunciadoComplejo = Math.max(1, lineasEnunciadoComplejo.length) * interlineado;
+        const dimensionesComplejo = imagenPregunta ? dimensionesImagen(imagenPregunta, pregunta.imagen_base64) : null;
+        const altoImagenComplejo = dimensionesComplejo ? dimensionesComplejo.height + interlineado * 0.35 : 0;
+        const altoComplejo = altoEnunciadoComplejo + altoImagenComplejo + altoAfirmaciones + altoClave + separacionPregunta;
+        if (y + altoComplejo > alto - margen - pieReservado) nuevaPagina();
+
+        escribirPregunta(numeroPregunta, pregunta.enunciado || '');
+        dibujarImagenPregunta(imagenPregunta, pregunta.imagen_base64);
+        afirmaciones.forEach(texto => escribir(texto, margen + indentacion, ancho - margen * 2 - indentacion, 'normal'));
+        claveVfComplejas.forEach(([letra, texto]) => escribir(`${letra}) ${texto}`, margen + indentacion, ancho - margen * 2 - indentacion, 'normal'));
+        y += separacionPregunta;
+        continue;
       }
 
       // Reservar el bloque completo antes de dibujarlo para que el número,
       // enunciado e incisos permanezcan juntos en la misma página.
-      const prefijo = `${indice + 1}. ___`;
+      const prefijo = `${numeroPregunta}. ___`;
       fuente('bold', tamanoFuente);
       const anchoPrefijo = doc.getTextWidth(prefijo) + 1;
       const lineasEnunciado = medirLineas(pregunta.enunciado || '', ancho - margen * 2 - anchoPrefijo);
-      const opciones: Array<[string, string]> = pregunta.tipo === 'VERDADERO_O_FALSO_SIMPLE' ? [] : [
-        ['A', pregunta.opcion_a], ['B', pregunta.opcion_b], ['C', pregunta.opcion_c],
-        ['D', pregunta.opcion_d], ['E', pregunta.opcion_e]
-      ].filter(([, texto]) => !!texto?.trim()) as Array<[string, string]>;
+      const opciones: Array<[string, string]> = pregunta.tipo === 'VERDADERO_O_FALSO_SIMPLE' ? [] : pregunta.tipo === 'OPCION_EMPAREJAMIENTO'
+        ? [['A', ''], ['B', ''], ['C', ''], ['D', ''], ['E', '']]
+        : [
+          ['A', pregunta.opcion_a], ['B', pregunta.opcion_b], ['C', pregunta.opcion_c],
+          ['D', pregunta.opcion_d], ['E', pregunta.opcion_e]
+        ].filter(([, texto]) => !!texto?.trim()) as Array<[string, string]>;
       const altoEnunciado = Math.max(1, lineasEnunciado.length) * interlineado;
       const altoOpciones = opciones.reduce((total, [letra, texto]) =>
         total + Math.max(1, medirLineas(`${letra}) ${texto}`, ancho - margen * 2 - indentacion).length) * interlineado, 0);
-      const altoBloque = altoEnunciado + altoOpciones + (opciones.length ? interlineado * 0.15 : 0) + separacionPregunta;
+      const dimensiones = imagenPregunta ? dimensionesImagen(imagenPregunta, pregunta.imagen_base64) : null;
+      const altoImagen = dimensiones ? dimensiones.height + interlineado * 0.35 : 0;
+      const altoBloque = altoEnunciado + altoImagen + altoOpciones + (opciones.length ? interlineado * 0.15 : 0) + separacionPregunta;
       if (y + altoBloque > alto - margen - pieReservado) nuevaPagina();
 
-      escribirPregunta(indice + 1, pregunta.enunciado || '');
+      escribirPregunta(numeroPregunta, pregunta.enunciado || '');
+      dibujarImagenPregunta(imagenPregunta, pregunta.imagen_base64);
 
       opciones.forEach(([letra, texto]) => escribir(`${letra}) ${texto}`, margen + indentacion, ancho - margen * 2 - indentacion, 'normal'));
       y += separacionPregunta;
-    });
+    }
 
     for (let numeroPagina = 1; numeroPagina <= pagina; numeroPagina++) {
       doc.setPage(numeroPagina);

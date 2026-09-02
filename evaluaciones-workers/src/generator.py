@@ -1,4 +1,6 @@
 """Generación de variantes de examen y cuadernillos individuales con Typst."""
+import base64
+import hashlib
 import json
 import logging
 import os
@@ -53,6 +55,14 @@ INSTRUCCIONES_POR_TIPO = {
         "INSTRUCCIONES: De la lista de opciones, seleccione la respuesta correcta\npara cada enunciado.",
     ),
 }
+
+CLAVE_VF_COMPLEJAS = [
+    ("A", "1, 2 y 3 son verdaderas."),
+    ("B", "1 y 3 son verdaderas."),
+    ("C", "2 y 4 son verdaderas."),
+    ("D", "Solo 4 es verdadera."),
+    ("E", "Todas son verdaderas."),
+]
 
 
 def _slugify(texto: str) -> str:
@@ -137,6 +147,58 @@ def _typst_content(texto: str) -> str:
     if len(partes) == 1:
         return partes[0]
     return " + ".join(partes)
+
+
+def _preparar_imagen_typst(imagen_base64: Any, image_dir: str | None, indice: int) -> str | None:
+    """Guarda una imagen del banco junto al .typ para que Typst pueda incluirla."""
+    if not imagen_base64 or not image_dir:
+        return None
+
+    entrada = str(imagen_base64).split("#", 1)[0].strip()
+    mime = "image/png"
+    payload = entrada
+    if entrada.lower().startswith("data:"):
+        cabecera, separador, payload = entrada.partition(",")
+        if not separador or ";base64" not in cabecera.lower():
+            return None
+        mime = cabecera[5:].split(";", 1)[0].lower()
+
+    extensiones = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/webp": "webp",
+        "image/gif": "gif",
+    }
+    extension = extensiones.get(mime)
+    if not extension:
+        return None
+
+    try:
+        datos = base64.b64decode(re.sub(r"\s+", "", payload), validate=True)
+    except (ValueError, TypeError):
+        return None
+    if not datos:
+        return None
+
+    os.makedirs(image_dir, exist_ok=True)
+    huella = hashlib.sha1(entrada.encode("utf-8")).hexdigest()[:12]
+    nombre = f"imagen_reactivo_{indice}_{huella}.{extension}"
+    ruta = os.path.join(image_dir, nombre)
+    if not os.path.exists(ruta):
+        with open(ruta, "wb") as archivo:
+            archivo.write(datos)
+    return nombre
+
+
+def _ancho_imagen_typst(imagen_base64: Any) -> str:
+    """Convierte el metadato interno del selector a un ancho consistente."""
+    tamano = re.search(r"#sea-size=(GRANDE|MEDIANA|PEQUENA)$", str(imagen_base64 or ""), re.IGNORECASE)
+    return {
+        "GRANDE": "100%",
+        "MEDIANA": "70%",
+        "PEQUENA": "45%",
+    }.get((tamano.group(1).upper() if tamano else "MEDIANA"), "70%")
 
 
 def _mayusculas(valor: Any) -> str:
@@ -337,13 +399,18 @@ def _seccion_typst(titulo: str, instruccion: str) -> str:
 '''
 
 
-def _cuestionario_typst(preguntas: list[dict[str, Any]]) -> str:
+def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None = None) -> str:
     """Construye el cuestionario sin datos de estudiante ni etiquetas de variante."""
     typ_code = ""
     current_section = None
     numero_pregunta = 0
-    for p in preguntas:
+    for indice, p in enumerate(preguntas):
         tipo = p.get("tipo_reactivo", "")
+        imagen_path = _preparar_imagen_typst(p.get("imagen_base64"), image_dir, indice)
+        imagen_code = (
+            f'#align(center)[#image("{imagen_path}", width: {_ancho_imagen_typst(p.get("imagen_base64"))})]\\\n'
+            if imagen_path else ""
+        )
 
         seccion_tipo = (
             "OPCION_EMPAREJAMIENTO"
@@ -388,6 +455,8 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]]) -> str:
 ]
 #v(1em)
 '''
+            if imagen_code:
+                typ_code += imagen_code
             continue
 
         if tipo == "CASO_CLINICO_TRONCO":
@@ -398,6 +467,8 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]]) -> str:
 ]
 #v(1em)
 '''
+            if imagen_code:
+                typ_code += imagen_code
             continue
 
         # El número visible corresponde únicamente a preguntas respondibles;
@@ -405,12 +476,31 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]]) -> str:
         numero_pregunta += 1
         num = numero_pregunta
 
-        opciones = [] if tipo == "VERDADERO_O_FALSO_SIMPLE" else parsear_opciones(p.get("opciones_json", "[]"))
         enunciado = _typst_content(str(p.get("enunciado", "")))
+        if tipo == "VERDADERO_O_FALSO_COMPLEJAS":
+            afirmaciones = parsear_opciones(p.get("opciones_json", "[]"))[:4]
+            typ_code += f'\n#block(breakable: false, spacing: {config.SEPARACION_PREGUNTAS})[\n'
+            typ_code += f'  #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}\\\\\n'
+            typ_code += imagen_code
+            typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
+            for indice_afirmacion, (_, texto, _) in enumerate(afirmaciones, start=1):
+                typ_code += f'    #text(weight: "regular")[{indice_afirmacion}) {_typst_content(str(texto))}]\\\\\n'
+            typ_code += '  ]\\\\\n'
+            typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
+            for letra, texto in CLAVE_VF_COMPLEJAS:
+                typ_code += f'    #text(weight: "regular")[{letra}) {_typst_content(texto)}]\\\\\n'
+            typ_code += '  ]\n]\n'
+            continue
+
+        opciones = [] if tipo == "VERDADERO_O_FALSO_SIMPLE" else (
+            [(letra, "", False) for letra in "ABCDE"]
+            if tipo == "OPCION_EMPAREJAMIENTO"
+            else parsear_opciones(p.get("opciones_json", "[]"))
+        )
         typ_code += f'''
 #block(breakable: false, spacing: {config.SEPARACION_PREGUNTAS})[
   #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}\\
-'''
+{imagen_code}'''
         if opciones:
             typ_code += f'''  #v(0.15em)
   #block(inset: (left: {config.INDENTACION_INCISOS}))[
@@ -455,6 +545,7 @@ def _generar_typst(
     variante_letra: str,
     preguntas: list[dict[str, Any]],
     rol: dict[str, Any],
+    image_dir: str | None = None,
 ) -> str:
     """Genera un documento individual compatible para pruebas y compatibilidad."""
     return f'''#set text(
@@ -468,7 +559,7 @@ def _generar_typst(
 #set par(leading: {config.LEADING}, spacing: {config.LEADING})
 {_pagina_con_pie(estudiante)}
 {_cabecera_institucional(rol, estudiante)}
-{_cuestionario_typst(preguntas)}
+{_cuestionario_typst(preguntas, image_dir)}
 '''
 
 
@@ -476,6 +567,7 @@ def _generar_typst_unificado(
     estudiantes_con_variantes: list[tuple[dict[str, Any], str]],
     preguntas_por_variante: dict[str, list[dict[str, Any]]],
     rol: dict[str, Any],
+    image_dir: str | None = None,
 ) -> str:
     """Genera un único PDF: un examen por estudiante, iniciado en página impar."""
     typ_code = f'''#set text(
@@ -494,7 +586,7 @@ def _generar_typst_unificado(
             typ_code += '\n#pagebreak(to: "odd")\n'
         typ_code += _pagina_con_pie(estudiante)
         typ_code += _cabecera_institucional(rol, estudiante)
-        typ_code += _cuestionario_typst(preguntas_por_variante[letra])
+        typ_code += _cuestionario_typst(preguntas_por_variante[letra], image_dir)
 
     return typ_code
 
@@ -541,6 +633,7 @@ def generar_variante(
             "tipoReactivo": p.get("tipo_reactivo"),
             "grupoContexto": p.get("grupo_contexto"),
             "enunciado": p.get("enunciado", ""),
+            "imagenBase64": p.get("imagen_base64"),
             "opciones": opciones,
         })
 
@@ -568,7 +661,7 @@ def generar_variante(
         typ_path = os.path.join(work_dir, f"{base_name}.typ")
         pdf_path = os.path.join(work_dir, f"{base_name}.pdf")
 
-        typ_code = _generar_typst(estudiante_default, letra, preguntas, rol)
+        typ_code = _generar_typst(estudiante_default, letra, preguntas, rol, work_dir)
         with open(typ_path, "w", encoding="utf-8") as f:
             f.write(typ_code)
 
@@ -617,7 +710,7 @@ def generar_documento_unificado(
     typ_path = os.path.join(work_dir, f"{base_name}.typ")
     pdf_path = os.path.join(work_dir, f"{base_name}.pdf")
 
-    typ_code = _generar_typst_unificado(estudiantes_con_variantes, preguntas_por_variante, rol)
+    typ_code = _generar_typst_unificado(estudiantes_con_variantes, preguntas_por_variante, rol, work_dir)
     with open(typ_path, "w", encoding="utf-8") as f:
         f.write(typ_code)
     _compilar_typst(typ_path, pdf_path)
@@ -653,7 +746,7 @@ def generar_cuadernillo(
     typ_path = os.path.join(work_dir, f"{base_name}.typ")
     pdf_path = os.path.join(work_dir, f"{base_name}.pdf")
 
-    typ_code = _generar_typst(estudiante, letra, preguntas, rol)
+    typ_code = _generar_typst(estudiante, letra, preguntas, rol, work_dir)
     with open(typ_path, "w", encoding="utf-8") as f:
         f.write(typ_code)
 

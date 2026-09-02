@@ -21,6 +21,8 @@ export interface OmrLecturaResponse {
   mensaje?: string;
   respuestas: Record<string, string>;
   grilla?: { x: number; y: number; ancho: number; alto: number };
+  perfilEscaneo?: 'ESCANEO_FISICO' | 'PDF_RECORTADO';
+  zonaCodigoDetectada?: { x: number; y: number; ancho: number; alto: number };
   detalles: Array<{
     pregunta: number;
     respuesta: string;
@@ -95,9 +97,17 @@ export class OmrProcesamientoService {
   private readonly _http = inject(HttpClient);
 
   public procesar(rolExamenId: string, archivo: File): Observable<OmrJobResponse> {
+    return this._enviarArchivo(rolExamenId, archivo, 'procesar');
+  }
+
+  public procesarLecturaConciliacion(rolExamenId: string, archivo: File): Observable<OmrJobResponse> {
+    return this._enviarArchivo(rolExamenId, archivo, 'procesar-lectura');
+  }
+
+  private _enviarArchivo(rolExamenId: string, archivo: File, operacion: string): Observable<OmrJobResponse> {
     const datos = new FormData();
     datos.append('file', archivo, archivo.name);
-    return this._http.post<OmrJobResponse>(`/api/omr/${rolExamenId}/procesar`, datos);
+    return this._http.post<OmrJobResponse>(`/api/omr/${rolExamenId}/${operacion}`, datos);
   }
 
   public consultar(jobId: string): Observable<OmrJobResponse> {

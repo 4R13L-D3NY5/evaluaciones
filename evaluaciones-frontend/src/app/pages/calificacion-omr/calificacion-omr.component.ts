@@ -344,9 +344,12 @@ export interface EstudianteOmrItem {
 
                     <!-- Campo exclusivo del código del estudiante en el recuadro grande -->
                     <div class="absolute z-10 border-2 border-amber-400 bg-amber-300/10 shadow-[0_0_12px_rgba(251,191,36,0.55)] rounded"
-                         style="top: 16%; left: 70%; width: 27%; height: 6%;">
+                         [style.top.%]="codigoBoxTop()"
+                         [style.left.%]="codigoBoxLeft()"
+                         [style.width.%]="codigoBoxWidth()"
+                         [style.height.%]="codigoBoxHeight()">
                       <span class="absolute -top-5 left-0 bg-amber-600 text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-black whitespace-nowrap">
-                        ÁREA CÓDIGO DEL ESTUDIANTE
+                        ÁREA CÓDIGO DEL ESTUDIANTE · AUTO
                       </span>
                     </div>
 
@@ -926,6 +929,12 @@ export class CalificacionOmrComponent implements OnInit {
   public boxLeft = signal<number>(2.8);
   public boxWidth = signal<number>(94.5);
   public boxHeight = signal<number>(71.0);
+  // La guía del código se deriva de la matriz detectada. Así acompaña tanto
+  // al escaneo físico como al PDF recortado con margen blanco lateral.
+  public codigoBoxTop = computed(() => Math.max(0, this.boxTop() - this.boxHeight() * 0.23));
+  public codigoBoxLeft = computed(() => Math.min(100, Math.max(0, this.boxLeft() + this.boxWidth() * 0.70)));
+  public codigoBoxWidth = computed(() => Math.min(100 - this.codigoBoxLeft(), this.boxWidth() * 0.34));
+  public codigoBoxHeight = computed(() => Math.min(100 - this.codigoBoxTop(), this.boxHeight() * 0.18));
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
@@ -1004,10 +1013,10 @@ export class CalificacionOmrComponent implements OnInit {
 
   private configuracionOmrDefecto(): ConfiguracionOmr {
     return {
-      umbralDensidadMarca: 70,
+      umbralDensidadMarca: 60,
       umbralDiferencialDoble: 18,
       umbralBinarioGrilla: 185,
-      nivelTintaMarca: 145,
+      nivelTintaMarca: 120,
       zonaCodigoX: 0.70,
       zonaCodigoY: 0.16,
       zonaCodigoAncho: 0.27,
@@ -1213,6 +1222,7 @@ export class CalificacionOmrComponent implements OnInit {
 
           if (renderedPages.length > 0) {
             this.paginasRenderizadas.set(renderedPages);
+            this.autoCalibrarCartilla();
           } else {
             this.mensajeOmr.set('El PDF no contiene páginas renderizables. Seleccione nuevamente el escaneo.');
           }
@@ -1228,6 +1238,7 @@ export class CalificacionOmrComponent implements OnInit {
           const dataUrl = e.target?.result as string;
           if (dataUrl) {
             this.paginasRenderizadas.set([dataUrl]);
+            this.autoCalibrarCartilla();
           }
         };
         reader.readAsDataURL(file);
@@ -1431,7 +1442,13 @@ export class CalificacionOmrComponent implements OnInit {
     width: number,
     height: number
   ): { rx: number; ry: number; rw: number; rh: number } {
-    // 1. Intentar anclaje exacto por las 4 esquinas fiduciales ■
+    // 1. Buscar los bordes largos de la matriz. Esta geometría funciona tanto
+    // cuando la cartilla llena el escaneo físico como cuando el PDF conserva
+    // un margen blanco lateral.
+    const matriz = this._detectarMatrizRespuestaEnImageData(data, width, height);
+    if (matriz) return matriz;
+
+    // 2. Intentar anclaje por las 4 esquinas fiduciales ■
     const markerResult = this._detectarEsquinasFiducialesEnImageData(data, width, height);
     if (markerResult) {
       return {
@@ -1442,7 +1459,7 @@ export class CalificacionOmrComponent implements OnInit {
       };
     }
 
-    // 2. Fallback de alta precisión para Cartilla en Hoja 1 OMR (Margen 2.0 cm)
+    // 3. Fallback de alta precisión para Cartilla en Hoja 1 OMR (Margen 2.0 cm)
     return {
       // La cabecera mantiene su posición física cuando el escaneo incluye el
       // talón inferior; por eso estas medidas se calculan con el ancho de la
@@ -1452,6 +1469,74 @@ export class CalificacionOmrComponent implements OnInit {
       rw: Math.floor(width * 0.945),
       rh: Math.floor(width * 0.78)
     };
+  }
+
+  private _detectarMatrizRespuestaEnImageData(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number
+  ): { rx: number; ry: number; rw: number; rh: number } | null {
+    const paso = 2;
+    const esTinta = (x: number, y: number): boolean => {
+      const idx = (y * width + x) * 4;
+      const gris = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+      return gris < 175;
+    };
+    const agrupar = (valores: number[]): number[] => {
+      const grupos: number[][] = [];
+      for (const valor of valores) {
+        const ultimo = grupos[grupos.length - 1];
+        if (!ultimo || valor - ultimo[ultimo.length - 1] > paso * 2) grupos.push([valor]);
+        else ultimo.push(valor);
+      }
+      return grupos.map(grupo => Math.round(grupo.reduce((a, b) => a + b, 0) / grupo.length));
+    };
+
+    // Primero se localizan los bordes verticales. Son estables incluso cuando
+    // el borde superior tiene poco contraste.
+    const minimoVertical = Math.max(30, Math.floor(((height * 0.75) / paso) * 0.25));
+    const columnasFuertes: number[] = [];
+    for (let x = Math.floor(width * 0.005); x < Math.floor(width * 0.995); x += paso) {
+      let tinta = 0;
+      for (let y = Math.floor(height * 0.15); y < Math.floor(height * 0.90); y += paso) {
+        if (esTinta(x, y)) tinta++;
+      }
+      if (tinta >= minimoVertical) columnasFuertes.push(x);
+    }
+    const columnas = agrupar(columnasFuertes);
+    const izquierda = columnas.find(x => x < width * 0.12);
+    const derecha = [...columnas].reverse().find(x => x > width * 0.55);
+    if (izquierda === undefined || derecha === undefined || derecha - izquierda < width * 0.45) {
+      return null;
+    }
+    const rw = derecha - izquierda;
+
+    // Se elige el par horizontal cuya altura coincide con la proporción real
+    // de la matriz (aprox. 1.21:1), evitando líneas del encabezado.
+    const minimoHorizontal = Math.max(30, Math.floor((width / paso) * 0.25));
+    const filasFuertes: number[] = [];
+    for (let y = Math.floor(height * 0.15); y < Math.floor(height * 0.99); y += paso) {
+      let tinta = 0;
+      for (let x = 0; x < width; x += paso) if (esTinta(x, y)) tinta++;
+      if (tinta >= minimoHorizontal) filasFuertes.push(y);
+    }
+    const filas = agrupar(filasFuertes);
+    if (filas.length < 2) return null;
+    const altoEsperado = rw / 1.21;
+    // La línea inferior de la matriz es la última línea larga de la zona de
+    // respuestas. Desde ella se busca hacia arriba el borde superior con la
+    // altura esperada; así no se confunden las líneas de cada encabezado/fila.
+    const bottom = filas[filas.length - 1];
+    const candidatosTop = filas
+      .slice(0, -1)
+      .map(top => ({ top, diferencia: Math.abs((bottom - top) - altoEsperado) }))
+      .filter(item => bottom - item.top >= height * 0.25)
+      .sort((a, b) => a.diferencia - b.diferencia);
+    const top = candidatosTop[0]?.top;
+    if (top === undefined) return null;
+    const rh = bottom - top;
+    if (rh < height * 0.25) return null;
+    return { rx: izquierda, ry: top, rw, rh };
   }
 
   private _procesarPaginaOmrConCanvas(

@@ -80,8 +80,14 @@ El lector no reproduce ni redibuja la cartilla institucional. Recibe el PDF o la
 El worker `worker-omr` realiza la primera iteración oficial:
 
 1. Renderiza cada página del PDF o abre la imagen escaneada.
-2. Detecta el contorno de la grilla principal de 60 reactivos (tres bloques de 20)
-   y calibra los 15 centros de opciones y las 20 filas mediante las
+2. Detecta el contorno de la grilla principal de 60 reactivos (tres bloques de 20),
+   incluso cuando el PDF A4 conserva margen blanco lateral; no utiliza el borde
+   completo de la hoja como área de respuestas.
+3. Clasifica automáticamente la presentación como `ESCANEO_FISICO` o
+   `PDF_RECORTADO` según cuánto ocupa la grilla en la hoja. La grilla detectada
+   se usa como ancla para ubicar también el recuadro del código del estudiante;
+   por ello el código no depende de una posición fija del A4.
+4. Calibra los 15 centros de opciones y las 20 filas mediante las
    circunferencias impresas. Así se compensan desplazamientos, escala y las dos
    distribuciones verticales de la cartilla que están en uso.
 3. Lee la densidad en un anillo interno de cada burbuja A-E, excluyendo las
@@ -110,7 +116,7 @@ Al terminar el procesamiento, la pantalla presenta cada página en una fila de d
 
 El código se puede escribir manualmente cuando el OCR no lo reconoce. El botón **Validar código y recalibrar** solicita confirmación y coteja el código contra la nómina oficial del grupo; si pertenece al rol, recupera el patrón de su variante, recalcula las respuestas y persiste el resultado. El botón final para pasar a `CALIFICADO` solo se habilita cuando todas las páginas tienen grilla y código validado.
 
-La guía de alineación visual utiliza por defecto la geometría del escaneo de referencia: grilla principal aproximada en `top 16,9 %`, `left 1,1 %`, `width 73,2 %`, `height 42,7 %`; el recuadro exclusivo de código `top 9 %`, `left 53 %`, `width 22 %`, `height 5 %` se resalta por separado para verificarlo antes de procesar.
+La guía de alineación visual toma la matriz detectada en cada página y deriva desde ella el recuadro exclusivo del código: aproximadamente desde `73 %` del ancho de la matriz, por encima de su borde superior, hasta su extremo derecho. Así la guía se desplaza con la cartilla y no queda fija en el A4 cuando existe margen blanco lateral. Los presets siguen disponibles como respaldo para una página sin contorno recuperable.
 
 ### Condiciones del escaneo
 
@@ -125,13 +131,15 @@ El módulo **Calificación Óptica OMR** incluye el apartado **Parámetros OMR**
 
 | Parámetro | Default | Rango | Efecto |
 | --- | ---: | ---: | --- |
-| Densidad mínima de marca | 70 | 40–95 | Decide cuándo una burbuja tiene tinta suficiente. |
+| Densidad mínima de marca | 60 | 40–95 | Decide cuándo una burbuja tiene tinta suficiente; se complementa con una separación mínima frente a las demás opciones. |
 | Diferencial de doble marca | 18 | 1–50 | Identifica dos opciones cuando sus densidades quedan próximas. |
 | Umbral binario de grilla | 185 | 80–240 | Ayuda a localizar el cuadro de respuestas. |
-| Nivel de tinta de marca | 145 | 40–220 | Umbral de gris medido dentro del anillo de la burbuja. |
-| Zona código X/Y/ancho/alto | 0.53/0.09/0.22/0.05 | 0–1 | Recuadro exclusivo del código estudiantil, normalizado sobre la página. |
-| Escala OCR | 2.5 | 1–5 | Ampliación aplicada al código antes de OCR. |
+| Nivel de tinta de marca | 120 | 40–220 | Umbral de gris medido dentro del anillo de la burbuja. |
+| Zona código X/Y/ancho/alto | 0.70/0.16/0.27/0.06 | 0–1 | Recuadro exclusivo del código estudiantil, normalizado sobre la página. |
+| Escala OCR | 3.0 | 1–5 | Ampliación aplicada al código antes de OCR. |
 | Búsqueda del centro | 2 px | 0–5 | Vecindad de tolerancia para compensar pequeños desplazamientos. |
+
+La lectura de marcas utiliza un anillo interno alejado del centro tipográfico de la burbuja. Esto evita que las letras preimpresas, especialmente `B` y `D`, se interpreten como respuestas cuando la cartilla está en blanco. El umbral operativo es `60%` y se exige además una diferencia mínima de `10` puntos frente a la segunda opción; así se recuperan marcas claras sin aceptar el ruido parejo de una burbuja vacía. Los valores deben validarse con una cartilla vacía y otra correctamente marcada antes de una aplicación masiva.
 
 API administrativa de la configuración:
 

@@ -48,6 +48,14 @@ public class OmrProcesamientoService {
     private final Map<String, JsonNode> resultados = new ConcurrentHashMap<>();
 
     public JsonNode solicitar(String rolExamenId, MultipartFile archivo) {
+        return solicitar(rolExamenId, archivo, "CALIFICACION");
+    }
+
+    public JsonNode solicitarLecturaConciliacion(String rolExamenId, MultipartFile archivo) {
+        return solicitar(rolExamenId, archivo, "LECTURA_CONCILIACION");
+    }
+
+    private JsonNode solicitar(String rolExamenId, MultipartFile archivo, String modo) {
         if (archivo == null || archivo.isEmpty()) {
             throw new IllegalArgumentException("Debe seleccionar un PDF o imagen escaneada.");
         }
@@ -58,7 +66,12 @@ public class OmrProcesamientoService {
         try {
             Files.createDirectories(destino.getParent());
             archivo.transferTo(destino);
-            JsonNode solicitud = objectMapper.valueToTree(Map.of("jobId", jobId, "rolExamenId", rolExamenId, "archivoPath", destino.toString()));
+            JsonNode solicitud = objectMapper.valueToTree(Map.of(
+                    "jobId", jobId,
+                    "rolExamenId", rolExamenId,
+                    "archivoPath", destino.toString(),
+                    "modo", modo
+            ));
             rabbitTemplate.convertAndSend("evaluaciones.omr.procesar", solicitud.toString());
             JsonNode aceptado = objectMapper.createObjectNode().put("jobId", jobId).put("estado", "EN_COLA");
             resultados.put(jobId, aceptado);

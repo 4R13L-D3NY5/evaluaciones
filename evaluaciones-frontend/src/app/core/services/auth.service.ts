@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, throwError } from 'rxjs';
-import { catchError, map, tap } from 'rxjs/operators';
+import { Observable, of, throwError, timer } from 'rxjs';
+import { catchError, map, retry, tap } from 'rxjs/operators';
 import { AppRole, UsuarioSesion } from '../models/auth.models';
 
 @Injectable({
@@ -17,6 +17,12 @@ export class AuthService {
   public iniciarSesion(usuario: string, contrasena: string): Observable<UsuarioSesion> {
     this.cargando.set(true);
     return this._http.post<UsuarioSesion>('/api/auth/login', { usuario, contrasena }).pipe(
+      retry({
+        count: 3,
+        delay: (error, intento) => this._esFalloTransitorio(error)
+          ? timer(intento * 1000)
+          : throwError(() => error)
+      }),
       tap(sesion => {
         this.usuario.set(sesion);
         this._sessionRequest = of(sesion);
@@ -36,6 +42,12 @@ export class AuthService {
 
     this.cargando.set(true);
     this._sessionRequest = this._http.get<UsuarioSesion>('/api/auth/session').pipe(
+      retry({
+        count: 3,
+        delay: (error, intento) => this._esFalloTransitorio(error)
+          ? timer(intento * 1000)
+          : throwError(() => error)
+      }),
       tap(sesion => {
         this.usuario.set(sesion);
         this.cargando.set(false);
@@ -51,6 +63,10 @@ export class AuthService {
     );
 
     return this._sessionRequest;
+  }
+
+  private _esFalloTransitorio(error: { status?: number }): boolean {
+    return error?.status === 0 || [502, 503, 504].includes(error?.status || 0);
   }
 
   public cerrarSesion(): Observable<void> {

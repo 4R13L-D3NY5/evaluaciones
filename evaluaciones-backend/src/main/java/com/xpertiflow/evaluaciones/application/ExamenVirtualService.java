@@ -519,6 +519,7 @@ public class ExamenVirtualService {
                 pregunta.setNumeroPregunta(esContexto ? 0 : numero++);
                 pregunta.setGrupoContexto(node.path("grupoContexto").asText(null));
                 pregunta.setEnunciado(node.path("enunciado").asText(""));
+                pregunta.setImagenBase64(node.path("imagenBase64").asText(null));
                 List<OpcionVirtualDto> opciones = new ArrayList<>();
                 for (JsonNode opcion : node.path("opciones")) {
                     opciones.add(new OpcionVirtualDto(opcion.path("letra").asText(), opcion.path("texto").asText()));

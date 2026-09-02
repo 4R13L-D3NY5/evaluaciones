@@ -426,11 +426,11 @@
   #box[#text(weight: "bold")[28. #raw("___", block: false)]] #h(0.25em)#raw("Pregunta difícil número 7", block: false)\
   #v(0.15em)
   #block(inset: (left: 1em))[
-    #text(weight: "regular")[A) #raw("Opción B de ejemplo", block: false)]\
-    #text(weight: "regular")[B) #raw("Opción C de ejemplo", block: false)]\
-    #text(weight: "regular")[C) #raw("Opción D de ejemplo", block: false)]\
-    #text(weight: "regular")[D) #raw("Opción E de ejemplo", block: false)]\
-    #text(weight: "regular")[E) #raw("Opción A de ejemplo", block: false)]\
+    #text(weight: "regular")[A) #raw("", block: false)]\
+    #text(weight: "regular")[B) #raw("", block: false)]\
+    #text(weight: "regular")[C) #raw("", block: false)]\
+    #text(weight: "regular")[D) #raw("", block: false)]\
+    #text(weight: "regular")[E) #raw("", block: false)]\
   ]
 ]
 
@@ -438,11 +438,11 @@
   #box[#text(weight: "bold")[29. #raw("___", block: false)]] #h(0.25em)#raw("Pregunta difícil número 6", block: false)\
   #v(0.15em)
   #block(inset: (left: 1em))[
-    #text(weight: "regular")[A) #raw("Opción A de ejemplo", block: false)]\
-    #text(weight: "regular")[B) #raw("Opción E de ejemplo", block: false)]\
-    #text(weight: "regular")[C) #raw("Opción C de ejemplo", block: false)]\
-    #text(weight: "regular")[D) #raw("Opción D de ejemplo", block: false)]\
-    #text(weight: "regular")[E) #raw("Opción B de ejemplo", block: false)]\
+    #text(weight: "regular")[A) #raw("", block: false)]\
+    #text(weight: "regular")[B) #raw("", block: false)]\
+    #text(weight: "regular")[C) #raw("", block: false)]\
+    #text(weight: "regular")[D) #raw("", block: false)]\
+    #text(weight: "regular")[E) #raw("", block: false)]\
   ]
 ]
 
@@ -450,11 +450,11 @@
   #box[#text(weight: "bold")[30. #raw("___", block: false)]] #h(0.25em)#raw("Pregunta difícil número 5", block: false)\
   #v(0.15em)
   #block(inset: (left: 1em))[
-    #text(weight: "regular")[A) #raw("Opción D de ejemplo", block: false)]\
-    #text(weight: "regular")[B) #raw("Opción B de ejemplo", block: false)]\
-    #text(weight: "regular")[C) #raw("Opción A de ejemplo", block: false)]\
-    #text(weight: "regular")[D) #raw("Opción C de ejemplo", block: false)]\
-    #text(weight: "regular")[E) #raw("Opción E de ejemplo", block: false)]\
+    #text(weight: "regular")[A) #raw("", block: false)]\
+    #text(weight: "regular")[B) #raw("", block: false)]\
+    #text(weight: "regular")[C) #raw("", block: false)]\
+    #text(weight: "regular")[D) #raw("", block: false)]\
+    #text(weight: "regular")[E) #raw("", block: false)]\
   ]
 ]
 

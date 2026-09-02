@@ -35,6 +35,7 @@ La cartilla OMR es un documento separado del examen. El cuadernillo no incluye c
 - Interlineado (`leading`): 0,8 em.
 - Separación entre preguntas: 1,2 em.
 - Los bloques de preguntas no deben dividirse entre páginas.
+- Una imagen opcional almacenada en `imagen_base64` se muestra debajo del enunciado, conservando su proporción y el tamaño seleccionado mediante el metadato interno `#sea-size=GRANDE|MEDIANA|PEQUENA`; la previsualización y el PDF oficial deben aplicar la misma escala.
 
 ## 3. Cabecera institucional
 
@@ -76,6 +77,7 @@ La cartilla OMR es un documento separado del examen. El cuadernillo no incluye c
 - Los bloques de sección deben conservar separación vertical suficiente para que el estudiante identifique con facilidad el cambio de tipo de reactivo.
 - Los casos clínicos o problemas y los emparejamientos deben conservar sus bloques tipo tarjeta con borde; las preguntas internas respetan la numeración y los incisos del formato general.
 - Los enunciados mantienen texto normal, sin negrita, salvo el número de pregunta y sus tres guiones `___`. El enunciado principal de un emparejamiento se mantiene dentro de su tarjeta de referencia.
+- Las imágenes de apoyo no reemplazan el texto ni las opciones de respuesta y deben mantenerse dentro del ancho útil de la hoja, sin recortar ni deformar la proporción original.
 - En `Emparejamiento Ampliado`, el enunciado principal y sus opciones de referencia A-E se imprimen dentro de la tarjeta, sin número de pregunta ni `___`. Las opciones relacionadas del grupo se imprimen después como preguntas numeradas y sí conservan `___`.
 - Verdadero o falso simple no muestra incisos ni opciones impresas; el estudiante responde en el espacio `___` y la clave se conserva únicamente de forma interna para calificación.
 - En verdadero o falso complejo, las cuatro afirmaciones de cada pregunta se identifican como `1`, `2`, `3` y `4`; debajo se presenta el grupo de respuestas A-E para que el estudiante marque una sola clave.
@@ -145,6 +147,7 @@ Debe conservarse en la base de datos:
 | 2026-08-29 | Previsualización PDF real del banco, sin datos ficticios, una sola columna y normalización de etiquetas descriptivas oficiales del Excel. |
 | 2026-08-30 | La aprobación de la previsualización queda bloqueada hasta recorrer todas las páginas del PDF real; se agrega un mensaje explícito y se aclara que las observaciones de opciones se corrigen en el Excel oficial. |
 | 2026-08-30 | El enunciado principal de Emparejamiento Ampliado se presenta dentro de su tarjeta de referencia, sin `___`; las preguntas dependientes mantienen la numeración y los guiones. La previsualización usa los parámetros persistidos de Administración de Evaluaciones. |
+| 2026-09-02 | Las imágenes opcionales del banco se incorporan tanto a la previsualización PDF como al PDF oficial, con escala consistente y sin deformación; las filas madre de casos/emparejamientos no consumen numeración. |
 | 2026-08-29 | Un PDF consolidado por rol, un examen por estudiante, inicio en página impar, pie con identidad y paginación reiniciada, ratio 5 y asignación aleatoria. |
 | 2026-08-28 | Times New Roman 11 pt, leading 1 em, separación 1,5 em, incisos con sangría, tres guiones por pregunta y eliminación de cartilla/vista previa. |
 # Nota operativa de cartilla OMR

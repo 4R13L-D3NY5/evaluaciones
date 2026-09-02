@@ -41,7 +41,7 @@ def obtener_rol_examen(rol_examen_id: str) -> dict[str, Any] | None:
 def obtener_reactivos_por_banco(banco_preguntas_id: str) -> list[dict[str, Any]]:
     sql = """
         SELECT id, numero_orden, tipo_reactivo, dificultad, nivel_dificultad,
-               grupo_contexto, enunciado, opciones_json, respuesta_correcta, peso_puntos
+               grupo_contexto, enunciado, imagen_base64, opciones_json, respuesta_correcta, peso_puntos
         FROM sea_reactivos
         WHERE banco_id = %s
         ORDER BY numero_orden, id

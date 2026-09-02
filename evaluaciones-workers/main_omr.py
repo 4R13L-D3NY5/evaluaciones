@@ -4,7 +4,7 @@ import sys
 import time
 
 from src import messaging
-from src.omr_engine import procesar_archivo
+from src.omr_engine import procesar_archivo, procesar_archivo_lectura
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,12 +18,12 @@ def _procesar_job_omr(payload: dict) -> dict:
     job_id = payload.get("jobId", "unknown")
     rol_examen_id = payload.get("rolExamenId", "unknown")
     logger.info("Job OMR %s recibido para rol %s", job_id, rol_examen_id)
-    resultado = procesar_archivo(payload["archivoPath"], rol_examen_id)
+    resultado = procesar_archivo_lectura(payload["archivoPath"]) if payload.get("modo") == "LECTURA_CONCILIACION" else procesar_archivo(payload["archivoPath"], rol_examen_id)
     return {
         "jobId": job_id,
         "rolExamenId": rol_examen_id,
         "estado": "COMPLETADO",
-        "mensaje": "Cartillas procesadas: código y respuestas leídos.",
+        "mensaje": "Lectura OMR completada: código y respuestas disponibles para conciliación." if payload.get("modo") == "LECTURA_CONCILIACION" else "Cartillas procesadas: código y respuestas leídos.",
         **resultado,
     }
 

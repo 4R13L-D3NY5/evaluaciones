@@ -6,7 +6,7 @@ Documento técnico y pedagógico de referencia para la elaboración, estructurac
 
 ## 1. Estructura General del Archivo Excel (ormato_banco_preguntas_asig_EF.xlsx)
 
-Cada reactivo en la hoja **Banco** se estructura en las siguientes 12 columnas obligatorias:
+Cada reactivo en la hoja **Banco** se estructura en las siguientes columnas. `imagen_base64` es opcional:
 
 | Columna | Nombre de Campo | Descripción | Valores Permitidos / Reglas |
 | :---: | :--- | :--- | :--- |
@@ -22,6 +22,15 @@ Cada reactivo en la hoja **Banco** se estructura en las siguientes 12 columnas o
 | **J** | dificultad | Nivel taxonómico del reactivo | 1 (Fácil), 2 (Medio), 3 (Difícil) |
 | **K** | parcial | Tipo de evaluación programada | 1P, 2P, EF, 2T |
 | **L** | observaciones | Diagnóstico automático de consistencia | OK o detalle de faltantes (Falta revisar...) |
+| **M** | imagen_base64 | Imagen opcional para mostrar debajo del enunciado en el examen virtual | Data URI `data:image/png;base64,...` o Base64 puro; PNG, JPEG, WEBP o GIF; máximo 512 KB. La herramienta puede agregar `#sea-size=GRANDE`, `#sea-size=MEDIANA` o `#sea-size=PEQUENA` para conservar el tamaño visual sin otra columna |
+
+### Imagen opcional en Base64
+
+Agregue la columna `imagen_base64` en la hoja **Banco** para mostrar una imagen dentro de una pregunta. Se recomienda usar una data URI completa, por ejemplo:
+
+`data:image/png;base64,iVBORw0KGgoAAAANSUhEUg...`
+
+También se acepta Base64 puro, que se interpreta como PNG. La imagen se valida y se muestra automáticamente debajo del enunciado en el examen virtual. Por el límite de una celda de Excel, la cadena no debe superar 32767 caracteres y la imagen decodificada no debe superar 512 KB. El previsualizador permite elegir Grande, Mediana (predeterminada) o Pequeña y conserva esa elección en el fragmento de la data URI; no se agrega una columna de tamaño.
 
 ---
 

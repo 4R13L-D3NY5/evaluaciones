@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +23,11 @@ from src import config
 logger = logging.getLogger(__name__)
 OPCIONES = "ABCDE"
 # Umbral mínimo de tinta en el anillo interno de la burbuja para considerar una marca.
+# Las cartillas escaneadas pueden contener marcas válidas claras o incompletas;
+# el diferencial mínimo evita que el texto preimpreso se convierta en respuesta.
 # Se mantiene separado de la lectura OCR del código del estudiante.
-UMBRAL_DENSIDAD_MARCA = 70.0
+UMBRAL_DENSIDAD_MARCA = 60.0
+UMBRAL_DIFERENCIAL_MARCA = 10.0
 # Diferencia mínima entre la primera y segunda opción para no confundir una
 # marca parcialmente escrita con una doble marca. La comparación se hace sobre
 # un anillo interno que excluye las letras A-E preimpresas.
@@ -37,10 +41,10 @@ UMBRAL_DIFERENCIAL_DOBLE = 18.0
 # derecha; se excluyen N°, materia, grupo y el serial superior.
 ZONA_CODIGO_ESTUDIANTE = (0.70, 0.16, 0.97, 0.22)
 PARAMETROS_OMR_DEFECTO: dict[str, float] = {
-    "umbral_densidad_marca": 70.0,
+    "umbral_densidad_marca": 60.0,
     "umbral_diferencial_doble": 18.0,
     "umbral_binario_grilla": 185.0,
-    "nivel_tinta_marca": 145.0,
+    "nivel_tinta_marca": 120.0,
     "zona_codigo_x": 0.70,
     "zona_codigo_y": 0.16,
     "zona_codigo_ancho": 0.27,
@@ -117,11 +121,14 @@ def _detectar_grilla(gray: np.ndarray, parametros: dict[str, float] | None = Non
         # página; se descartan exigiendo la posición y proporción del cuadro
         # real.
         if (
-            0.95 <= aspecto <= 1.55
-            and w > ancho * 0.75
-            and h > alto * 0.55
-            and ancho * 0.015 <= x <= ancho * 0.08
-            and alto * 0.24 <= y < alto * 0.80
+            # La cartilla oficial puede ocupar solo una parte del A4 y dejar
+            # un margen blanco lateral. Por eso no se puede exigir que la
+            # grilla mida 75% del ancho ni 55% del alto de toda la página.
+            1.05 <= aspecto <= 1.55
+            and w > ancho * 0.45
+            and h > alto * 0.18
+            and ancho * 0.005 <= x <= ancho * 0.20
+            and alto * 0.12 <= y < alto * 0.70
         ):
             candidatos.append((w * h, x, y, w, h))
     if candidatos:
@@ -138,8 +145,13 @@ def _densidad_centro(
     # El escaneo puede desplazar el centro uno o dos píxeles aunque la grilla
     # haya sido encontrada correctamente. Se toma la mejor lectura en una
     # vecindad pequeña para no perder marcas hechas cerca del borde.
-    radio_interno = max(2, int(radio * .25))
-    radio_externo = max(radio_interno + 1, int(radio * .65))
+    # Las letras A-E impresas ocupan buena parte del centro de la burbuja.
+    # El anillo anterior (.25-.65) todavía incluía sus trazos, sobre todo B y
+    # D, y podía convertir una cartilla vacía en una respuesta fantasma.
+    # Medimos cerca del borde interno, donde una marca real deja tinta pero la
+    # tipografía preimpresa tiene mucha menos presencia.
+    radio_interno = max(2, int(radio * .55))
+    radio_externo = max(radio_interno + 1, int(radio * .90))
     parametros = parametros or PARAMETROS_OMR_DEFECTO
     radio_busqueda = max(0, int(parametros["radio_busqueda_pixeles"]))
     nivel_tinta = int(parametros["nivel_tinta_marca"])
@@ -158,9 +170,8 @@ def _densidad_centro(
                 min(radio, roi.shape[1] // 2),
                 min(radio, roi.shape[0] // 2),
             )
-            # Las letras A-E están impresas en el centro de cada burbuja y por
-            # eso no pueden usarse como indicador de tinta. Se mide un anillo
-            # intermedio: excluye la letra y el borde circular preimpreso.
+            # Se excluyen el centro tipográfico y el borde circular preimpreso;
+            # solo se evalúa el anillo interno de escritura de la burbuja.
             cv2.circle(mask, centro, radio_externo, 255, -1)
             cv2.circle(mask, centro, radio_interno, 0, -1)
             muestra = roi[mask > 0]
@@ -284,7 +295,14 @@ def _leer_respuestas(
         orden = np.argsort(densidades)[::-1]
         maximo = float(densidades[int(orden[0])])
         segundo = float(densidades[int(orden[1])])
-        if maximo < parametros["umbral_densidad_marca"]:
+        # Una marca real puede quedar entre 60% y 70% cuando el trazo es claro
+        # o está concentrado en el centro. En una burbuja vacía, en cambio,
+        # las letras impresas suelen elevar todas las opciones casi por igual;
+        # exigir separación evita recuperar nuevamente falsos B/D.
+        if (
+            maximo < parametros["umbral_densidad_marca"]
+            or maximo - segundo < UMBRAL_DIFERENCIAL_MARCA
+        ):
             respuesta = ""
         elif (
             segundo >= parametros["umbral_densidad_marca"]
@@ -298,22 +316,68 @@ def _leer_respuestas(
     return {"respuestas": respuestas, "detalles": detalles}
 
 
-def _candidatos_codigo(imagen: np.ndarray, parametros: dict[str, float] | None = None) -> list[str]:
+def _zona_codigo_desde_grilla(
+    grilla: tuple[int, int, int, int],
+    ancho: int,
+    alto: int,
+) -> tuple[int, int, int, int]:
+    """Ubica el recuadro del código respecto a la matriz, no respecto a la hoja.
+
+    La matriz conserva la misma relación con el código tanto en el escaneo
+    físico que llena casi toda la página como en el PDF recortado que deja
+    margen blanco lateral. Las coordenadas se recortan para que también sirvan
+    en imágenes con inclinación o recorte parcial.
+    """
+    gx, gy, gw, gh = grilla
+    # El .70 todavía alcanza el recuadro contiguo de N°/materia en el
+    # escaneo físico. El .73 inicia dentro del recuadro numérico del estudiante
+    # y sigue cubriendo el PDF recortado.
+    x1 = gx + int(gw * .73)
+    y1 = gy - int(gh * .23)
+    x2 = gx + int(gw * 1.04)
+    y2 = gy - int(gh * .05)
+    return max(0, x1), max(0, y1), min(ancho, x2), min(alto, y2)
+
+
+def _clasificar_perfil_escaneo(
+    imagen: np.ndarray,
+    grilla: tuple[int, int, int, int],
+) -> str:
+    """Clasifica la presentación por cuánto ocupa la matriz dentro de la hoja."""
+    alto, ancho = imagen.shape[:2]
+    proporcion_ancho = grilla[2] / float(ancho) if ancho else 0
+    return "ESCANEO_FISICO" if proporcion_ancho >= .82 else "PDF_RECORTADO"
+
+
+def _candidatos_codigo(
+    imagen: np.ndarray,
+    parametros: dict[str, float] | None = None,
+    grilla: tuple[int, int, int, int] | None = None,
+) -> list[str]:
     alto, ancho = imagen.shape[:2]
     parametros = parametros or PARAMETROS_OMR_DEFECTO
-    # Solo se procesa el recuadro superior derecho donde se sobreimprime el
-    # código del estudiante. No se cotejan grupo, materia ni nombre.
+    # La matriz detectada es el ancla común para los dos formatos de captura.
+    # El recuadro del código queda arriba y hacia su extremo derecho.
+    zonas_pixeles: list[tuple[int, int, int, int]] = []
+    if grilla:
+        zonas_pixeles.append(_zona_codigo_desde_grilla(grilla, ancho, alto))
+
+    # Respaldo para imágenes donde no se pudo detectar la matriz. Conserva la
+    # configuración administrativa y la geometría histórica de la cartilla.
     x1 = parametros["zona_codigo_x"]
     y1 = parametros["zona_codigo_y"]
-    # Algunas cartillas oficiales incluyen un talón inferior y por ello tienen
-    # más alto, pero la cabecera conserva la misma posición física. Se usa como
-    # referencia el alto de una hoja sin talón para que el código no se desplace
-    # hacia abajo al normalizarlo sobre una página más larga.
     alto_referencia = min(alto, int(ancho * 1.12))
-    zonas = [(x1, y1, x1 + parametros["zona_codigo_ancho"], y1 + parametros["zona_codigo_alto"])]
+    zonas_pixeles.append((
+        int(ancho * x1),
+        int(alto_referencia * y1),
+        int(ancho * (x1 + parametros["zona_codigo_ancho"])),
+        int(alto_referencia * (y1 + parametros["zona_codigo_alto"])),
+    ))
     candidatos: list[str] = []
-    for x1, y1, x2, y2 in zonas:
-        recorte = imagen[int(alto_referencia * y1):int(alto_referencia * y2), int(ancho * x1):int(ancho * x2)]
+    for x1, y1, x2, y2 in zonas_pixeles:
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(ancho, x2), min(alto, y2)
+        recorte = imagen[y1:y2, x1:x2]
         if recorte.size == 0:
             continue
         gris = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
@@ -342,7 +406,12 @@ def _candidatos_codigo(imagen: np.ndarray, parametros: dict[str, float] | None =
                 if len(secuencia) > 7:
                     candidatos.append(secuencia[-7:])
                     candidatos.append(secuencia[:7])
-    return list(dict.fromkeys(candidatos))
+    # Cuando una captura tiene poco contraste, Tesseract puede confundir un
+    # dígito en una de las variantes de binarización. Se prioriza el candidato
+    # que más veces aparece entre las zonas/variantes, en lugar del primero que
+    # devuelve el OCR. Esto es importante para conciliación, que no dispone de
+    # la nómina oficial para elegir entre candidatos.
+    return [candidato for candidato, _ in Counter(candidatos).most_common()]
 
 
 def _cargar_mapeos(rol_examen_id: str) -> dict[str, dict[str, Any]]:
@@ -466,13 +535,20 @@ def procesar_archivo(archivo: str, rol_examen_id: str) -> dict[str, Any]:
     for numero_pagina, imagen in enumerate(paginas, start=1):
         gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
         grilla = _detectar_grilla(gris, parametros)
-        candidatos = _candidatos_codigo(imagen, parametros)
+        candidatos = _candidatos_codigo(imagen, parametros, grilla)
         codigo = next((valor for valor in candidatos if valor in mapeos), None)
         lectura = {
             "pagina": numero_pagina,
             "codigoEstudiante": codigo,
             "codigoOcr": candidatos,
             "grilla": {"x": grilla[0], "y": grilla[1], "ancho": grilla[2], "alto": grilla[3]},
+            "perfilEscaneo": _clasificar_perfil_escaneo(imagen, grilla),
+            "zonaCodigoDetectada": {
+                "x": _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[0],
+                "y": _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[1],
+                "ancho": max(0, _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[2] - _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[0]),
+                "alto": max(0, _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[3] - _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[1]),
+            },
             **_leer_respuestas(gris, grilla, parametros),
         }
         if codigo:
@@ -491,5 +567,36 @@ def procesar_archivo(archivo: str, rol_examen_id: str) -> dict[str, Any]:
                 )
             else:
                 lectura["mensaje"] = "No se detectó el código preimpreso del estudiante."
+        lecturas.append(lectura)
+    return {"totalPaginas": len(paginas), "resultados": lecturas}
+
+
+def procesar_archivo_lectura(archivo: str) -> dict[str, Any]:
+    """Lee código y respuestas sin exigir nómina, variante ni clave de respuestas."""
+    parametros = _cargar_parametros_omr()
+    paginas = _abrir_paginas(archivo)
+    lecturas = []
+    for numero_pagina, imagen in enumerate(paginas, start=1):
+        gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+        grilla = _detectar_grilla(gris, parametros)
+        candidatos = _candidatos_codigo(imagen, parametros, grilla)
+        lectura = {
+            "pagina": numero_pagina,
+            "codigoEstudiante": candidatos[0] if candidatos else None,
+            "codigoOcr": candidatos,
+            "codigoValidado": False,
+            "letraVariante": None,
+            "grilla": {"x": grilla[0], "y": grilla[1], "ancho": grilla[2], "alto": grilla[3]},
+            "perfilEscaneo": _clasificar_perfil_escaneo(imagen, grilla),
+            "zonaCodigoDetectada": {
+                "x": _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[0],
+                "y": _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[1],
+                "ancho": max(0, _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[2] - _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[0]),
+                "alto": max(0, _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[3] - _zona_codigo_desde_grilla(grilla, imagen.shape[1], imagen.shape[0])[1]),
+            },
+            **_leer_respuestas(gris, grilla, parametros),
+        }
+        lectura["estado"] = "REVISION_MANUAL"
+        lectura["mensaje"] = "Lectura para conciliación; no se calificó ni se validó variante."
         lecturas.append(lectura)
     return {"totalPaginas": len(paginas), "resultados": lecturas}

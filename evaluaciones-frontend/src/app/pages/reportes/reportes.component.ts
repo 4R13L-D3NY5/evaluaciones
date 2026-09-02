@@ -7,12 +7,12 @@ import {
   EtapaEvaluacion 
 } from '../../core/services/evaluaciones-storage.service';
 import { RolExamenService, RolExamenResponse } from '../../core/services/rol-examen.service';
-import { CalificacionOmrResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
+import { OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 import * as XLSX from 'xlsx';
 
 type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR' | 'AUDITORIA_TRAZABILIDAD' | 'CONCILIACION_REMARK';
 
-type EstadoConciliacion = 'COINCIDE' | 'DIFERENCIA_RESPUESTAS' | 'DIFERENCIA_NOTA' | 'SOLO_REMARK' | 'SOLO_SISTEMA';
+type EstadoConciliacion = 'COINCIDE' | 'DIFERENCIA_RESPUESTAS' | 'SOLO_REMARK' | 'SOLO_SISTEMA';
 
 interface DiferenciaPregunta {
   numero: number;
@@ -24,8 +24,6 @@ interface ResultadoConciliacion {
   codigoEstudiante: string;
   nombreRemark: string;
   nombreSistema: string;
-  notaRemark60: number | null;
-  notaSistema60: number | null;
   estado: EstadoConciliacion;
   diferencias: DiferenciaPregunta[];
   respuestasRemark: Record<string, string>;
@@ -35,10 +33,6 @@ interface ResultadoConciliacion {
 interface FilaRemark {
   codigoEstudiante: string;
   nombre: string;
-  materia: string;
-  grupo: string;
-  fecha: string;
-  nota60: number | null;
   respuestas: Record<string, string>;
 }
 
@@ -88,7 +82,8 @@ interface FilaRemark {
           <!-- Botón Exportar a Excel -->
           <button 
             (click)="exportarReporteActualExcel()" 
-            class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:scale-105 transition-all cursor-pointer">
+            [disabled]="tipoReporteActivo() === 'CONCILIACION_REMARK' && !resultadosConciliacion().length"
+            class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:scale-105 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
             <i class="pi pi-file-excel text-sm"></i>
             <span>Exportar Excel (.xlsx)</span>
           </button>
@@ -218,7 +213,7 @@ interface FilaRemark {
           <div class="p-5 border-b border-border bg-purple-50/60 dark:bg-purple-950/20 flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 class="text-base font-black text-foreground uppercase tracking-wide">Conciliación Remark vs. OMR</h2>
-              <p class="text-xs text-muted-foreground mt-1 max-w-3xl">Compara la lectura externa de Remark contra las respuestas almacenadas por el sistema, usando el código oficial del estudiante.</p>
+              <p class="text-xs text-muted-foreground mt-1 max-w-3xl">Compara la lectura OMR del PDF contra las respuestas exportadas por Remark, usando únicamente el código del estudiante.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <button (click)="exportarConciliacion()" [disabled]="!resultadosConciliacion().length" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
@@ -228,41 +223,47 @@ interface FilaRemark {
           </div>
 
           <div class="p-5 space-y-4">
-            <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr_auto] gap-3 items-end">
+            <div class="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr] gap-3 items-end">
               <div class="space-y-1">
-                <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Evaluación del sistema</label>
+                <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Referencia técnica del escaneo</label>
                 <select [(ngModel)]="rolConciliacionId" (ngModelChange)="seleccionarRolConciliacion($event)" class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer">
-                  <option value="">Selecciona una evaluación con OMR procesado</option>
+                  <option value="">Selecciona la configuración usada para este escaneo</option>
                   @for (rol of rolesConciliacionOrdenados(); track rol.id) {
-                    <option [value]="rol.id">{{ rol.materiaCodigo }} · {{ rol.materiaNombre }} · {{ rol.grupo }} · {{ rol.fecha }}</option>
+                    <option [value]="rol.id">{{ rol.fecha }} · {{ rol.tipoParcial }} · {{ rol.id }}</option>
                   }
                 </select>
               </div>
               <div class="space-y-1">
-                <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Archivo exportado desde Remark</label>
+                <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Paso 1 · PDF escaneado para OMR</label>
                 <div class="flex items-center gap-2">
-                  <input #archivoRemarkInput type="file" accept=".xlsx,.xls,.csv" (change)="cargarArchivoRemark($event)" class="hidden" />
-                  <button (click)="archivoRemarkInput.click()" class="flex-1 text-left bg-muted border border-dashed border-purple-300 hover:border-purple-500 rounded-xl px-3 py-2 text-xs font-bold text-foreground cursor-pointer">
-                    <i class="pi pi-upload text-purple-700 mr-2"></i>{{ archivoRemarkNombre() || 'Seleccionar Excel o CSV de Remark' }}
+                  <input #archivoOmrInput type="file" accept="application/pdf,.pdf" (change)="cargarArchivoOmr($event)" class="hidden" />
+                  <button (click)="archivoOmrInput.click()" class="flex-1 text-left bg-muted border border-dashed border-purple-300 hover:border-purple-500 rounded-xl px-3 py-2 text-xs font-bold text-foreground cursor-pointer">
+                    <i class="pi pi-file-pdf text-purple-700 mr-2"></i>{{ archivoOmrNombre() || 'Seleccionar PDF escaneado' }}
                   </button>
-                  @if (cargandoConciliacion()) { <i class="pi pi-spinner pi-spin text-purple-700"></i> }
+                  <button (click)="procesarPdfOmr()" [disabled]="!archivoOmr || !rolConciliacionId || cargandoOmr()" class="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-black whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                    @if (cargandoOmr()) { <i class="pi pi-spinner pi-spin mr-1"></i> } @else { <i class="pi pi-play mr-1"></i> } Procesar OMR
+                  </button>
                 </div>
               </div>
-              <div class="text-[10px] text-muted-foreground max-w-56 leading-relaxed">Se comparan COD_EST y PREG1–PREG30. No se modifican las calificaciones oficiales.</div>
+              <div class="space-y-1">
+                <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Paso 2 · Archivo exportado desde Remark</label>
+                <div class="flex items-center gap-2">
+                  <input #archivoRemarkInput type="file" accept=".xlsx,.xls,.csv" (change)="cargarArchivoRemark($event)" class="hidden" />
+                  <button (click)="archivoRemarkInput.click()" [disabled]="!omrProcesado()" class="flex-1 text-left bg-muted border border-dashed border-teal-300 hover:border-teal-500 rounded-xl px-3 py-2 text-xs font-bold text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                    <i class="pi pi-file-excel text-teal-700 mr-2"></i>{{ archivoRemarkNombre() || 'Seleccionar Excel o CSV de Remark' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-purple-200 bg-purple-50/60 p-3 text-xs text-purple-900 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span><i class="pi pi-info-circle mr-1"></i>Flujo: selecciona la evaluación, procesa el PDF escaneado y luego carga el Excel de Remark.</span>
+              <span [class]="omrProcesado() ? 'text-emerald-700 font-black' : 'text-muted-foreground'"><i class="pi" [class.pi-check-circle]="omrProcesado()" [class.pi-clock]="!omrProcesado()"></i> OMR: {{ omrProcesado() ? 'procesado' : 'pendiente' }}</span>
+              <span class="text-muted-foreground">La materia, grupo, fecha y nota no participan; solo se comparan COD_EST y PREG1–PREG30.</span>
             </div>
 
             @if (errorConciliacion()) {
               <div class="rounded-xl border border-rose-200 bg-rose-50 text-rose-800 p-3 text-xs font-medium flex items-center gap-2"><i class="pi pi-exclamation-triangle"></i>{{ errorConciliacion() }}</div>
-            }
-
-            @if (contextoConciliacion(); as contexto) {
-              <div class="rounded-xl border border-border bg-muted/30 p-3 flex flex-wrap items-center gap-3 text-xs">
-                <span class="font-black text-foreground">Contexto Remark:</span>
-                <span [class]="contexto.materiaCoincide ? 'text-emerald-700' : 'text-rose-700'">Materia {{ contexto.materia || 'no informada' }} <i class="pi" [class.pi-check-circle]="contexto.materiaCoincide" [class.pi-times-circle]="!contexto.materiaCoincide"></i></span>
-                <span [class]="contexto.grupoAdvertencia ? 'text-amber-700' : 'text-emerald-700'">Grupo {{ contexto.grupo || 'no informado' }} <i class="pi" [class.pi-exclamation-triangle]="contexto.grupoAdvertencia" [class.pi-check-circle]="!contexto.grupoAdvertencia"></i></span>
-                <span [class]="contexto.fechaAdvertencia ? 'text-amber-700' : 'text-emerald-700'">Fecha {{ contexto.fecha || 'no informada' }} <i class="pi" [class.pi-exclamation-triangle]="contexto.fechaAdvertencia" [class.pi-check-circle]="!contexto.fechaAdvertencia"></i></span>
-                @if (!contexto.materiaCoincide) { <strong class="text-rose-700">El archivo no corresponde a la materia seleccionada.</strong> }
-              </div>
             }
 
             @if (resultadosConciliacion().length) {
@@ -278,7 +279,7 @@ interface FilaRemark {
                 <table class="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                      <th class="p-3">COD_EST</th><th class="p-3">Estudiante Remark</th><th class="p-3">Estudiante sistema</th><th class="p-3 text-center">Remark /60</th><th class="p-3 text-center">Sistema /60</th><th class="p-3 text-center">Diferencias</th><th class="p-3 text-center">Resultado</th><th class="p-3 text-center">Detalle</th>
+                      <th class="p-3">COD_EST</th><th class="p-3">Estudiante Remark</th><th class="p-3">Estudiante sistema</th><th class="p-3 text-center">Respuestas diferentes</th><th class="p-3 text-center">Resultado</th><th class="p-3 text-center">Detalle</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-border">
@@ -287,8 +288,6 @@ interface FilaRemark {
                         <td class="p-3 font-mono font-black text-primary">{{ resultado.codigoEstudiante }}</td>
                         <td class="p-3 font-medium max-w-56 truncate">{{ resultado.nombreRemark || '—' }}</td>
                         <td class="p-3 font-medium max-w-56 truncate">{{ resultado.nombreSistema || '—' }}</td>
-                        <td class="p-3 text-center font-mono font-bold">{{ resultado.notaRemark60 ?? '—' }}</td>
-                        <td class="p-3 text-center font-mono font-bold">{{ resultado.notaSistema60 ?? '—' }}</td>
                         <td class="p-3 text-center font-mono font-black">{{ resultado.diferencias.length }}</td>
                         <td class="p-3 text-center"><span [class]="claseEstadoConciliacion(resultado.estado)" class="text-[9px] font-black px-2 py-1 rounded-lg uppercase whitespace-nowrap">{{ etiquetaEstadoConciliacion(resultado.estado) }}</span></td>
                         <td class="p-3 text-center"><button (click)="verDetalleConciliacion(resultado)" class="h-7 w-7 rounded-lg border border-border text-purple-700 hover:bg-purple-50 cursor-pointer"><i class="pi pi-eye text-xs"></i></button></td>
@@ -300,8 +299,8 @@ interface FilaRemark {
             } @else if (!cargandoConciliacion()) {
               <div class="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center text-xs text-muted-foreground">
                 <i class="pi pi-sync text-2xl text-purple-400"></i>
-                <p class="mt-2 font-bold text-foreground">Selecciona una evaluación y carga el archivo exportado desde Remark.</p>
-                <p class="mt-1">La conciliación se ejecutará cuando ambos datos estén disponibles.</p>
+                <p class="mt-2 font-bold text-foreground">Procesa el PDF escaneado y carga el archivo exportado desde Remark.</p>
+                <p class="mt-1">La conciliación se ejecutará cuando ambos datos estén disponibles; la materia no es necesaria.</p>
               </div>
             }
           </div>
@@ -315,10 +314,8 @@ interface FilaRemark {
                 <button (click)="cerrarDetalleConciliacion()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
               </div>
               <div class="p-5 overflow-y-auto space-y-4">
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-center">
                   <div class="rounded-xl border border-border bg-muted/30 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Resultado</span><strong [class]="claseEstadoConciliacion(detalle.estado)" class="text-xs">{{ etiquetaEstadoConciliacion(detalle.estado) }}</strong></div>
-                  <div class="rounded-xl border border-border bg-muted/30 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Remark /60</span><strong class="text-sm font-mono">{{ detalle.notaRemark60 ?? '—' }}</strong></div>
-                  <div class="rounded-xl border border-border bg-muted/30 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Sistema /60</span><strong class="text-sm font-mono">{{ detalle.notaSistema60 ?? '—' }}</strong></div>
                   <div class="rounded-xl border border-border bg-muted/30 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Preguntas distintas</span><strong class="text-sm font-mono">{{ detalle.diferencias.length }}</strong></div>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
@@ -701,19 +698,22 @@ export class ReporteEvaluacionesComponent {
 
   public rolesConciliacion = signal<RolExamenResponse[]>([]);
   public rolConciliacionId = '';
+  public archivoOmrNombre = signal<string | null>(null);
   public archivoRemarkNombre = signal<string | null>(null);
+  public cargandoOmr = signal<boolean>(false);
+  public omrProcesado = signal<boolean>(false);
   public cargandoConciliacion = signal<boolean>(false);
   public cargandoRolesConciliacion = signal<boolean>(false);
   public errorConciliacion = signal<string | null>(null);
   public resultadosConciliacion = signal<ResultadoConciliacion[]>([]);
   public resultadoConciliacionSeleccionado = signal<ResultadoConciliacion | null>(null);
-  public contextoConciliacion = signal<{ materia: string; grupo: string; fecha: string; materiaCoincide: boolean; grupoAdvertencia: boolean; fechaAdvertencia: boolean } | null>(null);
   private filasRemark: FilaRemark[] = [];
-  private calificacionesSistema: CalificacionOmrResponse[] = [];
+  private lecturasOmr: OmrLecturaResponse[] = [];
+  public archivoOmr: File | null = null;
 
   public rolesConciliacionOrdenados = computed(() => [...this.rolesConciliacion()].sort((a, b) => {
-    const codigo = (a.materiaCodigo || '').localeCompare(b.materiaCodigo || '');
-    return codigo || (a.grupo || '').localeCompare(b.grupo || '');
+    const fecha = (a.fecha || '').localeCompare(b.fecha || '');
+    return fecha || (a.tipoParcial || '').localeCompare(b.tipoParcial || '') || a.id.localeCompare(b.id);
   }));
 
   public resumenConciliacion = computed(() => {
@@ -721,7 +721,7 @@ export class ReporteEvaluacionesComponent {
     return {
       total: resultados.length,
       coinciden: resultados.filter(item => item.estado === 'COINCIDE').length,
-      diferencias: resultados.filter(item => item.estado === 'DIFERENCIA_RESPUESTAS' || item.estado === 'DIFERENCIA_NOTA').length,
+      diferencias: resultados.filter(item => item.estado === 'DIFERENCIA_RESPUESTAS').length,
       soloRemark: resultados.filter(item => item.estado === 'SOLO_REMARK').length,
       soloSistema: resultados.filter(item => item.estado === 'SOLO_SISTEMA').length
     };
@@ -773,10 +773,48 @@ export class ReporteEvaluacionesComponent {
 
   public seleccionarRolConciliacion(rolId: string): void {
     this.rolConciliacionId = rolId;
+    this.archivoOmr = null;
+    this.archivoOmrNombre.set(null);
+    this.omrProcesado.set(false);
+    this.archivoRemarkNombre.set(null);
+    this.filasRemark = [];
+    this.lecturasOmr = [];
     this.resultadosConciliacion.set([]);
-    this.contextoConciliacion.set(null);
     this.errorConciliacion.set(null);
-    this._ejecutarConciliacion();
+  }
+
+  public cargarArchivoOmr(evento: Event): void {
+    const input = evento.target as HTMLInputElement;
+    const archivo = input.files?.[0] || null;
+    input.value = '';
+    this.archivoOmr = archivo;
+    this.archivoOmrNombre.set(archivo?.name || null);
+    this.omrProcesado.set(false);
+    this.lecturasOmr = [];
+    this.resultadosConciliacion.set([]);
+    this.errorConciliacion.set(null);
+    if (archivo && !(archivo.type === 'application/pdf' || archivo.name.toLowerCase().endsWith('.pdf'))) {
+      this.archivoOmr = null;
+      this.archivoOmrNombre.set(null);
+      this.errorConciliacion.set('El archivo OMR debe ser un PDF escaneado.');
+    }
+  }
+
+  public procesarPdfOmr(): void {
+    if (!this.archivoOmr || !this.rolConciliacionId || this.cargandoOmr()) return;
+    this.cargandoOmr.set(true);
+    this.cargandoConciliacion.set(true);
+    this.omrProcesado.set(false);
+    this.resultadosConciliacion.set([]);
+    this.errorConciliacion.set(null);
+    this._omr.procesarLecturaConciliacion(this.rolConciliacionId, this.archivoOmr).subscribe({
+      next: aceptado => this._esperarResultadoOmr(aceptado.jobId),
+      error: error => {
+        this.cargandoOmr.set(false);
+        this.cargandoConciliacion.set(false);
+        this.errorConciliacion.set(error?.error?.message || 'No se pudo enviar el PDF escaneado al motor OMR.');
+      }
+    });
   }
 
   public cargarArchivoRemark(evento: Event): void {
@@ -788,7 +826,6 @@ export class ReporteEvaluacionesComponent {
     this.archivoRemarkNombre.set(archivo.name);
     this.errorConciliacion.set(null);
     this.resultadosConciliacion.set([]);
-    this.contextoConciliacion.set(null);
     const lector = new FileReader();
     lector.onload = () => {
       try {
@@ -797,6 +834,7 @@ export class ReporteEvaluacionesComponent {
         const libro = XLSX.read(new Uint8Array(contenido), { type: 'array', raw: false });
         const hoja = libro.Sheets[libro.SheetNames[0]];
         if (!hoja) throw new Error('El archivo no contiene una hoja de datos.');
+        if (!this.omrProcesado()) throw new Error('Primero procesa el PDF escaneado con OMR y luego carga el archivo de Remark.');
         this.filasRemark = this._leerFilasRemark(hoja);
         if (!this.filasRemark.length) throw new Error('No se encontraron filas válidas con COD_EST.');
         this._ejecutarConciliacion();
@@ -832,7 +870,6 @@ export class ReporteEvaluacionesComponent {
     switch (estado) {
       case 'COINCIDE': return 'Coincide';
       case 'DIFERENCIA_RESPUESTAS': return 'Diferencia en respuestas';
-      case 'DIFERENCIA_NOTA': return 'Diferencia de nota';
       case 'SOLO_REMARK': return 'Solo Remark';
       case 'SOLO_SISTEMA': return 'Solo sistema';
     }
@@ -842,7 +879,6 @@ export class ReporteEvaluacionesComponent {
     switch (estado) {
       case 'COINCIDE': return 'bg-emerald-100 text-emerald-800';
       case 'DIFERENCIA_RESPUESTAS': return 'bg-amber-100 text-amber-800';
-      case 'DIFERENCIA_NOTA': return 'bg-orange-100 text-orange-800';
       case 'SOLO_REMARK': return 'bg-purple-100 text-purple-800';
       case 'SOLO_SISTEMA': return 'bg-rose-100 text-rose-800';
     }
@@ -854,8 +890,6 @@ export class ReporteEvaluacionesComponent {
         'COD_EST': resultado.codigoEstudiante,
         'NOMBRE_REMARK': resultado.nombreRemark,
         'NOMBRE_SISTEMA': resultado.nombreSistema,
-        'NOTA_REMARK_60': resultado.notaRemark60,
-        'NOTA_SISTEMA_60': resultado.notaSistema60,
         'ESTADO': this.etiquetaEstadoConciliacion(resultado.estado),
         'PREGUNTAS_DIFERENTES': resultado.diferencias.length
       };
@@ -872,21 +906,37 @@ export class ReporteEvaluacionesComponent {
   }
 
   private _ejecutarConciliacion(): void {
-    if (!this.rolConciliacionId || !this.filasRemark.length) return;
+    if (!this.rolConciliacionId || !this.filasRemark.length || !this.omrProcesado()) return;
     this.cargandoConciliacion.set(true);
     this.errorConciliacion.set(null);
-    const rol = this.rolesConciliacion().find(item => item.id === this.rolConciliacionId);
-    if (rol) this._actualizarContexto(rol);
-    this._omr.listarCalificaciones(this.rolConciliacionId).subscribe({
-      next: calificaciones => {
-        this.calificacionesSistema = calificaciones;
-        this.resultadosConciliacion.set(this._compararFilas(this.filasRemark, calificaciones));
+    this.resultadosConciliacion.set(this._compararFilas(this.filasRemark, this.lecturasOmr));
+    this.cargandoConciliacion.set(false);
+  }
+
+  private _esperarResultadoOmr(jobId: string): void {
+    this._omr.consultar(jobId).subscribe({
+      next: resultado => {
+        if (resultado.estado === 'EN_COLA') {
+          window.setTimeout(() => this._esperarResultadoOmr(jobId), 1200);
+          return;
+        }
+        if (resultado.estado !== 'COMPLETADO') {
+          this.cargandoOmr.set(false);
+          this.cargandoConciliacion.set(false);
+          this.errorConciliacion.set(resultado.mensaje || 'El motor OMR no pudo completar la lectura del PDF.');
+          return;
+        }
+        this.lecturasOmr = resultado.resultados || [];
+        this.cargandoOmr.set(false);
         this.cargandoConciliacion.set(false);
+        this.omrProcesado.set(true);
+        if (!this.lecturasOmr.length) {
+          this.errorConciliacion.set('El PDF terminó de procesarse, pero no se detectaron páginas para leer.');
+          return;
+        }
+        if (this.filasRemark.length) this._ejecutarConciliacion();
       },
-      error: () => {
-        this.cargandoConciliacion.set(false);
-        this.errorConciliacion.set('No se pudieron consultar las lecturas OMR de la evaluación seleccionada.');
-      }
+      error: () => window.setTimeout(() => this._esperarResultadoOmr(jobId), 1500)
     });
   }
 
@@ -910,18 +960,24 @@ export class ReporteEvaluacionesComponent {
       return {
         codigoEstudiante,
         nombre: valor(['NOMBREEST', 'NOMBRECOMPLETO', 'NOMBREALUMNO']),
-        materia: valor(['SIGLAMAT', 'CODIGOMATERIA', 'MATERIA']),
-        grupo: valor(['GRUPO', 'GRUPOCLASE']),
-        fecha: valor(['FECHA', 'FECHAEVALUACION']),
-        nota60: this._numeroNullable(valor(['NOTA60', 'NOTA'])),
         respuestas
       };
     });
   }
 
-  private _compararFilas(filasRemark: FilaRemark[], calificaciones: CalificacionOmrResponse[]): ResultadoConciliacion[] {
+  private _compararFilas(filasRemark: FilaRemark[], lecturas: OmrLecturaResponse[]): ResultadoConciliacion[] {
     const remarkPorCodigo = new Map(filasRemark.map(fila => [fila.codigoEstudiante, fila]));
-    const sistemaPorCodigo = new Map(calificaciones.map(calificacion => [this._normalizarCodigo(calificacion.codigoEstudiante), calificacion]));
+    const sistemaPorCodigo = new Map(lecturas
+      .map(lectura => {
+        // El OCR puede devolver varios candidatos. Si Remark contiene uno de ellos,
+        // se usa ese candidato para evitar falsos "Solo Remark" por ruido de lectura.
+        const candidatos = [lectura.codigoEstudiante, ...(lectura.codigoOcr || [])]
+          .map(candidato => this._normalizarCodigo(candidato))
+          .filter(Boolean);
+        const codigo = candidatos.find(candidato => remarkPorCodigo.has(candidato)) || candidatos[0] || '';
+        return [codigo, lectura] as const;
+      })
+      .filter(([codigo]) => !!codigo));
     const codigos = [...new Set([...remarkPorCodigo.keys(), ...sistemaPorCodigo.keys()])].sort();
     return codigos.map(codigoEstudiante => {
       const remark = remarkPorCodigo.get(codigoEstudiante);
@@ -931,22 +987,15 @@ export class ReporteEvaluacionesComponent {
       const diferencias = sistema && remark ? Array.from({ length: 30 }, (_, indice) => indice + 1)
         .map(numero => ({ numero, remark: respuestasRemark[String(numero)] || '', sistema: respuestasSistema[String(numero)] || '' }))
         .filter(item => item.remark !== item.sistema) : [];
-      const notaSistema60 = sistema ? this._notaSistemaSobre60(sistema) : null;
-      const notaRemark60 = remark?.nota60 ?? null;
-      const diferenciaNota = notaRemark60 !== null && notaSistema60 !== null
-        && Math.abs(notaRemark60 - notaSistema60) > 0.01;
       let estado: EstadoConciliacion;
       if (!remark) estado = 'SOLO_SISTEMA';
       else if (!sistema) estado = 'SOLO_REMARK';
       else if (diferencias.length) estado = 'DIFERENCIA_RESPUESTAS';
-      else if (diferenciaNota) estado = 'DIFERENCIA_NOTA';
       else estado = 'COINCIDE';
       return {
         codigoEstudiante,
         nombreRemark: remark?.nombre || '',
-        nombreSistema: sistema?.estudianteNombreCompleto || '',
-        notaRemark60,
-        notaSistema60,
+        nombreSistema: sistema?.estudianteNombre || '',
         estado,
         diferencias,
         respuestasRemark,
@@ -955,55 +1004,13 @@ export class ReporteEvaluacionesComponent {
     });
   }
 
-  private _respuestasSistema(calificacion: CalificacionOmrResponse): Record<string, string> {
-    if (!calificacion.respuestasDetectadasJson) return {};
-    try {
-      const respuestas = JSON.parse(calificacion.respuestasDetectadasJson) as Record<string, unknown>;
-      return Object.fromEntries(Object.entries(respuestas).map(([pregunta, respuesta]) => [pregunta, this._normalizarRespuesta(respuesta)]));
-    } catch {
-      return {};
-    }
-  }
-
-  private _notaSistemaSobre60(calificacion: CalificacionOmrResponse): number | null {
-    if (calificacion.notaSobre100 === null || calificacion.notaSobre100 === undefined) return null;
-    return Math.round(calificacion.notaSobre100 * 0.6 * 100) / 100;
-  }
-
-  private _actualizarContexto(rol: RolExamenResponse): void {
-    const fila = this.filasRemark[0];
-    const materia = fila?.materia || '';
-    const grupo = fila?.grupo || '';
-    const fecha = fila?.fecha || '';
-    this.contextoConciliacion.set({
-      materia,
-      grupo,
-      fecha,
-      materiaCoincide: !materia || this._normalizarTexto(materia) === this._normalizarTexto(rol.materiaCodigo),
-      grupoAdvertencia: !!grupo && this._normalizarTexto(grupo) !== this._normalizarTexto(rol.grupo),
-      fechaAdvertencia: !!fecha && !this._fechaCoincide(fecha, rol.fecha)
-    });
-  }
-
-  private _fechaCoincide(fechaRemark: string, fechaSistema: string): boolean {
-    const texto = fechaRemark.trim();
-    let fecha = '';
-    if (/^\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}$/.test(texto)) {
-      const [anio, mes, dia] = texto.split(/[-/]/);
-      fecha = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-    } else if (/^\\d{1,2}[-/]\\d{1,2}[-/]\\d{4}$/.test(texto)) {
-      const [dia, mes, anio] = texto.split(/[-/]/);
-      fecha = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-    }
-    return fecha === fechaSistema;
+  private _respuestasSistema(lectura: OmrLecturaResponse): Record<string, string> {
+    return Object.fromEntries(Object.entries(lectura.respuestas || {})
+      .map(([pregunta, respuesta]) => [pregunta, this._normalizarRespuesta(respuesta)]));
   }
 
   private _normalizarCabecera(valor: unknown): string {
     return String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  }
-
-  private _normalizarTexto(valor: unknown): string {
-    return this._normalizarCabecera(valor);
   }
 
   private _normalizarCodigo(valor: unknown): string {
@@ -1015,13 +1022,6 @@ export class ReporteEvaluacionesComponent {
     const texto = String(valor ?? '').trim().toUpperCase();
     if (!texto || ['BLANK', 'BLANCO', 'VACIO', 'VACÍA', 'VACIA', '—', '-'].includes(texto)) return '';
     return [...new Set(texto.match(/[A-E]/g) || [])].sort().join('');
-  }
-
-  private _numeroNullable(valor: unknown): number | null {
-    const texto = String(valor ?? '').trim().replace(',', '.');
-    if (!texto) return null;
-    const numero = Number(texto);
-    return Number.isFinite(numero) ? numero : null;
   }
 
   public getEstadoBadge(etapa: EtapaEvaluacion): string {
