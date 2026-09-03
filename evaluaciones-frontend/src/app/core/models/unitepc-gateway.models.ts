@@ -27,6 +27,7 @@ export interface Course {
   syllabusCourseId: string;
   courseCode: string;
   courseName: string;
+  planCurricular?: string | null;
   credits: number;
   theoryHours: number;
   practiceHours: number;

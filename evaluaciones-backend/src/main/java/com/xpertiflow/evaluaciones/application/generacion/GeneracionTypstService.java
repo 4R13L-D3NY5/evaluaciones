@@ -234,8 +234,7 @@ public class GeneracionTypstService {
                     VarianteResultadoDto dto = new VarianteResultadoDto();
                     dto.setLetra(variante.getLetraVariante());
                     dto.setSemilla(variante.getSemillaPermutacion());
-                    dto.setPatronClavesJson(variante.getPatronClavesJson());
-                    dto.setOrdenReactivosIdsJson(variante.getOrdenReactivosIdsJson());
+                    dto.setTotalPreguntas(variante.getTotalPreguntas());
                     dto.setArchivoPdfPath(variante.getArchivoPdfPath());
                     dto.setArchivoTypstPath(variante.getArchivoTypstPath());
                     dto.setArchivoRemarkXlsxPath(variante.getArchivoRemarkXlsxPath());
@@ -331,13 +330,19 @@ public class GeneracionTypstService {
             variante.setLetraVariante(letra);
             variante.setNombreVariante("TIPO " + letra);
             variante.setSemillaPermutacion(dto.getSemilla() != null ? dto.getSemilla() : 0);
-            variante.setTotalPreguntas(contarPreguntas(dto.getPatronClavesJson()));
+            variante.setTotalPreguntas(dto.getTotalPreguntas() != null ? dto.getTotalPreguntas() : 30);
             variante.setCuotaFaciles(7);
             variante.setCuotaMedias(16);
             variante.setCuotaDificiles(7);
-            variante.setPatronClavesJson(dto.getPatronClavesJson());
-            variante.setOrdenReactivosIdsJson(dto.getOrdenReactivosIdsJson());
-            variante.setContenidoVirtualJson(dto.getContenidoVirtualJson());
+            variante.setPatronClavesJson(null);
+            variante.setOrdenReactivosIdsJson(null);
+            variante.setContenidoVirtualJson(null);
+            variante.setContenidoSeguroCifrado(dto.getContenidoCifrado());
+            variante.setContenidoSeguroNonce(dto.getContenidoNonce());
+            variante.setContenidoSeguroDekEnvuelta(dto.getContenidoDekEnvuelta());
+            variante.setContenidoSeguroKekReferencia(dto.getContenidoKekReferencia());
+            variante.setContenidoSeguroKekVersion(dto.getContenidoKekVersion());
+            variante.setContenidoSeguroAlgoritmo(dto.getContenidoAlgoritmo());
             variante.setArchivoTypstPath(dto.getArchivoTypstPath());
             variante.setArchivoPdfPath(dto.getArchivoPdfPath());
             variante.setArchivoRemarkXlsxPath(dto.getArchivoRemarkXlsxPath());
@@ -392,19 +397,6 @@ public class GeneracionTypstService {
             log.info("Rol {} transicionado a GENERADO", rolExamenId);
         } else {
             log.warn("Rol {} no se transiciono a GENERADO porque su estado actual es {}", rolExamenId, rol.getEstadoFlujo());
-        }
-    }
-
-    private int contarPreguntas(String patronClavesJson) {
-        if (patronClavesJson == null || patronClavesJson.isBlank()) {
-            return 30;
-        }
-        try {
-            Map<String, String> patron = objectMapper.readValue(patronClavesJson, new TypeReference<>() {});
-            return patron.size();
-        } catch (IOException e) {
-            log.warn("No se pudo parsear patronClavesJson, usando total por defecto 30", e);
-            return 30;
         }
     }
 

@@ -19,6 +19,7 @@ import psycopg2
 import pytesseract
 
 from src import config
+from src.vault_crypto import descifrar_json
 
 logger = logging.getLogger(__name__)
 OPCIONES = "ABCDE"
@@ -434,18 +435,34 @@ def _cargar_mapeos(rol_examen_id: str) -> dict[str, dict[str, Any]]:
             cursor.execute(
                 """SELECT m.codigo_estudiante,
                           concat_ws(' ', m.nombres, m.apellido_paterno, m.apellido_materno),
-                          m.letra_variante, v.patron_claves_json
+                          m.letra_variante, v.id, v.rol_examen_id,
+                          v.contenido_seguro_cifrado, v.contenido_seguro_nonce,
+                          v.contenido_seguro_dek_envuelta, v.contenido_seguro_kek_referencia,
+                          v.contenido_seguro_kek_version, v.contenido_seguro_algoritmo
                    FROM sea_mapeo_estudiantes_variantes m
                    JOIN sea_examenes_variantes v ON v.id = m.variante_id
                   WHERE m.rol_examen_id = %s""",
                 (rol_examen_id,),
             )
             resultado = {}
-            for codigo, nombre, letra, patron_json in cursor.fetchall():
+            for codigo, nombre, letra, variante_id, variante_rol_id, ciphertext, nonce, wrapped_key, key_ref, key_version, algorithm in cursor.fetchall():
+                if not ciphertext or not nonce or not wrapped_key:
+                    raise RuntimeError(f"La variante {variante_id} no tiene contenido OMR cifrado")
+                paquete = descifrar_json(
+                    {
+                        "ciphertext": ciphertext,
+                        "nonce": nonce,
+                        "wrappedDataKey": wrapped_key,
+                        "keyReference": key_ref,
+                        "keyVersion": key_version,
+                        "algorithm": algorithm,
+                    },
+                    f"variante:{variante_id}:rol:{variante_rol_id}",
+                )
                 resultado[str(codigo)] = {
                     "nombre": nombre,
                     "variante": letra,
-                    "patron": json.loads(patron_json or "{}"),
+                    "patron": json.loads(paquete.get("patronClavesJson", "{}")),
                 }
             return resultado
     finally:

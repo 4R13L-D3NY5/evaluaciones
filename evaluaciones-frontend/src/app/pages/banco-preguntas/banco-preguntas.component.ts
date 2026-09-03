@@ -2551,8 +2551,9 @@ export class BancoPreguntasComponent implements OnInit {
       next: data => {
         this.sedes.set(data);
         this.cargandoSedes.set(false);
-        if (data.length > 0) {
-          this.seleccionarSede(data[0]);
+        const sedeInicial = this._gateway.resolverSedeInicial(data);
+        if (sedeInicial) {
+          this.seleccionarSede(sedeInicial);
         }
       },
       error: () => this.cargandoSedes.set(false)

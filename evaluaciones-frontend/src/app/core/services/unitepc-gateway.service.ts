@@ -12,6 +12,7 @@ import {
   TimeFrame,
   GroupStudentItem
 } from '../models/unitepc-gateway.models';
+import { AuthService } from './auth.service';
 
 /**
  * Servicio de Integración Gateway UNITEPC (SEA / SISA)
@@ -23,6 +24,7 @@ import {
 })
 export class UnitepcGatewayService {
   private readonly _http = inject(HttpClient);
+  private readonly _auth = inject(AuthService);
 
   // Endpoints propios del backend SEA Evaluaciones (proxy vía /api)
   private readonly _baseUrl = '/api/catalogo-academico';
@@ -91,6 +93,45 @@ export class UnitepcGatewayService {
         return throwError(() => err);
       })
     );
+  }
+
+  public resolverSedeInicial(sedes: BranchOffice[]): BranchOffice | null {
+    if (sedes.length === 0) return null;
+
+    const usuario = this._auth.usuario();
+    const sedesAsignadas = new Set(
+      (usuario?.sedesAsignadas || []).map(sede => this._normalizarSede(sede))
+    );
+    const sedeCochabamba = sedes.find(sede => this._esSedeCochabamba(sede));
+
+    if (
+      sedeCochabamba &&
+      (usuario?.rol === 'ADMINISTRADOR_SISTEMA' || this._sedeEstaAsignada(sedeCochabamba, sedesAsignadas))
+    ) {
+      return sedeCochabamba;
+    }
+
+    return sedes.find(sede => this._sedeEstaAsignada(sede, sedesAsignadas)) || sedes[0];
+  }
+
+  private _esSedeCochabamba(sede: BranchOffice): boolean {
+    const codigo = this._normalizarSede(sede.code);
+    const nombre = this._normalizarSede(sede.name);
+    return codigo === 'cba' || nombre.includes('cochabamba');
+  }
+
+  private _sedeEstaAsignada(sede: BranchOffice, sedesAsignadas: Set<string>): boolean {
+    return [sede.code, sede.branchOfficeId, sede.name]
+      .map(valor => this._normalizarSede(valor))
+      .some(valor => valor.length > 0 && sedesAsignadas.has(valor));
+  }
+
+  private _normalizarSede(valor: unknown): string {
+    return String(valor ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
   }
 
   /**

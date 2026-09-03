@@ -39,17 +39,56 @@ def obtener_rol_examen(rol_examen_id: str) -> dict[str, Any] | None:
 
 
 def obtener_reactivos_por_banco(banco_preguntas_id: str) -> list[dict[str, Any]]:
+    banco = obtener_paquete_cifrado_por_banco(banco_preguntas_id)
+    from src.vault_crypto import descifrar_json
+
+    contexto = f"banco:{banco['id']}:rol:{banco['rol_examen_id']}"
+    reactivos = descifrar_json(banco, contexto)
+    if not isinstance(reactivos, list):
+        raise RuntimeError("El paquete cifrado del banco no contiene una lista de reactivos")
+    return [
+        {
+            "id": item.get("id"),
+            "numero_orden": item.get("numeroOrden", item.get("numero_orden")),
+            "tipo_reactivo": item.get("tipoReactivo", item.get("tipo_reactivo")),
+            "dificultad": item.get("dificultad"),
+            "nivel_dificultad": item.get("nivelDificultad", item.get("nivel_dificultad")),
+            "grupo_contexto": item.get("grupoContexto", item.get("grupo_contexto")),
+            "enunciado": item.get("enunciado", ""),
+            "imagen_base64": item.get("imagenBase64", item.get("imagen_base64")),
+            "opciones_json": item.get("opcionesJson", item.get("opciones_json", "[]")),
+            "respuesta_correcta": item.get("respuestaCorrecta", item.get("respuesta_correcta")),
+            "peso_puntos": item.get("pesoPuntos", item.get("peso_puntos")),
+        }
+        for item in reactivos
+        if isinstance(item, dict)
+    ]
+
+
+def obtener_paquete_cifrado_por_banco(banco_preguntas_id: str) -> dict[str, Any]:
     sql = """
-        SELECT id, numero_orden, tipo_reactivo, dificultad, nivel_dificultad,
-               grupo_contexto, enunciado, imagen_base64, opciones_json, respuesta_correcta, peso_puntos
-        FROM sea_reactivos
-        WHERE banco_id = %s
-        ORDER BY numero_orden, id
+        SELECT id, rol_examen_id, contenido_cifrado, contenido_nonce,
+               contenido_dek_envuelta, contenido_kek_referencia,
+               contenido_kek_version, contenido_algoritmo
+        FROM sea_bancos_preguntas
+        WHERE id = %s
     """
     with _connect() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(sql, (banco_preguntas_id,))
-            return [dict(row) for row in cur.fetchall()]
+            row = cur.fetchone()
+            if not row or not row["contenido_cifrado"]:
+                raise RuntimeError("El banco no tiene contenido cifrado disponible")
+            return {
+                "id": row["id"],
+                "rol_examen_id": row["rol_examen_id"],
+                "ciphertext": row["contenido_cifrado"],
+                "nonce": row["contenido_nonce"],
+                "wrappedDataKey": row["contenido_dek_envuelta"],
+                "keyReference": row["contenido_kek_referencia"],
+                "keyVersion": row["contenido_kek_version"],
+                "algorithm": row["contenido_algoritmo"],
+            }
 
 
 def obtener_estudiantes_por_rol(rol_examen_id: str) -> list[dict[str, Any]]:

@@ -18,6 +18,12 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 LOGO_PATH = os.getenv("LOGO_PATH", "/app/bases/logo_unitepc_clean.png")
 TYPST_BIN = os.getenv("TYPST_BIN", "")
 
+VAULT_ADDR = os.getenv("VAULT_ADDR", "http://localhost:8200").rstrip("/")
+VAULT_TOKEN_FILE = os.getenv("VAULT_TOKEN_FILE", "")
+VAULT_TOKEN = os.getenv("VAULT_TOKEN", "")
+VAULT_TRANSIT_KEY_NAME = os.getenv("VAULT_TRANSIT_KEY_NAME", "sea-banco-kek")
+VAULT_TIMEOUT_SECONDS = int(os.getenv("VAULT_TIMEOUT_SECONDS", "10"))
+
 # Semillas fijas para reproducibilidad de variantes en el MVP.
 SEED_POR_VARIANTE = {"A": 100, "B": 153, "C": 206, "D": 259, "E": 312}
 # Cantidad institucional por defecto de estudiantes que comparte una variante.

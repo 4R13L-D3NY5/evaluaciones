@@ -5,7 +5,7 @@ import os
 import random
 from typing import Any
 
-from src import config, db, generator, messaging
+from src import config, db, generator, messaging, vault_crypto
 
 logger = logging.getLogger(__name__)
 
@@ -106,12 +106,24 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
 
     for letra in variantes_letras:
         variante = generator.generar_variante(letra, reactivos, rol, output_base, generar_pdf=False)
+        contenido_cifrado = vault_crypto.cifrar_json(
+            {
+                "patronClavesJson": variante["patronClavesJson"],
+                "ordenReactivosIdsJson": variante["ordenReactivosIdsJson"],
+                "contenidoVirtualJson": variante["contenidoVirtualJson"],
+            },
+            f"variante:VAR-{rol_examen_id}-{letra}:rol:{rol_examen_id}",
+        )
         variantes_result.append({
             "letra": variante["letra"],
             "semilla": variante["semilla"],
-            "patronClavesJson": variante["patronClavesJson"],
-            "ordenReactivosIdsJson": variante["ordenReactivosIdsJson"],
-            "contenidoVirtualJson": variante["contenidoVirtualJson"],
+            "totalPreguntas": len(json.loads(variante["patronClavesJson"])),
+            "contenidoCifrado": contenido_cifrado["ciphertext"],
+            "contenidoNonce": contenido_cifrado["nonce"],
+            "contenidoDekEnvuelta": contenido_cifrado["wrappedDataKey"],
+            "contenidoKekReferencia": contenido_cifrado["keyReference"],
+            "contenidoKekVersion": contenido_cifrado["keyVersion"],
+            "contenidoAlgoritmo": contenido_cifrado["algorithm"],
             "archivoPdfPath": variante["archivoPdfPath"],
             "archivoTypstPath": variante["archivoTypstPath"],
         })

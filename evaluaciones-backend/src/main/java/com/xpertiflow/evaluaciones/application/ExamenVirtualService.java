@@ -8,6 +8,8 @@ import com.xpertiflow.evaluaciones.domain.entity.*;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.*;
+import com.xpertiflow.evaluaciones.security.BancoCifradoService;
+import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,6 +36,7 @@ public class ExamenVirtualService {
     private final RolExamenService rolExamenService;
     private final ConfiguracionEvaluacionesService configuracionEvaluacionesService;
     private final ObjectMapper objectMapper;
+    private final BancoCifradoService cifradoService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
@@ -503,12 +506,11 @@ public class ExamenVirtualService {
     }
 
     private List<PreguntaVirtualDto> construirPreguntas(ExamenVariante variante) {
-        if (variante.getContenidoVirtualJson() == null || variante.getContenidoVirtualJson().isBlank()) {
-            throw new RuntimeException("Esta generación no tiene contenido virtual seguro; regenere las variantes del examen");
-        }
+        String contenidoSeguro = descifrarContenidoVariante(variante);
         try {
             List<PreguntaVirtualDto> preguntas = new ArrayList<>();
-            JsonNode root = objectMapper.readTree(variante.getContenidoVirtualJson());
+            JsonNode paquete = objectMapper.readTree(contenidoSeguro);
+            JsonNode root = objectMapper.readTree(paquete.path("contenidoVirtualJson").asText("[]"));
             int numero = 1;
             for (JsonNode node : root) {
                 PreguntaVirtualDto pregunta = new PreguntaVirtualDto();
@@ -528,6 +530,22 @@ public class ExamenVirtualService {
             }
             return preguntas;
         } catch (Exception ex) { throw new RuntimeException("Contenido virtual de variante inválido", ex); }
+    }
+
+    private String descifrarContenidoVariante(ExamenVariante variante) {
+        if (variante.getContenidoSeguroCifrado() == null || variante.getContenidoSeguroCifrado().isBlank()) {
+            throw new RuntimeException("Esta generación no tiene contenido virtual cifrado; regenere las variantes del examen");
+        }
+        BancoEncryptedPayload payload = BancoEncryptedPayload.builder()
+                .ciphertext(variante.getContenidoSeguroCifrado())
+                .nonce(variante.getContenidoSeguroNonce())
+                .wrappedDataKey(variante.getContenidoSeguroDekEnvuelta())
+                .keyReference(variante.getContenidoSeguroKekReferencia())
+                .keyVersion(variante.getContenidoSeguroKekVersion())
+                .algorithm(variante.getContenidoSeguroAlgoritmo())
+                .build();
+        return cifradoService.descifrarTexto(payload,
+                "variante:" + variante.getId() + ":rol:" + variante.getRolExamenId());
     }
 
     private JsonNode buscarPregunta(ExamenVariante variante, Integer numero, Integer reactivoId) {

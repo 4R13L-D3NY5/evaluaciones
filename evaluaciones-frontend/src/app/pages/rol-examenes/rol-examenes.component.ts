@@ -892,9 +892,10 @@ export class RolExamenesComponent implements OnInit {
     this._gateway.getBranchOffices().subscribe({
       next: sedes => {
         this.sedes.set(sedes);
-        if (sedes.length > 0) {
-          this.sedeSeleccionada.set(sedes[0]);
-          this._cargarCarreras(sedes[0].code);
+        const sedeInicial = this._gateway.resolverSedeInicial(sedes);
+        if (sedeInicial) {
+          this.sedeSeleccionada.set(sedeInicial);
+          this._cargarCarreras(sedeInicial.code);
         }
       },
       error: () => this.cargando.set(false)

@@ -49,3 +49,7 @@ Thumbs.db
 bases/page-*.png
 bases/verify_*
 bases/test_*
+
+# Llaves y secretos locales de Vault (nunca versionar)
+vault/secrets/*
+!vault/secrets/README.md

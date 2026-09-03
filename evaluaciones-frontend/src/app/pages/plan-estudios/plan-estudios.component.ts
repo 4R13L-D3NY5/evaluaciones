@@ -111,7 +111,8 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
             <div class="relative">
               <input 
                 type="text" 
-                [(ngModel)]="busquedaTexto" 
+                [ngModel]="busquedaTexto()"
+                (ngModelChange)="busquedaTexto.set($event)"
                 placeholder="Buscar plan de estudios..."
                 class="w-full bg-muted/70 border border-border rounded-xl pl-8 pr-3 py-2 text-xs font-medium text-foreground outline-none focus:border-primary">
               <i class="pi pi-search absolute left-2.5 top-2.5 text-muted-foreground text-xs"></i>
@@ -128,19 +129,26 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
             <div class="flex items-center gap-2">
               <span class="text-[10px] font-extrabold uppercase text-muted-foreground">Plan Curricular:</span>
               <select 
-                [(ngModel)]="filtroPlanCurricular" 
+                [ngModel]="filtroPlanCurricular()"
+                (ngModelChange)="filtroPlanCurricular.set($event)"
+                [disabled]="planesCurriculares().length === 0"
                 class="bg-muted/70 border border-border rounded-lg px-2.5 py-1 text-xs font-bold text-foreground outline-none">
                 <option value="todos">Todos los Planes</option>
-                <option value="2024-V2">Plan 2024-V2</option>
-                <option value="MED-2022">Plan MED-2022</option>
+                @for (plan of planesCurriculares(); track plan) {
+                  <option [value]="plan">{{ plan }}</option>
+                }
               </select>
+              @if (planesCurriculares().length === 0) {
+                <span class="text-[10px] text-muted-foreground">SEA no informó planes curriculares</span>
+              }
             </div>
 
             <!-- Toggle Ocultar sin asignar -->
             <label class="flex items-center gap-2 text-xs font-bold text-foreground cursor-pointer select-none">
               <input 
                 type="checkbox" 
-                [(ngModel)]="ocultarSinAsignar" 
+                [ngModel]="ocultarSinAsignar()"
+                (ngModelChange)="ocultarSinAsignar.set($event)"
                 class="rounded text-amber-500 focus:ring-amber-500 h-4 w-4">
               <span class="text-muted-foreground">Ocultar sin asignar</span>
             </label>
@@ -540,9 +548,9 @@ export class PlanEstudiosComponent implements OnInit {
   public cargandoPlan = signal(false);
   public errorCarga = signal<string | null>(null);
   public planSemestres = signal<PlanEstudioSemestre[]>([]);
-  public filtroPlanCurricular = 'todos';
-  public busquedaTexto = '';
-  public ocultarSinAsignar = false;
+  public filtroPlanCurricular = signal('todos');
+  public busquedaTexto = signal('');
+  public ocultarSinAsignar = signal(false);
 
   public parcialActivo = signal<'1P' | '2P' | 'FINAL' | '2DA_INSTANCIA'>('1P');
   public toastMessage = signal<string | null>(null);
@@ -562,9 +570,15 @@ export class PlanEstudiosComponent implements OnInit {
     (total, semestre) => total + semestre.asignaturas.filter(asignatura => asignatura.asignada).length, 0
   ));
   public totalSinAsignar = computed(() => this.totalPlan() - this.totalAsignadas());
+  public planesCurriculares = computed(() => [...new Set(
+    this.planSemestres()
+      .flatMap(semestre => semestre.asignaturas)
+      .map(asignatura => asignatura.planCurricular)
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, 'es')));
 
   public ngOnInit(): void {
-    if (this.auth.usuario()?.rol === 'DOCENTE') this.ocultarSinAsignar = true;
+    if (this.auth.usuario()?.rol === 'DOCENTE') this.ocultarSinAsignar.set(true);
     this.cargarSedes();
   }
 
@@ -584,6 +598,7 @@ export class PlanEstudiosComponent implements OnInit {
     if (!carrera) return;
 
     this.filtroCarreraCodigo = carrera.careerCode;
+    this.filtroPlanCurricular.set('todos');
     this.cargarPlanReal(this.filtroSedeCodigo, carrera.careerCode);
   }
 
@@ -603,7 +618,7 @@ export class PlanEstudiosComponent implements OnInit {
         this.sedes.set(sedes || []);
         this.cargandoSedes.set(false);
 
-        const sedeInicial = sedes[0];
+        const sedeInicial = this.gateway.resolverSedeInicial(sedes);
         if (sedeInicial) {
           this.filtroSedeCodigo = sedeInicial.code;
           this.cargarCarreras(sedeInicial.code);
@@ -798,6 +813,7 @@ export class PlanEstudiosComponent implements OnInit {
       id,
       codigo: curso.courseCode,
       nombre: curso.courseName.trim(),
+      planCurricular: curso.planCurricular?.trim() || '',
       semestre: curso.semester || 0,
       horas: (curso.theoryHours || 0) + (curso.practiceHours || 0),
       docenteNombre: docentes.join(' · ') || rolPrincipal?.docenteNombre || '',
@@ -858,7 +874,15 @@ export class PlanEstudiosComponent implements OnInit {
 
   public semestresFiltrados = computed(() => {
     let list = this.planSemestres();
-    const query = this.busquedaTexto.trim().toLowerCase();
+    const planSeleccionado = this.filtroPlanCurricular().trim().toLowerCase();
+    const query = this.busquedaTexto().trim().toLowerCase();
+
+    if (planSeleccionado && planSeleccionado !== 'todos') {
+      list = list.map(sem => ({
+        ...sem,
+        asignaturas: sem.asignaturas.filter(a => a.planCurricular.trim().toLowerCase() === planSeleccionado)
+      })).filter(sem => sem.asignaturas.length > 0);
+    }
 
     if (query) {
       list = list.map(sem => ({
@@ -871,7 +895,7 @@ export class PlanEstudiosComponent implements OnInit {
       })).filter(sem => sem.asignaturas.length > 0);
     }
 
-    if (this.ocultarSinAsignar) {
+    if (this.ocultarSinAsignar()) {
       list = list.map(sem => ({
         ...sem,
         asignaturas: sem.asignaturas.filter(a => a.asignada)

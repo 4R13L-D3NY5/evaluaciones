@@ -48,8 +48,27 @@ public class BancoPreguntas {
     @Column(name = "hash_sha256_integridad", length = 128, nullable = false)
     private String hashSha256Integridad;
 
-    @Column(name = "paquete_json_encriptado", nullable = false, columnDefinition = "TEXT")
+    /** Columna histórica. Se limpia durante la migración y ya no se utiliza. */
+    @Column(name = "paquete_json_encriptado", columnDefinition = "TEXT")
     private String paqueteJsonEncriptado;
+
+    @Column(name = "contenido_cifrado", columnDefinition = "TEXT")
+    private String contenidoCifrado;
+
+    @Column(name = "contenido_nonce", length = 64)
+    private String contenidoNonce;
+
+    @Column(name = "contenido_dek_envuelta", columnDefinition = "TEXT")
+    private String contenidoDekEnvuelta;
+
+    @Column(name = "contenido_kek_referencia", length = 150)
+    private String contenidoKekReferencia;
+
+    @Column(name = "contenido_kek_version", length = 30)
+    private String contenidoKekVersion;
+
+    @Column(name = "contenido_algoritmo", length = 40)
+    private String contenidoAlgoritmo;
 
     @Column(name = "estado", length = 30, nullable = false)
     private String estado = "VALIDADO";

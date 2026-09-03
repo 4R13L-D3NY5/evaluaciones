@@ -274,6 +274,28 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
         + _tomar(dificiles, config.CUOTA_DIFICILES)
     )
 
+    # Los grupos de caso clínico/problema y emparejamiento son bloques
+    # indivisibles. Si la selección por cuota toma un subítem, se incorporan
+    # todos los hermanos del mismo grupo. La cuota se aplica a reactivos
+    # respondibles, pero un bloque puede superar la cuota porque nunca se
+    # permite dejar fuera parte del caso ni alterar el orden de sus subítems.
+    claves_grupos_seleccionadas = {
+        clave
+        for pregunta in seleccionadas_respondibles
+        if (clave := _clave_grupo(pregunta)) is not None
+    }
+    ids_seleccionados = {
+        pregunta.get("id")
+        for pregunta in seleccionadas_respondibles
+        if pregunta.get("id") is not None
+    }
+    seleccionadas_respondibles = [
+        pregunta
+        for pregunta in respondibles
+        if pregunta.get("id") in ids_seleccionados
+        or _clave_grupo(pregunta) in claves_grupos_seleccionadas
+    ]
+
     # Agregar cada macro que sea necesario y colocarlo inmediatamente antes
     # de sus hijos. Así el PDF y el examen web conservan el contexto del grupo
     # sin convertirlo en una pregunta adicional.

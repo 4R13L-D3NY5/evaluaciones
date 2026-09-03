@@ -38,6 +38,60 @@ services:
       - "15672:15672"
     networks:
       - eval-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Vault Transit - KMS provisional en el mismo servidor
+  # Se ejecuta en modo servidor con almacenamiento persistente. La inicialización
+  # inicial continúa siendo manual; vault-bootstrap automatiza el desbloqueo
+  # posterior usando llaves montadas como secreto local.
+  # ---------------------------------------------------------------------------
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: evaluaciones-vault
+    restart: unless-stopped
+    command: ["vault", "server", "-config=/vault/config/vault.hcl"]
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "127.0.0.1:${VAULT_PORT:-8200}:8200"
+    volumes:
+      - vaultdata:/vault/data
+      - ./vault/config.hcl:/vault/config/vault.hcl:ro
+      - ./vault/policies:/vault/policies:ro
+    networks:
+      - eval-network
+
+  # Desbloqueo automático de Vault después de un reinicio o contingencia.
+  # No inicializa ni recrea Vault: si faltan las llaves, permanece no saludable
+  # y evita que backend/workers operen sin cifrado disponible.
+  vault-bootstrap:
+    image: hashicorp/vault:1.17
+    container_name: evaluaciones-vault-bootstrap
+    restart: unless-stopped
+    depends_on:
+      vault:
+        condition: service_started
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_KEYS_FILE: /vault/secrets/unseal-keys
+    volumes:
+      - ./vault/bootstrap.sh:/vault/bootstrap.sh:ro
+      - ./vault/secrets:/vault/secrets:ro
+    command: ["sh", "/vault/bootstrap.sh"]
+    networks:
+      - eval-network
+    healthcheck:
+      test: ["CMD-SHELL", "VAULT_ADDR=http://vault:8200 vault status -format=json 2>/dev/null | grep -q '\"sealed\"[[:space:]]*:[[:space:]]*false'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
 
   # ---------------------------------------------------------------------------
   # Backend Spring Boot
@@ -52,7 +106,9 @@ services:
       db:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+      vault-bootstrap:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SERVER_PORT: 8080
@@ -70,6 +126,11 @@ services:
       UNITEPC_CLIENT_SECRET: ${UNITEPC_CLIENT_SECRET}
       UNITEPC_SYSTEM_CLIENT_ID: ${UNITEPC_SYSTEM_CLIENT_ID}
       JWT_SECRET: ${JWT_SECRET}
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_BACKEND_TOKEN}
+      VAULT_TRANSIT_KEY_NAME: ${VAULT_TRANSIT_KEY_NAME:-sea-banco-kek}
+      KMS_MIGRATION_ENABLED: ${KMS_MIGRATION_ENABLED:-false}
+      KMS_ROTATION_ENABLED: ${KMS_ROTATION_ENABLED:-false}
       STORAGE_BASE_PATH: /app/storage
     ports:
       - "${SERVER_PORT:-8080}:8080"
@@ -112,10 +173,12 @@ services:
     restart: unless-stopped
     depends_on:
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
       db:
-        condition: service_started
+        condition: service_healthy
       backend:
+        condition: service_healthy
+      vault-bootstrap:
         condition: service_healthy
     environment:
       RABBITMQ_HOST: rabbitmq
@@ -128,6 +191,9 @@ services:
       DB_USER: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       STORAGE_BASE_PATH: /app/storage
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_WORKER_TOKEN}
+      VAULT_TRANSIT_KEY_NAME: ${VAULT_TRANSIT_KEY_NAME:-sea-banco-kek}
     volumes:
       - ./storage:/app/storage
       - ./bases:/app/bases:ro
@@ -147,10 +213,12 @@ services:
     restart: unless-stopped
     depends_on:
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
       db:
-        condition: service_started
+        condition: service_healthy
       backend:
+        condition: service_healthy
+      vault-bootstrap:
         condition: service_healthy
     environment:
       RABBITMQ_HOST: rabbitmq
@@ -165,6 +233,9 @@ services:
       DB_USER: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       STORAGE_BASE_PATH: /app/storage
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_OMR_TOKEN}
+      VAULT_TRANSIT_KEY_NAME: ${VAULT_TRANSIT_KEY_NAME:-sea-banco-kek}
     volumes:
       - ./storage:/app/storage
       - ./bases:/app/bases:ro
@@ -179,3 +250,4 @@ networks:
 
 volumes:
   pgdata:
+  vaultdata:

@@ -1650,7 +1650,7 @@ interface ResultadoVirtual {
         </div>
       }
 
-      <!-- MODAL: CONFIGURACIÓN PERSISTIDA DE VARIANTES Y PATRONES -->
+      <!-- MODAL: CONFIGURACIÓN PERSISTIDA DE VARIANTES Y ASIGNACIONES -->
       @if (dialogConfiguracionGeneracion()) {
         <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-border rounded-2xl max-w-6xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
@@ -1658,7 +1658,7 @@ interface ResultadoVirtual {
               <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center"><i class="pi pi-sitemap text-lg"></i></div>
                 <div>
-                  <h3 class="text-sm font-black text-foreground">Variantes, patrones y asignaciones</h3>
+                <h3 class="text-sm font-black text-foreground">Variantes y asignaciones</h3>
                   <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaConfiguracion()?.codigo }} · {{ evaluacionSeleccionadaConfiguracion()?.materia }} · datos persistidos de la generación</p>
                 </div>
               </div>
@@ -1676,7 +1676,7 @@ interface ResultadoVirtual {
                   </div>
 
                   <section>
-                    <h4 class="text-xs font-black uppercase tracking-wide text-foreground mb-2">Patrones oficiales por variante</h4>
+                    <h4 class="text-xs font-black uppercase tracking-wide text-foreground mb-2">Metadatos de variantes</h4>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
                       @for (variante of configuracion.variantes; track variante.letra) {
                         <div class="rounded-xl border border-border overflow-hidden">
@@ -1684,12 +1684,8 @@ interface ResultadoVirtual {
                             <span class="text-xs font-black text-indigo-900">VARIANTE {{ variante.letra }}</span>
                             <span class="text-[10px] font-mono text-indigo-700">Semilla: {{ variante.semilla }}</span>
                           </div>
-                          <div class="grid grid-cols-5 sm:grid-cols-6 gap-1.5 p-3 max-h-48 overflow-y-auto">
-                            @for (clave of patronComoEntradas(variante); track clave.numero) {
-                              <div class="flex items-center justify-between gap-1 rounded border border-border bg-muted/30 px-1.5 py-1 text-[10px] font-mono">
-                                <span class="text-muted-foreground">{{ clave.numero }}</span><strong class="text-indigo-800">{{ clave.respuesta }}</strong>
-                              </div>
-                            }
+                          <div class="p-3 text-xs text-muted-foreground">
+                            {{ variante.totalPreguntas || 0 }} preguntas protegidas · patrón OMR reservado al proceso de calificación.
                           </div>
                         </div>
                       }
@@ -2231,9 +2227,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     this._gateway.getBranchOffices().subscribe({
       next: sedes => {
         this.sedes.set(sedes);
-        if (sedes.length > 0) {
-          this.sedeSeleccionada.set(sedes[0]);
-          this._cargarCarreras(sedes[0].code);
+        const sedeInicial = this._gateway.resolverSedeInicial(sedes);
+        if (sedeInicial) {
+          this.sedeSeleccionada.set(sedeInicial);
+          this._cargarCarreras(sedeInicial.code);
         }
       },
       error: () => this.cargando.set(false)
@@ -2522,18 +2519,6 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.dialogConfiguracionGeneracion.set(false);
     this.evaluacionSeleccionadaConfiguracion.set(null);
     this.configuracionGeneracion.set(null);
-  }
-
-  public patronComoEntradas(variante: GeneracionTypstVariante): { numero: string; respuesta: string }[] {
-    if (!variante.patronClavesJson) return [];
-    try {
-      const patron = JSON.parse(variante.patronClavesJson) as Record<string, string>;
-      return Object.entries(patron)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([numero, respuesta]) => ({ numero, respuesta }));
-    } catch {
-      return [];
-    }
   }
 
   public nombreMapeo(mapeo: ConfiguracionGeneracion['mapeos'][number]): string {

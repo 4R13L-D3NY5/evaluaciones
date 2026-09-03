@@ -41,6 +41,11 @@ Cuando todavía no existe el examen se muestra **Sin examen**. Si existe el exam
 - `GET /api/roles-examen?sedeCodigo={codigo}&carreraCodigo={codigo}`
 - `GET /api/bancos-preguntas/{rolExamenId}`
 
+El filtro **Plan Curricular** utiliza únicamente el campo `planCurricular` que
+entrega el catálogo SEA. Si la respuesta oficial no contiene ese dato, el
+selector permanece sin opciones y muestra que SEA no informó planes
+curriculares; no se presentan planes fijos o inventados.
+
 ## Criterios de implementación
 
 - No se usan sedes, carreras, materias ni bancos ficticios para esta vista.
@@ -54,6 +59,8 @@ Cuando todavía no existe el examen se muestra **Sin examen**. Si existe el exam
 - Build Angular de producción correcto.
 - Imagen Docker del frontend reconstruida y levantada correctamente.
 - Validación manual de los endpoints oficiales con la instancia local.
+- Filtro de búsqueda, plan curricular y ocultamiento de asignaturas sin
+  asignar conectados a señales reactivas para actualizar la tabla al cambiar.
 
 ## Pendiente
 

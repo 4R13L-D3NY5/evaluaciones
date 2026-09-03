@@ -951,9 +951,9 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
         this.sedes.set(data);
         this._cargarCarrerasFiltroGrupos(data);
         this.cargando.set(false);
-        // Seleccionar Cochabamba (CBA) por defecto si existe
-        if (!this.sedeSeleccionada() && data.length > 0) {
-          this.seleccionarSede(data[0]);
+        const sedeInicial = this._gateway.resolverSedeInicial(data);
+        if (!this.sedeSeleccionada() && sedeInicial) {
+          this.seleccionarSede(sedeInicial);
         }
       },
       error: () => this.cargando.set(false)

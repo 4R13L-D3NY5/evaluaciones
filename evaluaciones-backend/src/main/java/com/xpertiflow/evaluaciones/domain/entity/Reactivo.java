@@ -35,16 +35,16 @@ public class Reactivo {
     @Column(name = "grupo_contexto", length = 100)
     private String grupoContexto;
 
-    @Column(name = "enunciado", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "enunciado", columnDefinition = "TEXT")
     private String enunciado;
 
     @Column(name = "imagen_base64", columnDefinition = "TEXT")
     private String imagenBase64;
 
-    @Column(name = "opciones_json", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "opciones_json", columnDefinition = "TEXT")
     private String opcionesJson;
 
-    @Column(name = "respuesta_correcta", length = 1, nullable = false)
+    @Column(name = "respuesta_correcta", length = 1)
     private String respuestaCorrecta;
 
     @Column(name = "peso_puntos", nullable = false, precision = 5, scale = 2)

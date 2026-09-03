@@ -76,6 +76,8 @@ La cartilla OMR es un documento separado del examen. El cuadernillo no incluye c
 - En las instrucciones solo la palabra `INSTRUCCIONES:` se escribe en mayúsculas; el texto descriptivo conserva mayúsculas y minúsculas normales. Las claves de premisas, V/F complejas y emparejamiento preservan sus saltos de línea semánticos.
 - Los bloques de sección deben conservar separación vertical suficiente para que el estudiante identifique con facilidad el cambio de tipo de reactivo.
 - Los casos clínicos o problemas y los emparejamientos deben conservar sus bloques tipo tarjeta con borde; las preguntas internas respetan la numeración y los incisos del formato general.
+- Si durante la selección de preguntas se incorpora un caso clínico, problema o emparejamiento, se debe incluir el bloque completo con todos sus subítems u opciones relacionadas; nunca se permite seleccionar solo una parte del grupo.
+- El orden de los subítems u opciones relacionadas debe ser exactamente el orden original del banco validado, aunque las variantes cambien el orden de otros reactivos o de sus opciones.
 - Los enunciados mantienen texto normal, sin negrita, salvo el número de pregunta y sus tres guiones `___`. El enunciado principal de un emparejamiento se mantiene dentro de su tarjeta de referencia.
 - Las imágenes de apoyo no reemplazan el texto ni las opciones de respuesta y deben mantenerse dentro del ancho útil de la hoja, sin recortar ni deformar la proporción original.
 - En `Emparejamiento Ampliado`, el enunciado principal y sus opciones de referencia A-E se imprimen dentro de la tarjeta, sin número de pregunta ni `___`. Las opciones relacionadas del grupo se imprimen después como preguntas numeradas y sí conservan `___`.
@@ -148,6 +150,7 @@ Debe conservarse en la base de datos:
 | 2026-08-30 | La aprobación de la previsualización queda bloqueada hasta recorrer todas las páginas del PDF real; se agrega un mensaje explícito y se aclara que las observaciones de opciones se corrigen en el Excel oficial. |
 | 2026-08-30 | El enunciado principal de Emparejamiento Ampliado se presenta dentro de su tarjeta de referencia, sin `___`; las preguntas dependientes mantienen la numeración y los guiones. La previsualización usa los parámetros persistidos de Administración de Evaluaciones. |
 | 2026-09-02 | Las imágenes opcionales del banco se incorporan tanto a la previsualización PDF como al PDF oficial, con escala consistente y sin deformación; las filas madre de casos/emparejamientos no consumen numeración. |
+| 2026-09-02 | La selección de variantes trata los casos, problemas y emparejamientos como bloques indivisibles: incluye todos sus subítems y conserva su orden original. |
 | 2026-08-29 | Un PDF consolidado por rol, un examen por estudiante, inicio en página impar, pie con identidad y paginación reiniciada, ratio 5 y asignación aleatoria. |
 | 2026-08-28 | Times New Roman 11 pt, leading 1 em, separación 1,5 em, incisos con sangría, tres guiones por pregunta y eliminación de cartilla/vista previa. |
 # Nota operativa de cartilla OMR

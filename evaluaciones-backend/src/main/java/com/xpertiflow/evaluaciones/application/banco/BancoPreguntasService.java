@@ -13,6 +13,8 @@ import com.xpertiflow.evaluaciones.domain.enums.TipoParcial;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ReactivoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.security.BancoCifradoService;
+import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -40,6 +42,7 @@ public class BancoPreguntasService {
     private final RolExamenRepository rolRepository;
     private final RolExamenService rolExamenService;
     private final ObjectMapper objectMapper;
+    private final BancoCifradoService cifradoService;
 
     private static final int TOTAL_REQUERIDO = 60;
     private static final int CUOTA_FACILES = 15;
@@ -192,8 +195,11 @@ public class BancoPreguntasService {
                 throw new RuntimeException("No se encontró un docente oficial en los servicios institucionales para este rol de examen");
             }
 
-            // Guardar banco
+            // Guardar banco. El paquete contiene todo el contenido sensible y
+            // se cifra antes de tocar la base de datos.
             String bancoId = "BANCO-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+            String contexto = "banco:" + bancoId + ":rol:" + rol.getId();
+            BancoEncryptedPayload paqueteCifrado = cifradoService.cifrarJson(reactivos, contexto);
             BancoPreguntas banco = new BancoPreguntas();
             banco.setId(bancoId);
             banco.setRolExamenId(rol.getId());
@@ -207,7 +213,13 @@ public class BancoPreguntasService {
             banco.setDificilesCount(dificiles);
             banco.setNombreArchivoExcel(file.getOriginalFilename());
             banco.setHashSha256Integridad(hash);
-            banco.setPaqueteJsonEncriptado(paqueteJson);
+            banco.setPaqueteJsonEncriptado(null);
+            banco.setContenidoCifrado(paqueteCifrado.getCiphertext());
+            banco.setContenidoNonce(paqueteCifrado.getNonce());
+            banco.setContenidoDekEnvuelta(paqueteCifrado.getWrappedDataKey());
+            banco.setContenidoKekReferencia(paqueteCifrado.getKeyReference());
+            banco.setContenidoKekVersion(paqueteCifrado.getKeyVersion());
+            banco.setContenidoAlgoritmo(paqueteCifrado.getAlgorithm());
             banco.setEstado("VALIDADO");
             banco.setDocenteAprobador(docenteOficial.trim());
             banco.setFechaAprobacion(LocalDateTime.now());
@@ -218,6 +230,12 @@ public class BancoPreguntasService {
             for (Reactivo r : reactivos) {
                 r.setBancoId(bancoId);
                 r.setNumeroOrden(orden++);
+                // La fuente de verdad es el paquete cifrado. No duplicar
+                // preguntas ni claves en columnas legibles.
+                r.setEnunciado(null);
+                r.setImagenBase64(null);
+                r.setOpcionesJson(null);
+                r.setRespuestaCorrecta(null);
                 reactivoRepository.save(r);
             }
 

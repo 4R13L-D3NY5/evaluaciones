@@ -16,6 +16,8 @@ import com.xpertiflow.evaluaciones.domain.repository.CalificacionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ConfiguracionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
+import com.xpertiflow.evaluaciones.security.BancoCifradoService;
+import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,7 @@ public class OmrProcesamientoService {
     private final ConfiguracionOmrRepository configuracionRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final ExamenVarianteRepository varianteRepository;
+    private final BancoCifradoService cifradoService;
     private final Map<String, JsonNode> resultados = new ConcurrentHashMap<>();
 
     public JsonNode solicitar(String rolExamenId, MultipartFile archivo) {
@@ -172,7 +175,7 @@ public class OmrProcesamientoService {
         }
 
         Map<String, String> respuestas = normalizarRespuestas(request.getRespuestas());
-        Map<String, String> patron = leerPatron(variante.getPatronClavesJson());
+        Map<String, String> patron = leerPatron(variante);
         int total = patron.isEmpty() ? (respuestas.isEmpty() ? 30 : respuestas.size()) : patron.size();
         int aciertos = 0;
         int blancos = 0;
@@ -219,13 +222,32 @@ public class OmrProcesamientoService {
         return mapearCalificacion(calificacionRepository.save(calificacion));
     }
 
-    private Map<String, String> leerPatron(String patronJson) {
-        if (patronJson == null || patronJson.isBlank()) return Map.of();
+    private Map<String, String> leerPatron(ExamenVariante variante) {
         try {
+            String contenidoSeguro = descifrarContenidoVariante(variante);
+            JsonNode contenido = objectMapper.readTree(contenidoSeguro);
+            String patronJson = contenido.path("patronClavesJson").asText("");
+            if (patronJson.isBlank()) return Map.of();
             return objectMapper.readValue(patronJson, new TypeReference<LinkedHashMap<String, String>>() {});
         } catch (IOException exception) {
-            throw new IllegalStateException("No se pudo leer el patrón oficial de la variante.", exception);
+            throw new IllegalStateException("No se pudo leer el patrón cifrado de la variante.", exception);
         }
+    }
+
+    private String descifrarContenidoVariante(ExamenVariante variante) {
+        if (variante.getContenidoSeguroCifrado() == null || variante.getContenidoSeguroCifrado().isBlank()) {
+            throw new IllegalStateException("La variante no tiene contenido cifrado; debe regenerarse con la protección vigente");
+        }
+        BancoEncryptedPayload payload = BancoEncryptedPayload.builder()
+                .ciphertext(variante.getContenidoSeguroCifrado())
+                .nonce(variante.getContenidoSeguroNonce())
+                .wrappedDataKey(variante.getContenidoSeguroDekEnvuelta())
+                .keyReference(variante.getContenidoSeguroKekReferencia())
+                .keyVersion(variante.getContenidoSeguroKekVersion())
+                .algorithm(variante.getContenidoSeguroAlgoritmo())
+                .build();
+        return cifradoService.descifrarTexto(payload,
+                "variante:" + variante.getId() + ":rol:" + variante.getRolExamenId());
     }
 
     private Map<String, String> normalizarRespuestas(Map<String, String> respuestas) {
@@ -283,7 +305,7 @@ public class OmrProcesamientoService {
         }
         Map<String, String> patron = varianteRepository
                 .findByRolExamenIdAndLetraVariante(calificacion.getRolExamenId(), calificacion.getLetraVariante())
-                .map(variante -> leerPatron(variante.getPatronClavesJson()))
+                .map(this::leerPatron)
                 .orElse(Map.of());
         int total = calificacion.getTotalReactivos() == null ? 0 : calificacion.getTotalReactivos();
         List<DetalleRespuestaOmrDto> detalles = new ArrayList<>();

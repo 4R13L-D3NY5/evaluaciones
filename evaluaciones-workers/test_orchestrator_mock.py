@@ -11,6 +11,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from src import config, orchestrator
 import src.db as db_module
 
+
+def _cifrado_de_prueba(_value, _context):
+    return {
+        "ciphertext": "TEST-CIPHERTEXT",
+        "nonce": "TEST-NONCE",
+        "wrappedDataKey": "TEST-WRAPPED-KEY",
+        "keyReference": "test-kms",
+        "keyVersion": "1",
+        "algorithm": "AES-256-GCM-v1",
+    }
+
 # Datos de ejemplo
 ROL_EJEMPLO = {
     "id": "ROL-MOCK-TA01-1P",
@@ -78,6 +89,7 @@ ESTUDIANTES_EJEMPLO = [
 
 
 def main() -> None:
+    orchestrator.vault_crypto.cifrar_json = _cifrado_de_prueba
     output_base = os.path.join(os.path.dirname(__file__), "test_output_orchestrator")
     if os.path.exists(output_base):
         # No eliminar la raíz: puede ser un volumen montado durante la QA visual.

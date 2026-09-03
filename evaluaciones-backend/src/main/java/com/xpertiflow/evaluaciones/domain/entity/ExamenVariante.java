@@ -39,15 +39,34 @@ public class ExamenVariante {
     @Column(name = "cuota_dificiles", nullable = false)
     private Integer cuotaDificiles = 7;
 
-    @Column(name = "patron_claves_json", nullable = false, columnDefinition = "TEXT")
+    /** Columnas históricas; el contenido sensible se guarda en contenido_seguro_cifrado. */
+    @Column(name = "patron_claves_json", columnDefinition = "TEXT")
     private String patronClavesJson;
 
-    @Column(name = "orden_reactivos_ids_json", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "orden_reactivos_ids_json", columnDefinition = "TEXT")
     private String ordenReactivosIdsJson;
 
     /** Contenido renderizable para modalidad virtual, sin respuestas correctas. */
     @Column(name = "contenido_virtual_json", columnDefinition = "TEXT")
     private String contenidoVirtualJson;
+
+    @Column(name = "contenido_seguro_cifrado", columnDefinition = "TEXT")
+    private String contenidoSeguroCifrado;
+
+    @Column(name = "contenido_seguro_nonce", length = 64)
+    private String contenidoSeguroNonce;
+
+    @Column(name = "contenido_seguro_dek_envuelta", columnDefinition = "TEXT")
+    private String contenidoSeguroDekEnvuelta;
+
+    @Column(name = "contenido_seguro_kek_referencia", length = 150)
+    private String contenidoSeguroKekReferencia;
+
+    @Column(name = "contenido_seguro_kek_version", length = 30)
+    private String contenidoSeguroKekVersion;
+
+    @Column(name = "contenido_seguro_algoritmo", length = 40)
+    private String contenidoSeguroAlgoritmo;
 
     @Column(name = "archivo_typst_path", length = 255)
     private String archivoTypstPath;

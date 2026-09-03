@@ -43,6 +43,15 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   storage:
     base-path: ${STORAGE_BASE_PATH:C:/laragon/www/evaluaciones/storage}
+  kms:
+    migration-enabled: ${KMS_MIGRATION_ENABLED:false}
+    rotation-enabled: ${KMS_ROTATION_ENABLED:false}
+    vault:
+      address: ${VAULT_ADDR:http://localhost:8200}
+      token-file: ${VAULT_TOKEN_FILE:}
+      token: ${VAULT_TOKEN:}
+      transit-key-name: ${VAULT_TRANSIT_KEY_NAME:sea-banco-kek}
+      timeout-seconds: ${VAULT_TIMEOUT_SECONDS:10}
   unitepc:
     gateway-base-url: ${UNITEPC_GATEWAY_BASE_URL:https://gw-dev.unitepc.solutions}
     client-id: ${UNITEPC_CLIENT_ID}

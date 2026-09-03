@@ -7,8 +7,7 @@
 export interface GeneracionTypstVariante {
   letra: 'A' | 'B' | 'C' | 'D' | 'E';
   semilla: number;
-  patronClavesJson: string;
-  ordenReactivosIdsJson: string;
+  totalPreguntas?: number;
   archivoPdfPath: string;
   archivoTypstPath: string;
   archivoRemarkXlsxPath?: string;

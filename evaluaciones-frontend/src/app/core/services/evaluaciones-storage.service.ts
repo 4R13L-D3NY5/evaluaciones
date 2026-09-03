@@ -37,6 +37,7 @@ export interface PlanEstudioItem {
   id: number;
   codigo: string;
   nombre: string;
+  planCurricular: string;
   semestre: number;
   horas: number;
   docenteNombre: string;

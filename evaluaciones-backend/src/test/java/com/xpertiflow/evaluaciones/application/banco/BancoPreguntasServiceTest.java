@@ -11,6 +11,8 @@ import com.xpertiflow.evaluaciones.domain.enums.TipoParcial;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ReactivoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.security.BancoCifradoService;
+import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -46,6 +48,8 @@ class BancoPreguntasServiceTest {
     private RolExamenRepository rolRepository;
     @Mock
     private RolExamenService rolExamenService;
+    @Mock
+    private BancoCifradoService cifradoService;
 
     private BancoPreguntasService service;
     private RolExamen rol;
@@ -57,7 +61,16 @@ class BancoPreguntasServiceTest {
                 reactivoRepository,
                 rolRepository,
                 rolExamenService,
-                new ObjectMapper());
+                new ObjectMapper(),
+                cifradoService);
+        lenient().when(cifradoService.cifrarJson(any(), anyString())).thenReturn(BancoEncryptedPayload.builder()
+                .ciphertext("ciphertext")
+                .nonce("nonce")
+                .wrappedDataKey("vault:v1:wrapped")
+                .keyReference("sea-banco-kek")
+                .keyVersion("1")
+                .algorithm(BancoCifradoService.ALGORITHM)
+                .build());
         rol = RolExamen.builder()
                 .id("ROL-BANCO-001")
                 .materiaCodigo("PRD-314")
@@ -98,6 +111,12 @@ class BancoPreguntasServiceTest {
         assertThat(reactivos).extracting(Reactivo::getNumeroOrden)
                 .containsExactlyElementsOf(java.util.stream.IntStream.rangeClosed(1, 60).boxed().toList());
         assertThat(reactivos).extracting(Reactivo::getBancoId).containsOnly(respuesta.getBancoPreguntasId());
+        assertThat(reactivos).allSatisfy(item -> {
+            assertThat(item.getEnunciado()).isNull();
+            assertThat(item.getImagenBase64()).isNull();
+            assertThat(item.getOpcionesJson()).isNull();
+            assertThat(item.getRespuestaCorrecta()).isNull();
+        });
 
         verify(rolExamenService).validarPorBanco(
                 rol.getId(), respuesta.getHashSha256(), "Docente SEA");
