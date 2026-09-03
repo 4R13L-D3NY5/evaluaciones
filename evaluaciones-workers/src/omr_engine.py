@@ -295,20 +295,30 @@ def _leer_respuestas(
         orden = np.argsort(densidades)[::-1]
         maximo = float(densidades[int(orden[0])])
         segundo = float(densidades[int(orden[1])])
-        # Una marca real puede quedar entre 60% y 70% cuando el trazo es claro
-        # o está concentrado en el centro. En una burbuja vacía, en cambio,
-        # las letras impresas suelen elevar todas las opciones casi por igual;
-        # exigir separación evita recuperar nuevamente falsos B/D.
-        if (
-            maximo < parametros["umbral_densidad_marca"]
-            or maximo - segundo < UMBRAL_DIFERENCIAL_MARCA
-        ):
+        umbral_marca = float(parametros["umbral_densidad_marca"])
+        umbral_doble = float(parametros["umbral_diferencial_doble"])
+
+        # La clasificación debe resolver primero las múltiples marcas. Si se
+        # aplica antes el diferencial de marca única, dos burbujas realmente
+        # marcadas con densidades parecidas terminan convertidas en blanco.
+        # Ejemplo: P13 puede producir A=74 y B=75; no es ausencia de tinta,
+        # sino una doble marca que debe pasar a revisión/calificación en cero.
+        if maximo < umbral_marca:
             respuesta = ""
-        elif (
-            segundo >= parametros["umbral_densidad_marca"]
-            and maximo - segundo < parametros["umbral_diferencial_doble"]
-        ):
-            respuesta = OPCIONES[int(orden[0])] + OPCIONES[int(orden[1])]
+        elif segundo >= umbral_marca and maximo - segundo < umbral_doble:
+            # Se incluyen terceras marcas próximas al máximo para no ocultar
+            # una triple/múltiple marca bajo la etiqueta de doble.
+            indices_marcados = [
+                indice for indice, densidad in enumerate(densidades)
+                if densidad >= umbral_marca and maximo - densidad < umbral_doble
+            ]
+            respuesta = "".join(OPCIONES[indice] for indice in sorted(indices_marcados))
+        elif maximo - segundo < UMBRAL_DIFERENCIAL_MARCA:
+            # Si no hay dos opciones que superen el umbral absoluto, pero la
+            # diferencia es demasiado pequeña, la lectura no es confiable:
+            # se conserva como blanco para revisión manual y no como respuesta
+            # fantasma.
+            respuesta = ""
         else:
             respuesta = OPCIONES[int(orden[0])]
         respuestas[str(pregunta)] = respuesta

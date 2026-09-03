@@ -90,16 +90,17 @@ El worker `worker-omr` realiza la primera iteración oficial:
 4. Calibra los 15 centros de opciones y las 20 filas mediante las
    circunferencias impresas. Así se compensan desplazamientos, escala y las dos
    distribuciones verticales de la cartilla que están en uso.
-3. Lee la densidad en un anillo interno de cada burbuja A-E, excluyendo las
+5. Lee la densidad en un anillo interno de cada burbuja A-E, excluyendo las
    letras preimpresas y el borde circular. Se tolera un desplazamiento de hasta
    dos píxeles del centro y se considera marcada una opción cuando la densidad
-   alcanza al menos el 70%. Una segunda opción solo se informa como doble cuando
-   también supera ese umbral y la diferencia frente a la primera es menor a
-   18 puntos; así una letra impresa o un trazo parcial no se convierte en doble
-   marca.
-4. Busca mediante OCR únicamente el recuadro superior derecho del código estudiantil, en la zona normalizada `x 53%-75%`, `y 9%-14%`; usa ampliación y binarización para tolerar escaneos, y no procesa tipo de examen, N°, materia, grupo, nombre ni los seriales rojos superior e inferior.
-5. Acepta el resultado solo si el código pertenece a `sea_mapeo_estudiantes_variantes` del rol seleccionado.
-6. Recupera internamente el patrón de la variante asignada, califica y persiste en `sea_calificaciones_omr`.
+   alcanza al menos el 60%. La clasificación de doble o múltiple marca se
+   evalúa antes de la regla de marca única: si dos o más opciones superan el
+   umbral y la diferencia frente a la más oscura es menor a 18 puntos, se
+   informan todas como marcas múltiples. Así una pregunta con dos incisos
+   realmente marcados no se convierte en blanco.
+6. Busca mediante OCR únicamente el recuadro superior derecho del código estudiantil, en la zona normalizada `x 53%-75%`, `y 9%-14%`; usa ampliación y binarización para tolerar escaneos, y no procesa tipo de examen, N°, materia, grupo, nombre ni los seriales rojos superior e inferior.
+7. Acepta el resultado solo si el código pertenece a `sea_mapeo_estudiantes_variantes` del rol seleccionado.
+8. Recupera internamente el patrón de la variante asignada, califica y persiste en `sea_calificaciones_omr`.
 
 Un código no reconocido no se asigna por posición, orden de página ni datos de ejemplo: queda como `REVISION_MANUAL` y no crea una calificación en la base de datos. Si el OCR detecta dígitos pero no están en el rol seleccionado, la interfaz lo informa como **código fuera del rol**; se debe seleccionar la evaluación cuya nómina contiene ese código.
 
@@ -139,7 +140,7 @@ El módulo **Calificación Óptica OMR** incluye el apartado **Parámetros OMR**
 | Escala OCR | 3.0 | 1–5 | Ampliación aplicada al código antes de OCR. |
 | Búsqueda del centro | 2 px | 0–5 | Vecindad de tolerancia para compensar pequeños desplazamientos. |
 
-La lectura de marcas utiliza un anillo interno alejado del centro tipográfico de la burbuja. Esto evita que las letras preimpresas, especialmente `B` y `D`, se interpreten como respuestas cuando la cartilla está en blanco. El umbral operativo es `60%` y se exige además una diferencia mínima de `10` puntos frente a la segunda opción; así se recuperan marcas claras sin aceptar el ruido parejo de una burbuja vacía. Los valores deben validarse con una cartilla vacía y otra correctamente marcada antes de una aplicación masiva.
+La lectura de marcas utiliza un anillo interno alejado del centro tipográfico de la burbuja. Esto evita que las letras preimpresas, especialmente `B` y `D`, se interpreten como respuestas cuando la cartilla está en blanco. El umbral operativo es `60%`. Primero se comprueba si existen dos o más opciones sobre ese umbral y con una diferencia menor a `18` puntos; en ese caso se conserva la combinación completa como doble o múltiple marca. Solo cuando hay una única opción clara se aplica la separación mínima de `10` puntos frente a la segunda opción. Si la tinta es insuficiente o la lectura es ambigua, se conserva como blanco para revisión y no se asigna una respuesta fantasma.
 
 API administrativa de la configuración:
 

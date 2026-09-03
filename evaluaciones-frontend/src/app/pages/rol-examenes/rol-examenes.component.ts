@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { RolExamenPersistedItem } from '../../core/services/evaluaciones-db.service';
+import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import {
   RolExamenCreateRequest,
@@ -214,10 +215,10 @@ export type RolExamenItem = RolExamenPersistedItem;
       <div class="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
         
         <!-- Indicador de Carga -->
-        @if (cargando()) {
+        @if (cargando() || cargandoRoles()) {
           <div class="p-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
             <i class="pi pi-spin pi-spinner text-3xl text-primary"></i>
-            <span class="text-xs font-bold">Consultando materias oficiales...</span>
+            <span class="text-xs font-bold">Cargando información académica...</span>
           </div>
         } @else if (examenesFiltrados().length === 0) {
           
@@ -662,6 +663,7 @@ export type RolExamenItem = RolExamenPersistedItem;
 export class RolExamenesComponent implements OnInit {
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _rolService = inject(RolExamenService);
+  public readonly storage = inject(EvaluacionesStorageService);
 
   // Estados de Datos Reales de SEA
   public sedes = signal<BranchOffice[]>([]);
@@ -676,6 +678,7 @@ export class RolExamenesComponent implements OnInit {
   // Estados de Carga
   public cargando = signal<boolean>(false);
   public cargandoCarreras = signal<boolean>(false);
+  public cargandoRoles = signal<boolean>(false);
 
   // Filtros Reactivos con Signals
   public filtroSemestre = signal<string | number>('Todos');
@@ -955,10 +958,15 @@ export class RolExamenesComponent implements OnInit {
     const carrera = this.carreraSeleccionada();
     if (!sede || !carrera) return;
 
+    this.cargandoRoles.set(true);
     this._rolService.listar(sede.code, carrera.careerCode).subscribe({
-      next: roles => this.examenes.set(roles.map(rol => this._mapearRolResponse(rol))),
+      next: roles => {
+        this.examenes.set(roles.map(rol => this._mapearRolResponse(rol)));
+        this.cargandoRoles.set(false);
+      },
       error: err => {
         this.examenes.set([]);
+        this.cargandoRoles.set(false);
         this._mostrarToast(this._mensajeError(err, 'No se pudo cargar el rol de exámenes desde el servidor.'));
       }
     });
@@ -1456,7 +1464,51 @@ export class RolExamenesComponent implements OnInit {
       };
     }
 
+    const fechaTexto = texto
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\./g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const fechaConMes = fechaTexto.match(/^(\d{1,2})\s+(?:de\s+|del\s+)?([a-z]+)(?:\s+(?:de\s+|del\s+)?(\d{4}))?$/);
+    if (fechaConMes) {
+      const [, diaTexto, mesTexto, anioTexto] = fechaConMes;
+      const meses: Record<string, number> = {
+        ene: 1, enero: 1,
+        feb: 2, febrero: 2,
+        mar: 3, marzo: 3,
+        abr: 4, abril: 4,
+        may: 5, mayo: 5,
+        jun: 6, junio: 6,
+        jul: 7, julio: 7,
+        ago: 8, agosto: 8,
+        sep: 9, sept: 9, set: 9, septiembre: 9, setiembre: 9,
+        oct: 10, octubre: 10,
+        nov: 11, noviembre: 11,
+        dic: 12, diciembre: 12
+      };
+      const mes = meses[mesTexto] ?? 0;
+      const dia = Number(diaTexto);
+      const anio = Number(anioTexto || this._anioGestionActiva());
+      const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+      const fechaValida = mes && dia >= 1 && dia <= 31
+        && fecha.getUTCFullYear() === anio
+        && fecha.getUTCMonth() === mes - 1
+        && fecha.getUTCDate() === dia;
+      if (fechaValida) {
+        const iso = `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+        return { iso, display: `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${anio}` };
+      }
+    }
+
     return { iso: '', display: 'Por programar' };
+  }
+
+  private _anioGestionActiva(): number {
+    const gestion = this.storage.gestionActiva();
+    const anio = gestion.match(/(?:19|20)\d{2}/)?.[0];
+    return Number(anio || new Date().getFullYear());
   }
 
   private _leerHoraExcel(valor: unknown): string {

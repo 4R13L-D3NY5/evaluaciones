@@ -21,8 +21,8 @@ Cada reactivo en la hoja **Banco** se estructura en las siguientes columnas. `im
 | **I** | espuesta_correcta | Clave o letra de la opción correcta | A, B, C, D, E (o vacía en encabezados) |
 | **J** | dificultad | Nivel taxonómico del reactivo | 1 (Fácil), 2 (Medio), 3 (Difícil) |
 | **K** | parcial | Tipo de evaluación programada | 1P, 2P, EF, 2T |
-| **L** | imagen_base64 | Imagen opcional para mostrar debajo del enunciado en el examen virtual | Data URI `data:image/png;base64,...` o Base64 puro; PNG, JPEG, WEBP o GIF; máximo 512 KB. La herramienta puede agregar `#sea-size=GRANDE`, `#sea-size=MEDIANA`, `#sea-size=PEQUENA` o `#sea-size=MUY_PEQUENA` para conservar el tamaño visual sin otra columna |
-| **M** | observaciones | Diagnóstico automático de consistencia | No editar; se calcula automáticamente |
+| **L** | observaciones | Diagnóstico automático de consistencia | No editar; se calcula automáticamente |
+| **M** | imagen_base64 | Imagen opcional para mostrar debajo del enunciado en el examen virtual | Data URI `data:image/png;base64,...` o Base64 puro; PNG, JPEG, WEBP o GIF; máximo 512 KB. La herramienta puede agregar `#sea-size=GRANDE`, `#sea-size=MEDIANA`, `#sea-size=PEQUENA` o `#sea-size=MUY_PEQUENA` para conservar el tamaño visual sin otra columna |
 
 ### Imagen opcional en Base64
 

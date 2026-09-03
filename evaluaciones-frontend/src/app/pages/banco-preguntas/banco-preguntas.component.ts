@@ -3812,12 +3812,11 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public descargarExcelBaseMacro(): void {
-    const filename = 'formato_banco_preguntas_asig_EF.xlsx';
+    const filename = 'formato_banco_preguntas_asig_EF_1P.xlsx';
     const asigNombre = this.asignaturaNombreCompleto();
-    const asigClean = asigNombre.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
     const link = document.createElement('a');
     link.href = `assets/${filename}`;
-    link.download = `PLANTILLA_BANCO_${asigClean}_${this.grupoSeleccionado()}_${this.parcialActivo().toUpperCase().replace(/\s+/g, '_')}_2026.xlsx`;
+    link.download = 'PLANTILLA_BANCO_PREGUNTAS_1P.xlsx';
     link.click();
     this._mostrarToast(`Plantilla oficial descargada para ${asigNombre} (${this.grupoSeleccionado()}).`);
   }
