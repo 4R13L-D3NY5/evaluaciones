@@ -15,10 +15,13 @@ import org.springframework.stereotype.Component;
 public class KeyRotationRunner implements ApplicationRunner {
 
     private final BancoCifradoRotationService rotationService;
+    private final DocumentoSinCartillaRotationService documentoRotationService;
 
     @Override
     public void run(ApplicationArguments args) {
         BancoCifradoRotationService.RotationResult result = rotationService.reenfundarTodo();
-        log.info("Rotación de KEK completada: {} bancos y {} variantes reenvueltos", result.bancos(), result.variantes());
+        int documentos = documentoRotationService.reenfundarTodo();
+        log.info("Rotación de KEK completada: {} bancos, {} variantes y {} documentos sin cartilla reenvueltos",
+                result.bancos(), result.variantes(), documentos);
     }
 }

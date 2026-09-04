@@ -347,7 +347,7 @@ export interface DiaCalendario {
 
               <div (click)="triggerFileInput()" (dragover)="onDragOver($event)" (drop)="onDropFile($event)" [class]="rolPuedeCargarBanco() ? 'border-2 border-dashed border-emerald-300 hover:border-emerald-600 rounded-2xl p-8 text-center space-y-3 bg-emerald-50/40 hover:bg-emerald-50 transition-all cursor-pointer' : 'border-2 border-dashed border-amber-300 rounded-2xl p-8 text-center space-y-3 bg-amber-50/60 opacity-80 cursor-not-allowed'">
                 <div class="h-14 w-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto"><i class="pi pi-file-word"></i></div>
-                <div><div class="text-sm font-black text-foreground">{{ archivoSinCartillaSeleccionado()?.name || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar el examen .doc o .docx' : 'Carga bloqueada: restablezca el rol de examen a Validado') }}</div><p class="text-xs text-muted-foreground mt-1">Máximo 50 MB. Se conserva el archivo oficial y se calcula su huella de integridad.</p></div>
+                <div><div class="text-sm font-black text-foreground">{{ archivoSinCartillaSeleccionado()?.name || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar el examen .doc o .docx' : 'Carga bloqueada: restablezca el rol de examen a Validado') }}</div><p class="text-xs text-muted-foreground mt-1">Máximo 5 MB. El documento debe estar configurado en tamaño oficio: 8,5 × 13 pulgadas.</p></div>
               </div>
 
               <div class="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
@@ -2513,6 +2513,7 @@ export class BancoPreguntasComponent implements OnInit {
   public archivoSinCartillaSeleccionado = signal<File | null>(null);
   public documentoSinCartilla = signal<DocumentoSinCartilla | null>(null);
   public cargandoDocumentoSinCartilla = signal<boolean>(false);
+  private readonly maxDocumentoSinCartillaBytes = 5 * 1024 * 1024;
 
   // Pestaña activa: 'validador' (default) o 'calendario'
   public tabActiva = signal<'validador' | 'calendario'>('validador');
@@ -3583,8 +3584,8 @@ export class BancoPreguntasComponent implements OnInit {
       this._mostrarToast('Solo se aceptan documentos .doc o .docx para un examen sin cartilla.', 'error');
       return;
     }
-    if (file.size > 50 * 1024 * 1024) {
-      this._mostrarToast('El documento supera el límite máximo de 50 MB.', 'error');
+    if (file.size > this.maxDocumentoSinCartillaBytes) {
+      this._mostrarToast('El documento supera el límite máximo de 5 MB para exámenes sin cartilla.', 'error');
       return;
     }
     this.archivoSinCartillaSeleccionado.set(file);

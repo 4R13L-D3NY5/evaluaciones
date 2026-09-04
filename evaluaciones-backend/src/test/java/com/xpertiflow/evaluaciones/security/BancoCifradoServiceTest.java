@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,6 +28,31 @@ class BancoCifradoServiceTest {
         BancoEncryptedPayload payload = service.cifrarTexto("Contenido", "banco:BANCO-1:rol:ROL-1");
 
         assertThatThrownBy(() -> service.descifrarTexto(payload, "banco:BANCO-2:rol:ROL-1"))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void cifraYDescifraContenidoBinarioYDetectaAlteracion() {
+        BancoCifradoService service = new BancoCifradoService(new InMemoryKeyManagementProvider(), new ObjectMapper());
+        byte[] original = "contenido DOCX binario\u0000\u0001".getBytes(StandardCharsets.UTF_8);
+
+        BancoEncryptedPayload payload = service.cifrarBytes(original, "documento-sin-cartilla:DOC-1:rol:ROL-1");
+
+        assertThat(service.descifrarBytes(payload, "documento-sin-cartilla:DOC-1:rol:ROL-1"))
+                .isEqualTo(original);
+
+        byte[] ciphertextAlterado = java.util.Base64.getDecoder().decode(payload.getCiphertext());
+        ciphertextAlterado[0] ^= 1;
+        BancoEncryptedPayload alterado = BancoEncryptedPayload.builder()
+                .ciphertext(java.util.Base64.getEncoder().encodeToString(ciphertextAlterado))
+                .nonce(payload.getNonce())
+                .wrappedDataKey(payload.getWrappedDataKey())
+                .keyReference(payload.getKeyReference())
+                .keyVersion(payload.getKeyVersion())
+                .algorithm(payload.getAlgorithm())
+                .build();
+
+        assertThatThrownBy(() -> service.descifrarBytes(alterado, "documento-sin-cartilla:DOC-1:rol:ROL-1"))
                 .isInstanceOf(IllegalStateException.class);
     }
 

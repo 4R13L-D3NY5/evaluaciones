@@ -78,6 +78,11 @@ flowchart TB
 | Virtual | `Sala abierta → En curso` | El docente verifica el ingreso de los estudiantes y pulsa **Iniciar examen**. El servidor fija el tiempo oficial. |
 | Virtual | `En curso → Calificado` | No requiere una transición manual del rol: al vencer la duración o cerrar la sala, el sistema guarda/califica los intentos y pasa el examen a **Calificado**. |
 
+En los bloques de **emparejamiento ampliado**, cada variante conserva completa la
+tarjeta de opciones y todos sus subítems, pero presenta los subítems en un orden
+barajado determinístico. En los bloques de caso clínico o problema, los subítems
+mantienen el orden definido en el banco.
+
 ## Configuración administrativa que afecta el flujo
 
 Se administra en **Administración de Evaluaciones**:

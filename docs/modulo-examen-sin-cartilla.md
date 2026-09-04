@@ -19,7 +19,8 @@ Permitir que un examen presencial sin cartilla se gestione desde la carga del do
 
 - La nómina y los nombres de estudiantes se consultan desde el SEA; no se usan nombres locales para construir el listado de calificación.
 - No se generan variantes ni PDF para esta modalidad.
-- El documento debe ser `.doc` o `.docx` y no superar 50 MB.
+- El documento debe ser `.doc` o `.docx` y no superar 5 MB.
+- El docente debe preparar el documento en tamaño oficio de **8,5 × 13 pulgadas**. Este requisito se muestra en la carga y debe verificarse antes de enviarlo, porque el sistema no garantiza de forma automática el tamaño de página para ambos formatos de Word.
 - Para calificar se exige una nota entre 0 y 30 para cada estudiante oficial del grupo.
 - No se aceptan estudiantes que no pertenezcan a la nómina oficial devuelta por el SEA.
 - Mientras el rol está `PENDIENTE_NOTAS`, el docente puede editar y guardar las notas. En `CALIFICADO` el reporte queda disponible en modo consulta.
@@ -37,4 +38,3 @@ Permitir que un examen presencial sin cartilla se gestione desde la carga del do
 ## Resultado esperado
 
 Para cada estudiante se conserva el código oficial, la nota sobre 30 y la nota calculada sobre 100. El reporte impreso incluye materia, grupo, parcial, docente, estado, código de estudiante y ambas notas.
-

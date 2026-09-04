@@ -26,6 +26,8 @@ export interface DificultadesBanco {
 export interface PlanExamenResumen extends DificultadesBanco {
   clave: string;
   etiqueta: string;
+  rolId?: string;
+  modalidadCodigo?: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';
   modalidad: string;
   estado: string;
   bancoCargado: boolean;
@@ -102,6 +104,8 @@ export interface ParametrizacionExamen {
 export interface GestionEvaluacionItem {
   id: number;
   codigo: string;
+  sede?: string;
+  sedeCodigo?: string;
   materia: string;
   carrera: string;
   semestre: number;

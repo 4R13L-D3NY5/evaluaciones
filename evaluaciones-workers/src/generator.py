@@ -399,7 +399,10 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
                 macro = macros_por_grupo.get(clave)
                 if macro is not None:
                     bloque_tipo.append(macro)
-                bloque_tipo.extend(sorted(hijos, key=_numero_orden))
+                hijos_ordenados = sorted(hijos, key=_numero_orden)
+                if clave[0] == "EMPAREJAMIENTO":
+                    rng.shuffle(hijos_ordenados)
+                bloque_tipo.extend(hijos_ordenados)
             # Algunos bancos antiguos no traen grupo_contexto en los hijos;
             # siguen siendo preguntas válidas y no deben desaparecer.
             bloque_tipo.extend(
@@ -422,8 +425,10 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
             tipos_nuevos.setdefault(tipo_nuevo, []).append(pregunta)
     bloques.extend(sorted(tipos_nuevos.values(), key=lambda bloque: min(_numero_orden(p) for p in bloque)))
 
-    # El orden de las secciones cambia por variante, pero cada sección y cada
-    # bloque agrupado conserva su orden interno para no alterar su formato.
+    # El orden de las secciones cambia por variante. Los casos clínicos
+    # conservan sus subítems en orden; en emparejamiento, en cambio, los
+    # enunciados hijos se barajan. La tarjeta de opciones de referencia
+    # permanece sin cambios.
     rng.shuffle(bloques)
     return [pregunta for bloque in bloques for pregunta in bloque]
 

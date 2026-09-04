@@ -116,3 +116,25 @@ RabbitMQ, logs ni archivos `.env`.
 - Un cambio en ciphertext, nonce, contexto o DEK envuelta es rechazado por la
   autenticación de AES-GCM.
 - Los logs y errores no imprimen contenido sensible.
+
+## Documentos de exámenes sin cartilla
+
+Los archivos `.doc` y `.docx` cargados para exámenes presenciales sin cartilla
+se protegen con el mismo esquema envelope, pero con una DEK nueva por documento.
+El archivo físico se guarda como ciphertext binario con extensión `.enc`; la
+base de datos conserva únicamente la ruta interna, metadatos, nonce, DEK
+envuelta, referencia y versión de la KEK, algoritmo y huella SHA-256.
+
+La descarga descifra el archivo únicamente en memoria, valida la autenticación
+AES-GCM y comprueba la huella antes de devolverlo al usuario autorizado. Si el
+registro corresponde a un documento histórico no migrado, la descarga se
+rechaza para no exponer el archivo legible.
+
+Para migrar documentos existentes, activar temporalmente
+`KMS_MIGRATION_ENABLED=true` con Vault desbloqueado y el token técnico del
+backend disponible. El runner cifra el documento, actualiza sus metadatos y
+elimina el archivo legible anterior. Después de confirmar la migración, volver
+`KMS_MIGRATION_ENABLED=false`.
+
+La rotación de la KEK también reenvuelve las DEK de estos documentos sin
+descifrar ni modificar su ciphertext.

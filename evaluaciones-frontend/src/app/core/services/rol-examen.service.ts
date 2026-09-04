@@ -71,6 +71,10 @@ export interface RolExamenEstadoRequest {
   ipOrigen?: string;
 }
 
+export interface CambiarModalidadRequest {
+  modalidad: RolExamenResponse['modalidad'];
+}
+
 export interface RestablecerRolRequest {
   motivo: string;
   usuario?: string;
@@ -102,13 +106,16 @@ export class RolExamenService {
   /**
    * Lista los roles de examen filtrando opcionalmente por sede y/o carrera.
    */
-  public listar(sedeCodigo?: string, carreraCodigo?: string): Observable<RolExamenResponse[]> {
+  public listar(sedeCodigo?: string, carreraCodigo?: string, campus?: string): Observable<RolExamenResponse[]> {
     let params = new HttpParams();
     if (sedeCodigo) {
       params = params.set('sedeCodigo', sedeCodigo);
     }
     if (carreraCodigo) {
       params = params.set('carreraCodigo', carreraCodigo);
+    }
+    if (campus) {
+      params = params.set('campus', campus);
     }
 
     return this._http.get<RolExamenResponse[]>(this._baseUrl, { params }).pipe(
@@ -147,6 +154,15 @@ export class RolExamenService {
     return this._http.put<RolExamenResponse>(`${this._baseUrl}/${id}`, dto).pipe(
       catchError(err => {
         console.error(`[RolExamenService] Error al actualizar rol de examen ${id}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public cambiarModalidad(id: string, modalidad: RolExamenResponse['modalidad']): Observable<RolExamenResponse> {
+    return this._http.put<RolExamenResponse>(`${this._baseUrl}/${id}/modalidad`, { modalidad }).pipe(
+      catchError(err => {
+        console.error(`[RolExamenService] Error al cambiar la modalidad del rol ${id}:`, err);
         return throwError(() => err);
       })
     );

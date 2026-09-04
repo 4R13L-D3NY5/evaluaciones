@@ -43,6 +43,10 @@ export class ExamenSinCartillaService {
     return `${this._baseUrl}/${rolExamenId}/documento/archivo`;
   }
 
+  public descargarDocumento(rolExamenId: string): Observable<Blob> {
+    return this._http.get(this.urlDocumento(rolExamenId), { responseType: 'blob' });
+  }
+
   public listarNotas(rolExamenId: string): Observable<NotaDocente[]> {
     return this._http.get<NotaDocente[]>(`${this._baseUrl}/${rolExamenId}/notas`);
   }

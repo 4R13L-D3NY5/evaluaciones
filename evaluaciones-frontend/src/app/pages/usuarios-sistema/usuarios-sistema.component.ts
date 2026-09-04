@@ -1,14 +1,14 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, Input, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
-import { UsuariosSistemaService, UsuarioSistema, RolSistema, AlcanceAcademico, UsuarioSistemaRequest, ImportacionUsuariosResponse, CredencialTemporal, AnalisisDocentesSeaResponse, DocenteSeaAnalisis, SincronizacionDocentesSeaResponse } from '../../core/services/usuarios-sistema.service';
+import { UsuariosSistemaService, UsuarioSistema, RolSistema, AlcanceAcademico, AlcanceCampus, AsignacionAcademica, UsuarioSistemaRequest, ImportacionUsuariosResponse, CredencialTemporal, AnalisisDocentesSeaResponse, DocenteSeaAnalisis, SincronizacionDocentesSeaResponse } from '../../core/services/usuarios-sistema.service';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
-import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
+import { BranchOffice, Campus, Career, Course } from '../../core/models/unitepc-gateway.models';
 
 interface RolCatalogo extends RolSistema {
   alcance: string;
@@ -27,8 +27,8 @@ interface RolCatalogo extends RolSistema {
           <div class="flex items-center gap-3">
             <span class="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><i class="pi pi-users text-xl"></i></span>
             <div>
-              <h1 class="text-2xl font-black tracking-tight text-foreground">Usuarios y accesos</h1>
-              <p class="mt-1 text-sm text-muted-foreground">Registra cuentas internas y define el alcance académico que pueden consultar.</p>
+              <h1 class="text-2xl font-black tracking-tight text-foreground">{{ contexto === 'EVALUACIONES' ? 'Personal de evaluaciones' : 'Usuarios y accesos' }}</h1>
+              <p class="mt-1 text-sm text-muted-foreground">{{ contexto === 'EVALUACIONES' ? 'Administra responsables y personal vinculados al proceso de evaluaciones.' : 'Registra cuentas institucionales y define su alcance académico.' }}</p>
             </div>
           </div>
         </div>
@@ -52,9 +52,11 @@ interface RolCatalogo extends RolSistema {
         <button type="button" class="view-tab" [class.active]="vistaActual() === 'usuarios'" (click)="cambiarVista('usuarios')">
           <i class="pi pi-users"></i><span>Usuarios del sistema</span><small>{{ usuarios().length }}</small>
         </button>
-        <button type="button" class="view-tab" [class.active]="vistaActual() === 'sea'" (click)="cambiarVista('sea')">
-          <i class="pi pi-sync"></i><span>Docentes SEA</span><small>{{ analisisDocentesSea()?.docentesEnSea ?? '—' }}</small>
-        </button>
+        @if (contexto === 'INSTITUCIONAL') {
+          <button type="button" class="view-tab" [class.active]="vistaActual() === 'sea'" (click)="cambiarVista('sea')">
+            <i class="pi pi-sync"></i><span>Docentes SEA</span><small>{{ analisisDocentesSea()?.docentesEnSea ?? '—' }}</small>
+          </button>
+        }
         <button type="button" class="view-tab" [class.active]="vistaActual() === 'roles'" (click)="cambiarVista('roles')">
           <i class="pi pi-shield"></i><span>Roles y permisos</span><small>{{ rolesConPermisos().length }}</small>
         </button>
@@ -105,7 +107,7 @@ interface RolCatalogo extends RolSistema {
       </details>
       }
 
-      @if (vistaActual() === 'sea') {
+      @if (contexto === 'INSTITUCIONAL' && vistaActual() === 'sea') {
       <section class="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -176,7 +178,7 @@ interface RolCatalogo extends RolSistema {
           </div>
           <select class="field-input" [ngModel]="filtroRol()" (ngModelChange)="filtroRol.set($event)">
             <option value="">Todos los roles</option>
-            @for (rol of roles(); track rol.codigo) { <option [value]="rol.codigo">{{ rol.nombre }}</option> }
+            @for (rol of rolesVisibles(); track rol.codigo) { <option [value]="rol.codigo">{{ rol.nombre }}</option> }
           </select>
           <select class="field-input" [ngModel]="filtroEstado()" (ngModelChange)="filtroEstado.set($event)">
             <option value="TODOS">Todos</option><option value="ACTIVOS">Activos</option><option value="INACTIVOS">Inactivos</option>
@@ -212,12 +214,51 @@ interface RolCatalogo extends RolSistema {
           <div class="modal-card" (click)="$event.stopPropagation()">
             <div class="flex items-start justify-between border-b border-border px-6 py-5"><div><p class="eyebrow">Administración de acceso</p><h2 class="text-xl font-black">{{ usuarioEditando ? 'Editar usuario' : 'Registrar usuario' }}</h2><p class="mt-1 text-xs text-muted-foreground">La contraseña inicial será el CI y se exigirá cambiarla en el primer ingreso.</p></div><button class="icon-button" (click)="cerrarFormulario()"><i class="pi pi-times"></i></button></div>
             <form class="space-y-5 p-6" (ngSubmit)="guardar()" #usuarioForm="ngForm">
-              <div class="grid gap-4 md:grid-cols-2"><label class="form-label">CI / Usuario<input class="field-input" name="ci" [(ngModel)]="form.ci" required [disabled]="guardando()"></label><label class="form-label">Rol<select class="field-input" name="rol" [(ngModel)]="form.rolCodigo" required [disabled]="guardando()"><option value="">Seleccionar rol</option>@for (rol of rolesPermitidos(); track rol.codigo) {<option [value]="rol.codigo">{{ rol.nombre }}</option>}</select></label></div>
+              <div class="grid gap-4 md:grid-cols-2"><label class="form-label">CI / Usuario<input class="field-input" name="ci" [(ngModel)]="form.ci" required [disabled]="guardando()"></label><label class="form-label">Rol<select class="field-input" name="rol" [(ngModel)]="form.rolCodigo" (ngModelChange)="cambiarRol($event)" required [disabled]="guardando()"><option value="">Seleccionar rol</option>@for (rol of rolesPermitidos(); track rol.codigo) {<option [value]="rol.codigo">{{ rol.nombre }}</option>}</select></label></div>
               <label class="form-label">Nombre completo (tal como llega de SEA)<input class="field-input" name="nombre" [(ngModel)]="form.nombreCompleto" required [disabled]="guardando()"><small>Se conserva el orden: nombres, apellido 1 y apellido 2, exactamente como se recibe.</small></label>
               <label class="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3 text-xs font-bold"><input type="checkbox" name="activo" [(ngModel)]="form.activo"> Usuario activo y habilitado para ingresar</label>
 
-              <div><div class="section-title"><i class="pi pi-building"></i><span>Sedes asignadas</span><small>puedes marcar varias</small></div><div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div>@if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}</div>
-              <div><div class="section-title"><i class="pi pi-book"></i><span>Carreras asignadas</span><small>puedes marcar varias</small></div><div class="check-grid">@for (carrera of carreras; track carrera.careerCode) {<label class="check-item"><input type="checkbox" [checked]="tieneCarrera(carrera.careerCode)" (change)="alternarCarrera(carrera)"><span><strong>{{ carrera.careerCode }}</strong><small>{{ carrera.careerName }}</small></span></label>}</div>@if (!carreras.length) {<p class="empty-note">No se pudieron cargar carreras desde SEA. El usuario puede quedar sin restricción de carrera.</p>}</div>
+              @if (requiereAsignacionesAcademicas()) {
+                <div class="assignment-panel">
+                  <div class="section-title"><i class="pi pi-sitemap"></i><span>Asignaciones académicas</span><small>agrega cada relación por separado</small></div>
+                  <p class="assignment-help">Un mismo usuario puede tener distintas combinaciones de sede, carrera y asignatura.</p>
+                  <div class="grid gap-3 md:grid-cols-3">
+                    <label class="form-label">Sede<select class="field-input" name="sedeAsignacion" [(ngModel)]="sedeAsignacionCodigo" (ngModelChange)="cambiarSedeAsignacion($event)" [disabled]="guardando()"><option value="">Seleccionar sede...</option>@for (sede of sedes; track sede.code) {<option [value]="sede.code">{{ sede.code }} · {{ sede.name }}</option>}</select></label>
+                    @if (mostrarCarrerasAsignacion()) {
+                      <label class="form-label">Carrera<select class="field-input" name="carreraAsignacion" [(ngModel)]="carreraAsignacionCodigo" (ngModelChange)="cambiarCarreraAsignacion($event)" [disabled]="guardando()"><option value="">Seleccionar carrera...</option>@for (carrera of carrerasAsignacion; track carrera.careerCode) {<option [value]="carrera.careerCode">{{ carrera.careerCode }} · {{ carrera.careerName }}</option>}</select></label>
+                    }
+                    @if (esDocenteSeleccionado() && carreraAsignacionCodigo) {
+                      <label class="form-label">Asignatura<select class="field-input" name="asignaturaAsignacion" [(ngModel)]="asignaturaAsignacionCodigo" [disabled]="guardando() || cargandoAsignaturas"><option value="">{{ cargandoAsignaturas ? 'Cargando...' : 'Seleccionar asignatura...' }}</option>@for (asignatura of asignaturasAsignacion; track asignatura.courseCode) {<option [value]="asignatura.courseCode">{{ asignatura.courseCode }} · {{ asignatura.courseName }}</option>}</select></label>
+                    }
+                  </div>
+                  @if (!sedeAsignacionCodigo) { <p class="assignment-empty">Selecciona una sede para habilitar la selección de carreras.</p> }
+                  @if (sedeAsignacionCodigo && !carrerasAsignacion.length && !cargandoCarreras) { <p class="assignment-empty">No hay carreras disponibles para la sede seleccionada.</p> }
+                  <button type="button" class="secondary-button mt-3" (click)="agregarAsignacion()" [disabled]="guardando() || !puedeAgregarAsignacion()"><i class="pi pi-plus"></i> Agregar asignación</button>
+                  @if (asignacionesSeleccionadas.length) {
+                    <div class="assignment-list mt-3">
+                      @for (asignacion of asignacionesSeleccionadas; track claveAsignacion(asignacion)) {
+                        <div class="assignment-row"><div><strong>{{ asignacion.sedeCodigo }} · {{ asignacion.carreraCodigo }}</strong><small>{{ asignacion.sedeNombre }} · {{ asignacion.carreraNombre }}@if (asignacion.asignaturaCodigo) { · {{ asignacion.asignaturaCodigo }} · {{ asignacion.asignaturaNombre }}}</small></div><button type="button" class="icon-button" title="Quitar asignación" (click)="quitarAsignacion(asignacion)"><i class="pi pi-times"></i></button></div>
+                      }
+                    </div>
+                  } @else { <p class="assignment-empty">Aún no hay asignaciones agregadas.</p> }
+                </div>
+              } @else if (esPersonalEvaluacionesSeleccionado()) {
+                <div class="assignment-panel campus-access-panel">
+                  <div class="section-title"><i class="pi pi-map-marker"></i><span>Sedes y campus asignados</span><small>puedes marcar varias sedes y campus</small></div>
+                  <p class="assignment-help">El personal podrá trabajar únicamente con los campus habilitados. Puedes deshabilitar un campus temporalmente sin eliminar la asignación.</p>
+                  <div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div>
+                  @if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}
+                  @for (sede of sedesParaCampus(); track sede.code) {
+                    <div class="campus-group">
+                      <div class="campus-group-title"><span><strong>{{ sede.code }}</strong> · {{ sede.name }}</span><small>Campus autorizados</small></div>
+                      @if (!campusDeSede(sede.code).length) {<p class="assignment-empty">No hay campus disponibles para esta sede.</p>}
+                      <div class="check-grid campus-grid">@for (campus of campusDeSede(sede.code); track campus.campusId || campus.code || campus.name) {<label class="check-item" [class.campus-disabled]="tieneCampus(sede.code, campus) && !campusHabilitado(sede.code, campus)"><input type="checkbox" [checked]="tieneCampus(sede.code, campus)" (change)="alternarCampus(sede, campus)"><span><strong>{{ campus.code || campus.campusId || 'Campus' }}</strong><small>{{ campus.name }}</small></span>@if (tieneCampus(sede.code, campus)) {<button type="button" class="campus-status" [class.enabled]="campusHabilitado(sede.code, campus)" (click)="$event.preventDefault(); $event.stopPropagation(); alternarEstadoCampus(sede.code, campus)" [title]="campusHabilitado(sede.code, campus) ? 'Deshabilitar campus' : 'Habilitar campus'"><i [class]="campusHabilitado(sede.code, campus) ? 'pi pi-check-circle' : 'pi pi-ban'"></i>{{ campusHabilitado(sede.code, campus) ? 'Habilitado' : 'Deshabilitado' }}</button>}</label>}</div>
+                    </div>
+                  }
+                </div>
+              } @else if (esRolConAlcanceSimple()) {
+                <div><div class="section-title"><i class="pi pi-building"></i><span>Sedes asignadas</span><small>puedes marcar varias</small></div><div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div>@if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}</div>
+              }
               @if (error()) {<div class="message error"><i class="pi pi-exclamation-circle"></i>{{ error() }}</div>}
               <div class="flex justify-end gap-2 border-t border-border pt-5"><button type="button" class="secondary-button" (click)="cerrarFormulario()">Cancelar</button><button type="submit" class="primary-button" [disabled]="usuarioForm.invalid || guardando()">@if (guardando()) {<i class="pi pi-spin pi-spinner"></i> Guardando...} @else {Guardar usuario}</button></div>
             </form>
@@ -232,10 +273,14 @@ interface RolCatalogo extends RolSistema {
     </section>
   `,
   styles: [`
-    :host { display: block; } details > summary::-webkit-details-marker { display:none; } details[open] > summary > span { transform:rotate(180deg); } .view-tabs { display:flex; gap:.35rem; overflow-x:auto; padding:.3rem; border:1px solid var(--surface-border); border-radius:.9rem; background:var(--surface-ground); } .view-tab { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; min-height:2.65rem; padding:.65rem .85rem; border:1px solid transparent; border-radius:.65rem; background:transparent; color:var(--text-color-secondary); font-size:.72rem; font-weight:800; white-space:nowrap; cursor:pointer; transition:all 150ms ease; } .view-tab:hover { color:var(--primary-color); background:var(--sea-primary-soft); } .view-tab.active { border-color:var(--primary-color); background:var(--surface-card); color:var(--primary-color); box-shadow:0 4px 12px rgba(15,23,42,.06); } .view-tab small { min-width:1.35rem; padding:.18rem .35rem; border-radius:999px; background:var(--surface-ground); color:var(--text-color-secondary); font-size:.6rem; text-align:center; } .view-tab.active small { background:var(--sea-primary-soft); color:var(--primary-color); } .filter-toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(10rem,16rem) minmax(9rem,12rem); gap:.65rem; align-items:center; } .sea-filter-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; align-items:center; } .metric-card { padding: 1rem 1.15rem; border: 1px solid var(--surface-border); border-radius: 1rem; background: var(--surface-card); box-shadow: 0 4px 15px rgba(15,23,42,.04); } .metric-card span,.metric-card small { display:block; color:var(--text-color-secondary); font-size:.68rem; font-weight:700; } .metric-card strong { display:block; margin:.25rem 0; color:var(--text-color); font-size:1.5rem; font-weight:900; } .secondary-button,.primary-button { display:inline-flex; align-items:center; justify-content:center; gap:.45rem; min-height:2.45rem; padding:.65rem .85rem; border-radius:.7rem; font-size:.72rem; font-weight:800; transition:all 150ms ease; } .secondary-button { border:1px solid var(--surface-border); background:var(--surface-card); color:var(--text-color); } .secondary-button:hover { border-color:var(--primary-color); color:var(--primary-color); } .primary-button { border:1px solid var(--primary-color); background:var(--primary-color); color:#fff; } .primary-button:hover { filter:brightness(.94); box-shadow:0 7px 16px var(--sea-primary-ring); } .field-input { width:100%; min-height:2.45rem; padding:.65rem .75rem; border:1px solid var(--surface-border); border-radius:.65rem; background:var(--surface-ground); color:var(--text-color); outline:none; font:inherit; font-size:.75rem; } .field-input:focus { border-color:var(--primary-color); box-shadow:0 0 0 3px var(--sea-primary-ring); } .role-pill,.status-pill { display:inline-flex; border-radius:999px; padding:.3rem .55rem; font-size:.62rem; font-weight:800; } .role-pill { background:var(--sea-primary-soft); color:var(--primary-color); } .status-pill.active { background:#dcfce7; color:#047857; } .status-pill.warning { background:#fef3c7; color:#92400e; } .status-pill.inactive { background:#f1f5f9; color:#64748b; } .icon-button { display:inline-grid; width:2rem; height:2rem; place-items:center; border:1px solid var(--surface-border); border-radius:.55rem; background:var(--surface-card); color:var(--text-color-secondary); cursor:pointer; } .icon-button:hover { color:var(--primary-color); border-color:var(--primary-color); } .icon-button.warning:hover { color:#b45309; border-color:#f59e0b; } .modal-backdrop { position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:1rem; background:rgba(15,23,42,.62); } .modal-card { width:min(100%, 50rem); max-height:calc(100vh - 2rem); overflow:auto; border:1px solid var(--surface-border); border-radius:1rem; background:var(--surface-card); color:var(--text-color); box-shadow:0 25px 70px rgba(15,23,42,.25); } .modal-card.compact { width:min(100%, 42rem); } .eyebrow { margin:0 0 .35rem; color:var(--primary-color); font-size:.62rem; font-weight:900; letter-spacing:.12em; text-transform:uppercase; } .form-label { display:grid; gap:.4rem; color:var(--text-color); font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; } .form-label small { color:var(--text-color-secondary); font-size:.62rem; font-weight:600; text-transform:none; letter-spacing:0; } .section-title { display:flex; align-items:center; gap:.45rem; margin-bottom:.55rem; color:var(--text-color); font-size:.75rem; font-weight:900; } .section-title i { color:var(--primary-color); } .section-title small { margin-left:auto; color:var(--text-color-secondary); font-size:.62rem; font-weight:600; } .check-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(12rem,1fr)); gap:.5rem; max-height:10rem; overflow:auto; padding:.1rem; } .check-item { display:flex; align-items:flex-start; gap:.5rem; padding:.6rem; border:1px solid var(--surface-border); border-radius:.65rem; background:var(--surface-ground); cursor:pointer; } .check-item:has(input:checked) { border-color:var(--primary-color); background:var(--sea-primary-soft); } .check-item input { margin-top:.16rem; accent-color:var(--primary-color); } .check-item strong,.check-item small { display:block; } .check-item strong { color:var(--text-color); font-size:.69rem; } .check-item small { margin-top:.15rem; color:var(--text-color-secondary); font-size:.61rem; line-height:1.3; } .empty-note { color:#b45309; font-size:.7rem; } .message { display:flex; gap:.5rem; padding:.7rem .8rem; border-radius:.65rem; font-size:.72rem; line-height:1.45; } .message.error { border:1px solid var(--sea-danger-border); background:var(--sea-danger-soft); color:var(--sea-danger); } .message.info { border:1px solid #bae6fd; background:#f0f9ff; color:#0369a1; } .result-box { display:grid; place-items:center; padding:.8rem; border:1px solid var(--surface-border); border-radius:.75rem; background:var(--surface-ground); } .result-box strong { font-size:1.4rem; } .result-box span { color:var(--text-color-secondary); font-size:.65rem; } .result-box.success { border-color:#a7f3d0; background:#ecfdf5; color:#047857; } .toast-message,.toast-credential { position:fixed; right:1.5rem; bottom:1.5rem; z-index:1100; display:flex; align-items:center; gap:.65rem; padding:.8rem 1rem; border-radius:.75rem; background:#0f172a; color:#fff; box-shadow:0 12px 30px rgba(15,23,42,.22); font-size:.75rem; } .toast-message i { color:#6ee7b7; } .error-toast i { color:#fca5a5; } .toast-credential { bottom:5.5rem; background:#047857; } .toast-credential span { display:block; margin-top:.2rem; font-size:.68rem; } .toast-credential button { margin-left:.5rem; color:#fff; } @media(max-width:700px) { .filter-toolbar,.sea-filter-toolbar { grid-template-columns:1fr; } .view-tab { flex:1 0 auto; } } @media(max-width:640px) { .toast-message,.toast-credential { left:1rem; right:1rem; } }
-  `]
+    :host { display: block; } details > summary::-webkit-details-marker { display:none; } details[open] > summary > span { transform:rotate(180deg); } .view-tabs { display:flex; gap:.35rem; overflow-x:auto; padding:.3rem; border:1px solid var(--surface-border); border-radius:.9rem; background:var(--surface-ground); } .view-tab { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; min-height:2.65rem; padding:.65rem .85rem; border:1px solid transparent; border-radius:.65rem; background:transparent; color:var(--text-color-secondary); font-size:.72rem; font-weight:800; white-space:nowrap; cursor:pointer; transition:all 150ms ease; } .view-tab:hover { color:var(--primary-color); background:var(--sea-primary-soft); } .view-tab.active { border-color:var(--primary-color); background:var(--surface-card); color:var(--primary-color); box-shadow:0 4px 12px rgba(15,23,42,.06); } .view-tab small { min-width:1.35rem; padding:.18rem .35rem; border-radius:999px; background:var(--surface-ground); color:var(--text-color-secondary); font-size:.6rem; text-align:center; } .view-tab.active small { background:var(--sea-primary-soft); color:var(--primary-color); } .filter-toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(10rem,16rem) minmax(9rem,12rem); gap:.65rem; align-items:center; } .sea-filter-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; align-items:center; } .metric-card { padding: 1rem 1.15rem; border: 1px solid var(--surface-border); border-radius: 1rem; background: var(--surface-card); box-shadow: 0 4px 15px rgba(15,23,42,.04); } .metric-card span,.metric-card small { display:block; color:var(--text-color-secondary); font-size:.68rem; font-weight:700; } .metric-card strong { display:block; margin:.25rem 0; color:var(--text-color); font-size:1.5rem; font-weight:900; } .secondary-button,.primary-button { display:inline-flex; align-items:center; justify-content:center; gap:.45rem; min-height:2.45rem; padding:.65rem .85rem; border-radius:.7rem; font-size:.72rem; font-weight:800; transition:all 150ms ease; } .secondary-button { border:1px solid var(--surface-border); background:var(--surface-card); color:var(--text-color); } .secondary-button:hover { border-color:var(--primary-color); color:var(--primary-color); } .primary-button { border:1px solid var(--primary-color); background:var(--primary-color); color:#fff; } .primary-button:hover { filter:brightness(.94); box-shadow:0 7px 16px var(--sea-primary-ring); } .field-input { width:100%; min-height:2.45rem; padding:.65rem .75rem; border:1px solid var(--surface-border); border-radius:.65rem; background:var(--surface-ground); color:var(--text-color); outline:none; font:inherit; font-size:.75rem; } .field-input:focus { border-color:var(--primary-color); box-shadow:0 0 0 3px var(--sea-primary-ring); } .role-pill,.status-pill { display:inline-flex; border-radius:999px; padding:.3rem .55rem; font-size:.62rem; font-weight:800; } .role-pill { background:var(--sea-primary-soft); color:var(--primary-color); } .status-pill.active { background:#dcfce7; color:#047857; } .status-pill.warning { background:#fef3c7; color:#92400e; } .status-pill.inactive { background:#f1f5f9; color:#64748b; } .icon-button { display:inline-grid; width:2rem; height:2rem; place-items:center; border:1px solid var(--surface-border); border-radius:.55rem; background:var(--surface-card); color:var(--text-color-secondary); cursor:pointer; } .icon-button:hover { color:var(--primary-color); border-color:var(--primary-color); } .icon-button.warning:hover { color:#b45309; border-color:#f59e0b; } .modal-backdrop { position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:1rem; background:rgba(15,23,42,.62); } .modal-card { width:min(100%, 50rem); max-height:calc(100vh - 2rem); overflow:auto; border:1px solid var(--surface-border); border-radius:1rem; background:var(--surface-card); color:var(--text-color); box-shadow:0 25px 70px rgba(15,23,42,.25); } .modal-card.compact { width:min(100%, 42rem); } .eyebrow { margin:0 0 .35rem; color:var(--primary-color); font-size:.62rem; font-weight:900; letter-spacing:.12em; text-transform:uppercase; } .form-label { display:grid; gap:.4rem; color:var(--text-color); font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; } .form-label small { color:var(--text-color-secondary); font-size:.62rem; font-weight:600; text-transform:none; letter-spacing:0; } .section-title { display:flex; align-items:center; gap:.45rem; margin-bottom:.55rem; color:var(--text-color); font-size:.75rem; font-weight:900; } .section-title i { color:var(--primary-color); } .section-title small { margin-left:auto; color:var(--text-color-secondary); font-size:.62rem; font-weight:600; } .assignment-panel { padding: .85rem; border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--surface-border)); border-radius: .85rem; background: color-mix(in srgb, var(--sea-primary-soft) 42%, var(--surface-card)); } .assignment-help { margin: -.2rem 0 .8rem; color: var(--text-color-secondary); font-size: .68rem; } .assignment-list { display: grid; gap: .45rem; max-height: 11rem; overflow: auto; } .assignment-row { display:flex; align-items:center; justify-content:space-between; gap:.7rem; padding:.6rem .7rem; border:1px solid var(--surface-border); border-radius:.65rem; background:var(--surface-card); } .assignment-row strong,.assignment-row small { display:block; } .assignment-row strong { color:var(--text-color); font-size:.7rem; } .assignment-row small { margin-top:.15rem; color:var(--text-color-secondary); font-size:.61rem; line-height:1.35; } .assignment-empty { margin:.65rem 0 0; color:var(--text-color-secondary); font-size:.68rem; } .check-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(12rem,1fr)); gap:.5rem; max-height:10rem; overflow:auto; padding:.1rem; } .check-item { display:flex; align-items:flex-start; gap:.5rem; padding:.6rem; border:1px solid var(--surface-border); border-radius:.65rem; background:var(--surface-ground); cursor:pointer; } .check-item:has(input:checked) { border-color:var(--primary-color); background:var(--sea-primary-soft); } .check-item input { margin-top:.16rem; accent-color:var(--primary-color); } .check-item strong,.check-item small { display:block; } .check-item strong { color:var(--text-color); font-size:.69rem; } .check-item small { margin-top:.15rem; color:var(--text-color-secondary); font-size:.61rem; line-height:1.3; } .empty-note { color:#b45309; font-size:.7rem; } .message { display:flex; gap:.5rem; padding:.7rem .8rem; border-radius:.65rem; font-size:.72rem; line-height:1.45; } .message.error { border:1px solid var(--sea-danger-border); background:var(--sea-danger-soft); color:var(--sea-danger); } .message.info { border:1px solid #bae6fd; background:#f0f9ff; color:#0369a1; } .result-box { display:grid; place-items:center; padding:.8rem; border:1px solid var(--surface-border); border-radius:.75rem; background:var(--surface-ground); } .result-box strong { font-size:1.4rem; } .result-box span { color:var(--text-color-secondary); font-size:.65rem; } .result-box.success { border-color:#a7f3d0; background:#ecfdf5; color:#047857; } .toast-message,.toast-credential { position:fixed; right:1.5rem; bottom:1.5rem; z-index:1100; display:flex; align-items:center; gap:.65rem; padding:.8rem 1rem; border-radius:.75rem; background:#0f172a; color:#fff; box-shadow:0 12px 30px rgba(15,23,42,.22); font-size:.75rem; } .toast-message i { color:#6ee7b7; } .error-toast i { color:#fca5a5; } .toast-credential { bottom:5.5rem; background:#047857; } .toast-credential span { display:block; margin-top:.2rem; font-size:.68rem; } .toast-credential button { margin-left:.5rem; color:#fff; } @media(max-width:700px) { .filter-toolbar,.sea-filter-toolbar { grid-template-columns:1fr; } .view-tab { flex:1 0 auto; } } @media(max-width:640px) { .toast-message,.toast-credential { left:1rem; right:1rem; } }
+  `,
+    `.campus-group { margin-top:.8rem; padding-top:.75rem; border-top:1px solid var(--surface-border); } .campus-group-title { display:flex; justify-content:space-between; gap:.75rem; margin-bottom:.45rem; color:var(--text-color); font-size:.7rem; } .campus-group-title small { color:var(--text-color-secondary); font-size:.61rem; } .campus-grid { max-height:none; } .campus-disabled { opacity:.7; } .campus-status { margin-left:auto; display:inline-flex; align-items:center; gap:.25rem; border:0; border-radius:999px; padding:.25rem .4rem; background:#fef2f2; color:#b91c1c; font-size:.56rem; font-weight:800; cursor:pointer; } .campus-status.enabled { background:#ecfdf5; color:#047857; }`
+  ]
 })
 export class UsuariosSistemaComponent implements OnInit {
+  @Input() contexto: 'EVALUACIONES' | 'INSTITUCIONAL' = 'INSTITUCIONAL';
+
   private readonly service = inject(UsuariosSistemaService);
   private readonly gateway = inject(UnitepcGatewayService);
   private readonly auth = inject(AuthService);
@@ -264,10 +309,23 @@ export class UsuariosSistemaComponent implements OnInit {
   public readonly filtroDocenteSea = signal('');
   public sedes: BranchOffice[] = [];
   public carreras: Career[] = [];
+  public carrerasAsignacion: Career[] = [];
+  public asignaturasAsignacion: Course[] = [];
+  public sedeAsignacionCodigo = '';
+  public carreraAsignacionCodigo = '';
+  public asignaturaAsignacionCodigo = '';
+  public cargandoCarreras = false;
+  public cargandoAsignaturas = false;
+  public asignacionesSeleccionadas: AsignacionAcademica[] = [];
+  public campusesPorSede = new Map<string, Campus[]>();
   public usuarioEditando: UsuarioSistema | null = null;
   public form: UsuarioSistemaRequest = this.formularioVacio();
   private sedesSeleccionadas = new Map<string, AlcanceAcademico>();
   private carrerasSeleccionadas = new Map<string, AlcanceAcademico>();
+  private campusesSeleccionados = new Map<string, AlcanceCampus>();
+
+  private readonly rolesDeEvaluaciones = new Set(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']);
+  private readonly rolesInstitucionales = new Set(['ADMINISTRADOR_SISTEMA', 'DIRECTOR_CARRERA', 'DOCENTE', 'VICERRECTOR']);
 
   private readonly catalogoRolesBase: RolCatalogo[] = [
     {
@@ -300,7 +358,7 @@ export class UsuariosSistemaComponent implements OnInit {
       codigo: 'PERSONAL_EVALUACIONES',
       nombre: 'Personal de evaluaciones',
       descripcion: 'Opera las actividades diarias de preparación, entrega, recepción y calificación.',
-      alcance: 'Sedes y carreras asignadas',
+      alcance: 'Sedes y campus asignados',
       permisos: [
         'Consultar roles de examen asignados.',
         'Generar e imprimir exámenes y cartillas.',
@@ -351,12 +409,13 @@ export class UsuariosSistemaComponent implements OnInit {
   ];
 
   public readonly rolesConPermisos = computed<RolCatalogo[]>(() => {
+    const codigosVisibles = this.codigosRolesContexto();
     const rolesDelServicio = new Map(this.roles().map(rol => [rol.codigo, rol]));
-    const rolesBase = this.catalogoRolesBase.map(rol => {
+    const rolesBase = this.catalogoRolesBase.filter(rol => codigosVisibles.has(rol.codigo)).map(rol => {
       const rolDelServicio = rolesDelServicio.get(rol.codigo);
       return rolDelServicio ? { ...rol, nombre: rolDelServicio.nombre, descripcion: rolDelServicio.descripcion || rol.descripcion } : rol;
     });
-    const rolesNoDocumentados = this.roles().filter(rol => !this.catalogoRolesBase.some(base => base.codigo === rol.codigo)).map(rol => ({
+    const rolesNoDocumentados = this.roles().filter(rol => codigosVisibles.has(rol.codigo) && !this.catalogoRolesBase.some(base => base.codigo === rol.codigo)).map(rol => ({
       ...rol,
       descripcion: rol.descripcion || 'Perfil institucional definido en el servicio de acceso.',
       alcance: 'Definido por administración',
@@ -366,13 +425,15 @@ export class UsuariosSistemaComponent implements OnInit {
     return [...rolesBase, ...rolesNoDocumentados];
   });
 
-  public readonly activos = computed(() => this.usuarios().filter(item => item.activo).length);
-  public readonly pendientesClave = computed(() => this.usuarios().filter(item => item.debeCambiarContrasena).length);
+  public readonly rolesVisibles = computed(() => this.roles().filter(rol => this.codigosRolesContexto().has(rol.codigo)));
+  public readonly usuariosVisibles = computed(() => this.usuarios().filter(usuario => this.codigosRolesContexto().has(usuario.rol)));
+  public readonly activos = computed(() => this.usuariosVisibles().filter(item => item.activo).length);
+  public readonly pendientesClave = computed(() => this.usuariosVisibles().filter(item => item.debeCambiarContrasena).length);
   public readonly usuariosFiltrados = computed(() => {
     const query = this.busqueda().trim().toLowerCase();
     const rol = this.filtroRol();
     const estado = this.filtroEstado();
-    return this.usuarios().filter(item => {
+    return this.usuariosVisibles().filter(item => {
       const texto = `${item.ci} ${item.usuario} ${item.nombreCompleto} ${item.rolNombre}`.toLowerCase();
       return (!query || texto.includes(query)) && (!rol || item.rol === rol) && (estado === 'TODOS' || (estado === 'ACTIVOS' ? item.activo : !item.activo));
     });
@@ -392,32 +453,167 @@ export class UsuariosSistemaComponent implements OnInit {
 
   public rolesPermitidos(): RolSistema[] {
     return this.auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
-      ? this.roles()
-      : this.roles().filter(rol => rol.codigo !== 'ADMINISTRADOR_SISTEMA');
+      ? this.rolesVisibles()
+      : this.rolesVisibles().filter(rol => rol.codigo !== 'ADMINISTRADOR_SISTEMA');
   }
 
   public cambiarVista(vista: 'usuarios' | 'sea' | 'roles'): void { this.vistaActual.set(vista); }
 
+  private codigosRolesContexto(): Set<string> {
+    return this.contexto === 'EVALUACIONES' ? this.rolesDeEvaluaciones : this.rolesInstitucionales;
+  }
+
   public abrirNuevo(): void {
-    this.usuarioEditando = null; this.form = this.formularioVacio(); this.sedesSeleccionadas.clear(); this.carrerasSeleccionadas.clear(); this.error.set(null); this.formularioAbierto.set(true);
+    this.usuarioEditando = null; this.form = this.formularioVacio(); this.sedesSeleccionadas.clear(); this.carrerasSeleccionadas.clear(); this.campusesSeleccionados.clear(); this.campusesPorSede.clear(); this.limpiarConstructorAsignaciones(); this.error.set(null); this.formularioAbierto.set(true);
   }
 
   public editar(usuario: UsuarioSistema): void {
-    this.usuarioEditando = usuario; this.form = { ci: usuario.ci, nombreCompleto: usuario.nombreCompleto, rolCodigo: usuario.rol, activo: usuario.activo, sedes: [...usuario.sedes], carreras: [...usuario.carreras] }; this.sedesSeleccionadas = new Map(usuario.sedes.map(item => [item.codigo, item])); this.carrerasSeleccionadas = new Map(usuario.carreras.map(item => [item.codigo, item])); this.error.set(null); this.formularioAbierto.set(true);
+    const campuses = [...(usuario.campuses || [])];
+    this.usuarioEditando = usuario; this.form = { ci: usuario.ci, nombreCompleto: usuario.nombreCompleto, rolCodigo: usuario.rol, activo: usuario.activo, sedes: [...usuario.sedes], carreras: [...usuario.carreras], campuses, asignaciones: [...(usuario.asignaciones || [])] }; this.sedesSeleccionadas = new Map(usuario.sedes.map(item => [item.codigo, item])); this.carrerasSeleccionadas = new Map(usuario.carreras.map(item => [item.codigo, item])); this.campusesSeleccionados = new Map(campuses.map(item => [this.claveCampus(item.sedeCodigo, item), item])); this.campusesPorSede.clear(); this.asignacionesSeleccionadas = [...(usuario.asignaciones || [])]; this.limpiarSeleccionAsignacion(); this.error.set(null); this.formularioAbierto.set(true);
+    this.sedesParaCampus().forEach(sede => this.cargarCampusSede(sede));
   }
 
   public cerrarFormulario(): void { if (!this.guardando()) this.formularioAbierto.set(false); }
 
   public tieneSede(codigo: string): boolean { return this.sedesSeleccionadas.has(codigo); }
   public tieneCarrera(codigo: string): boolean { return this.carrerasSeleccionadas.has(codigo); }
-  public alternarSede(sede: BranchOffice): void { this.tieneSede(sede.code) ? this.sedesSeleccionadas.delete(sede.code) : this.sedesSeleccionadas.set(sede.code, { codigo: sede.code, nombre: sede.name }); }
+  public alternarSede(sede: BranchOffice): void {
+    if (this.tieneSede(sede.code)) {
+      this.sedesSeleccionadas.delete(sede.code);
+      [...this.campusesSeleccionados.keys()].filter(clave => clave.startsWith(`${sede.code}|`)).forEach(clave => this.campusesSeleccionados.delete(clave));
+    } else {
+      this.sedesSeleccionadas.set(sede.code, { codigo: sede.code, nombre: sede.name });
+      this.cargarCampusSede(sede);
+    }
+  }
   public alternarCarrera(carrera: Career): void { this.tieneCarrera(carrera.careerCode) ? this.carrerasSeleccionadas.delete(carrera.careerCode) : this.carrerasSeleccionadas.set(carrera.careerCode, { codigo: carrera.careerCode, nombre: carrera.careerName }); }
+
+  public esPersonalEvaluacionesSeleccionado(): boolean { return this.form.rolCodigo === 'PERSONAL_EVALUACIONES'; }
+  public sedesParaCampus(): BranchOffice[] { return this.sedes.filter(sede => this.tieneSede(sede.code)); }
+  public campusDeSede(sedeCodigo: string): Campus[] { return this.campusesPorSede.get(sedeCodigo) || []; }
+  public cargarCampusSede(sede: BranchOffice): void {
+    if (this.campusesPorSede.has(sede.code)) return;
+    this.gateway.getCampuses(sede.branchOfficeId).pipe(catchError(() => of([] as Campus[]))).subscribe(campuses => {
+      this.campusesPorSede.set(sede.code, [...campuses].sort((a, b) => (a.code || a.name).localeCompare(b.code || b.name)));
+      this.campusesPorSede = new Map(this.campusesPorSede);
+    });
+  }
+  public claveCampus(sedeCodigo: string, campus: Campus | AlcanceCampus): string {
+    const item = campus as Campus & AlcanceCampus;
+    return `${sedeCodigo}|${item.campusId || item.campusCodigo || item.code || item.campusNombre || item.name}`;
+  }
+  public tieneCampus(sedeCodigo: string, campus: Campus): boolean { return this.campusesSeleccionados.has(this.claveCampus(sedeCodigo, campus)); }
+  public campusHabilitado(sedeCodigo: string, campus: Campus): boolean { return this.campusesSeleccionados.get(this.claveCampus(sedeCodigo, campus))?.habilitado ?? false; }
+  public alternarCampus(sede: BranchOffice, campus: Campus): void {
+    const clave = this.claveCampus(sede.code, campus);
+    if (this.campusesSeleccionados.has(clave)) {
+      this.campusesSeleccionados.delete(clave);
+    } else {
+      this.campusesSeleccionados.set(clave, { sedeCodigo: sede.code, sedeNombre: sede.name, campusId: campus.campusId || '', campusCodigo: campus.code || '', campusNombre: campus.name, habilitado: true });
+    }
+  }
+  public alternarEstadoCampus(sedeCodigo: string, campus: Campus): void {
+    const clave = this.claveCampus(sedeCodigo, campus);
+    const actual = this.campusesSeleccionados.get(clave);
+    if (actual) this.campusesSeleccionados.set(clave, { ...actual, habilitado: !actual.habilitado });
+  }
+
+  public cambiarRol(rol: string): void {
+    this.limpiarConstructorAsignaciones();
+    // Las asignaciones pertenecen al tipo de rol; nunca se arrastran al cambiar
+    // entre docente, director u otro perfil.
+    this.asignacionesSeleccionadas = [];
+    this.campusesSeleccionados.clear();
+    if (rol === 'PERSONAL_EVALUACIONES') this.sedesSeleccionadas.clear();
+  }
+
+  public requiereAsignacionesAcademicas(): boolean {
+    return this.esRolDeAsignaciones(this.form.rolCodigo);
+  }
+
+  public esDocenteSeleccionado(): boolean { return this.form.rolCodigo === 'DOCENTE'; }
+
+  public esRolConAlcanceSimple(): boolean {
+    return !this.requiereAsignacionesAcademicas();
+  }
+
+  public mostrarCarrerasAsignacion(): boolean {
+    return this.requiereAsignacionesAcademicas() && !!this.sedeAsignacionCodigo;
+  }
+
+  public cambiarSedeAsignacion(codigo: string): void {
+    this.sedeAsignacionCodigo = codigo || '';
+    this.carreraAsignacionCodigo = '';
+    this.asignaturaAsignacionCodigo = '';
+    this.carrerasAsignacion = [];
+    this.asignaturasAsignacion = [];
+    if (!this.sedeAsignacionCodigo) return;
+    this.cargandoCarreras = true;
+    this.gateway.getCareers(this.sedeAsignacionCodigo).pipe(catchError(() => of([] as Career[]))).subscribe(carreras => {
+      this.carrerasAsignacion = [...carreras].sort((a, b) => a.careerCode.localeCompare(b.careerCode));
+      this.cargandoCarreras = false;
+    });
+  }
+
+  public cambiarCarreraAsignacion(codigo: string): void {
+    this.carreraAsignacionCodigo = codigo || '';
+    this.asignaturaAsignacionCodigo = '';
+    this.asignaturasAsignacion = [];
+    if (!this.esDocenteSeleccionado() || !this.sedeAsignacionCodigo || !this.carreraAsignacionCodigo) return;
+    this.cargandoAsignaturas = true;
+    this.gateway.getCourses(this.sedeAsignacionCodigo, this.carreraAsignacionCodigo).pipe(catchError(() => of([] as Course[]))).subscribe(asignaturas => {
+      this.asignaturasAsignacion = [...asignaturas].sort((a, b) => a.courseCode.localeCompare(b.courseCode));
+      this.cargandoAsignaturas = false;
+    });
+  }
+
+  public puedeAgregarAsignacion(): boolean {
+    return !!this.sedeAsignacionCodigo && !!this.carreraAsignacionCodigo
+      && (!this.esDocenteSeleccionado() || !!this.asignaturaAsignacionCodigo);
+  }
+
+  public agregarAsignacion(): void {
+    if (!this.puedeAgregarAsignacion()) return;
+    const sede = this.sedes.find(item => item.code === this.sedeAsignacionCodigo);
+    const carrera = this.carrerasAsignacion.find(item => item.careerCode === this.carreraAsignacionCodigo);
+    const asignatura = this.asignaturasAsignacion.find(item => item.courseCode === this.asignaturaAsignacionCodigo);
+    if (!sede || !carrera || (this.esDocenteSeleccionado() && !asignatura)) return;
+    const nueva: AsignacionAcademica = {
+      sedeCodigo: sede.code, sedeNombre: sede.name,
+      carreraCodigo: carrera.careerCode, carreraNombre: carrera.careerName,
+      asignaturaCodigo: asignatura?.courseCode || '', asignaturaNombre: asignatura?.courseName || ''
+    };
+    if (!this.asignacionesSeleccionadas.some(item => this.claveAsignacion(item) === this.claveAsignacion(nueva))) {
+      this.asignacionesSeleccionadas = [...this.asignacionesSeleccionadas, nueva];
+    }
+    this.carreraAsignacionCodigo = '';
+    this.asignaturaAsignacionCodigo = '';
+    this.asignaturasAsignacion = [];
+  }
+
+  public quitarAsignacion(asignacion: AsignacionAcademica): void {
+    const clave = this.claveAsignacion(asignacion);
+    this.asignacionesSeleccionadas = this.asignacionesSeleccionadas.filter(item => this.claveAsignacion(item) !== clave);
+  }
+
+  public claveAsignacion(asignacion: AsignacionAcademica): string {
+    return `${asignacion.sedeCodigo}|${asignacion.carreraCodigo}|${asignacion.asignaturaCodigo || ''}`;
+  }
 
   public guardar(): void {
     this.error.set(null); this.guardando.set(true);
-    const request = { ...this.form, ci: this.form.ci.trim(), sedes: [...this.sedesSeleccionadas.values()], carreras: [...this.carrerasSeleccionadas.values()] };
+    const asignaciones = this.requiereAsignacionesAcademicas() ? [...this.asignacionesSeleccionadas] : [];
+    const usaRelacionesNuevas = this.requiereAsignacionesAcademicas() && asignaciones.length > 0;
+    const sedes = usaRelacionesNuevas
+      ? this.alcancesDesdeAsignaciones(asignaciones, 'sede')
+      : [...this.sedesSeleccionadas.values()];
+    const carreras = usaRelacionesNuevas
+      ? this.alcancesDesdeAsignaciones(asignaciones, 'carrera')
+      : [...this.carrerasSeleccionadas.values()];
+    const campuses = this.esPersonalEvaluacionesSeleccionado() ? [...this.campusesSeleccionados.values()] : [];
+    const request = { ...this.form, ci: this.form.ci.trim(), sedes, carreras: this.esPersonalEvaluacionesSeleccionado() ? [] : carreras, campuses, asignaciones };
     const operation = this.usuarioEditando ? this.service.actualizar(this.usuarioEditando.id, request) : this.service.crear(request);
-    operation.subscribe({ next: () => { this.guardando.set(false); this.formularioAbierto.set(false); this.cargarUsuarios(); this.mostrarMensaje(this.usuarioEditando ? 'Usuario actualizado correctamente.' : 'Usuario registrado. La clave inicial es el CI.'); }, error: error => { this.guardando.set(false); this.error.set(error?.error?.message || 'No se pudo guardar el usuario.'); } });
+    operation.subscribe({ next: () => { this.guardando.set(false); this.formularioAbierto.set(false); this.cargarUsuarios(); this.mostrarMensaje(this.usuarioEditando ? 'Usuario actualizado correctamente.' : 'Usuario registrado. La clave inicial es el CI.'); }, error: error => { this.guardando.set(false); this.error.set(error?.error?.message || error?.error?.error || error?.message || 'No se pudo guardar el usuario.'); } });
   }
 
   public importar(event: Event): void { const input = event.target as HTMLInputElement; const archivo = input.files?.[0]; if (!archivo) return; this.service.importar(archivo).subscribe({ next: resultado => { this.resultadoImportacion.set(resultado); this.cargarUsuarios(); input.value = ''; }, error: error => { this.mostrarError(error); input.value = ''; } }); }
@@ -500,12 +696,24 @@ export class UsuariosSistemaComponent implements OnInit {
     this.service.restablecerContrasena(usuario.id).subscribe({ next: credencial => { this.credencialMostrada.set(credencial); this.cargarUsuarios(); }, error: error => this.mostrarError(error) });
   }
 
-  public resumenAlcance(usuario: UsuarioSistema): string { const sedes = usuario.sedes?.length || 0; const carreras = usuario.carreras?.length || 0; return `${sedes} sede${sedes === 1 ? '' : 's'} · ${carreras} carrera${carreras === 1 ? '' : 's'}`; }
-  public nombresAlcance(usuario: UsuarioSistema): string { return [...(usuario.sedes || []).map(item => item.codigo), ...(usuario.carreras || []).map(item => item.codigo)].join(' · ') || 'Sin alcance específico registrado'; }
+  public resumenAlcance(usuario: UsuarioSistema): string { const asignaciones = usuario.asignaciones?.length || 0; if (asignaciones) return `${asignaciones} asignación${asignaciones === 1 ? '' : 'es'}`; const campuses = usuario.campuses?.length || 0; if (campuses) { const habilitados = usuario.campuses.filter(item => item.habilitado).length; return `${usuario.sedes?.length || 0} sede${(usuario.sedes?.length || 0) === 1 ? '' : 's'} · ${campuses} campus · ${habilitados} habilitado${habilitados === 1 ? '' : 's'}`; } const sedes = usuario.sedes?.length || 0; const carreras = usuario.carreras?.length || 0; return `${sedes} sede${sedes === 1 ? '' : 's'} · ${carreras} carrera${carreras === 1 ? '' : 's'}`; }
+  public nombresAlcance(usuario: UsuarioSistema): string { if (usuario.asignaciones?.length) return usuario.asignaciones.map(item => `${item.sedeCodigo}/${item.carreraCodigo}${item.asignaturaCodigo ? '/' + item.asignaturaCodigo : ''}`).join(' · '); if (usuario.campuses?.length) return usuario.campuses.map(item => `${item.sedeCodigo}/${item.campusCodigo || item.campusNombre} · ${item.habilitado ? 'Habilitado' : 'Deshabilitado'}`).join(' · '); return [...(usuario.sedes || []).map(item => item.codigo), ...(usuario.carreras || []).map(item => item.codigo)].join(' · ') || 'Sin alcance específico registrado'; }
 
-  private formularioVacio(): UsuarioSistemaRequest { return { ci: '', nombreCompleto: '', rolCodigo: 'DOCENTE', activo: true, sedes: [], carreras: [] }; }
-  private cargarUsuarios(): void { this.service.listar().subscribe({ next: usuarios => this.usuarios.set(usuarios), error: error => this.mostrarError(error) }); }
+  private formularioVacio(): UsuarioSistemaRequest { return { ci: '', nombreCompleto: '', rolCodigo: 'DOCENTE', activo: true, sedes: [], carreras: [], campuses: [], asignaciones: [] }; }
+  private cargarUsuarios(): void { this.service.listar(this.contexto).subscribe({ next: usuarios => this.usuarios.set(usuarios), error: error => this.mostrarError(error) }); }
   private cargarCatalogo(): void { this.gateway.getBranchOffices().pipe(switchMap(sedes => { this.sedes = sedes; return sedes.length ? forkJoin(sedes.map(sede => this.gateway.getCareers(sede.code).pipe(catchError(() => of([] as Career[]))))).pipe(map(listas => listas.flat())) : of([] as Career[]); })).subscribe({ next: carreras => { const unicas = new Map<string, Career>(); carreras.forEach(carrera => unicas.set(carrera.careerCode, carrera)); this.carreras = [...unicas.values()].sort((a, b) => a.careerCode.localeCompare(b.careerCode)); }, error: () => { this.sedes = []; this.carreras = []; } }); }
+  private esRolDeAsignaciones(rol: string): boolean { return rol === 'DIRECTOR_CARRERA' || rol === 'DOCENTE'; }
+  private limpiarSeleccionAsignacion(): void { this.sedeAsignacionCodigo = ''; this.carreraAsignacionCodigo = ''; this.asignaturaAsignacionCodigo = ''; this.carrerasAsignacion = []; this.asignaturasAsignacion = []; this.cargandoCarreras = false; this.cargandoAsignaturas = false; }
+  private limpiarConstructorAsignaciones(): void { this.limpiarSeleccionAsignacion(); }
+  private alcancesDesdeAsignaciones(asignaciones: AsignacionAcademica[], tipo: 'sede' | 'carrera'): AlcanceAcademico[] {
+    const unicos = new Map<string, AlcanceAcademico>();
+    asignaciones.forEach(item => {
+      const codigo = tipo === 'sede' ? item.sedeCodigo : item.carreraCodigo;
+      const nombre = tipo === 'sede' ? item.sedeNombre : item.carreraNombre;
+      if (codigo) unicos.set(codigo, { codigo, nombre });
+    });
+    return [...unicos.values()];
+  }
   private ejecutarSincronizacion(cis: string[], desactivarAusentes: boolean): void {
     this.sincronizandoDocentesSea.set(true);
     this.service.sincronizarDocentesSea(cis, desactivarAusentes, this.gestionSea.trim() || '2-2026').subscribe({

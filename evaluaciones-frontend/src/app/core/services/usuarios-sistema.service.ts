@@ -7,6 +7,24 @@ export interface AlcanceAcademico {
   nombre: string;
 }
 
+export interface AsignacionAcademica {
+  sedeCodigo: string;
+  sedeNombre: string;
+  carreraCodigo: string;
+  carreraNombre: string;
+  asignaturaCodigo?: string;
+  asignaturaNombre?: string;
+}
+
+export interface AlcanceCampus {
+  sedeCodigo: string;
+  sedeNombre: string;
+  campusId?: string;
+  campusCodigo?: string;
+  campusNombre: string;
+  habilitado: boolean;
+}
+
 export interface RolSistema {
   codigo: string;
   nombre: string;
@@ -25,6 +43,8 @@ export interface UsuarioSistema {
   proveedorIdentidad: string;
   sedes: AlcanceAcademico[];
   carreras: AlcanceAcademico[];
+  campuses: AlcanceCampus[];
+  asignaciones: AsignacionAcademica[];
   ultimoIngreso?: string;
   creadoEn?: string;
 }
@@ -36,6 +56,8 @@ export interface UsuarioSistemaRequest {
   activo: boolean;
   sedes: AlcanceAcademico[];
   carreras: AlcanceAcademico[];
+  campuses: AlcanceCampus[];
+  asignaciones: AsignacionAcademica[];
 }
 
 export interface CredencialTemporal {
@@ -103,8 +125,8 @@ export class UsuariosSistemaService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api/usuarios';
 
-  listar(): Observable<UsuarioSistema[]> {
-    return this.http.get<UsuarioSistema[]>(this.baseUrl);
+  listar(contexto: 'EVALUACIONES' | 'INSTITUCIONAL' = 'INSTITUCIONAL'): Observable<UsuarioSistema[]> {
+    return this.http.get<UsuarioSistema[]>(this.baseUrl, { params: { contexto } });
   }
 
   listarRoles(): Observable<RolSistema[]> {

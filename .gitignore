@@ -51,6 +51,11 @@ bases/page-*.png
 bases/verify_*
 bases/test_*
 
+# Artefactos generados localmente (pueden contener exámenes o ciphertext)
+/storage/*
+/outputs/*
+/evaluaciones-workers/test_output/*
+
 # Llaves y secretos locales de Vault (nunca versionar)
 vault/secrets/*
 !vault/secrets/README.md

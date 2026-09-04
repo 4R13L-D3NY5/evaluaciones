@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
+import { UsuariosSistemaComponent } from '../usuarios-sistema/usuarios-sistema.component';
 
 export interface CampusItem {
   id: number;
@@ -38,7 +39,7 @@ export interface ParcialConfig {
 @Component({
   selector: 'sea-administracion-evaluaciones',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UsuariosSistemaComponent],
   template: `
     <div class="space-y-6">
       
@@ -85,7 +86,7 @@ export interface ParcialConfig {
             [class]="tabActual() === 'usuarios' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
             class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
             <i class="pi pi-users text-xs"></i>
-            <span>Usuarios Evaluadores</span>
+            <span>Usuarios y accesos</span>
           </button>
 
           <button 
@@ -317,120 +318,8 @@ export interface ParcialConfig {
           <!-- TAB 3: USUARIOS EVALUADORES -->
           <!-- ============================================================ -->
           @if (tabActual() === 'usuarios') {
-            <div class="space-y-5 animate-fade-in">
-              
-              <!-- Sub-Cabecera -->
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 class="text-base font-black text-foreground">Usuarios de Evaluaciones</h3>
-                  <p class="text-xs text-muted-foreground">Asigna usuarios con el rol Evaluaciones a uno o más campus.</p>
-                </div>
-
-                <button 
-                  (click)="abrirModalUsuario()"
-                  class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs transition-colors">
-                  <i class="pi pi-user-plus"></i>
-                  <span>Agregar Evaluador</span>
-                </button>
-              </div>
-
-              <!-- Filtro por Campus -->
-              <div class="max-w-xs">
-                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">Filtrar por Campus</label>
-                <select 
-                  [(ngModel)]="filtroCampusUsuarios"
-                  class="w-full bg-muted/60 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
-                  <option value="Todos">Todos los Campus</option>
-                  @for (c of listaCampus; track c.id) {
-                    <option [value]="c.nombre">{{ c.nombre }}</option>
-                  }
-                </select>
-              </div>
-
-              <!-- Tabla de Usuarios Evaluadores -->
-              <div class="border border-border rounded-xl overflow-hidden shadow-2xs">
-                <table class="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr class="bg-muted/40 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                      <th class="p-3.5">Usuario</th>
-                      <th class="p-3.5">Campus</th>
-                      <th class="p-3.5">Carreras Asignadas</th>
-                      <th class="p-3.5 text-center">Acceso al Sistema</th>
-                      <th class="p-3.5 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-border">
-                    @for (usr of usuariosEvaluadoresFiltrados(); track usr.id) {
-                      <tr class="hover:bg-muted/20 transition-colors">
-                        
-                        <!-- Avatar y Nombre -->
-                        <td class="p-3.5">
-                          <div class="flex items-center gap-2.5">
-                            <div class="h-8 w-8 rounded-full bg-purple-700 text-white flex items-center justify-center font-black text-xs shrink-0">
-                              {{ usr.nombre.charAt(0) }}
-                            </div>
-                            <div>
-                              <div class="font-black text-foreground">{{ usr.nombre }}</div>
-                              <div class="text-[10px] text-muted-foreground">{{ usr.email }}</div>
-                            </div>
-                          </div>
-                        </td>
-
-                        <!-- Campus Chips -->
-                        <td class="p-3.5">
-                          <div class="flex flex-wrap gap-1">
-                            @for (camp of usr.campus; track camp) {
-                              <span class="bg-purple-50 text-purple-800 border border-purple-200 text-[10px] font-black px-2 py-0.5 rounded-full">
-                                {{ camp }}
-                              </span>
-                            }
-                          </div>
-                        </td>
-
-                        <!-- Carreras Chips -->
-                        <td class="p-3.5">
-                          <div class="flex flex-wrap gap-1">
-                            @for (carr of usr.carreras; track carr) {
-                              <span class="bg-blue-50 text-blue-800 border border-blue-200 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                                {{ carr }}
-                              </span>
-                            }
-                          </div>
-                        </td>
-
-                        <!-- Acceso al Sistema -->
-                        <td class="p-3.5 text-center">
-                          <div class="inline-flex items-center gap-2">
-                            <button 
-                              (click)="toggleAccesoUsuario(usr)"
-                              [class]="usr.activo ? 'bg-emerald-500' : 'bg-slate-300'"
-                              class="w-8 h-4 rounded-full p-0.5 transition-colors relative flex items-center">
-                              <div [class]="usr.activo ? 'translate-x-4 bg-white' : 'translate-x-0 bg-white'" class="w-3 h-3 rounded-full shadow-md transform transition-transform"></div>
-                            </button>
-                            <span [class]="usr.activo ? 'text-emerald-700 font-bold text-[10px]' : 'text-slate-400 font-bold text-[10px]'">
-                              {{ usr.activo ? 'Activo' : 'Inactivo' }}
-                            </span>
-                          </div>
-                        </td>
-
-                        <!-- Acciones -->
-                        <td class="p-3.5 text-right">
-                          <div class="inline-flex items-center gap-1.5">
-                            <button (click)="abrirModalUsuario(usr)" title="Editar" class="text-amber-600 hover:bg-amber-50 p-1.5 rounded-lg">
-                              <i class="pi pi-pencil text-xs"></i>
-                            </button>
-                            <button (click)="quitarRolUsuario(usr)" title="Quitar rol" class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg">
-                              <i class="pi pi-user-minus text-xs"></i>
-                            </button>
-                          </div>
-                        </td>
-
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-
+            <div class="animate-fade-in">
+              <sea-usuarios-sistema [contexto]="'EVALUACIONES'"></sea-usuarios-sistema>
             </div>
           }
 

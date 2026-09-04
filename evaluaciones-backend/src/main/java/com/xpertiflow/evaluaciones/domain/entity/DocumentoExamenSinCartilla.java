@@ -19,6 +19,12 @@ public class DocumentoExamenSinCartilla {
     @Column(name = "tamano_bytes", nullable = false) private Long tamanoBytes;
     @Column(name = "hash_sha256", nullable = false, length = 128) private String hashSha256;
     @Column(name = "archivo_path", nullable = false, length = 500) private String archivoPath;
+    @Column(name = "dek_envuelta", columnDefinition = "TEXT") private String dekEnvuelta;
+    @Column(name = "nonce", length = 64) private String nonce;
+    @Column(name = "kek_referencia", length = 255) private String kekReferencia;
+    @Column(name = "kek_version", length = 32) private String kekVersion;
+    @Column(name = "algoritmo_cifrado", length = 80) private String algoritmoCifrado;
+    @Column(name = "archivo_cifrado", nullable = false) private boolean archivoCifrado;
     @Column(name = "cargado_por", nullable = false, length = 100) private String cargadoPor;
     @Column(name = "cargado_en", nullable = false) private LocalDateTime cargadoEn = LocalDateTime.now();
 }

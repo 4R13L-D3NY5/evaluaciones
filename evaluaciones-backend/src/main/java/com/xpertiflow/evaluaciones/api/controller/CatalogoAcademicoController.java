@@ -79,8 +79,36 @@ public class CatalogoAcademicoController {
 
     @GetMapping("/campus")
     @Operation(summary = "Listar campus físicos")
-    public ResponseEntity<List<CampusDto>> campus(@RequestParam(required = false) String branchOfficeId) {
-        return ResponseEntity.ok(unitepcGatewayClient.getCampuses(branchOfficeId));
+    public ResponseEntity<List<CampusDto>> campus(@RequestParam(required = false) String branchOfficeId,
+                                                  Authentication authentication) {
+        // El personal debe solicitar el campus dentro de una sede ya autorizada;
+        // no se expone un catálogo global para evitar ampliar su alcance.
+        if (authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_PERSONAL_EVALUACIONES"))
+                && (branchOfficeId == null || branchOfficeId.isBlank())) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        if (branchOfficeId != null && !branchOfficeId.isBlank()
+                && !puedeConsultarSedePorId(branchOfficeId, authentication)) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<CampusDto> campuses = unitepcGatewayClient.getCampuses(branchOfficeId);
+        String sedeCodigo = unitepcGatewayClient.getBranchOffices().stream()
+                .filter(sede -> branchOfficeId != null && branchOfficeId.equalsIgnoreCase(sede.getBranchOfficeId()))
+                .map(BranchOfficeDto::getCode)
+                .findFirst()
+                .orElse(null);
+        return ResponseEntity.ok(accesoAcademicoService.filtrarCampusParaUsuario(campuses, sedeCodigo, authentication));
+    }
+
+    private boolean puedeConsultarSedePorId(String branchOfficeId, Authentication authentication) {
+        return unitepcGatewayClient.getBranchOffices().stream()
+                .filter(sede -> branchOfficeId.equalsIgnoreCase(sede.getBranchOfficeId()))
+                .findFirst()
+                .map(sede -> accesoAcademicoService.puedeConsultarSede(sede.getCode(), authentication))
+                .orElse(false);
     }
 
     @GetMapping("/gestiones")

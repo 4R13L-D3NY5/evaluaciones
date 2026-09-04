@@ -1,6 +1,7 @@
 package com.xpertiflow.evaluaciones.api.controller;
 
 import com.xpertiflow.evaluaciones.api.dto.AuditoriaResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.CambiarModalidadRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
@@ -31,8 +32,9 @@ public class RolExamenController {
     public ResponseEntity<List<RolExamenResponseDto>> listar(
             @RequestParam(required = false) String sedeCodigo,
             @RequestParam(required = false) String carreraCodigo,
+            @RequestParam(required = false) String campus,
             Authentication authentication) {
-        return ResponseEntity.ok(rolExamenService.listarFiltrado(sedeCodigo, carreraCodigo, authentication));
+        return ResponseEntity.ok(rolExamenService.listarFiltrado(sedeCodigo, carreraCodigo, campus, authentication));
     }
 
     @GetMapping("/{id}")
@@ -42,14 +44,14 @@ public class RolExamenController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA') and @accesoAcademicoService.puedeConsultarCarrera(#dto.sedeCodigo, #dto.carreraCodigo, authentication)")
     @Operation(summary = "Crear un nuevo rol de examen")
     public ResponseEntity<RolExamenResponseDto> crear(@Valid @RequestBody RolExamenRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(rolExamenService.crear(dto));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
     @Operation(summary = "Actualizar un rol de examen programado o validado")
     public ResponseEntity<RolExamenResponseDto> actualizar(
             @PathVariable String id,
@@ -57,8 +59,18 @@ public class RolExamenController {
         return ResponseEntity.ok(rolExamenService.actualizar(id, dto));
     }
 
+    @PutMapping("/{id}/modalidad")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
+    @Operation(summary = "Cambiar el tipo de examen programado o validado")
+    public ResponseEntity<RolExamenResponseDto> cambiarModalidad(
+            @PathVariable String id,
+            @Valid @RequestBody CambiarModalidadRequestDto dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.cambiarModalidad(id, dto.getModalidad(), authentication));
+    }
+
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
     @Operation(summary = "Eliminar un rol de examen programado o validado")
     public ResponseEntity<Void> eliminar(@PathVariable String id) {
         rolExamenService.eliminar(id);
@@ -84,8 +96,10 @@ public class RolExamenController {
     }
 
     @GetMapping("/{id}/auditoria")
+    @PreAuthorize("@accesoAcademicoService.puedeAccederRol(#id, authentication)")
     @Operation(summary = "Listar auditoría de un rol de examen")
-    public ResponseEntity<List<AuditoriaResponseDto>> auditoria(@PathVariable String id) {
-        return ResponseEntity.ok(rolExamenService.listarAuditoria(id));
+    public ResponseEntity<List<AuditoriaResponseDto>> auditoria(@PathVariable String id,
+                                                                 Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.listarAuditoria(id, authentication));
     }
 }

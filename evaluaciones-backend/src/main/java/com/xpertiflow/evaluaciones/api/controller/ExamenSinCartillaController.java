@@ -32,6 +32,7 @@ public class ExamenSinCartillaController {
     private final ExamenSinCartillaService service;
 
     @GetMapping("/{rolExamenId}/documento")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
     public ResponseEntity<DocumentoSinCartillaResponseDto> obtenerDocumento(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(service.obtenerDocumento(rolExamenId));
     }
@@ -46,6 +47,7 @@ public class ExamenSinCartillaController {
     }
 
     @GetMapping("/{rolExamenId}/documento/archivo")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
     public ResponseEntity<Resource> descargarDocumento(@PathVariable String rolExamenId) {
         var documento = service.obtenerDocumentoEntidad(rolExamenId);
         ByteArrayResource resource = new ByteArrayResource(service.descargarDocumento(rolExamenId));
@@ -59,6 +61,7 @@ public class ExamenSinCartillaController {
     }
 
     @GetMapping("/{rolExamenId}/notas")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
     public ResponseEntity<List<NotaDocenteResponseDto>> listarNotas(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(service.listarNotas(rolExamenId));
     }

@@ -84,8 +84,11 @@ public class RolExamenMapper {
                 .semestre(entity.getSemestre())
                 .grupo(entity.getGrupo())
                 .tipoClase(entity.getTipoClase())
-                .docenteNombre(null)
-                .docenteCi(null)
+                // Las respuestas de acciones (crear, editar, transición y
+                // restablecimiento) deben conservar el docente oficial que
+                // ya fue resuelto y persistido en el rol.
+                .docenteNombre(entity.getDocenteNombre())
+                .docenteCi(entity.getDocenteCi())
                 .tipoParcial(entity.getTipoParcial())
                 .version(entity.getVersion() != null ? entity.getVersion() : 1)
                 .modalidad(entity.getModalidad())

@@ -11,14 +11,20 @@ import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ConfiguracionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
+import com.xpertiflow.evaluaciones.domain.entity.LoteCartillasOmr;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
+import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
+import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.CalificacionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ConfiguracionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
+import com.xpertiflow.evaluaciones.domain.repository.LoteCartillasOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
+import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.security.BancoCifradoService;
 import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +53,8 @@ public class OmrProcesamientoService {
     private final ConfiguracionOmrRepository configuracionRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final ExamenVarianteRepository varianteRepository;
+    private final RolExamenRepository rolExamenRepository;
+    private final LoteCartillasOmrRepository loteCartillasRepository;
     private final BancoCifradoService cifradoService;
     private final Map<String, JsonNode> resultados = new ConcurrentHashMap<>();
 
@@ -62,6 +70,7 @@ public class OmrProcesamientoService {
         if (archivo == null || archivo.isEmpty()) {
             throw new IllegalArgumentException("Debe seleccionar un PDF o imagen escaneada.");
         }
+        validarCantidadPaginas(rolExamenId, archivo);
         String jobId = "OMR-" + UUID.randomUUID();
         String original = archivo.getOriginalFilename() == null ? "" : archivo.getOriginalFilename().toLowerCase(Locale.ROOT);
         String extension = original.endsWith(".pdf") ? ".pdf" : original.endsWith(".jpg") || original.endsWith(".jpeg") ? ".jpg" : ".png";
@@ -81,6 +90,41 @@ public class OmrProcesamientoService {
             return aceptado;
         } catch (IOException exception) {
             throw new IllegalStateException("No se pudo guardar el escaneo OMR", exception);
+        }
+    }
+
+    private void validarCantidadPaginas(String rolExamenId, MultipartFile archivo) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_CARTILLA) {
+            throw new IllegalArgumentException("El procesamiento OMR solo corresponde a exámenes con cartilla.");
+        }
+
+        int cartillasEsperadas = loteCartillasRepository.findFirstByRolExamenIdOrderByGeneradoEnDesc(rolExamenId)
+                .map(LoteCartillasOmr::getTotalCartillas)
+                .filter(total -> total != null && total > 0)
+                .orElse(rol.getEstudiantesInscritosCount() == null ? 0 : rol.getEstudiantesInscritosCount());
+        if (cartillasEsperadas <= 0) {
+            throw new IllegalArgumentException("No se pudo determinar la cantidad de cartillas entregadas para este rol. Genere primero el lote de cartillas.");
+        }
+
+        int paginas = contarPaginas(archivo);
+        if (paginas != cartillasEsperadas) {
+            throw new IllegalArgumentException(String.format(
+                    "El escaneado contiene %d página%s, pero el rol tiene %d cartilla%s entregada%s. Verifique que corresponda al mismo grupo y vuelva a cargar el archivo.",
+                    paginas, paginas == 1 ? "" : "s", cartillasEsperadas, cartillasEsperadas == 1 ? "" : "s", cartillasEsperadas == 1 ? "" : "s"));
+        }
+    }
+
+    private int contarPaginas(MultipartFile archivo) {
+        String nombre = archivo.getOriginalFilename() == null ? "" : archivo.getOriginalFilename().toLowerCase(Locale.ROOT);
+        if (!nombre.endsWith(".pdf") && !"application/pdf".equalsIgnoreCase(archivo.getContentType())) {
+            return 1;
+        }
+        try (PDDocument documento = PDDocument.load(archivo.getInputStream())) {
+            return documento.getNumberOfPages();
+        } catch (IOException | RuntimeException exception) {
+            throw new IllegalArgumentException("No se pudo leer el PDF escaneado para validar sus páginas. Verifique que el archivo no esté dañado.", exception);
         }
     }
 

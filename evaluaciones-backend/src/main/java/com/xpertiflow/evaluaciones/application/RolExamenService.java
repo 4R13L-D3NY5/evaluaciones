@@ -12,6 +12,7 @@ import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
+import com.xpertiflow.evaluaciones.domain.repository.DocumentoExamenSinCartillaRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.CourseDto;
@@ -34,9 +35,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RolExamenService {
 
+    private static final String ACCION_IMPRESION_MARCAS = "IMPRESION_MARCAS_OMR";
+    private static final String ACCION_IMPRESION_LISTA = "IMPRESION_LISTA_ESTUDIANTES";
+
     private final RolExamenRepository rolExamenRepository;
     private final AuditoriaEvaluacionRepository auditoriaRepository;
     private final BancoPreguntasRepository bancoPreguntasRepository;
+    private final DocumentoExamenSinCartillaRepository documentoSinCartillaRepository;
     private final RolExamenMapper mapper;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AccesoAcademicoService accesoAcademicoService;
@@ -78,6 +83,14 @@ public class RolExamenService {
 
     @Transactional(readOnly = true)
     public List<RolExamenResponseDto> listarFiltrado(String sedeCodigo, String carreraCodigo, Authentication authentication) {
+        return listarFiltrado(sedeCodigo, carreraCodigo, null, authentication);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RolExamenResponseDto> listarFiltrado(String sedeCodigo,
+                                                      String carreraCodigo,
+                                                      String campus,
+                                                      Authentication authentication) {
         List<RolExamen> roles;
         boolean tieneSede = sedeCodigo != null && !sedeCodigo.isBlank();
         boolean tieneCarrera = carreraCodigo != null && !carreraCodigo.isBlank();
@@ -90,6 +103,12 @@ public class RolExamenService {
             roles = rolExamenRepository.findByCarreraCodigo(carreraCodigo);
         } else {
             roles = rolExamenRepository.findAll();
+        }
+
+        if (campus != null && !campus.isBlank()) {
+            roles = roles.stream()
+                    .filter(rol -> mismoTexto(rol.getCampus(), campus))
+                    .toList();
         }
 
         return mapearRolesConDocenteOficial(authentication == null
@@ -536,6 +555,9 @@ public class RolExamenService {
                     String.format("Transición no permitida de %s a %s", origen, destino));
         }
 
+        validarRequisitosCartillaParaEntrega(rol, origen, destino);
+        validarDocumentoSinCartillaParaImprimir(rol, origen, destino);
+
         if (destino == EstadoFlujo.VALIDADO) {
             rol.setFechaValidacion(LocalDateTime.now());
         } else if (destino == EstadoFlujo.GENERADO) {
@@ -569,6 +591,76 @@ public class RolExamenService {
         }
 
         return mapper.toResponseDto(guardado);
+    }
+
+    @Transactional
+    public RolExamenResponseDto cambiarModalidad(String id, ModalidadExamen modalidad,
+                                                   Authentication authentication) {
+        RolExamen rol = rolExamenRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
+        if (authentication != null) {
+            accesoAcademicoService.exigirAccesoRol(id, authentication);
+        }
+        if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
+            throw new RuntimeException("Solo se puede cambiar el tipo de examen en estado PROGRAMADO o VALIDADO");
+        }
+        if (modalidad == null) {
+            throw new RuntimeException("El tipo de examen es obligatorio");
+        }
+        if (rol.getModalidad() == modalidad) {
+            return mapper.toResponseDto(rol);
+        }
+
+        ModalidadExamen anterior = rol.getModalidad();
+        rol.setModalidad(modalidad);
+        rol.setConCartilla(modalidad == ModalidadExamen.PRESENCIAL_CARTILLA);
+        RolExamen guardado = rolExamenRepository.save(rol);
+        registrarAuditoria(guardado, guardado.getEstadoFlujo(), guardado.getEstadoFlujo(),
+                "CAMBIO_MODALIDAD: " + anterior.getValor() + " -> " + modalidad.getValor(),
+                authentication != null ? usuarioValido(authentication.getName()) : "Sistema",
+                "127.0.0.1");
+        return mapper.toResponseDto(guardado);
+    }
+
+    private void validarRequisitosCartillaParaEntrega(RolExamen rol, EstadoFlujo origen, EstadoFlujo destino) {
+        if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_CARTILLA
+                || origen != EstadoFlujo.IMPRESO
+                || destino != EstadoFlujo.ENTREGADO) {
+            return;
+        }
+
+        boolean marcasConfirmadas = auditoriaRepository
+                .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rol.getId(), ACCION_IMPRESION_MARCAS)
+                .isPresent();
+        boolean listaConfirmada = auditoriaRepository
+                .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rol.getId(), ACCION_IMPRESION_LISTA)
+                .isPresent();
+
+        if (marcasConfirmadas && listaConfirmada) {
+            return;
+        }
+
+        String pendientes = java.util.stream.Stream.of(
+                        !marcasConfirmadas ? "marcas OMR" : null,
+                        !listaConfirmada ? "lista de estudiantes" : null)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.joining(" y "));
+        throw new IllegalStateException(
+                "No se puede pasar a Entregado. Primero confirme la impresión de las " + pendientes + ".");
+    }
+
+    private void validarDocumentoSinCartillaParaImprimir(RolExamen rol, EstadoFlujo origen, EstadoFlujo destino) {
+        if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_SIN_CARTILLA
+                || origen != EstadoFlujo.VALIDADO
+                || destino != EstadoFlujo.IMPRESO) {
+            return;
+        }
+
+        boolean documentoCargado = documentoSinCartillaRepository.findByRolExamenId(rol.getId()).isPresent();
+        if (!documentoCargado) {
+            throw new IllegalStateException(
+                    "No se puede pasar a Impreso. Primero cargue el archivo del examen sin cartilla.");
+        }
     }
 
     @Transactional
@@ -612,6 +704,14 @@ public class RolExamenService {
                         .fechaEvento(a.getFechaEvento())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AuditoriaResponseDto> listarAuditoria(String rolExamenId, Authentication authentication) {
+        if (authentication != null) {
+            accesoAcademicoService.exigirAccesoRol(rolExamenId, authentication);
+        }
+        return listarAuditoria(rolExamenId);
     }
 
     private void registrarAuditoria(RolExamen rol, EstadoFlujo origen, EstadoFlujo destino,

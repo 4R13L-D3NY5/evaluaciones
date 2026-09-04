@@ -33,6 +33,11 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
         </div>
 
         <div class="flex items-center gap-2">
+          @if (esVicerrector()) {
+            <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
+              <i class="pi pi-eye"></i> Consulta por sede
+            </span>
+          }
           <button (click)="descargarMalla()" class="bg-card hover:bg-muted text-primary border border-border font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-2 shadow-2xs transition-colors">
             <i class="pi pi-download"></i>
             <span>Descargar Malla</span>
@@ -94,8 +99,8 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
               class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
               @if (cargandoCarreras()) {
                 <option value="">Cargando carreras...</option>
-              } @else if (carreras().length === 0) {
-                <option value="">No hay carreras disponibles</option>
+          } @else if (carreras().length === 0) {
+            <option value="">No hay carreras autorizadas</option>
               } @else {
                 @for (carrera of carreras(); track carrera.careerId) {
                   <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
@@ -287,10 +292,11 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                       <th class="p-3.5">Plan de Estudios</th>
                       <th class="p-3.5 text-center">Horas</th>
                       <th class="p-3.5">Docente / Grupo</th>
-                      <th class="p-3.5 text-center">Modalidad principal</th>
-                      <th class="p-3.5 min-w-[430px]">Información del parcial seleccionado</th>
+                      <th class="p-3.5 text-center">Tipo de examen</th>
+                      <th class="p-3.5 w-[285px] min-w-[255px] max-w-[305px]">Información del parcial</th>
                       <th class="p-3.5 text-center">Estado</th>
-                      <th class="p-3.5 text-right">Acciones</th>
+                      <th class="p-3.5 text-center">Asignación</th>
+                      <th class="p-3.5 text-right">Tipo</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-border text-xs">
@@ -339,7 +345,7 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                           }
                         </td>
 
-                        <!-- Modalidad principal -->
+                        <!-- Tipo de examen principal -->
                         <td class="p-3.5 text-center">
                           @let modalidadPrincipal = getInformacionParcial(asig)?.modalidad;
                           @if (asig.asignada && modalidadPrincipal === 'Virtual') {
@@ -361,32 +367,34 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                           }
                         </td>
 
-                        <!-- Información macro del parcial seleccionado -->
-                        <td class="p-2">
+                        <!-- Información compacta del parcial seleccionado -->
+                        <td class="p-2 w-[285px] min-w-[255px] max-w-[305px]">
                           @let info = getInformacionParcial(asig);
                           @if (info?.tieneRol) {
-                            <div [class]="'flex items-center gap-2 rounded-lg border px-2.5 py-2 ' + (info?.cumple ? 'border-emerald-200 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/50')">
-                              <span class="w-20 shrink-0 text-[10px] font-black text-primary">{{ info?.etiqueta }}</span>
-                              <span class="bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-full px-2 py-0.5 text-[9px] font-black whitespace-nowrap">Rol de examen programado</span>
-                              <span class="text-[10px] font-mono text-foreground whitespace-nowrap">
-                                {{ info?.facil }}F · {{ info?.medio }}M · {{ info?.dificil }}D · {{ info?.total }} total
-                              </span>
-                              <span class="text-[9px] font-bold text-muted-foreground whitespace-nowrap">{{ info?.modalidad }}</span>
-                              @if (info?.cumple) {
-                                <span class="ml-auto bg-emerald-600 text-white text-[10px] font-black rounded-full px-2 py-0.5 whitespace-nowrap">
-                                  <i class="pi pi-check-circle mr-1"></i> OK
+                            <div [class]="'rounded-lg border px-2.5 py-1.5 ' + (info?.cumple ? 'border-emerald-200 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/50')">
+                              <div class="flex items-center justify-between gap-2 min-w-0">
+                                <span class="text-[10px] font-black text-primary truncate">{{ info?.etiqueta }}</span>
+                                <span class="text-[9px] font-bold text-muted-foreground whitespace-nowrap">{{ info?.modalidad }}</span>
+                              </div>
+                              <div class="mt-1 flex items-center justify-between gap-2 min-w-0">
+                                <span class="text-[9px] font-mono text-foreground whitespace-nowrap">
+                                  {{ info?.facil }}F · {{ info?.medio }}M · {{ info?.dificil }}D · {{ info?.total }} total
                                 </span>
-                              } @else if (!info?.bancoCargado) {
-                                <span class="ml-auto text-amber-700 text-[10px] font-black whitespace-nowrap">Banco pendiente</span>
-                              } @else {
-                                <span class="ml-auto text-amber-700 text-[10px] font-black whitespace-nowrap">Pendiente</span>
-                              }
+                                @if (info?.cumple) {
+                                  <span class="bg-emerald-600 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                                    <i class="pi pi-check-circle mr-0.5"></i> OK
+                                  </span>
+                                } @else if (!info?.bancoCargado) {
+                                  <span class="text-amber-700 text-[9px] font-black whitespace-nowrap">Banco pendiente</span>
+                                } @else {
+                                  <span class="text-amber-700 text-[9px] font-black whitespace-nowrap">Pendiente</span>
+                                }
+                              </div>
                             </div>
                           } @else {
-                            <div class="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
-                              <span class="w-20 shrink-0 text-[10px] font-black text-primary">{{ info?.etiqueta || parcialLabel() }}</span>
+                            <div class="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
                               <i class="pi pi-info-circle text-amber-600"></i>
-                              <span class="text-[10px] font-black text-amber-800">No tiene rol de examen programado para este parcial</span>
+                              <span class="text-[9px] font-black text-amber-800">Sin rol para {{ info?.etiqueta || parcialLabel() }}</span>
                             </div>
                           }
                         </td>
@@ -412,27 +420,39 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                           }
                         </td>
 
-                        <!-- Columna Acciones: Abre Modal de Confirmación y Advertencia de Estados -->
+                        <!-- Selector compacto de modalidad -->
                         <td class="p-3.5 text-right">
-                          <div class="inline-flex items-center gap-1.5">
-                            @if (asig.asignada && asig.conCartilla) {
-                              <button 
-                                (click)="solicitarCambioCartilla(asig)"
-                                title="Cambiar a Sin Cartilla (Examen físico/manual)"
-                                class="bg-muted hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 text-muted-foreground border border-border font-bold text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all">
-                                <i class="pi pi-times-circle text-[10px]"></i>
-                                <span>Sin Cartilla</span>
+                          @let modalidadInfo = getInformacionParcial(asig);
+                          @if (modalidadInfo?.tieneRol) {
+                            <div class="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-1" role="group" aria-label="Tipo de examen">
+                              <button type="button"
+                                [disabled]="!puedeCambiarModalidad(modalidadInfo)"
+                                (click)="solicitarCambioModalidad(asig, 'PRESENCIAL_CARTILLA')"
+                                [class]="claseBotonModalidad(modalidadInfo, 'PRESENCIAL_CARTILLA')"
+                                title="Con Cartilla"
+                                aria-label="Definir examen Con Cartilla">
+                                <i class="pi pi-file-check"></i>
                               </button>
-                            } @else if (asig.asignada) {
-                              <button 
-                                (click)="solicitarCambioCartilla(asig)"
-                                title="Cambiar a generación digital"
-                                class="bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/30 font-bold text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all">
-                                <i class="pi pi-check-circle text-[10px]"></i>
-                                <span>Con Cartilla</span>
+                              <button type="button"
+                                [disabled]="!puedeCambiarModalidad(modalidadInfo)"
+                                (click)="solicitarCambioModalidad(asig, 'PRESENCIAL_SIN_CARTILLA')"
+                                [class]="claseBotonModalidad(modalidadInfo, 'PRESENCIAL_SIN_CARTILLA')"
+                                title="Sin Cartilla"
+                                aria-label="Definir examen Sin Cartilla">
+                                <i class="pi pi-file"></i>
                               </button>
-                            }
-                          </div>
+                              <button type="button"
+                                [disabled]="!puedeCambiarModalidad(modalidadInfo)"
+                                (click)="solicitarCambioModalidad(asig, 'VIRTUAL')"
+                                [class]="claseBotonModalidad(modalidadInfo, 'VIRTUAL')"
+                                title="Virtual"
+                                aria-label="Definir examen Virtual">
+                                <i class="pi pi-desktop"></i>
+                              </button>
+                            </div>
+                          } @else {
+                            <span class="text-[10px] text-muted-foreground">—</span>
+                          }
                         </td>
 
                       </tr>
@@ -446,63 +466,32 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
         }
       </div>
 
-      <!-- Modal de Advertencia de Transición de Estados -->
+      <!-- Confirmación de cambio de modalidad -->
       @if (itemSeleccionadoParaCambio()) {
         <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-scale-in">
-            
-            <!-- Cabecera del Modal con Icono de Advertencia -->
             <div class="flex items-start gap-3.5">
-              <div class="h-11 w-11 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shrink-0">
-                <i class="pi pi-exclamation-triangle text-xl"></i>
+              <div class="h-11 w-11 rounded-xl bg-indigo-50 text-primary border border-indigo-200 flex items-center justify-center shrink-0">
+                <i class="pi pi-sliders-h text-xl"></i>
               </div>
               <div class="space-y-1">
-                <h3 class="text-base font-black text-foreground">Cambio en la Secuencia de Estados</h3>
+                <h3 class="text-base font-black text-foreground">Confirmar tipo de examen</h3>
                 <p class="text-xs font-bold text-primary font-mono">
                   {{ itemSeleccionadoParaCambio()?.codigo }} · {{ itemSeleccionadoParaCambio()?.nombre }}
                 </p>
               </div>
             </div>
 
-            <!-- Cuerpo de la Advertencia según la transición -->
             <div class="bg-muted/60 border border-border rounded-xl p-4 space-y-3 text-xs text-foreground">
-              @if (itemSeleccionadoParaCambio()?.conCartilla) {
-                <!-- Transición: De Con Cartilla -> Sin Cartilla -->
-                <p class="text-muted-foreground leading-relaxed">
-                  Está a punto de cambiar la modalidad de evaluación a <strong>Sin Cartilla</strong>.
-                </p>
-
-                <div class="bg-amber-500/10 border-l-4 border-amber-500 p-3 rounded-r-lg space-y-1.5">
-                  <div class="font-extrabold text-amber-800 flex items-center gap-1.5">
-                    <i class="pi pi-info-circle"></i>
-                    <span>Impacto en el Flujo de Estados:</span>
-                  </div>
-                  <ul class="list-disc list-inside text-amber-900/90 text-[11px] space-y-1 font-medium">
-                    <li>No se requerirá la carga de archivo Excel con banco de preguntas.</li>
-                    <li>No se generarán variantes automáticas ni hojas de respuestas dentro del examen.</li>
-                    <li>El estado del examen pasará a <strong>Gestión Manual / Exento de Banco</strong>.</li>
-                  </ul>
-                </div>
-              } @else {
-                <!-- Transición: De Sin Cartilla -> Con Cartilla -->
-                <p class="text-muted-foreground leading-relaxed">
-                  Está a punto de activar la modalidad <strong>Con Cartilla</strong>.
-                </p>
-
-                <div class="bg-indigo-500/10 border-l-4 border-indigo-600 p-3 rounded-r-lg space-y-1.5">
-                  <div class="font-extrabold text-indigo-900 flex items-center gap-1.5">
-                    <i class="pi pi-info-circle"></i>
-                    <span>Impacto en el Flujo de Estados:</span>
-                  </div>
-                  <ul class="list-disc list-inside text-indigo-900/90 text-[11px] space-y-1 font-medium">
-                    <li>El encargado de evaluaciones subirá el archivo Excel con las preguntas y fórmulas.</li>
-                    <li>El ciclo requerirá: <strong>Programado $\rightarrow$ Generado $\rightarrow$ Impreso $\rightarrow$ Entregado $\rightarrow$ Devuelto $\rightarrow$ Pendiente de notas $\rightarrow$ Calificado</strong>.</li>
-                  </ul>
-                </div>
-              }
+              <p class="text-muted-foreground leading-relaxed">
+                Cambiarás de <strong>{{ modalidadActual(itemSeleccionadoParaCambio()) }}</strong>
+                a <strong>{{ etiquetaModalidad(modalidadParaCambio()) }}</strong>.
+              </p>
+              <p class="text-muted-foreground leading-relaxed">
+                El examen conservará su estado actual y el cambio quedará registrado en la bitácora.
+              </p>
             </div>
 
-            <!-- Botones de Acción -->
             <div class="flex items-center justify-end gap-3 pt-2">
               <button 
                 (click)="cancelarCambio()"
@@ -511,10 +500,10 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
               </button>
               
               <button 
-                (click)="confirmarCambio()"
+                (click)="confirmarCambioModalidad()"
                 class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-black shadow-xs transition-colors flex items-center gap-2">
                 <i class="pi pi-check"></i>
-                <span>Confirmar y Cambiar Secuencia</span>
+                <span>Confirmar cambio</span>
               </button>
             </div>
 
@@ -553,10 +542,12 @@ export class PlanEstudiosComponent implements OnInit {
   public filtroPlanCurricular = signal('todos');
   public busquedaTexto = signal('');
   public ocultarSinAsignar = signal(false);
+  public readonly esVicerrector = computed(() => this.auth.usuario()?.rol === 'VICERRECTOR');
 
-  public parcialActivo = signal<'1P' | '2P' | 'FINAL' | '2DA_INSTANCIA'>('1P');
-  public toastMessage = signal<string | null>(null);
-  public itemSeleccionadoParaCambio = signal<PlanEstudioItem | null>(null);
+    public parcialActivo = signal<'1P' | '2P' | 'FINAL' | '2DA_INSTANCIA'>('1P');
+    public toastMessage = signal<string | null>(null);
+    public itemSeleccionadoParaCambio = signal<PlanEstudioItem | null>(null);
+    public modalidadParaCambio = signal<'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' | null>(null);
 
   private readonly parcialesConfig: Array<{ clave: PlanParcialClave; etiqueta: string }> = [
     { clave: '1P', etiqueta: '1er Parcial' },
@@ -653,7 +644,7 @@ export class PlanEstudiosComponent implements OnInit {
           this.cargarPlanReal(codigoSede, carreraInicial.careerCode);
         } else {
           this.planSemestres.set([]);
-          this.errorCarga.set('La sede seleccionada no tiene carreras disponibles.');
+          this.errorCarga.set('No hay carreras autorizadas para esta sede. Verifica que el administrador haya asignado el alcance académico del director.');
         }
       },
       error: () => {
@@ -803,6 +794,8 @@ export class PlanEstudiosComponent implements OnInit {
       examenes[parcial.clave] = {
         clave: parcial.clave,
         etiqueta: parcial.etiqueta,
+        rolId: rol?.id,
+        modalidadCodigo: rol?.modalidad,
         facil,
         medio,
         dificil,
@@ -942,22 +935,74 @@ export class PlanEstudiosComponent implements OnInit {
     return examenes[this.parcialActivo()] || null;
   }
 
-  public solicitarCambioCartilla(asig: PlanEstudioItem): void {
-    this.itemSeleccionadoParaCambio.set(asig);
-  }
-
   public cancelarCambio(): void {
     this.itemSeleccionadoParaCambio.set(null);
+    this.modalidadParaCambio.set(null);
   }
 
-  public confirmarCambio(): void {
-    const item = this.itemSeleccionadoParaCambio();
-    if (!item) return;
+  public puedeCambiarModalidad(info: PlanExamenResumen | null): boolean {
+    return !this.esVicerrector()
+      && !!info?.tieneRol
+      && !!info.rolId
+      && (info.estado === 'PROGRAMADO' || info.estado === 'VALIDADO');
+  }
 
-    this.storage.toggleCartillaPlan(item.id);
-    const nuevaModalidad = !item.conCartilla ? 'Con Cartilla' : 'Sin Cartilla';
-    this.itemSeleccionadoParaCambio.set(null);
-    this._mostrarToast(`${item.codigo}: Modalidad cambiada a '${nuevaModalidad}'. La secuencia de estados ha sido actualizada.`);
+  public claseBotonModalidad(
+    info: PlanExamenResumen | null,
+    modalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL'
+  ): string {
+    const seleccionada = info?.modalidadCodigo === modalidad;
+    const base = 'h-7 w-7 rounded-md border flex items-center justify-center text-[11px] transition-colors';
+    if (seleccionada && modalidad === 'VIRTUAL') return `${base} border-purple-300 bg-purple-100 text-purple-700`;
+    if (seleccionada && modalidad === 'PRESENCIAL_SIN_CARTILLA') return `${base} border-amber-300 bg-amber-100 text-amber-700`;
+    if (seleccionada) return `${base} border-blue-300 bg-blue-100 text-blue-700`;
+    if (this.puedeCambiarModalidad(info)) return `${base} border-transparent text-muted-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary`;
+    return `${base} border-transparent text-muted-foreground/40 cursor-not-allowed`;
+  }
+
+  public solicitarCambioModalidad(
+    asig: PlanEstudioItem,
+    modalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL'
+  ): void {
+    const info = this.getInformacionParcial(asig);
+    if (!info || !this.puedeCambiarModalidad(info)) {
+      this._mostrarToast('Solo puedes cambiar el tipo de examen cuando está PROGRAMADO o VALIDADO.');
+      return;
+    }
+    if (info.modalidadCodigo === modalidad) return;
+    this.itemSeleccionadoParaCambio.set(asig);
+    this.modalidadParaCambio.set(modalidad);
+  }
+
+  public modalidadActual(item: PlanEstudioItem | null): string {
+    return item ? this.getInformacionParcial(item)?.modalidad || 'No registrada' : 'No registrada';
+  }
+
+  public etiquetaModalidad(modalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' | null): string {
+    return modalidad ? this.getModalidadLabel(modalidad) : 'No definida';
+  }
+
+  public confirmarCambioModalidad(): void {
+    const item = this.itemSeleccionadoParaCambio();
+    const modalidad = this.modalidadParaCambio();
+    const info = item ? this.getInformacionParcial(item) : null;
+    if (!item || !modalidad || !this.puedeCambiarModalidad(info) || !info?.rolId) {
+      this.cancelarCambio();
+      return;
+    }
+
+    this.rolService.cambiarModalidad(info.rolId, modalidad).subscribe({
+      next: () => {
+        this.cancelarCambio();
+        this._mostrarToast(`${item.codigo}: tipo de examen actualizado a '${this.getModalidadLabel(modalidad)}'.`);
+        this.cargarPlanReal(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+      },
+      error: err => {
+        const mensaje = err?.error?.message || 'No se pudo actualizar el tipo de examen.';
+        this.cancelarCambio();
+        this._mostrarToast(mensaje);
+      }
+    });
   }
 
   public onGestionChange(gestion: string): void {

@@ -1267,7 +1267,7 @@ export class CalificacionOmrComponent implements OnInit {
       error: error => {
         console.error('Error enviando escaneo OMR al backend:', error);
         this.procesandoOmr.set(false);
-        this.mensajeOmr.set('No se pudo enviar el escaneo al motor OMR. Revise que el backend y RabbitMQ estén disponibles.');
+        this.mensajeOmr.set(error?.error?.error || error?.error?.message || 'No se pudo enviar el escaneo al motor OMR. Revise que el backend y RabbitMQ estén disponibles.');
       }
     });
   }

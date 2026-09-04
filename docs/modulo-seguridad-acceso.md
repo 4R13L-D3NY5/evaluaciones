@@ -9,8 +9,8 @@ El sistema utiliza autenticación interna con sesión HTTP y autorización por r
 | Código | Alcance |
 |---|---|
 | `ADMINISTRADOR_SISTEMA` | Acceso total. |
-| `RESPONSABLE_EVALUACIONES` | Campus, carreras, evaluaciones, tiempos y parámetros. |
-| `PERSONAL_EVALUACIONES` | Evaluaciones del día, generación, impresión y calificación OMR. |
+| `RESPONSABLE_EVALUACIONES` | Lista de evaluaciones, calificación OMR, reportes y administración del proceso, incluidos los usuarios operativos desde Administración de Evaluaciones. |
+| `PERSONAL_EVALUACIONES` | Dashboard y Lista de Evaluaciones. El campus y las carreras se limitan al alcance asignado. |
 | `DOCENTE` | Bancos de preguntas y salas virtuales propias; sin acceso al Plan de Estudios ni a la Lista de Evaluaciones. |
 | `VICERRECTOR` | Lectura y reportes de sedes asignadas. |
 | `DIRECTOR_CARRERA` | Gestión y consulta del rol de exámenes de las carreras asignadas. |

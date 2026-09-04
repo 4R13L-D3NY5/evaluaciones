@@ -3,8 +3,11 @@ package com.xpertiflow.evaluaciones.application;
 import com.xpertiflow.evaluaciones.api.dto.gateway.BranchOfficeDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.CareerDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.CourseDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.CampusDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
+import com.xpertiflow.evaluaciones.domain.entity.AlcanceCampus;
+import com.xpertiflow.evaluaciones.domain.entity.AsignacionAcademica;
 import com.xpertiflow.evaluaciones.domain.entity.UsuarioSistema;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.UsuarioSistemaRepository;
@@ -51,10 +54,35 @@ public class AccesoAcademicoService {
                 .toList();
     }
 
+    public List<CampusDto> filtrarCampusParaUsuario(List<CampusDto> campuses,
+                                                     String sedeCodigo,
+                                                     Authentication authentication) {
+        if (!tieneRol(authentication, "PERSONAL_EVALUACIONES")) return campuses;
+        UsuarioSistema usuario = usuarioAutenticado(authentication);
+        if (usuario == null || !usuario.isActivo() || !puedeConsultarSede(sedeCodigo, authentication)) {
+            return List.of();
+        }
+        return campuses.stream()
+                .filter(campus -> usuario.getCampuses().stream().anyMatch(asignacion ->
+                        asignacion.isHabilitado()
+                                && coincide(asignacion.getSedeCodigo(), sedeCodigo)
+                                && coincideCampus(asignacion, campus)))
+                .toList();
+    }
+
     public List<CareerDto> filtrarCarrerasParaUsuario(List<CareerDto> carreras,
                                                        String sedeCodigo,
                                                        Authentication authentication) {
         if (!puedeConsultarSede(sedeCodigo, authentication)) return List.of();
+        UsuarioSistema usuario = usuarioAutenticado(authentication);
+        if (usuario != null && !usuario.getAsignaciones().isEmpty()
+                && ("DOCENTE".equals(usuario.getRolCodigo()) || "DIRECTOR_CARRERA".equals(usuario.getRolCodigo()))) {
+            return carreras.stream()
+                    .filter(carrera -> usuario.getAsignaciones().stream().anyMatch(item ->
+                            coincide(item.getSedeCodigo(), sedeCodigo)
+                                    && coincide(item.getCarreraCodigo(), carrera.getCareerCode())))
+                    .toList();
+        }
         Set<String> carrerasPermitidas = codigosCarrerasPermitidas(authentication);
         if (carrerasPermitidas == null) return carreras;
         return carreras.stream()
@@ -72,13 +100,25 @@ public class AccesoAcademicoService {
         }
         if (!esDocente(authentication)) return asignaturas;
 
-        Set<String> materiasPermitidas = rolesVisiblesDelDocente(authentication).stream()
-                .filter(rol -> coincide(rol.getSedeCodigo(), sedeCodigo))
-                .filter(rol -> coincide(rol.getCarreraCodigo(), carreraCodigo))
-                .map(RolExamen::getMateriaCodigo)
-                .map(this::normalizar)
-                .filter(codigo -> !codigo.isBlank())
-                .collect(Collectors.toSet());
+        UsuarioSistema usuario = usuarioAutenticado(authentication);
+        Set<String> materiasPermitidas;
+        if (usuario != null && !usuario.getAsignaciones().isEmpty()) {
+            materiasPermitidas = usuario.getAsignaciones().stream()
+                    .filter(item -> coincide(item.getSedeCodigo(), sedeCodigo))
+                    .filter(item -> coincide(item.getCarreraCodigo(), carreraCodigo))
+                    .map(AsignacionAcademica::getAsignaturaCodigo)
+                    .map(this::normalizar)
+                    .filter(codigo -> !codigo.isBlank())
+                    .collect(Collectors.toSet());
+        } else {
+            materiasPermitidas = rolesVisiblesDelDocente(authentication).stream()
+                    .filter(rol -> coincide(rol.getSedeCodigo(), sedeCodigo))
+                    .filter(rol -> coincide(rol.getCarreraCodigo(), carreraCodigo))
+                    .map(RolExamen::getMateriaCodigo)
+                    .map(this::normalizar)
+                    .filter(codigo -> !codigo.isBlank())
+                    .collect(Collectors.toSet());
+        }
         return asignaturas.stream()
                 .filter(asignatura -> materiasPermitidas.contains(normalizar(asignatura.getCourseCode())))
                 .toList();
@@ -95,6 +135,13 @@ public class AccesoAcademicoService {
                                           Authentication authentication) {
         if (!puedeConsultarSede(sedeCodigo, authentication)
                 || carreraCodigo == null || carreraCodigo.isBlank()) return false;
+        UsuarioSistema usuario = usuarioAutenticado(authentication);
+        if (usuario != null && !usuario.getAsignaciones().isEmpty()
+                && ("DOCENTE".equals(usuario.getRolCodigo()) || "DIRECTOR_CARRERA".equals(usuario.getRolCodigo()))) {
+            return usuario.getAsignaciones().stream().anyMatch(item ->
+                    coincide(item.getSedeCodigo(), sedeCodigo)
+                            && coincide(item.getCarreraCodigo(), carreraCodigo));
+        }
         Set<String> carrerasPermitidas = codigosCarrerasPermitidas(authentication);
         return carrerasPermitidas == null || carrerasPermitidas.contains(normalizar(carreraCodigo));
     }
@@ -122,24 +169,33 @@ public class AccesoAcademicoService {
         if (usuario == null || !usuario.isActivo()) return false;
         String rolUsuario = usuario.getRolCodigo();
         if ("DOCENTE".equals(rolUsuario)) {
-            return coincide(rol.getDocenteCi(), ciAutenticado(authentication, usuario));
+            if (!coincide(rol.getDocenteCi(), ciAutenticado(authentication, usuario))) return false;
+            return usuario.getAsignaciones().isEmpty() || usuario.getAsignaciones().stream()
+                    .anyMatch(item -> coincide(item.getSedeCodigo(), rol.getSedeCodigo())
+                            && coincide(item.getCarreraCodigo(), rol.getCarreraCodigo())
+                            && (item.getAsignaturaCodigo().isBlank()
+                                || coincide(item.getAsignaturaCodigo(), rol.getMateriaCodigo())));
         }
         if ("DIRECTOR_CARRERA".equals(rolUsuario)) {
-            boolean sedeValida = usuario.getSedes().isEmpty() || usuario.getSedes().stream()
+            if (!usuario.getAsignaciones().isEmpty()) {
+                return usuario.getAsignaciones().stream().anyMatch(item ->
+                        coincide(item.getSedeCodigo(), rol.getSedeCodigo())
+                                && coincide(item.getCarreraCodigo(), rol.getCarreraCodigo()));
+            }
+            boolean sedeValida = !usuario.getSedes().isEmpty() && usuario.getSedes().stream()
                     .anyMatch(item -> coincide(item.getCodigo(), rol.getSedeCodigo()));
-            boolean carreraValida = usuario.getCarreras().isEmpty() || usuario.getCarreras().stream()
+            boolean carreraValida = !usuario.getCarreras().isEmpty() && usuario.getCarreras().stream()
                     .anyMatch(item -> coincide(item.getCodigo(), rol.getCarreraCodigo()));
             return sedeValida && carreraValida;
         }
         if ("PERSONAL_EVALUACIONES".equals(rolUsuario)) {
-            boolean sedeValida = usuario.getSedes().isEmpty() || usuario.getSedes().stream()
-                    .anyMatch(item -> coincide(item.getCodigo(), rol.getSedeCodigo()));
-            boolean carreraValida = usuario.getCarreras().isEmpty() || usuario.getCarreras().stream()
-                    .anyMatch(item -> coincide(item.getCodigo(), rol.getCarreraCodigo()));
-            return sedeValida && carreraValida;
+            return usuario.getCampuses().stream().anyMatch(item ->
+                    item.isHabilitado()
+                            && coincide(item.getSedeCodigo(), rol.getSedeCodigo())
+                            && coincideCampus(item, rol.getCampus()));
         }
         if ("VICERRECTOR".equals(rolUsuario)) {
-            return usuario.getSedes().isEmpty() || usuario.getSedes().stream()
+            return !usuario.getSedes().isEmpty() && usuario.getSedes().stream()
                     .anyMatch(item -> coincide(item.getCodigo(), rol.getSedeCodigo()));
         }
         return false;
@@ -159,13 +215,23 @@ public class AccesoAcademicoService {
         UsuarioSistema usuario = usuarioAutenticado(authentication);
         if (usuario == null || !usuario.isActivo()) return Set.of();
         if ("DOCENTE".equals(usuario.getRolCodigo())) {
+            if (!usuario.getAsignaciones().isEmpty()) {
+                return usuario.getAsignaciones().stream()
+                        .map(AsignacionAcademica::getSedeCodigo)
+                        .map(this::normalizar)
+                        .filter(codigo -> !codigo.isBlank())
+                        .collect(Collectors.toSet());
+            }
             return rolesVisiblesDelDocente(authentication).stream()
                     .map(RolExamen::getSedeCodigo)
                     .map(this::normalizar)
                     .filter(codigo -> !codigo.isBlank())
                     .collect(Collectors.toSet());
         }
-        if (usuario.getSedes().isEmpty()) return null;
+        if (usuario.getSedes().isEmpty()) {
+            return Set.of("PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "VICERRECTOR").contains(usuario.getRolCodigo())
+                    ? Set.of() : null;
+        }
         return usuario.getSedes().stream()
                 .map(item -> normalizar(item.getCodigo()))
                 .filter(codigo -> !codigo.isBlank())
@@ -176,6 +242,7 @@ public class AccesoAcademicoService {
         if (!estaAutenticado(authentication)) return Set.of();
         if (tieneRol(authentication, "ADMINISTRADOR_SISTEMA")
                 || tieneRol(authentication, "RESPONSABLE_EVALUACIONES")
+                || tieneRol(authentication, "PERSONAL_EVALUACIONES")
                 || tieneRol(authentication, "VICERRECTOR")) {
             return null;
         }
@@ -183,13 +250,23 @@ public class AccesoAcademicoService {
         UsuarioSistema usuario = usuarioAutenticado(authentication);
         if (usuario == null || !usuario.isActivo()) return Set.of();
         if ("DOCENTE".equals(usuario.getRolCodigo())) {
+            if (!usuario.getAsignaciones().isEmpty()) {
+                return usuario.getAsignaciones().stream()
+                        .map(AsignacionAcademica::getCarreraCodigo)
+                        .map(this::normalizar)
+                        .filter(codigo -> !codigo.isBlank())
+                        .collect(Collectors.toSet());
+            }
             return rolesVisiblesDelDocente(authentication).stream()
                     .map(RolExamen::getCarreraCodigo)
                     .map(this::normalizar)
                     .filter(codigo -> !codigo.isBlank())
                     .collect(Collectors.toSet());
         }
-        if (usuario.getCarreras().isEmpty()) return null;
+        if (usuario.getCarreras().isEmpty()) {
+            return Set.of("PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA").contains(usuario.getRolCodigo())
+                    ? Set.of() : null;
+        }
         return usuario.getCarreras().stream()
                 .map(item -> normalizar(item.getCodigo()))
                 .filter(codigo -> !codigo.isBlank())
@@ -229,6 +306,25 @@ public class AccesoAcademicoService {
 
     private boolean coincide(String izquierdo, String derecho) {
         return izquierdo != null && derecho != null && normalizar(izquierdo).equals(normalizar(derecho));
+    }
+
+    private boolean coincideCampus(AlcanceCampus asignacion, CampusDto campus) {
+        return coincideNoVacio(asignacion.getCampusId(), campus.getCampusId())
+                || coincideNoVacio(asignacion.getCampusCodigo(), campus.getCode())
+                || coincideNoVacio(asignacion.getCampusNombre(), campus.getName())
+                || coincideNoVacio(asignacion.getCampusCodigo(), campus.getName())
+                || coincideNoVacio(asignacion.getCampusNombre(), campus.getCode());
+    }
+
+    private boolean coincideCampus(AlcanceCampus asignacion, String campus) {
+        return coincideNoVacio(asignacion.getCampusId(), campus)
+                || coincideNoVacio(asignacion.getCampusCodigo(), campus)
+                || coincideNoVacio(asignacion.getCampusNombre(), campus);
+    }
+
+    private boolean coincideNoVacio(String izquierdo, String derecho) {
+        return !normalizar(izquierdo).isBlank() && !normalizar(derecho).isBlank()
+                && coincide(izquierdo, derecho);
     }
 
     private String normalizar(String valor) {

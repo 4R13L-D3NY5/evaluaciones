@@ -15,6 +15,8 @@ public record UsuarioSistemaResponseDto(
         String proveedorIdentidad,
         List<AlcanceAcademicoDto> sedes,
         List<AlcanceAcademicoDto> carreras,
+        List<AlcanceCampusDto> campuses,
+        List<AsignacionAcademicaDto> asignaciones,
         LocalDateTime ultimoIngreso,
         LocalDateTime creadoEn
 ) {

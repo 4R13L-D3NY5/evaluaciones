@@ -216,28 +216,28 @@ export class SidebarComponent implements OnInit {
       route: '/plan-estudios',
       icon: 'pi pi-book',
       description: 'Asignaturas, docentes y estado de banco por carrera',
-      roles: ['RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA']
+      roles: ['DIRECTOR_CARRERA', 'VICERRECTOR']
     },
     {
       label: 'Banco de Preguntas',
       route: '/banco-preguntas',
       icon: 'pi pi-question-circle',
       description: 'Descarga de plantillas, validación y previsualización de preguntas',
-      roles: ['RESPONSABLE_EVALUACIONES', 'DOCENTE']
+      roles: ['DOCENTE']
     },
     {
       label: 'Lista de Evaluaciones por Día',
       route: '/evaluaciones-dia',
       icon: 'pi pi-calendar-clock',
       description: 'Exámenes del día, horarios y generación de paquetes',
-      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']
+      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR']
     },
     {
       label: 'Rol de Exámenes',
       route: '/rol-examenes',
       icon: 'pi pi-calendar',
       description: 'Calendarización, grilla semanal y subida de Excel',
-      roles: ['RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA']
+      roles: ['DIRECTOR_CARRERA', 'VICERRECTOR']
     },
     {
       label: 'Servicios académicos',
@@ -245,28 +245,28 @@ export class SidebarComponent implements OnInit {
       icon: 'pi pi-building-columns',
       badge: 'Live',
       description: 'Sedes, carreras, materias, grupos, horarios y campus sincronizados',
-      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']
+      roles: []
     },
     {
       label: 'Salas Virtuales',
       route: '/salas-virtuales',
       icon: 'pi pi-desktop',
       description: 'Ingreso, espera, inicio y seguimiento de exámenes virtuales',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE']
+      roles: ['ADMINISTRADOR_SISTEMA', 'DOCENTE']
     },
     {
       label: 'Calificación OMR',
       route: '/calificacion-omr',
       icon: 'pi pi-check-square',
       description: 'Lector óptico interactivo, verificación de marcas y comparación con patrón',
-      roles: ['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']
+      roles: ['RESPONSABLE_EVALUACIONES']
     },
     {
       label: 'Administración de Evaluaciones',
       route: '/administracion-evaluaciones',
       icon: 'pi pi-sliders-h',
       description: 'Parámetros institucionales, cuotas de dificultad y tiempos',
-      roles: ['RESPONSABLE_EVALUACIONES']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES']
     },
     {
       label: 'Auditoría & Bitácora',
@@ -287,14 +287,14 @@ export class SidebarComponent implements OnInit {
       route: '/reporte-evaluaciones',
       icon: 'pi pi-file-excel',
       description: 'Auditoría, cobertura de bancos y consolidado nacional',
-      roles: ['RESPONSABLE_EVALUACIONES', 'VICERRECTOR']
+      roles: ['RESPONSABLE_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA']
     },
     {
       label: 'Usuarios y accesos',
       route: '/usuarios-sistema',
       icon: 'pi pi-users',
       description: 'Cuentas, roles y alcance por sede y carrera',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES']
+      roles: ['ADMINISTRADOR_SISTEMA']
     }
   ];
 

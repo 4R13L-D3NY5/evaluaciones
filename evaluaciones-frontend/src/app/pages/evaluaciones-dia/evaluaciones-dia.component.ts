@@ -7,12 +7,13 @@ import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
+import { AuthService } from '../../core/services/auth.service';
 import { RolExamenPersistedItem, MapeoEstudianteExamen } from '../../core/services/evaluaciones-db.service';
 import { 
   EstudiantesGatewayService, 
   EstudianteInscrito 
 } from '../../core/services/estudiantes-gateway.service';
-import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
+import { BranchOffice, Campus, Career } from '../../core/models/unitepc-gateway.models';
 import { VarianteCompilada } from '../../core/services/examen-macro-generator.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { BancoPreguntasService, BancoPreguntasResponse } from '../../core/services/banco-preguntas.service';
@@ -23,7 +24,7 @@ import {
 } from '../../core/services/rol-examen.service';
 import { CartillasOmrService, PreparacionCartillasOmr } from '../../core/services/cartillas-omr.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
-import { ExamenSinCartillaService, NotaDocente as NotaDocenteSinCartilla } from '../../core/services/examen-sin-cartilla.service';
+import { DocumentoSinCartilla, ExamenSinCartillaService, NotaDocente as NotaDocenteSinCartilla } from '../../core/services/examen-sin-cartilla.service';
 import {
   CalificacionOmrResponse,
   AjustarCalificacionOmrRequest,
@@ -42,13 +43,6 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
-}
-
-function fechaIsoLocal(fecha: Date = new Date()): string {
-  const anio = fecha.getFullYear();
-  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-  const dia = String(fecha.getDate()).padStart(2, '0');
-  return `${anio}-${mes}-${dia}`;
 }
 
 export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Pendiente de notas' | 'Calificado';
@@ -123,6 +117,10 @@ interface ResultadoVirtual {
   respuestas: { numeroPregunta: number; reactivoId: number; respuesta: string; guardadaEn?: string }[];
 }
 
+interface CampusDisponible extends Campus {
+  branchOfficeCode: string;
+}
+
 /**
  * Componente: Lista de Evaluaciones con generación y archivos oficiales.
  * @author Ariel Camara / XpertiFlow
@@ -151,13 +149,20 @@ interface ResultadoVirtual {
         </div>
 
         <div class="flex items-center gap-2">
-          <button
-            (click)="abrirSupervisionCola()"
-            title="Supervisar cola de generación"
-            aria-label="Supervisar cola de generación"
-            class="h-10 w-10 rounded-xl bg-card border border-purple-200 text-purple-700 hover:bg-purple-50 flex items-center justify-center shadow-xs transition-colors cursor-pointer">
-            <i class="pi pi-list-check text-base"></i>
-          </button>
+          @if (!esConsultaAcademica()) {
+            <button
+              (click)="abrirSupervisionCola()"
+              title="Supervisar cola de generación"
+              aria-label="Supervisar cola de generación"
+              class="h-10 w-10 rounded-xl bg-card border border-purple-200 text-purple-700 hover:bg-purple-50 flex items-center justify-center shadow-xs transition-colors cursor-pointer">
+              <i class="pi pi-list-check text-base"></i>
+            </button>
+          }
+          @if (esConsultaAcademica()) {
+            <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
+              <i class="pi pi-eye"></i> {{ esVicerrector() ? 'Consulta por sede' : 'Consulta de su alcance' }}
+            </span>
+          }
           <button 
             (click)="abrirModalReporteDiario()"
             class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
@@ -172,20 +177,39 @@ interface ResultadoVirtual {
         
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
           
-          <!-- Sede (SEA Gateway) -->
-          <div>
-            <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
-              <i class="pi pi-building text-primary text-[10px]"></i> Sede
-            </label>
-            <select 
-              [ngModel]="sedeSeleccionada()?.code"
-              (ngModelChange)="onSedeChange($event)"
-              class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
-              @for (sede of sedes(); track sede.branchOfficeId) {
-                <option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>
-              }
-            </select>
-          </div>
+          @if (esPersonalEvaluaciones()) {
+            <!-- El personal trabaja sobre los campus que pertenecen a sus sedes autorizadas. -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-building text-primary text-[10px]"></i> Campus
+              </label>
+              <select
+                [ngModel]="campusSeleccionado() ? campusKey(campusSeleccionado()!) : ''"
+                (ngModelChange)="onCampusChange($event)"
+                [disabled]="cargando() || cargandoCampus() || !campuses().length"
+                class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
+                @for (campus of campuses(); track campusKey(campus)) {
+                  <option [value]="campusKey(campus)">{{ campus.name }}{{ campus.code ? ' (' + campus.code + ')' : '' }}</option>
+                }
+              </select>
+            </div>
+          } @else {
+            <!-- Sede institucional para responsables y demás perfiles con esta vista. -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-building text-primary text-[10px]"></i> Sede
+              </label>
+              <select
+                [ngModel]="sedeSeleccionada()?.code"
+                (ngModelChange)="onSedeChange($event)"
+                [disabled]="cargando() || !sedes().length"
+                class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary">
+                @for (sede of sedes(); track sede.branchOfficeId) {
+                  <option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>
+                }
+              </select>
+            </div>
+          }
 
           <!-- Carrera (SEA Gateway) -->
           <div class="lg:col-span-2">
@@ -220,10 +244,10 @@ interface ResultadoVirtual {
             </select>
           </div>
 
-          <!-- Modalidad -->
+          <!-- Tipo de examen -->
           <div>
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
-              <i class="pi pi-desktop text-primary text-[10px]"></i> Modalidad
+              <i class="pi pi-desktop text-primary text-[10px]"></i> Tipo de examen
             </label>
             <select 
               [(ngModel)]="filtroModalidad"
@@ -236,7 +260,7 @@ interface ResultadoVirtual {
             </select>
           </div>
 
-          <!-- Fecha Inicio (Default: Hoy) -->
+          <!-- Fecha Inicio (por defecto se consultan todas las fechas) -->
           <div>
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
               <i class="pi pi-calendar text-primary text-[10px]"></i> Fecha Inicio
@@ -248,7 +272,7 @@ interface ResultadoVirtual {
               class="w-full bg-muted/70 border border-border rounded-xl px-2 py-1.5 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
           </div>
 
-          <!-- Fecha Fin (Default: Hoy) -->
+          <!-- Fecha Fin (por defecto se consultan todas las fechas) -->
           <div>
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
               <i class="pi pi-calendar-plus text-primary text-[10px]"></i> Fecha Fin
@@ -433,8 +457,9 @@ interface ResultadoVirtual {
                           <div class="relative group/tooltip">
                             <button 
                               [class]="getPasoBotonClass(item, st.key)"
+                              [disabled]="esConsultaAcademica() || pasoBloqueadoPorCartillas(item, st.key)"
                               (click)="clickPasoEstado(item, st.key)"
-                              class="h-7 w-7 rounded-lg transition-all flex items-center justify-center cursor-pointer">
+                              class="h-7 w-7 rounded-lg transition-all flex items-center justify-center cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
                               <i [class]="getPasoIcon(item, st)" class="text-xs"></i>
                             </button>
 
@@ -458,9 +483,9 @@ interface ResultadoVirtual {
                     <td class="p-3.5 text-center">
                       <div class="relative inline-flex group/cartillas">
                         @if (item.modalidad !== 'VIRTUAL') {
-                        <button
-                          (click)="abrirGestionCartillas(item)"
-                          [disabled]="!puedeGestionarCartillas(item)"
+                          <button
+                            (click)="abrirGestionCartillas(item)"
+                            [disabled]="!puedeGestionarCartillas(item)"
                           aria-label="Gestionar marcas OMR y lista de estudiantes"
                           [class]="marcaImpresa(item) ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-teal-700 bg-teal-50 border-teal-200'"
                           class="relative h-8 w-8 p-0 rounded-lg hover:bg-teal-100 border flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35">
@@ -487,7 +512,7 @@ interface ResultadoVirtual {
 
                     <!-- Documento oficial -->
                     <td class="p-3.5 text-center">
-                      @if (puedeMostrarDocumento(item)) {
+                        @if (puedeMostrarDocumento(item)) {
                         <div class="relative inline-flex group/documento">
                           <button
                             (click)="abrirPdfExamen(item)"
@@ -907,6 +932,69 @@ interface ResultadoVirtual {
               </button>
             </div>
 
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: CONFIRMACIÓN DE IMPRESIÓN SIN CARTILLA -->
+      @if (dialogImpresionSinCartilla()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-[70] animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-emerald-200 rounded-2xl max-w-lg w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col animate-scale-in">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
+              <div class="flex items-start gap-3">
+                <div class="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center"><i class="pi pi-print"></i></div>
+                <div>
+                  <p class="text-[10px] font-black uppercase tracking-widest text-emerald-700">Confirmación de impresión</p>
+                  <h3 class="text-base font-black text-foreground">Examen sin cartilla</h3>
+                  <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaImpresionSinCartilla()?.codigo }} · {{ evaluacionSeleccionadaImpresionSinCartilla()?.materia }}</p>
+                </div>
+              </div>
+              <button (click)="cancelarImpresionSinCartilla()" [disabled]="confirmandoImpresionSinCartilla()" aria-label="Cerrar" class="text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40"><i class="pi pi-times"></i></button>
+            </div>
+
+            <div class="p-5 space-y-4 overflow-y-auto text-xs">
+              <div class="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950 leading-relaxed flex gap-2.5">
+                <i class="pi pi-info-circle text-amber-700 text-base mt-0.5"></i>
+                <span>Descarga el archivo oficial, realiza la impresión y luego confirma para pasar el examen al estado <strong>Impreso</strong>. Si cancelas, el estado permanecerá en <strong>Validado</strong>.</span>
+              </div>
+
+              @if (cargandoDocumentoSinCartilla()) {
+                <div class="rounded-xl border border-dashed border-border bg-muted/30 py-10 text-center text-muted-foreground">
+                  <i class="pi pi-spin pi-spinner text-emerald-600 text-xl"></i>
+                  <p class="mt-2 font-bold">Consultando el archivo oficial...</p>
+                </div>
+              } @else if (documentoSinCartilla()) {
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                  <div class="flex items-start gap-3">
+                    <div class="h-10 w-10 shrink-0 rounded-xl bg-white text-emerald-700 flex items-center justify-center border border-emerald-200"><i class="pi pi-file-word text-lg"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <p class="font-black text-emerald-950 break-words">{{ documentoSinCartilla()!.nombreArchivo }}</p>
+                      <p class="mt-1 text-[11px] text-emerald-800">Archivo oficial · {{ formatoTamanoArchivo(documentoSinCartilla()!.tamanoBytes) }}</p>
+                    </div>
+                  </div>
+                  <button (click)="descargarDocumentoSinCartilla()" [disabled]="descargandoDocumentoSinCartilla()" class="mt-4 w-full rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 text-white text-xs font-black cursor-pointer disabled:opacity-50">
+                    <i class="pi" [class.pi-spin]="descargandoDocumentoSinCartilla()" [class.pi-spinner]="descargandoDocumentoSinCartilla()" [class.pi-download]="!descargandoDocumentoSinCartilla()"></i>
+                    {{ descargandoDocumentoSinCartilla() ? 'Descargando...' : 'Descargar archivo del examen' }}
+                  </button>
+                  @if (archivoSinCartillaDescargado()) {
+                    <p class="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-700"><i class="pi pi-check-circle"></i>Archivo descargado. Ya puede imprimirlo.</p>
+                  }
+                </div>
+              } @else {
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800 flex items-start gap-2.5">
+                  <i class="pi pi-exclamation-triangle text-base mt-0.5"></i>
+                  <span>{{ errorDocumentoSinCartilla() || 'No se encontró el archivo oficial del examen.' }}</span>
+                </div>
+              }
+            </div>
+
+            <div class="p-4 border-t border-border bg-muted/30 flex flex-wrap justify-end gap-2 shrink-0">
+              <button (click)="cancelarImpresionSinCartilla()" [disabled]="confirmandoImpresionSinCartilla()" class="px-4 py-2 rounded-xl border border-border bg-card text-xs font-bold text-muted-foreground cursor-pointer disabled:opacity-50">Cancelar</button>
+              <button (click)="confirmarImpresionSinCartilla()" [disabled]="!documentoSinCartilla() || confirmandoImpresionSinCartilla()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                <i class="pi" [class.pi-spin]="confirmandoImpresionSinCartilla()" [class.pi-spinner]="confirmandoImpresionSinCartilla()" [class.pi-check]="!confirmandoImpresionSinCartilla()"></i>
+                {{ confirmandoImpresionSinCartilla() ? 'Confirmando...' : 'Aceptar y pasar a Impreso' }}
+              </button>
+            </div>
           </div>
         </div>
       }
@@ -1826,8 +1914,8 @@ interface ResultadoVirtual {
                   <span class="text-[10px] font-black px-2.5 py-1 rounded-full" [class.bg-emerald-100]="todasPaginasCalificadas(resultado)" [class.text-emerald-800]="todasPaginasCalificadas(resultado)" [class.bg-amber-100]="!todasPaginasCalificadas(resultado)" [class.text-amber-900]="!todasPaginasCalificadas(resultado)">{{ todasPaginasCalificadas(resultado) ? 'LISTO PARA CALIFICAR' : 'REQUIERE REVISIÓN MANUAL' }}</span>
                 </div>
                 <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-2.5 text-[11px] text-indigo-950">
-                  <i class="pi pi-pencil mr-1.5"></i>
-                  Verifique cada número de pregunta. Puede corregir el código y seleccionar la respuesta leída; al guardar se recalculan los aciertos, fallos, dobles y notas usando el patrón oficial de la variante.
+                  <i class="pi pi-eye mr-1.5"></i>
+                  Verifique cada número de pregunta comparando la respuesta del estudiante con el patrón oficial de su variante. Las respuestas detectadas son informativas y no se pueden modificar; solo puede corregirse el código cuando la lectura lo requiera.
                 </div>
                 <div class="border border-border rounded-xl overflow-hidden divide-y divide-border">
                   @for (lectura of resultado.resultados ?? []; track lectura.pagina) {
@@ -1858,10 +1946,10 @@ interface ResultadoVirtual {
                             <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Aciertos / Nota</span><strong class="text-emerald-700">{{ lectura.aciertos ?? 0 }} · {{ lectura.notaSobre30 ?? 0 }}/30</strong></div>
                           </div>
                           <div class="rounded-lg border border-border bg-card p-2">
-                            <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-muted-foreground">Respuestas detectadas · revisión por pregunta</span><span class="text-[10px] text-muted-foreground">— blanco · AB doble</span></div>
+                            <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-muted-foreground">Respuesta del estudiante vs patrón oficial</span><span class="text-[10px] text-muted-foreground">— blanco · AB doble</span></div>
                             <div class="grid grid-cols-2 gap-1.5">
                               @for (pregunta of preguntasOmr(lectura); track pregunta) {
-                                <label class="flex items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 text-[10px]" [title]="'Leída: ' + (respuestaOmr(lectura, pregunta) || 'blanco') + (respuestaCorrectaOmr(lectura, pregunta) ? ' · Clave: ' + respuestaCorrectaOmr(lectura, pregunta) : '')"><span class="w-5 shrink-0 font-mono font-black text-muted-foreground">{{ pregunta }}</span><span class="w-5 shrink-0 rounded bg-white text-center font-mono font-black text-indigo-700">{{ respuestaOmr(lectura, pregunta) || '—' }}</span><select [value]="respuestaOmr(lectura, pregunta)" (change)="editarRespuestaOmr(lectura, pregunta, $any($event.target).value)" class="min-w-0 flex-1 rounded border-0 bg-transparent py-0 text-[10px] font-black text-foreground outline-none"><option value="">—</option>@for (opcion of opcionesRespuestaOmr; track opcion) { <option [value]="opcion">{{ opcion }}</option> }</select><span class="w-14 shrink-0 text-right text-[9px] font-black" [class.text-emerald-700]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.text-rose-700]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.text-amber-700]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.text-slate-500]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.text-indigo-700]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'">{{ etiquetaEstadoPreguntaOmr(lectura, pregunta) }}</span></label>
+                                <div class="flex min-w-0 items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 text-[10px]" [title]="'Respuesta del estudiante: ' + (respuestaOmr(lectura, pregunta) || 'blanco') + ' · Patrón oficial: ' + (respuestaCorrectaOmr(lectura, pregunta) || 'sin patrón')"><span class="w-5 shrink-0 font-mono font-black text-muted-foreground">{{ pregunta }}</span><span class="min-w-0 flex-1 rounded bg-white px-1.5 py-0.5 font-mono text-[9px] font-black text-indigo-700" title="Respuesta marcada por el estudiante">Est.: {{ respuestaOmr(lectura, pregunta) || '—' }}</span><span class="min-w-0 flex-1 rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-[9px] font-black text-indigo-900" title="Respuesta del patrón oficial">Patrón: {{ respuestaCorrectaOmr(lectura, pregunta) || '—' }}</span><span class="w-14 shrink-0 text-right text-[9px] font-black" [class.text-emerald-700]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.text-rose-700]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.text-amber-700]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.text-slate-500]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.text-indigo-700]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'">{{ etiquetaEstadoPreguntaOmr(lectura, pregunta) }}</span></div>
                               }
                             </div>
                           </div>
@@ -1980,6 +2068,7 @@ interface ResultadoVirtual {
 export class EvaluacionesDiaComponent implements OnInit {
   private readonly _http = inject(HttpClient);
   private readonly _gateway = inject(UnitepcGatewayService);
+  private readonly _auth = inject(AuthService);
   private readonly _rolService = inject(RolExamenService);
   private readonly _studentService = inject(EstudiantesGatewayService);
   private readonly _generacionTypst = inject(GeneracionTypstService);
@@ -1993,22 +2082,36 @@ export class EvaluacionesDiaComponent implements OnInit {
   // Sedes y Carreras desde SEA Gateway
   public sedes = signal<BranchOffice[]>([]);
   public sedeSeleccionada = signal<BranchOffice | null>(null);
+  public campuses = signal<CampusDisponible[]>([]);
+  public campusSeleccionado = signal<CampusDisponible | null>(null);
 
   public carreras = signal<Career[]>([]);
   public carreraSeleccionada = signal<Career | null>(null);
 
   public cargando = signal<boolean>(false);
   public cargandoCarreras = signal<boolean>(false);
+  public cargandoCampus = signal<boolean>(false);
+  public readonly esPersonalEvaluaciones = computed(
+    () => this._auth.usuario()?.rol === 'PERSONAL_EVALUACIONES'
+  );
+  public readonly esDirectorCarrera = computed(
+    () => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA'
+  );
+  public readonly esVicerrector = computed(
+    () => this._auth.usuario()?.rol === 'VICERRECTOR'
+  );
+  public readonly esConsultaAcademica = computed(
+    () => this.esDirectorCarrera() || this.esVicerrector()
+  );
 
   // Filtros Parametrizados
   public filtroParcial: string = '1er Parcial';
   public filtroModalidad: 'Todos' | 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'Todos';
   
-  // No usar toISOString(): convierte la hora local a UTC y en Bolivia puede
-  // mover la fecha al día siguiente durante la noche.
-  public readonly hoyIso = fechaIsoLocal();
-  public filtroFechaInicio: string = this.hoyIso;
-  public filtroFechaFin: string = this.hoyIso;
+  // La lista debe abrir mostrando la programación disponible. El usuario
+  // puede acotar el rango manualmente cuando necesite revisar una fecha.
+  public filtroFechaInicio = '';
+  public filtroFechaFin = '';
 
   public busquedaTexto = '';
   public filtrosActualizados = signal(0);
@@ -2102,6 +2205,16 @@ export class EvaluacionesDiaComponent implements OnInit {
   public generandoCartillas = signal<boolean>(false);
   public generandoListaCartillas = signal<boolean>(false);
 
+  // Confirmación explícita antes de llevar un examen sin cartilla a Impreso.
+  public dialogImpresionSinCartilla = signal<boolean>(false);
+  public evaluacionSeleccionadaImpresionSinCartilla = signal<EvaluacionItemUI | null>(null);
+  public documentoSinCartilla = signal<DocumentoSinCartilla | null>(null);
+  public cargandoDocumentoSinCartilla = signal<boolean>(false);
+  public descargandoDocumentoSinCartilla = signal<boolean>(false);
+  public archivoSinCartillaDescargado = signal<boolean>(false);
+  public confirmandoImpresionSinCartilla = signal<boolean>(false);
+  public errorDocumentoSinCartilla = signal<string | null>(null);
+
   // Calificación OMR integrada al flujo de estados.
   public dialogCalificacionOmr = signal<boolean>(false);
   public evaluacionSeleccionadaOmr = signal<EvaluacionItemUI | null>(null);
@@ -2111,12 +2224,11 @@ export class EvaluacionesDiaComponent implements OnInit {
   public resultadoCalificacionOmr = signal<OmrJobResponse | null>(null);
   public mensajeCalificacionOmr = signal<string | null>(null);
   public errorCalificacionOmr = signal<boolean>(false);
-  public edicionesOmr = signal<Record<number, { codigo: string; respuestas: Record<string, string> }>>({});
+  public edicionesOmr = signal<Record<number, { codigo: string }>>({});
   public previewPaginasOmr = signal<string[]>([]);
   public cargandoPreviewOmr = signal<boolean>(false);
   public paginaPreviewOmr = signal<number | null>(null);
   public recalibrandoOmr = signal<Record<number, boolean>>({});
-  public readonly opcionesRespuestaOmr = ['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE', 'BC', 'BD', 'BE', 'CD', 'CE', 'DE'];
 
   // Consulta de notas ya persistidas.
   public dialogNotasOmr = signal<boolean>(false);
@@ -2299,6 +2411,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     this._gateway.getBranchOffices().subscribe({
       next: sedes => {
         this.sedes.set(sedes);
+        if (this.esPersonalEvaluaciones()) {
+          this._cargarCampus(sedes);
+          return;
+        }
         const sedeInicial = this._gateway.resolverSedeInicial(sedes);
         if (sedeInicial) {
           this.sedeSeleccionada.set(sedeInicial);
@@ -2306,6 +2422,49 @@ export class EvaluacionesDiaComponent implements OnInit {
         }
       },
       error: () => this.cargando.set(false)
+    });
+  }
+
+  private _cargarCampus(sedes: BranchOffice[]): void {
+    this.cargandoCampus.set(true);
+    if (!sedes.length) {
+      this.campuses.set([]);
+      this.campusSeleccionado.set(null);
+      this.cargandoCampus.set(false);
+      this.cargando.set(false);
+      return;
+    }
+
+    forkJoin(sedes.map(sede => this._gateway.getCampuses(sede.branchOfficeId).pipe(
+      catchError(() => of([] as Campus[])),
+      map(campuses => campuses.map(campus => ({ ...campus, branchOfficeCode: sede.code })))
+    ))).subscribe({
+      next: listas => {
+        const unicos = new Map<string, CampusDisponible>();
+        listas.flat().forEach(campus => unicos.set(this.campusKey(campus), campus));
+        const disponibles = [...unicos.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+        this.campuses.set(disponibles);
+        this.cargandoCampus.set(false);
+        this.cargando.set(false);
+
+        const campusInicial = disponibles[0] || null;
+        this.campusSeleccionado.set(campusInicial);
+        if (campusInicial) {
+          this.sedeSeleccionada.set(
+            sedes.find(sede => sede.code === campusInicial.branchOfficeCode) || null
+          );
+          this._cargarCarreras(campusInicial.branchOfficeCode);
+        } else {
+          this.carreraSeleccionada.set(null);
+          this.evaluaciones.set([]);
+        }
+      },
+      error: () => {
+        this.campuses.set([]);
+        this.campusSeleccionado.set(null);
+        this.cargandoCampus.set(false);
+        this.cargando.set(false);
+      }
     });
   }
 
@@ -2334,11 +2493,16 @@ export class EvaluacionesDiaComponent implements OnInit {
   private _cargarEvaluaciones(): void {
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
-    if (!sede || !carrera) return;
+    const campus = this.campusSeleccionado();
+    if (!sede || !carrera || (this.esPersonalEvaluaciones() && !campus)) return;
 
     this.cargando.set(true);
 
-    this._rolService.listar(sede.code, carrera.careerCode).subscribe({
+    this._rolService.listar(
+      sede.code,
+      carrera.careerCode,
+      this.esPersonalEvaluaciones() ? campus?.name : undefined
+    ).subscribe({
       next: roles => {
         const uiList: EvaluacionItemUI[] = roles.map(rol => this._mapearRolResponseA_UI(rol));
         this.evaluaciones.set(uiList);
@@ -2372,11 +2536,13 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   private _mapearRolResponseA_UI(rol: RolExamenResponse): EvaluacionItemUI {
-    const conCartilla = rol.modalidad === 'PRESENCIAL_CARTILLA';
+    const modalidad = this._normalizarModalidad(rol.modalidad);
+    const conCartilla = modalidad === 'PRESENCIAL_CARTILLA';
     const etapaMapeada = this._mapearEtapa(rol.estadoFlujo);
+    const registroAnterior = this.evaluaciones().find(item => item.id === rol.id);
     // Compatibilidad con generaciones virtuales antiguas: aunque hayan
     // quedado como GENERADO, operativamente esperan una sala y no un PDF.
-    const etapa = rol.modalidad === 'VIRTUAL' && etapaMapeada === 'Generado'
+    const etapa = modalidad === 'VIRTUAL' && etapaMapeada === 'Generado'
       ? 'Validado'
       : etapaMapeada;
 
@@ -2391,13 +2557,16 @@ export class EvaluacionesDiaComponent implements OnInit {
       semestre: rol.semestre,
       grupo: rol.grupo,
       tipoClase: rol.tipoClase,
-      docenteNombre: rol.docenteNombre,
-      docenteCI: rol.docenteCi,
+      // Algunas acciones devuelven una representación mínima del rol. Si el
+      // backend no incluye el docente en esa respuesta, conservar el dato que
+      // ya estaba visible en la lista hasta la siguiente sincronización.
+      docenteNombre: rol.docenteNombre || registroAnterior?.docenteNombre || '',
+      docenteCI: rol.docenteCi || registroAnterior?.docenteCI || '',
       tipo: rol.tipoParcial as RolExamenPersistedItem['tipo'],
       version: rol.version || 1,
       estado: rol.estadoFlujo as RolExamenPersistedItem['estado'],
       conCartilla,
-      modalidad: rol.modalidad,
+      modalidad,
       semana: rol.semana,
       dia: rol.dia,
       fecha: rol.fecha,
@@ -2415,6 +2584,15 @@ export class EvaluacionesDiaComponent implements OnInit {
     };
   }
 
+  private _normalizarModalidad(valor: unknown): 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' {
+    const modalidad = String(valor ?? '').trim().toUpperCase();
+    if (modalidad === 'VIRTUAL') return 'VIRTUAL';
+    if (modalidad === 'PRESENCIAL_SIN_CARTILLA' || modalidad === 'SIN_CARTILLA') {
+      return 'PRESENCIAL_SIN_CARTILLA';
+    }
+    return 'PRESENCIAL_CARTILLA';
+  }
+
   private _mapearEtapa(estado: string): EtapaEvaluacion {
     switch (estado?.toUpperCase()) {
       case 'VALIDADO': return 'Validado';
@@ -2429,41 +2607,41 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public puedeRestablecer(item: EvaluacionItemUI): boolean {
-    if (item.modalidad === 'VIRTUAL') return false;
+    if (this.esConsultaAcademica() || item.modalidad === 'VIRTUAL') return false;
     return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado']
       .includes(item.etapa);
   }
 
   public puedeMostrarNotasDocente(item: EvaluacionItemUI): boolean {
-    return item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
+    return !this.esConsultaAcademica() && item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
       && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
   }
 
   public puedeMostrarDocumento(item: EvaluacionItemUI): boolean {
-    if (item.modalidad === 'VIRTUAL') return false;
+    if (this.esConsultaAcademica() || item.modalidad === 'VIRTUAL') return false;
     return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado']
       .includes(item.etapa);
   }
 
   public puedeGestionarCartillas(item: EvaluacionItemUI): boolean {
-    if (item.modalidad === 'VIRTUAL') return false;
+    if (this.esConsultaAcademica() || item.modalidad === 'VIRTUAL') return false;
     // Las marcas se pueden preparar antes de entregar el examen. Desde
     // Entregado en adelante la cartilla ya no debe modificarse.
     return ['Programado', 'Validado', 'Generado', 'Impreso'].includes(item.etapa);
   }
 
   public puedeMostrarConfiguracion(item: EvaluacionItemUI): boolean {
-    return item.modalidad === 'VIRTUAL'
+    return !this.esConsultaAcademica() && (item.modalidad === 'VIRTUAL'
       ? ['Validado', 'Calificado'].includes(item.etapa)
-      : ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa);
+      : ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa));
   }
 
   public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
-    return item.modalidad === 'PRESENCIAL_CARTILLA' && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
+    return !this.esConsultaAcademica() && item.modalidad === 'PRESENCIAL_CARTILLA' && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
   }
 
   public puedeMostrarResultadosVirtuales(item: EvaluacionItemUI): boolean {
-    return item.modalidad === 'VIRTUAL' && item.etapa === 'Calificado';
+    return !this.esConsultaAcademica() && item.modalidad === 'VIRTUAL' && item.etapa === 'Calificado';
   }
 
   public marcaImpresa(item: EvaluacionItemUI): boolean {
@@ -2482,6 +2660,19 @@ export class EvaluacionesDiaComponent implements OnInit {
     if (estado === 'IMPRESO') return 'Impresa';
     if (estado === 'PENDIENTE') return 'Pendiente';
     return 'Consultando…';
+  }
+
+  public cartillasListasParaEntrega(item: EvaluacionItemUI): boolean {
+    if (item.modalidad !== 'PRESENCIAL_CARTILLA') return true;
+    return this.estadoMarcas()[item.id] === 'IMPRESO'
+      && this.estadoListas()[item.id] === 'IMPRESO';
+  }
+
+  public pasoBloqueadoPorCartillas(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): boolean {
+    return item.modalidad === 'PRESENCIAL_CARTILLA'
+      && item.etapa === 'Impreso'
+      && pasoKey === 'Entregado'
+      && !this.cartillasListasParaEntrega(item);
   }
 
   public bancoPreguntasCargado(item: EvaluacionItemUI): boolean {
@@ -2727,6 +2918,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     const currentIdx = pasos.indexOf(item.etapa);
     const pasoIdx = pasos.indexOf(pasoKey);
 
+    if (this.pasoBloqueadoPorCartillas(item, pasoKey)) {
+      return 'bg-amber-50 text-amber-700 border border-amber-300 border-dashed cursor-not-allowed';
+    }
+
     if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
         && item.etapa === 'Pendiente de notas'
         && pasoKey === 'Calificado') {
@@ -2767,6 +2962,9 @@ export class EvaluacionesDiaComponent implements OnInit {
     if (pasoIdx < currentIdx) return `Completado: ${st.label}`;
     if (pasoIdx === currentIdx) return `Estado actual: ${st.label}`;
     if (pasoIdx === currentIdx + 1) {
+      if (this.pasoBloqueadoPorCartillas(item, st.key)) {
+        return 'Confirma primero la impresión de las marcas OMR y de la lista de estudiantes';
+      }
       if (st.key === 'Validado') return 'Clic para Validar y Encriptar Examen de Docente';
       if (st.key === 'Generado') return 'Clic para generar el examen PDF';
       if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') return 'Preparar sala virtual, variantes y tokens de acceso';
@@ -2777,9 +2975,28 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public clickPasoEstado(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): void {
+    if (this.esConsultaAcademica()) {
+      this._mostrarToast(this.esVicerrector()
+        ? 'El vicerrector cuenta con acceso de consulta para sus sedes académicas.'
+        : 'El director de carrera cuenta con acceso de consulta para su alcance académico.', 'warning');
+      return;
+    }
+
     const pasos = this.getPasosFlujo(item).map(p => p.key);
     const currentIdx = pasos.indexOf(item.etapa);
     const pasoIdx = pasos.indexOf(pasoKey);
+
+    if (this.pasoBloqueadoPorCartillas(item, pasoKey)) {
+      this._mostrarToast('Antes de pasar a Entregado, confirma la impresión de las marcas OMR y de la lista de estudiantes.', 'warning');
+      return;
+    }
+
+    if (pasoKey === 'Impreso'
+        && item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
+        && item.etapa === 'Validado') {
+      this.abrirConfirmacionImpresionSinCartilla(item);
+      return;
+    }
 
     if (pasoKey === 'Validado' && item.etapa === 'Programado') {
       if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
@@ -2824,6 +3041,108 @@ export class EvaluacionesDiaComponent implements OnInit {
         error: err => this._mostrarToast(err?.error?.message || 'No se pudo actualizar el estado oficial del examen.', 'error')
       });
     }
+  }
+
+  public campusKey(campus: CampusDisponible): string {
+    return campus.campusId || campus.code || `${campus.branchOfficeCode}-${campus.name}`;
+  }
+
+  public onCampusChange(key: string): void {
+    const campus = this.campuses().find(item => this.campusKey(item) === key);
+    if (!campus) return;
+
+    this.campusSeleccionado.set(campus);
+    this.sedeSeleccionada.set(
+      this.sedes().find(sede => sede.code === campus.branchOfficeCode) || null
+    );
+    this._cargarCarreras(campus.branchOfficeCode);
+  }
+
+  public abrirConfirmacionImpresionSinCartilla(item: EvaluacionItemUI): void {
+    if (item.modalidad !== 'PRESENCIAL_SIN_CARTILLA' || item.etapa !== 'Validado') return;
+
+    this.evaluacionSeleccionadaImpresionSinCartilla.set(item);
+    this.documentoSinCartilla.set(null);
+    this.errorDocumentoSinCartilla.set(null);
+    this.archivoSinCartillaDescargado.set(false);
+    this.cargandoDocumentoSinCartilla.set(true);
+    this.dialogImpresionSinCartilla.set(true);
+
+    this._sinCartillaService.obtenerDocumento(item.id).subscribe({
+      next: documento => {
+        this.documentoSinCartilla.set(documento);
+        this.cargandoDocumentoSinCartilla.set(false);
+      },
+      error: err => {
+        this.cargandoDocumentoSinCartilla.set(false);
+        this.errorDocumentoSinCartilla.set(
+          err?.error?.error || err?.error?.message || 'No se pudo consultar el archivo oficial del examen.'
+        );
+      }
+    });
+  }
+
+  public cancelarImpresionSinCartilla(): void {
+    if (this.confirmandoImpresionSinCartilla()) return;
+    this.dialogImpresionSinCartilla.set(false);
+    this.evaluacionSeleccionadaImpresionSinCartilla.set(null);
+    this.documentoSinCartilla.set(null);
+    this.errorDocumentoSinCartilla.set(null);
+    this.archivoSinCartillaDescargado.set(false);
+  }
+
+  public descargarDocumentoSinCartilla(): void {
+    const item = this.evaluacionSeleccionadaImpresionSinCartilla();
+    const documento = this.documentoSinCartilla();
+    if (!item || !documento || this.descargandoDocumentoSinCartilla()) return;
+
+    this.descargandoDocumentoSinCartilla.set(true);
+    this._sinCartillaService.descargarDocumento(item.id).subscribe({
+      next: archivo => {
+        const url = window.URL.createObjectURL(archivo);
+        const enlace = window.document.createElement('a');
+        enlace.href = url;
+        enlace.download = documento.nombreArchivo || `${item.codigo}_examen_sin_cartilla.docx`;
+        enlace.click();
+        enlace.remove();
+        window.setTimeout(() => window.URL.revokeObjectURL(url), 1500);
+        this.descargandoDocumentoSinCartilla.set(false);
+        this.archivoSinCartillaDescargado.set(true);
+      },
+      error: err => {
+        this.descargandoDocumentoSinCartilla.set(false);
+        this._mostrarToast(err?.error?.error || err?.error?.message || 'No se pudo descargar el archivo del examen.', 'error');
+      }
+    });
+  }
+
+  public confirmarImpresionSinCartilla(): void {
+    const item = this.evaluacionSeleccionadaImpresionSinCartilla();
+    if (!item || !this.documentoSinCartilla() || this.confirmandoImpresionSinCartilla()) return;
+
+    this.confirmandoImpresionSinCartilla.set(true);
+    this._rolService.transicionarEstado(item.id, {
+      nuevoEstado: 'IMPRESO',
+      usuario: 'ADMIN_EVALUACIONES'
+    }).subscribe({
+      next: rolActualizado => {
+        const actualizado = this._mapearRolResponseA_UI(rolActualizado);
+        this.evaluaciones.update(items => items.map(actual => actual.id === item.id ? actualizado : actual));
+        this.confirmandoImpresionSinCartilla.set(false);
+        this.cancelarImpresionSinCartilla();
+        this._mostrarToast(`${item.codigo}: impresión confirmada y examen pasado a Impreso.`);
+      },
+      error: err => {
+        this.confirmandoImpresionSinCartilla.set(false);
+        this._mostrarToast(err?.error?.error || err?.error?.message || 'No se pudo pasar el examen a Impreso.', 'error');
+      }
+    });
+  }
+
+  public formatoTamanoArchivo(bytes: number): string {
+    if (!bytes || bytes < 1024) return `${bytes || 0} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
   private estadoBackendParaEtapa(etapa: EtapaEvaluacion): RolExamenResponse['estadoFlujo'] {
@@ -2955,7 +3274,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       error: err => {
         this.procesandoCalificacionOmr.set(false);
         this.errorCalificacionOmr.set(true);
-        this.mensajeCalificacionOmr.set(err?.error?.message || 'No se pudo enviar el escaneado al motor OMR.');
+        this.mensajeCalificacionOmr.set(err?.error?.error || err?.error?.message || 'No se pudo enviar el escaneado al motor OMR.');
       }
     });
   }
@@ -3000,10 +3319,6 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public respuestaOmr(lectura: OmrLecturaResponse, pregunta: number): string {
-    const edicion = this.edicionesOmr()[lectura.pagina];
-    if (edicion?.respuestas[String(pregunta)] !== undefined) {
-      return this.normalizarRespuestaOmr(edicion.respuestas[String(pregunta)]);
-    }
     const respuestaDirecta = this.normalizarRespuestaOmr(lectura.respuestas?.[String(pregunta)]);
     if (respuestaDirecta) return respuestaDirecta;
     return this.normalizarRespuestaOmr(lectura.detalles?.find(detalle => detalle.pregunta === pregunta)?.respuesta);
@@ -3045,27 +3360,10 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public editarCodigoOmr(lectura: OmrLecturaResponse, codigo: string): void {
-    const actual = this.edicionesOmr()[lectura.pagina] || {
-      codigo: lectura.codigoEstudiante || '',
-      respuestas: { ...(lectura.respuestas || {}) }
-    };
+    const actual = this.edicionesOmr()[lectura.pagina] || { codigo: lectura.codigoEstudiante || '' };
     this.edicionesOmr.update(ediciones => ({
       ...ediciones,
       [lectura.pagina]: { ...actual, codigo: codigo.replace(/\D/g, '') }
-    }));
-  }
-
-  public editarRespuestaOmr(lectura: OmrLecturaResponse, pregunta: number, respuesta: string): void {
-    const actual = this.edicionesOmr()[lectura.pagina] || {
-      codigo: lectura.codigoEstudiante || '',
-      respuestas: { ...(lectura.respuestas || {}) }
-    };
-    this.edicionesOmr.update(ediciones => ({
-      ...ediciones,
-      [lectura.pagina]: {
-        ...actual,
-        respuestas: { ...actual.respuestas, [String(pregunta)]: respuesta }
-      }
     }));
   }
 
@@ -4039,8 +4337,8 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public limpiarFiltros(): void {
-    this.filtroFechaInicio = this.hoyIso;
-    this.filtroFechaFin = this.hoyIso;
+    this.filtroFechaInicio = '';
+    this.filtroFechaFin = '';
     this.filtroParcial = '1er Parcial';
     this.filtroModalidad = 'Todos';
     this.estadosSeleccionados.set([]);

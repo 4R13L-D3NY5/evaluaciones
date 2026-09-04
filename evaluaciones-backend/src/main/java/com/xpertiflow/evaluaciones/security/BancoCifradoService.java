@@ -28,6 +28,16 @@ public class BancoCifradoService {
 
     public BancoEncryptedPayload cifrarTexto(String plaintext, String context) {
         if (plaintext == null) throw new IllegalArgumentException("No se puede cifrar contenido nulo");
+        return cifrarBytes(plaintext.getBytes(StandardCharsets.UTF_8), context);
+    }
+
+    /**
+     * Cifra contenido binario con el mismo sobre envelope usado por los bancos.
+     * El ciphertext se entrega en Base64 para que pueda transportarse como metadato
+     * o persistirse temporalmente; los archivos físicos pueden decodificarlo a bytes.
+     */
+    public BancoEncryptedPayload cifrarBytes(byte[] plaintext, String context) {
+        if (plaintext == null) throw new IllegalArgumentException("No se puede cifrar contenido nulo");
         byte[] dek = new byte[KEY_BYTES];
         byte[] nonce = new byte[NONCE_BYTES];
         secureRandom.nextBytes(dek);
@@ -36,7 +46,7 @@ public class BancoCifradoService {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(dek, "AES"), new GCMParameterSpec(TAG_BITS, nonce));
             cipher.updateAAD(context.getBytes(StandardCharsets.UTF_8));
-            byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+            byte[] ciphertext = cipher.doFinal(plaintext);
             KeyManagementProvider.WrappedKey wrapped = keyManagementProvider.wrapDataKey(dek, context);
             return BancoEncryptedPayload.builder()
                     .ciphertext(Base64.getEncoder().encodeToString(ciphertext))
@@ -62,6 +72,11 @@ public class BancoCifradoService {
     }
 
     public String descifrarTexto(BancoEncryptedPayload payload, String context) {
+        return new String(descifrarBytes(payload, context), StandardCharsets.UTF_8);
+    }
+
+    /** Descifra contenido binario y valida autenticidad mediante AES-GCM. */
+    public byte[] descifrarBytes(BancoEncryptedPayload payload, String context) {
         if (payload == null || payload.getCiphertext() == null || payload.getNonce() == null
                 || payload.getWrappedDataKey() == null) {
             throw new IllegalArgumentException("El paquete cifrado está incompleto");
@@ -73,7 +88,7 @@ public class BancoCifradoService {
                     new SecretKeySpec(dek, "AES"),
                     new GCMParameterSpec(TAG_BITS, Base64.getDecoder().decode(payload.getNonce())));
             cipher.updateAAD(context.getBytes(StandardCharsets.UTF_8));
-            return new String(cipher.doFinal(Base64.getDecoder().decode(payload.getCiphertext())), StandardCharsets.UTF_8);
+            return cipher.doFinal(Base64.getDecoder().decode(payload.getCiphertext()));
         } catch (GeneralSecurityException | IllegalArgumentException exception) {
             throw new IllegalStateException("El contenido cifrado no pudo validarse o descifrarse", exception);
         } finally {

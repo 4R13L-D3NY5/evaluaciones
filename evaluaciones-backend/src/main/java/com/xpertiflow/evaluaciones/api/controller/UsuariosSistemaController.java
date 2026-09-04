@@ -17,6 +17,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,8 +42,15 @@ public class UsuariosSistemaController {
     private final UsuariosSistemaService service;
 
     @GetMapping
-    public ResponseEntity<List<UsuarioSistemaResponseDto>> listar() {
-        return ResponseEntity.ok(service.listar());
+    public ResponseEntity<List<UsuarioSistemaResponseDto>> listar(
+            @RequestParam(defaultValue = "INSTITUCIONAL") String contexto,
+            Authentication authentication) {
+        if (!"EVALUACIONES".equalsIgnoreCase(contexto)
+                && authentication.getAuthorities().stream()
+                .noneMatch(authority -> authority.getAuthority().equals("ROLE_ADMINISTRADOR_SISTEMA"))) {
+            throw new AccessDeniedException("Solo el administrador puede consultar usuarios institucionales");
+        }
+        return ResponseEntity.ok(service.listar(contexto));
     }
 
     @GetMapping("/roles")

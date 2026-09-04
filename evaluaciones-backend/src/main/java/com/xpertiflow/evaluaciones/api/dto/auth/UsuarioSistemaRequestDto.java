@@ -27,4 +27,10 @@ public class UsuarioSistemaRequestDto {
 
     @Valid
     private List<AlcanceAcademicoDto> carreras = new ArrayList<>();
+
+    @Valid
+    private List<AlcanceCampusDto> campuses = new ArrayList<>();
+
+    @Valid
+    private List<AsignacionAcademicaDto> asignaciones = new ArrayList<>();
 }

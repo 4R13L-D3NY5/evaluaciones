@@ -5,6 +5,7 @@ import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
+import com.xpertiflow.evaluaciones.domain.repository.DocumentoExamenSinCartillaRepository;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
@@ -38,6 +39,8 @@ class RolExamenServiceTest {
     @Mock
     private BancoPreguntasRepository bancoPreguntasRepository;
     @Mock
+    private DocumentoExamenSinCartillaRepository documentoSinCartillaRepository;
+    @Mock
     private RolExamenMapper mapper;
     @Mock
     private UnitepcGatewayClient unitepcGatewayClient;
@@ -48,7 +51,7 @@ class RolExamenServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, mapper, unitepcGatewayClient, accesoAcademicoService);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, mapper, unitepcGatewayClient, accesoAcademicoService);
     }
 
     @Test
@@ -154,6 +157,28 @@ class RolExamenServiceTest {
     }
 
     @Test
+    void noPermiteImprimirSinCartillaSiNoTieneDocumentoCargado() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-TEST-SIN-CARTILLA-001")
+                .modalidad(ModalidadExamen.PRESENCIAL_SIN_CARTILLA)
+                .estadoFlujo(EstadoFlujo.VALIDADO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(documentoSinCartillaRepository.findByRolExamenId(rol.getId())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.transicionarEstado(rol.getId(), TransicionEstadoRequestDto.builder()
+                .nuevoEstado(EstadoFlujo.IMPRESO)
+                .usuario("ADMIN_EVALUACIONES")
+                .build()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Primero cargue el archivo del examen sin cartilla");
+
+        assertThat(rol.getEstadoFlujo()).isEqualTo(EstadoFlujo.VALIDADO);
+        verify(rolExamenRepository, never()).save(rol);
+        verify(auditoriaRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void alDevolverUnaCartillaPasaAutomaticamenteAPendienteDeCalificacion() {
         RolExamen rol = RolExamen.builder()
                 .id("ROL-TEST-CARTILLA-001")
@@ -179,6 +204,55 @@ class RolExamenServiceTest {
         assertThat(auditorias.getAllValues().get(1).getEtapaOrigen()).isEqualTo("DEVUELTO");
         assertThat(auditorias.getAllValues().get(1).getEtapaDestino()).isEqualTo("PENDIENTE_NOTAS");
         assertThat(auditorias.getAllValues().get(1).getAccion()).isEqualTo("INICIO_CALIFICACION_OMR");
+    }
+
+    @Test
+    void noPermiteEntregarUnaCartillaSinConfirmarMarcasYLista() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-TEST-CARTILLA-ENTREGA-001")
+                .modalidad(ModalidadExamen.PRESENCIAL_CARTILLA)
+                .estadoFlujo(EstadoFlujo.IMPRESO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(
+                rol.getId(), "IMPRESION_MARCAS_OMR")).thenReturn(Optional.empty());
+        when(auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(
+                rol.getId(), "IMPRESION_LISTA_ESTUDIANTES")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.transicionarEstado(rol.getId(), TransicionEstadoRequestDto.builder()
+                .nuevoEstado(EstadoFlujo.ENTREGADO)
+                .usuario("PERSONAL_EVALUACIONES")
+                .build()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("marcas OMR y lista de estudiantes");
+
+        verify(rolExamenRepository, never()).save(rol);
+        verify(auditoriaRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void permiteEntregarUnaCartillaCuandoMarcasYListaEstanConfirmadas() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-TEST-CARTILLA-ENTREGA-002")
+                .modalidad(ModalidadExamen.PRESENCIAL_CARTILLA)
+                .estadoFlujo(EstadoFlujo.IMPRESO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(rolExamenRepository.save(rol)).thenReturn(rol);
+        when(mapper.toResponseDto(rol)).thenReturn(null);
+        when(auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(
+                rol.getId(), "IMPRESION_MARCAS_OMR")).thenReturn(Optional.of(new AuditoriaEvaluacion()));
+        when(auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(
+                rol.getId(), "IMPRESION_LISTA_ESTUDIANTES")).thenReturn(Optional.of(new AuditoriaEvaluacion()));
+
+        service.transicionarEstado(rol.getId(), TransicionEstadoRequestDto.builder()
+                .nuevoEstado(EstadoFlujo.ENTREGADO)
+                .usuario("PERSONAL_EVALUACIONES")
+                .build());
+
+        assertThat(rol.getEstadoFlujo()).isEqualTo(EstadoFlujo.ENTREGADO);
+        verify(rolExamenRepository).save(rol);
+        verify(auditoriaRepository).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

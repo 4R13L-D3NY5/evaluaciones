@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
@@ -8,6 +8,9 @@ import {
 } from '../../core/services/evaluaciones-storage.service';
 import { RolExamenService, RolExamenResponse } from '../../core/services/rol-examen.service';
 import { OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
+import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
+import { AuthService } from '../../core/services/auth.service';
+import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
 import * as XLSX from 'xlsx';
 
 type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR' | 'AUDITORIA_TRAZABILIDAD' | 'CONCILIACION_REMARK';
@@ -150,13 +153,14 @@ interface FilaRemark {
             <div class="space-y-1">
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Sede / Campus:</label>
               <select 
-                [(ngModel)]="filtroSede"
+                [ngModel]="filtroSede"
+                (ngModelChange)="onSedeChange($event)"
+                [disabled]="cargandoSedes()"
                 class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
-                <option value="Todos">Todas las Sedes</option>
-                <option value="Cochabamba - Colonial">Cochabamba - Colonial</option>
-                <option value="Cochabamba - Juan Pablo II">Cochabamba - Juan Pablo II</option>
-                <option value="La Paz">Sede La Paz</option>
-                <option value="Santa Cruz">Sede Santa Cruz</option>
+                @if (!esDirectorCarrera() && !esVicerrector()) { <option value="Todos">Todas las Sedes</option> }
+                @for (sede of sedes(); track sede.branchOfficeId) {
+                  <option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>
+                }
               </select>
             </div>
 
@@ -164,13 +168,14 @@ interface FilaRemark {
             <div class="space-y-1">
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Carrera:</label>
               <select 
-                [(ngModel)]="filtroCarrera"
+                [ngModel]="filtroCarrera"
+                (ngModelChange)="onCarreraChange($event)"
+                [disabled]="cargandoCarreras() || !filtroSede || filtroSede === 'Todos'"
                 class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
-                <option value="Todos">Todas las Carreras</option>
-                <option value="LICENCIATURA EN INGENIERÍA DE SISTEMAS">Ingeniería de Sistemas</option>
-                <option value="MEDICINA">Medicina</option>
-                <option value="ODONTOLOGÍA">Odontología</option>
-                <option value="BIOQUÍMICA Y FARMACIA">Bioquímica y Farmacia</option>
+                @if (!esDirectorCarrera()) { <option value="Todos">Todas las Carreras</option> }
+                @for (carrera of carreras(); track carrera.careerId) {
+                  <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
+                }
               </select>
             </div>
 
@@ -207,6 +212,24 @@ interface FilaRemark {
 
         </div>
       </div>
+
+      @if (esConsultaAcademica() && !cargandoSedes() && sedes().length === 0) {
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-sm text-amber-900 shadow-xs">
+          <i class="pi pi-lock mt-0.5"></i>
+          <div>
+            <p class="font-black">No tienes sedes académicas asignadas</p>
+            <p class="text-xs mt-1">Solicita al administrador que registre las sedes correspondientes bajo tu alcance institucional.</p>
+          </div>
+        </div>
+      } @else if (esConsultaAcademica() && !cargandoCarreras() && filtroSede && carreras().length === 0) {
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-sm text-amber-900 shadow-xs">
+          <i class="pi pi-lock mt-0.5"></i>
+          <div>
+            <p class="font-black">No hay carreras disponibles para la sede seleccionada</p>
+            <p class="text-xs mt-1">Verifica que la sede esté publicada correctamente en el catálogo académico oficial.</p>
+          </div>
+        </div>
+      }
 
       @if (tipoReporteActivo() === 'CONCILIACION_REMARK') {
         <section class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden print-area">
@@ -689,10 +712,26 @@ interface FilaRemark {
     </div>
   `
 })
-export class ReporteEvaluacionesComponent {
+export class ReporteEvaluacionesComponent implements OnInit {
   public readonly storage = inject(EvaluacionesStorageService);
   private readonly _roles = inject(RolExamenService);
   private readonly _omr = inject(OmrProcesamientoService);
+  private readonly _gateway = inject(UnitepcGatewayService);
+  private readonly _auth = inject(AuthService);
+
+  public readonly esDirectorCarrera = computed(
+    () => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA'
+  );
+  public readonly esVicerrector = computed(
+    () => this._auth.usuario()?.rol === 'VICERRECTOR'
+  );
+  public readonly esConsultaAcademica = computed(
+    () => this.esDirectorCarrera() || this.esVicerrector()
+  );
+  public sedes = signal<BranchOffice[]>([]);
+  public carreras = signal<Career[]>([]);
+  public cargandoSedes = signal(false);
+  public cargandoCarreras = signal(false);
 
   public tipoReporteActivo = signal<TipoReporte>('PLANILLA_RECEPCION');
 
@@ -732,12 +771,99 @@ export class ReporteEvaluacionesComponent {
   public filtroModalidad = 'Todos';
   public filtroFecha = '';
 
+  public ngOnInit(): void {
+    this.cargarSedes();
+  }
+
+  public onSedeChange(codigoSede: string): void {
+    if (codigoSede === 'Todos') {
+      this.filtroSede = 'Todos';
+      this.filtroCarrera = 'Todos';
+      this.carreras.set([]);
+      return;
+    }
+
+    const sede = this.sedes().find(item => item.code === codigoSede);
+    if (!sede) return;
+    this.filtroSede = sede.code;
+    this.filtroCarrera = this.esDirectorCarrera() ? '' : 'Todos';
+    this.carreras.set([]);
+    this.cargarCarreras(sede.code);
+  }
+
+  public onCarreraChange(codigoCarrera: string): void {
+    if (codigoCarrera === 'Todos') {
+      this.filtroCarrera = 'Todos';
+      return;
+    }
+    if (this.carreras().some(item => item.careerCode === codigoCarrera)) {
+      this.filtroCarrera = codigoCarrera;
+    }
+  }
+
+  private cargarSedes(): void {
+    this.cargandoSedes.set(true);
+    this._gateway.getBranchOffices().subscribe({
+      next: sedes => {
+        this.sedes.set(sedes || []);
+        this.cargandoSedes.set(false);
+        if (!this.esConsultaAcademica()) return;
+
+        const sedeInicial = this._gateway.resolverSedeInicial(sedes || []);
+        if (!sedeInicial) {
+          this.filtroSede = '';
+          this.filtroCarrera = '';
+          return;
+        }
+        this.filtroSede = sedeInicial.code;
+        this.cargarCarreras(sedeInicial.code);
+      },
+      error: () => {
+        this.sedes.set([]);
+        this.cargandoSedes.set(false);
+        if (this.esDirectorCarrera()) {
+          this.filtroSede = '';
+          this.filtroCarrera = '';
+        }
+      }
+    });
+  }
+
+  private cargarCarreras(codigoSede: string): void {
+    this.cargandoCarreras.set(true);
+    this._gateway.getCareers(codigoSede).subscribe({
+      next: carreras => {
+        this.carreras.set(carreras || []);
+        this.cargandoCarreras.set(false);
+        if (this.esDirectorCarrera()) {
+          this.filtroCarrera = carreras?.[0]?.careerCode || '';
+        } else if (this.esVicerrector()) {
+          this.filtroCarrera = 'Todos';
+        }
+      },
+      error: () => {
+        this.carreras.set([]);
+        this.cargandoCarreras.set(false);
+        if (this.esDirectorCarrera()) this.filtroCarrera = '';
+        if (this.esVicerrector()) this.filtroCarrera = 'Todos';
+      }
+    });
+  }
+
   public datosFiltrados = computed(() => {
     return this.storage.gestionEvaluaciones().filter(item => {
-      if (this.filtroSede !== 'Todos' && !item.carrera.toLowerCase().includes(this.filtroSede.toLowerCase())) {
-        // La sede se resolverá con el catálogo oficial del backend.
+      if (this.esConsultaAcademica()) {
+        const sedeItem = String((item as GestionEvaluacionItem & { sede?: string; sedeCodigo?: string }).sedeCodigo
+          || (item as GestionEvaluacionItem & { sede?: string }).sede || '').trim().toLowerCase();
+        if (!this.filtroSede || this.filtroSede === 'Todos' || !sedeItem
+            || !sedeItem.includes(this.filtroSede.toLowerCase())) {
+          return false;
+        }
       }
-      if (this.filtroCarrera !== 'Todos' && item.carrera !== this.filtroCarrera) {
+      const carrera = this.carreras().find(c => c.careerCode === this.filtroCarrera);
+      const textoCarrera = `${item.carrera} ${carrera?.careerName || ''} ${carrera?.careerCode || ''}`.toLowerCase();
+      if (this.filtroCarrera && this.filtroCarrera !== 'Todos'
+          && !textoCarrera.includes(this.filtroCarrera.toLowerCase())) {
         return false;
       }
       if (this.filtroModalidad === 'CON_CARTILLA' && !item.conCartilla) {
@@ -815,7 +941,7 @@ export class ReporteEvaluacionesComponent {
       error: error => {
         this.cargandoOmr.set(false);
         this.cargandoConciliacion.set(false);
-        this.errorConciliacion.set(error?.error?.message || 'No se pudo enviar el PDF escaneado al motor OMR.');
+        this.errorConciliacion.set(error?.error?.error || error?.error?.message || 'No se pudo enviar el PDF escaneado al motor OMR.');
       }
     });
   }

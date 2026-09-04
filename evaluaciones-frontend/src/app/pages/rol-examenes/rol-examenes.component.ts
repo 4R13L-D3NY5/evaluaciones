@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
+import { AuthService } from '../../core/services/auth.service';
 import { RolExamenPersistedItem } from '../../core/services/evaluaciones-db.service';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
@@ -61,29 +62,33 @@ interface InstanciaImportacionItem {
         </div>
 
         <div class="flex items-center justify-end gap-2.5 flex-wrap">
-          <!-- Botón Subir Excel -->
-          <button 
-            (click)="abrirModalSubirExcel()"
-            class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-            <i class="pi pi-file-excel"></i>
-            <span>Subir Excel</span>
-          </button>
+          @if (esVicerrector()) {
+            <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
+              <i class="pi pi-eye"></i> Consulta por sede
+            </span>
+          } @else {
+            <!-- Acciones de gestión reservadas al director y al personal autorizado -->
+            <button
+              (click)="abrirModalSubirExcel()"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+              <i class="pi pi-file-excel"></i>
+              <span>Subir Excel</span>
+            </button>
 
-          <!-- Botón exclusivo para 2da Instancia -->
-          <button
-            (click)="abrirModalSubirInstancias()"
-            class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-            <i class="pi pi-calendar-plus"></i>
-            <span>Subir 2da Instancia</span>
-          </button>
+            <button
+              (click)="abrirModalSubirInstancias()"
+              class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+              <i class="pi pi-calendar-plus"></i>
+              <span>Subir 2da Instancia</span>
+            </button>
 
-          <!-- Botón Añadir Manual -->
-          <button 
-            (click)="abrirModalAnadirManual()"
-            class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-            <i class="pi pi-plus"></i>
-            <span>Añadir Examen al Rol de Examen</span>
-          </button>
+            <button
+              (click)="abrirModalAnadirManual()"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+              <i class="pi pi-plus"></i>
+              <span>Añadir Examen al Rol de Examen</span>
+            </button>
+          }
         </div>
       </div>
 
@@ -257,7 +262,7 @@ interface InstanciaImportacionItem {
             <div class="max-w-md mx-auto space-y-1">
               <h3 class="text-sm font-black text-foreground">No hay exámenes programados en el rol de examen</h3>
               <p class="text-xs text-muted-foreground">
-                El rol de examen está vacío (0 exámenes). Puedes programar exámenes seleccionando materias oficiales o importar la planilla oficial en formato Excel.
+                El rol de examen está vacío (0 exámenes). Si tampoco aparecen carreras, verifica que el administrador haya asignado el alcance académico del director.
               </p>
             </div>
 
@@ -448,6 +453,7 @@ interface InstanciaImportacionItem {
             <div class="flex items-center gap-3">
               <button 
                 (click)="vaciarRol()" 
+                [disabled]="esVicerrector()"
                 class="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer">
                 <i class="pi pi-trash text-xs"></i>
                 <span>Vaciar Rol de Examen</span>
@@ -879,7 +885,9 @@ export class RolExamenesComponent implements OnInit {
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _rolService = inject(RolExamenService);
   private readonly _feedback = inject(UiFeedbackService);
+  private readonly _auth = inject(AuthService);
   public readonly storage = inject(EvaluacionesStorageService);
+  public readonly esVicerrector = computed(() => this._auth.usuario()?.rol === 'VICERRECTOR');
 
   // Estados de Datos Reales de SEA
   public sedes = signal<BranchOffice[]>([]);
@@ -1095,6 +1103,10 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public async vaciarRol(): Promise<void> {
+    if (this.esVicerrector()) {
+      this._mostrarToast('El vicerrector cuenta con acceso de consulta por sede.');
+      return;
+    }
     const programados = this.examenes().filter(item => item.estado === 'PROGRAMADO');
     const protegidos = this.examenes().length - programados.length;
     if (programados.length === 0) {
@@ -1920,7 +1932,8 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public puedeEditarEliminar(item: RolExamenItem): boolean {
-    return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
+    return !this.esVicerrector()
+      && (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO');
   }
 
   public rolesImportacionReemplazables(): RolExamenItem[] {

@@ -61,7 +61,7 @@ class CartillaOmrPdfServiceTest {
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("LISTA DE ESTUDIANTES"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("FIRMA DEL ESTUDIANTE"));
             org.junit.jupiter.api.Assertions.assertTrue(
-                    documento.getPage(0).getResources().getXObjectNames().stream()
+                    java.util.stream.StreamSupport.stream(documento.getPage(0).getResources().getXObjectNames().spliterator(), false)
                             .anyMatch(nombre -> documento.getPage(0).getResources().isImageXObject(nombre)),
                     "La lista debe incluir el logo institucional");
         }

@@ -78,4 +78,12 @@ public class UsuarioSistema {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "sea_usuario_carreras", joinColumns = @JoinColumn(name = "usuario_id"))
     private Set<AlcanceCarrera> carreras = new LinkedHashSet<>();
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "sea_usuario_asignaciones", joinColumns = @JoinColumn(name = "usuario_id"))
+    private Set<AsignacionAcademica> asignaciones = new LinkedHashSet<>();
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "sea_usuario_campus", joinColumns = @JoinColumn(name = "usuario_id"))
+    private Set<AlcanceCampus> campuses = new LinkedHashSet<>();
 }

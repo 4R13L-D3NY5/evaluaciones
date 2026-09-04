@@ -49,7 +49,7 @@ class SeleccionBloquesAgrupadosTest(unittest.TestCase):
 
         self.assertEqual([p["id"] for p in resultado], ["caso", "caso-1", "caso-2", "caso-3"])
 
-    def test_emparejamiento_seleccionado_incluye_todas_las_opciones_en_orden(self):
+    def test_emparejamiento_seleccionado_baraja_subitems_sin_perder_el_bloque(self):
         config.CUOTA_FACILES = 0
         config.CUOTA_MEDIAS = 0
         config.CUOTA_DIFICILES = 1
@@ -61,8 +61,18 @@ class SeleccionBloquesAgrupadosTest(unittest.TestCase):
         ]
 
         resultado = generator.seleccionar_preguntas(reactivos, seed=7)
+        resultado_repetido = generator.seleccionar_preguntas(reactivos, seed=7)
 
-        self.assertEqual([p["id"] for p in resultado], ["emp", "emp-1", "emp-2", "emp-3"])
+        ids = [p["id"] for p in resultado]
+        ids_repetidos = [p["id"] for p in resultado_repetido]
+        self.assertEqual(ids[0], "emp")
+        self.assertCountEqual(ids[1:], ["emp-1", "emp-2", "emp-3"])
+        self.assertEqual(ids, ids_repetidos)
+        ordenes = {
+            tuple(p["id"] for p in generator.seleccionar_preguntas(reactivos, seed=semilla)[1:])
+            for semilla in range(1, 10)
+        }
+        self.assertGreater(len(ordenes), 1)
 
     def test_seleccion_no_descarta_preguntas_sin_id_de_postgres(self):
         config.CUOTA_FACILES = 1
