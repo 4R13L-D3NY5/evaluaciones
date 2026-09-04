@@ -21,6 +21,7 @@ El archivo `docker-compose.yml` levanta el conjunto completo:
 | `backend` | API Spring Boot, autenticación y reglas de negocio | Espera DB, RabbitMQ y Vault desbloqueado |
 | `worker-typst` | Generación de exámenes y documentos | Espera backend, DB, RabbitMQ y Vault |
 | `worker-omr` | Lectura OMR y procesamiento de cartillas | Espera backend, DB, RabbitMQ y Vault |
+| `worker-backup` | Respaldos y restauración mediante Restic | Espera backend, DB, RabbitMQ y Vault; usa `backups/` y `backups-external/` |
 | `frontend` | Interfaz Angular servida por Nginx | Espera backend saludable |
 
 El flujo de inicio es:
@@ -34,6 +35,7 @@ Docker Engine
             └─ backend saludable
                  ├─ worker-typst
                  ├─ worker-omr
+                 ├─ worker-backup
                  └─ frontend
 ```
 
@@ -54,6 +56,9 @@ stop`.
 - DNS o IP fija para el acceso de usuarios.
 - Acceso saliente HTTPS al gateway oficial SEA/SISA, si el entorno lo requiere.
 - Hora del servidor sincronizada mediante NTP.
+- Para producción: un proxy inverso institucional con HTTPS y un certificado
+  válido. La publicación directa de los puertos de desarrollo no es el diseño
+  recomendado.
 
 ### 2.2 Windows de desarrollo
 
@@ -84,6 +89,62 @@ En Linux, una ruta equivalente sería:
 /opt/evaluaciones
 ```
 
+El código fuente se mantiene en el GitLab institucional compartido:
+
+```text
+https://git.unitepc.solutions/investigacion/sisa-evaluacion
+```
+
+El tercero debe contar con una cuenta institucional o un token de acceso con
+permiso de lectura. No se debe compartir una contraseña personal ni crear una
+copia pública del proyecto.
+
+Si se entrega mediante GitLab, el tercero debe fijar explícitamente la versión
+aprobada y no desplegar automáticamente la rama de trabajo:
+
+```bash
+git clone https://git.unitepc.solutions/investigacion/sisa-evaluacion.git /opt/evaluaciones
+cd /opt/evaluaciones
+git fetch --tags
+git checkout <TAG_O_COMMIT_APROBADO>
+```
+
+La rama compartida `develop` puede utilizarse para validación cuando el equipo
+lo autorice:
+
+```bash
+git clone --branch develop --single-branch https://git.unitepc.solutions/investigacion/sisa-evaluacion.git /opt/evaluaciones
+```
+
+Para producción se recomienda desplegar un tag o commit aprobado, dejando
+registrado cuál fue la versión recibida desde GitLab.
+
+En Windows, use la misma secuencia desde PowerShell y cambie la ruta por la
+carpeta institucional definida para el servicio. Si se entrega como archivo
+ZIP, registre igualmente el commit o versión que contiene.
+
+### 3.1 Paquete que debe recibir el tercero
+
+Entregue el proyecto desde una versión identificable (tag o commit aprobado),
+junto con esta guía y el archivo `docker-compose.yml`. El paquete debe incluir
+los fuentes de `evaluaciones-backend/`, `evaluaciones-frontend/`,
+`evaluaciones-workers/`, `bases/`, `vault/` y `scripts/`, además de los archivos
+de configuración versionados como `.env.example` y `nginx.conf`.
+
+Entregue por un canal seguro y separado del código:
+
+- los valores de producción del `.env` o el acceso al gestor de secretos;
+- las credenciales OAuth del gateway institucional;
+- los tokens técnicos de Vault, según la política aprobada;
+- las llaves de desbloqueo de Vault, bajo custodia institucional;
+- la contraseña de Restic y el destino de respaldos externos;
+- el dominio, certificado HTTPS y reglas del proxy inverso.
+
+No incluya en el ZIP o repositorio `.env`, `vault/secrets/`, `storage/`,
+`backups/`, `backups-external/`, `node_modules/`, `target/`, logs ni bases de
+datos de prueba. El tercero debe confirmar por escrito el commit desplegado y
+los responsables de custodiar los secretos y respaldos.
+
 La carpeta debe contener, como mínimo:
 
 ```text
@@ -99,6 +160,43 @@ vault/
 
 No copie la carpeta `node_modules`, archivos de compilación temporales ni
 respaldos de secretos al servidor de producción.
+
+Las siguientes carpetas deben existir antes del primer `docker compose up`.
+Las carpetas de datos pueden estar vacías, pero no deben apuntar a una ruta
+temporal:
+
+```text
+bases/
+storage/
+backups/
+backups-external/
+vault/secrets/
+```
+
+`vault/secrets/unseal-keys` y `vault/secrets/restic-password` no vienen en Git
+porque contienen secretos. Deben crearse manualmente antes del despliegue
+completo. Si no se activa el módulo de respaldos, el servicio
+`worker-backup` igualmente se inicia y necesita que el archivo de contraseña
+exista para poder operar cuando se solicite un respaldo.
+
+En Windows:
+
+```powershell
+New-Item -ItemType Directory -Force -Path .\bases, .\storage, .\backups, .\backups-external, .\vault\secrets
+New-Item -ItemType File -Force -Path .\vault\secrets\unseal-keys, .\vault\secrets\restic-password
+```
+
+Después de crear los archivos, complételos con un editor protegido y aplique
+los permisos descritos en la sección de Vault. No los complete con valores de
+ejemplo.
+
+En Linux:
+
+```bash
+mkdir -p bases storage backups backups-external vault/secrets
+touch vault/secrets/unseal-keys vault/secrets/restic-password
+chmod 600 vault/secrets/unseal-keys vault/secrets/restic-password
+```
 
 ## 4. Configurar variables de entorno
 
@@ -138,7 +236,30 @@ VAULT_BACKEND_TOKEN=<token-tecnico-con-politica-sea-backend>
 VAULT_WORKER_TOKEN=<token-tecnico-con-politica-sea-worker>
 VAULT_OMR_TOKEN=<token-tecnico-con-politica-sea-omr>
 VAULT_TRANSIT_KEY_NAME=sea-banco-kek
+
+BACKUP_LOCAL_PATH=./backups
+BACKUP_EXTERNAL_PATH=./backups-external
+BACKUP_RESTIC_PASSWORD_FILE=./vault/secrets/restic-password
 ```
+
+`.env.example` es una plantilla de desarrollo, no una configuración de
+producción. En producción se deben reemplazar, como mínimo, la URL de gateway
+de desarrollo, el cliente y secreto OAuth, `DB_PASSWORD`, las credenciales de
+RabbitMQ, `JWT_SECRET` y los tres tokens de Vault. No se deben dejar los
+valores `postgres`, `guest` ni `cambia_este_*`.
+
+`docker compose config` comprueba la sintaxis y la interpolación del archivo,
+pero no puede saber si un secreto vacío o de ejemplo es válido. La revisión de
+los valores obligatorios del `.env` es responsabilidad del operador antes de
+iniciar los servicios. Nunca use `docker compose config` para mostrar la
+configuración completa en un ticket o log, porque puede imprimir secretos.
+
+Al ejecutar con este Compose, los servicios se comunican por la red interna de
+Docker. Por eso `DB_HOST`, `RABBITMQ_HOST`, `VAULT_ADDR` y `STORAGE_BASE_PATH`
+se reemplazan dentro de los contenedores por `db`, `rabbitmq`, `vault` y
+`/app/storage`, respectivamente; no los cambie a la IP pública del servidor.
+El frontend usa el proxy Nginx de `/api`, por lo que `API_BASE_URL` de la
+plantilla no es necesario para la imagen de producción.
 
 Reglas para `.env`:
 
@@ -223,6 +344,11 @@ estos pasos contra un Vault que ya esté inicializado.
 9. Revise las políticas y revoque el token administrativo inicial cuando exista
    un procedimiento institucional alternativo para administración de Vault.
 
+Los tokens técnicos deben ser independientes por servicio y contar con una
+política de expiración/renovación definida por la institución. Documente el
+procedimiento de rotación antes de revocar un token en uso: actualice primero
+el `.env`, reinicie el servicio correspondiente y valide su operación.
+
 ### 5.3 Activar el desbloqueo automático local
 
 El servicio `vault-bootstrap` no inicializa Vault, no crea una nueva clave y no
@@ -262,6 +388,17 @@ de aplicaciones.
 
 ## 6. Primer despliegue completo
 
+Si el servidor ya contiene los volúmenes `pgdata` o `vaultdata`, trátelo como
+una instalación existente: no vuelva a ejecutar `vault operator init`, no
+borre los volúmenes y confirme primero que las llaves corresponden a ese
+Vault. En una instalación nueva, complete la inicialización de Vault de la
+sección 5 antes de continuar.
+
+La creación del esquema inicial de PostgreSQL mediante el archivo montado de
+Flyway solo ocurre cuando el volumen de PostgreSQL es nuevo. En instalaciones
+existentes, el backend aplica únicamente las migraciones pendientes al
+arrancar; revise siempre `flyway_schema_history` y los logs del backend.
+
 Después de configurar `.env`, Vault, Transit, políticas, tokens y
 `vault/secrets/unseal-keys`:
 
@@ -270,9 +407,11 @@ docker compose config
 docker compose up -d --build
 ```
 
-`docker compose config` debe terminar sin errores de sintaxis ni variables
-obligatorias ausentes. El comando `up -d --build` construye backend, frontend y
-workers cuando sea necesario y deja los servicios en segundo plano.
+`docker compose config` debe terminar sin errores de sintaxis. Recuerde que
+esta comprobación no valida la presencia, calidad
+ni la vigencia de los secretos. El comando `up -d --build` construye backend,
+frontend y todos los workers, incluido `worker-backup`, cuando sea necesario y
+deja los servicios en segundo plano.
 
 Compruebe el estado:
 
@@ -289,7 +428,47 @@ El resultado esperado es:
 - `vault-bootstrap`: `healthy`.
 - Backend: `healthy`.
 - Frontend: ejecutándose.
-- Workers: ejecutándose y escuchando sus respectivas colas.
+- `worker-typst`, `worker-omr` y `worker-backup`: ejecutándose y conectados a
+  sus respectivas colas.
+
+Verifique también que el frontend responda desde el host:
+
+```bash
+curl -f http://127.0.0.1:${FRONTEND_PORT:-4200}/
+```
+
+En Windows:
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:4200/ -UseBasicParsing
+```
+
+El endpoint de salud del backend puede estar protegido y devolver `403` desde
+fuera; para esta comprobación use el estado `healthy` de `docker compose ps` y
+los logs del backend, no una URL pública inventada.
+
+### 6.1 Usuario inicial y carga de usuarios operativos
+
+En una base de datos nueva, las migraciones crean los roles del sistema y una
+única cuenta local inicial con rol `ADMINISTRADOR_SISTEMA`. La credencial
+temporal debe entregarse por un canal seguro y cambiarse inmediatamente en el
+primer ingreso; no se documenta ni se envía dentro del paquete de despliegue.
+
+El despliegue no crea automáticamente cuentas de docentes, directores de
+carrera, vicerrectores, responsables ni personal de evaluaciones. Después del
+primer ingreso del administrador:
+
+1. Cambie la contraseña temporal.
+2. Cree los usuarios institucionales desde **Usuarios y accesos** o importe
+   la plantilla autorizada.
+3. Asigne el rol correspondiente y sus sedes, carreras, asignaciones o campus.
+4. Para el personal de evaluaciones, revise además qué campus quedan
+   **Habilitados**.
+5. Haga que cada usuario cambie su contraseña temporal en su primer ingreso.
+
+Si el servidor ya tenía el volumen `pgdata`, no se vuelve a crear ni reemplazar
+la cuenta inicial: se conservan los usuarios y datos existentes. Nunca borre
+ese volumen para “reiniciar” las cuentas.
 
 URLs habituales:
 
@@ -330,6 +509,7 @@ docker compose logs --tail=100 vault-bootstrap
 docker compose logs --tail=100 backend
 docker compose logs --tail=100 worker-typst
 docker compose logs --tail=100 worker-omr
+docker compose logs --tail=100 worker-backup
 ```
 
 Si `vault-bootstrap` indica que faltan llaves, no intente reinicializar Vault.
@@ -388,10 +568,15 @@ Vault y no procesará bancos cifrados.
 
 ```bash
 git pull
-docker compose build backend frontend worker-typst worker-omr
+docker compose build backend frontend worker-typst worker-omr worker-backup
 docker compose up -d
 docker compose ps
 ```
+
+En producción, actualice desde una versión o tag aprobado y conserve el
+`.env`, `vault/secrets/`, `storage/`, `backups/` y `backups-external/` fuera del
+proceso de actualización. Antes de aplicar una versión con migraciones,
+realice el respaldo indicado en la siguiente sección.
 
 Si se cambió únicamente el frontend, basta con construir `frontend` y volver a
 levantarlo. Si se modificó el backend, espere a que vuelva a estar saludable
@@ -422,8 +607,13 @@ En PowerShell:
 
 ```powershell
 $fecha = Get-Date -Format yyyyMMdd
-docker compose exec -T db pg_dump -U postgres -d sea_evaluaciones -Fc > ".\backups\sea_evaluaciones_$fecha.dump"
+$dbUser = "<DB_USERNAME>"
+$dbName = "<DB_NAME>"
+docker compose exec -T db pg_dump -U $dbUser -d $dbName -Fc > ".\backups\sea_evaluaciones_$fecha.dump"
 ```
+
+Reemplace los dos marcadores por los valores reales del `.env`; no suponga que
+el servidor de producción usa `postgres` o `sea_evaluaciones`.
 
 Restauración controlada:
 
@@ -464,6 +654,14 @@ restaurado no está verificado.
 - No active `KMS_ROTATION_ENABLED` sin respaldo, ventana de mantenimiento y
   validación de descifrado.
 
+El Compose incluido publica algunos puertos para facilitar el desarrollo
+(`5432`, `5672`, `15672`, `8080` y `4200`). Antes de exponer el servidor a una
+red institucional, aplique reglas de firewall para bloquear desde redes no
+autorizadas los puertos de DB, RabbitMQ, backend y administración; publique
+solo el frontend a través del proxy HTTPS. Si el equipo de infraestructura
+necesita cambiar los mapeos, debe mantener los nombres internos `db`,
+`rabbitmq`, `vault` y `backend`, porque son los que usan los contenedores.
+
 ## 12. Errores frecuentes
 
 ### Backend no inicia
@@ -489,6 +687,30 @@ docker compose logs --tail=150 worker-omr
 Verifique que RabbitMQ esté saludable y que cada worker utilice el token de
 Vault correcto. Los workers tienen reconexión ante una caída temporal del
 broker.
+
+### `worker-backup` no aparece en `docker compose ps`
+
+Confirme primero que exista el archivo configurado en
+`BACKUP_RESTIC_PASSWORD_FILE` y que sea un archivo legible, no una carpeta:
+
+```powershell
+Get-Item .\vault\secrets\restic-password | Select-Object FullName,Length,PSIsContainer
+docker compose up -d --build worker-backup
+docker compose logs --tail=150 worker-backup
+```
+
+En Linux:
+
+```bash
+test -f vault/secrets/restic-password && test -r vault/secrets/restic-password
+docker compose up -d --build worker-backup
+docker compose logs --tail=150 worker-backup
+```
+
+Si el archivo no existe, créelo con una contraseña de Restic nueva y segura;
+no use una contraseña vacía ni la de PostgreSQL. Si el servicio fue agregado
+después de la última actualización, `docker compose up -d` debe ejecutarse de
+nuevo para crear el contenedor.
 
 ### Vault aparece sellado
 
@@ -535,16 +757,18 @@ ejecutarse contra un Vault ya inicializado.
 - [ ] DB, RabbitMQ, backend y frontend aparecen saludables o ejecutándose.
 - [ ] Worker Typst escucha `evaluaciones.generacion.typst`.
 - [ ] Worker OMR escucha `evaluaciones.omr.procesar`.
+- [ ] Worker de respaldos escucha `evaluaciones.backups` y puede escribir en
+      `backups/` y `backups-external/`.
 - [ ] Se probó login, banco cifrado, generación, lectura OMR y descarga.
 - [ ] Se realizó un respaldo de PostgreSQL, Vault y `storage/`.
 - [ ] Se probó al menos una restauración en un ambiente separado.
 - [ ] Docker inicia automáticamente según la política del servidor.
 - [ ] Existe un responsable de guardia y un procedimiento de recuperación.
-# 15. Respaldos administrables de base de datos y archivos
+## 15. Respaldos administrables de base de datos y archivos
 
 El sistema incorpora el módulo administrativo **Respaldos y contingencia**. Está disponible únicamente para `ADMINISTRADOR_SISTEMA` y permite generar, copiar, verificar, conservar, eliminar localmente y restaurar snapshots cifrados.
 
-## 15.1 Qué se respalda y dónde se almacena
+### 15.1 Qué se respalda y dónde se almacena
 
 | Contenido | Ubicación de origen | Incluido |
 |---|---|---|
@@ -561,7 +785,7 @@ En Docker, `storage` se monta como `/app/storage`, el repositorio local como `/a
 
 Restic guarda snapshots deduplicados. Cada ejecución genera el dump lógico completo, pero el repositorio solo almacena bloques nuevos o modificados. Por eso cada snapshot permite recuperación completa sin duplicar todo el contenido.
 
-## 15.2 Preparación inicial del servidor
+### 15.2 Preparación inicial del servidor
 
 1. Crear las carpetas persistentes junto al archivo `docker-compose.yml`:
 
@@ -588,7 +812,7 @@ Restic guarda snapshots deduplicados. Cada ejecución genera el dump lógico com
 
 6. No borrar `pgdata`, `vaultdata`, `storage`, `backups` ni `backups-external` durante un reinicio normal.
 
-## 15.3 Puesta en marcha
+### 15.3 Puesta en marcha
 
 Desde la carpeta del proyecto:
 
@@ -603,13 +827,13 @@ El servicio `worker-backup` tiene `restart: unless-stopped`, espera a PostgreSQL
 
 El primer respaldo inicializa automáticamente los repositorios Restic local y externo. Si el destino externo no está disponible, el respaldo local puede quedar generado, pero la copia no se marcará como verificada y nunca se eliminará localmente.
 
-## 15.4 Programación y retención
+### 15.4 Programación y retención
 
 En **Respaldos y contingencia** se puede activar o desactivar la ejecución automática, definir la frecuencia en minutos y establecer los días de retención. Los valores deben ser mayores que cero.
 
 El programador revisa la configuración cada minuto. No crea otro snapshot mientras existe una operación activa. La limpieza local usa la retención definida en el sistema y no elimina copias externas verificadas.
 
-## 15.5 Flujo operativo recomendado
+### 15.5 Flujo operativo recomendado
 
 1. Seleccionar **Generar respaldo ahora** o activar la programación.
 2. Esperar el estado `Generado`.
@@ -621,7 +845,7 @@ El programador revisa la configuración cada minuto. No crea otro snapshot mient
 
 Los estados `Solicitado`, `En proceso`, `Copiando`, `Verificando` y `Restaurando` indican que la operación sigue en curso. Si aparece `Error`, revisar el log del worker y corregir el problema antes de reintentar desde el módulo.
 
-## 15.6 Restauración controlada
+### 15.6 Restauración controlada
 
 La restauración está restringida al administrador y solo acepta un snapshot externo verificado.
 
@@ -635,7 +859,7 @@ La restauración está restringida al administrador y solo acepta un snapshot ex
 
 Durante la restauración el sistema debe considerarse en mantenimiento. No iniciar cargas, generaciones, lecturas OMR ni cambios de configuración desde otros usuarios. Si la restauración falla, el respaldo original externo permanece intacto y el registro queda auditado con estado `Error`.
 
-## 15.7 Vault y recuperación de bancos cifrados
+### 15.7 Vault y recuperación de bancos cifrados
 
 El módulo de respaldos no reemplaza el respaldo técnico de Vault. Restaurar PostgreSQL y `storage` no permite descifrar bancos de preguntas si se perdió el estado de Vault o su material de desbloqueo.
 
@@ -649,7 +873,7 @@ También deben conservarse, por un procedimiento independiente y seguro:
 
 Después de levantar Vault se debe comprobar que esté inicializado y desbloqueado, restaurar sus políticas y validar la clave Transit antes de arrancar backend y workers. Nunca se deben introducir llaves de Vault en la interfaz de respaldos ni en la base de datos.
 
-## 15.8 Contingencias frecuentes
+### 15.8 Contingencias frecuentes
 
 | Situación | Comportamiento esperado |
 |---|---|
@@ -661,7 +885,7 @@ Después de levantar Vault se debe comprobar que esté inicializado y desbloquea
 | Reinicio de Docker | Los repositorios y datos permanecen en sus carpetas/volúmenes; los servicios vuelven a iniciar |
 | Restauración incompleta | Se conserva el snapshot externo y debe intervenir el administrador técnico |
 
-## 15.9 Auditoría y comprobaciones
+### 15.9 Auditoría y comprobaciones
 
 Cada cambio de configuración y cada solicitud de generación, copia, verificación, eliminación o restauración se registra en `sea_auditoria_respaldos`. El historial del módulo conserva fechas, estado, snapshots, tamaño, cantidad de archivos y errores sin incluir contraseñas ni contenido sensible.
 

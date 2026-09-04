@@ -255,6 +255,17 @@ def _ancho_imagen_typst(imagen_base64: Any) -> str:
     }.get((tamano.group(1).upper() if tamano else "MEDIANA"), "70%")
 
 
+def _alto_imagen_typst(imagen_base64: Any) -> str:
+    """Limita la altura de imágenes para que no desplacen el cuestionario."""
+    tamano = re.search(r"#sea-size=(GRANDE|MEDIANA|PEQUENA|MUY_PEQUENA)$", str(imagen_base64 or ""), re.IGNORECASE)
+    return {
+        "GRANDE": "8cm",
+        "MEDIANA": "6.5cm",
+        "PEQUENA": "5cm",
+        "MUY_PEQUENA": "4cm",
+    }.get((tamano.group(1).upper() if tamano else "MEDIANA"), "6.5cm")
+
+
 def _mayusculas(valor: Any) -> str:
     """Normaliza los textos institucionales para la cabecera oficial."""
     return str(valor or "").strip().upper()
@@ -541,7 +552,7 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
         tipo = p.get("tipo_reactivo", "")
         imagen_path = _preparar_imagen_typst(p.get("imagen_base64"), image_dir, indice)
         imagen_code = (
-            f'#block(width: 100%)[#align(center)[#image("{imagen_path}", width: {_ancho_imagen_typst(p.get("imagen_base64"))})]]\\\n'
+            f'#block(width: 100%, breakable: false)[#align(center)[#image("{imagen_path}", width: {_ancho_imagen_typst(p.get("imagen_base64"))}, height: {_alto_imagen_typst(p.get("imagen_base64"))}, fit: "contain")]]\\\n'
             if imagen_path else ""
         )
 

@@ -145,6 +145,8 @@ flowchart TD
 2. **Inspección Visual y Estética**:
    - Cero anomalías tipográficas (Times New Roman 11pt estricto).
    - Cartilla OMR 100% visible y alineada.
-3. **Consolidación en Repositorio GitHub**:
-   - Repositorio `evaluaciones` sincronizado con todos los módulos y documentación.
+3. **Consolidación en Repositorio GitLab institucional**:
+   - Proyecto `sisa-evaluacion` sincronizado con todos los módulos y documentación.
+   - Código fuente disponible para el equipo autorizado en
+     `https://git.unitepc.solutions/investigacion/sisa-evaluacion`.
 

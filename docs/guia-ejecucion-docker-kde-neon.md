@@ -34,18 +34,29 @@ docker compose version
 docker run --rm hello-world
 ```
 
-## 2. Descargar el repositorio
+## 2. Descargar el repositorio institucional
 
 ```bash
 mkdir -p ~/proyectos
 cd ~/proyectos
-git clone https://github.com/4R13L-D3NY5/evaluaciones.git
+git clone https://git.unitepc.solutions/investigacion/sisa-evaluacion.git evaluaciones
 cd evaluaciones
+```
+
+El proyecto se obtiene del GitLab institucional compartido. La cuenta que
+realice el clonado debe tener permiso de lectura. Para una validación puntual
+se puede seleccionar la rama `develop`; para producción se debe fijar un tag o
+commit aprobado:
+
+```bash
+git fetch --tags
+git checkout <TAG_O_COMMIT_APROBADO>
 ```
 
 ## 3. Preparar las variables locales
 
-No uses credenciales copiadas del repositorio público. Crea tu archivo local:
+No copies secretos desde GitLab ni los guardes en el repositorio. Crea tu
+archivo local:
 
 ```bash
 cp .env.example .env
@@ -219,7 +230,9 @@ docker compose exec -T db pg_dump -U postgres -d sea_evaluaciones > backup_$(dat
 
 Guarda el respaldo fuera del repositorio. No lo publiques junto con el código.
 
-## 9. Advertencia de seguridad del repositorio público
+## 9. Seguridad del repositorio institucional
 
-El repositorio actual contiene un archivo `.env` versionado. Antes de compartirlo o desplegarlo, ese archivo debe dejar de estar versionado y se deben cambiar todas las credenciales que hayan sido expuestas, especialmente las del gateway institucional, JWT, PostgreSQL y RabbitMQ. El archivo local `.env` debe permanecer fuera del repositorio público.
-
+El repositorio institucional no debe contener `.env`, tokens, contraseñas ni
+llaves de Vault. El archivo `.env` debe crearse únicamente en el servidor y
+mantenerse fuera del control de versiones. Si alguna credencial aparece en un
+commit, debe revocarse y reemplazarse antes del despliegue.
