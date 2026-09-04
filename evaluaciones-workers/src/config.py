@@ -4,7 +4,7 @@ import os
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
 RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", "5672"))
 RABBITMQ_USER = os.getenv("RABBITMQ_USER", "guest")
-RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "guest")
+RABBITMQ_PASS = os.getenv("RABBITMQ_PASSWORD") or os.getenv("RABBITMQ_PASS", "guest")
 RABBITMQ_QUEUE_IN = os.getenv("RABBITMQ_QUEUE_IN", "evaluaciones.generacion.typst")
 RABBITMQ_QUEUE_OUT = os.getenv("RABBITMQ_QUEUE_OUT", "evaluaciones.generacion.resultado")
 RABBITMQ_VHOST = os.getenv("RABBITMQ_VHOST", "/")
