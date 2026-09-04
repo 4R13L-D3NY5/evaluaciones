@@ -181,6 +181,14 @@ def _typst_content(texto: str) -> str:
     return "".join(partes)
 
 
+_OPCION_PREFIX_RE = re.compile(r"^\s*(?:[A-Ea-e]|[1-5])\s*[\.\):\-]\s*")
+
+
+def _limpiar_prefijo_opcion(texto: Any) -> str:
+    """Elimina un inciso escrito manualmente antes de volver a enumerarlo."""
+    return _OPCION_PREFIX_RE.sub("", str(texto or "").strip(), count=1).strip()
+
+
 def _preparar_imagen_typst(imagen_base64: Any, image_dir: str | None, indice: int) -> str | None:
     """Guarda una imagen del banco junto al .typ para que Typst pueda incluirla."""
     if not imagen_base64 or not image_dir:
@@ -567,14 +575,7 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
             current_section = seccion_tipo
             titulo, instruccion = INSTRUCCIONES_POR_TIPO[seccion_tipo]
             typ_code += _seccion_typst(titulo, instruccion)
-            if seccion_tipo == "SUBITEM_CASO":
-                typ_code += '''
-#rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
-  [#text(weight: "bold")[CASO CLINICO O PROBLEMA:]  Resuelva el caso planteado y responda cada pregunta del grupo.]\
-]
-#v(1em)
-'''
-            elif seccion_tipo == "OPCION_EMPAREJAMIENTO" and tipo == "OPCION_EMPAREJAMIENTO":
+            if seccion_tipo == "OPCION_EMPAREJAMIENTO" and tipo == "OPCION_EMPAREJAMIENTO":
                 typ_code += '''
 #rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
   [#text(weight: "bold")[RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:]]\\
@@ -596,7 +597,9 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
                     if str(p.get(f"opcion_{letra.lower()}") or "").strip()
                 ]
             lineas_tarjeta = [str(p.get("enunciado") or "RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:")]
-            lineas_tarjeta.extend(f"{letra}) {texto}" for letra, texto, _ in opciones_referencia)
+            lineas_tarjeta.extend(
+                f"{letra}) {_limpiar_prefijo_opcion(texto)}" for letra, texto, _ in opciones_referencia
+            )
             contenido_tarjeta = "\\\n  ".join(
                 f'#text(weight: "regular")[{_typst_content(linea)}]' for linea in lineas_tarjeta
             )
@@ -635,7 +638,7 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
             typ_code += '  #v(0.15em)\n'
             typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
             for indice_afirmacion, (_, texto, _) in enumerate(afirmaciones, start=1):
-                typ_code += f'    #text(weight: "regular")[{indice_afirmacion}) {_typst_content(str(texto))}]\\\\\n'
+                typ_code += f'    #text(weight: "regular")[{indice_afirmacion}) {_typst_content(_limpiar_prefijo_opcion(texto))}]\\\\\n'
             typ_code += '  ]\\\\\n'
             typ_code += '  #v(0.4em)\n'
             typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
@@ -658,7 +661,7 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
   #block(inset: (left: {config.INDENTACION_INCISOS}))[
 '''
             for letra, texto, _ in opciones:
-                texto_typst = _typst_content(str(texto))
+                texto_typst = _typst_content(_limpiar_prefijo_opcion(texto))
                 typ_code += f'    #text(weight: "regular")[{letra}) {texto_typst}]\\\n'
             typ_code += "  ]\n"
         typ_code += "]\n"
@@ -802,7 +805,7 @@ def generar_variante(
     contenido_virtual = []
     for p in preguntas:
         opciones = [
-            {"letra": letra, "texto": texto}
+            {"letra": letra, "texto": _limpiar_prefijo_opcion(texto)}
             for letra, texto, _ in parsear_opciones(p.get("opciones_json", "[]"))
         ]
         contenido_virtual.append({
