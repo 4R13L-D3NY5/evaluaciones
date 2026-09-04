@@ -55,6 +55,11 @@ bases/test_*
 vault/secrets/*
 !vault/secrets/README.md
 
+# Variables de entorno locales (nunca versionar)
+.env
+.env.*
+!.env.example
+
 # Repositorios locales y externos de Restic
 backups/*
 !backups/.gitkeep
