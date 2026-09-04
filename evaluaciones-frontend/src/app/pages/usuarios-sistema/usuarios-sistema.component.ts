@@ -52,7 +52,7 @@ interface RolCatalogo extends RolSistema {
         <button type="button" class="view-tab" [class.active]="vistaActual() === 'usuarios'" (click)="cambiarVista('usuarios')">
           <i class="pi pi-users"></i><span>Usuarios del sistema</span><small>{{ usuarios().length }}</small>
         </button>
-        @if (contexto === 'INSTITUCIONAL') {
+        @if (contexto !== 'EVALUACIONES') {
           <button type="button" class="view-tab" [class.active]="vistaActual() === 'sea'" (click)="cambiarVista('sea')">
             <i class="pi pi-sync"></i><span>Docentes SEA</span><small>{{ analisisDocentesSea()?.docentesEnSea ?? '—' }}</small>
           </button>
@@ -107,7 +107,7 @@ interface RolCatalogo extends RolSistema {
       </details>
       }
 
-      @if (contexto === 'INSTITUCIONAL' && vistaActual() === 'sea') {
+      @if (contexto !== 'EVALUACIONES' && vistaActual() === 'sea') {
       <section class="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>

@@ -85,4 +85,6 @@ backups-external/*
 .codex-sheet-image-preview/
 .context/
 *.md
+!README.md
+
 
