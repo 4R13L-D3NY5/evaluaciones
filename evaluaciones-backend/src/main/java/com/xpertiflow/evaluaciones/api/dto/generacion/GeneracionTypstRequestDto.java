@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
@@ -31,11 +30,11 @@ public class GeneracionTypstRequestDto {
     @NotEmpty
     private List<String> variantes;
 
-    /** Cantidad máxima de estudiantes que comparte una variante. */
-    @NotNull
+    /** Cantidad máxima de estudiantes que comparte una variante. Si se omite,
+     * el backend usa la configuración vigente de Administración de evaluaciones. */
     @Min(1)
     @Max(30)
-    private Integer ratioEstudiantesPorVariante = 5;
+    private Integer ratioEstudiantesPorVariante;
 
     /** En virtual se preparan variantes y contenido web, sin compilar PDF. */
     private Boolean soloVirtual = false;

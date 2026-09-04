@@ -12,6 +12,9 @@ public record PreparacionCartillasOmrResponseDto(
         String estadoImpresion,
         LocalDateTime impresoEn,
         String usuarioImpresion,
-        List<DatosCartillaOmrDto> estudiantes
+        List<DatosCartillaOmrDto> estudiantes,
+        String estadoImpresionLista,
+        LocalDateTime listaImpresaEn,
+        String usuarioImpresionLista
 ) {
 }

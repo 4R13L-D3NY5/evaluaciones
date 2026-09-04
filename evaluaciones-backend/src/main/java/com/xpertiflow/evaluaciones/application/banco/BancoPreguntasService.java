@@ -182,6 +182,13 @@ public class BancoPreguntasService {
                         .build();
             }
 
+            // La posición es la identidad estable dentro del paquete cifrado.
+            // El id de PostgreSQL todavía no existe en este punto porque se
+            // genera al guardar cada reactivo después de cifrar el banco.
+            for (int indice = 0; indice < reactivos.size(); indice++) {
+                reactivos.get(indice).setNumeroOrden(indice + 1);
+            }
+
             // Calcular hash del contenido JSON
             String paqueteJson = objectMapper.writeValueAsString(reactivos);
             String hash = calcularSha256(paqueteJson);
@@ -226,10 +233,8 @@ public class BancoPreguntasService {
             bancoRepository.save(banco);
 
             // Guardar reactivos
-            int orden = 1;
             for (Reactivo r : reactivos) {
                 r.setBancoId(bancoId);
-                r.setNumeroOrden(orden++);
                 // La fuente de verdad es el paquete cifrado. No duplicar
                 // preguntas ni claves en columnas legibles.
                 r.setEnunciado(null);

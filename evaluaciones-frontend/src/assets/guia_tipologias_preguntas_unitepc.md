@@ -17,7 +17,7 @@ Cada reactivo en la hoja **Banco** se estructura en las siguientes columnas. `im
 | **E** | opcion_b | Inciso B / Proposición 2 / Opción V/F / Clave 2 | Texto de la opción o autocompletado automático |
 | **F** | opcion_c | Inciso C / Proposición 3 / Clave 3 | Texto de la opción o autocompletado automático |
 | **G** | opcion_d | Inciso D / Proposición 4 / Clave 4 | Texto de la opción o autocompletado automático |
-| **H** | opcion_e | Inciso E / Clave 5 | Texto de la opción (deshabilitada en ciertos tipos) |
+| **H** | opcion_e | Inciso E / Clave 5 | Texto de la opción; queda vacía en las tipologías que la deshabilitan |
 | **I** | espuesta_correcta | Clave o letra de la opción correcta | A, B, C, D, E (o vacía en encabezados) |
 | **J** | dificultad | Nivel taxonómico del reactivo | 1 (Fácil), 2 (Medio), 3 (Difícil) |
 | **K** | parcial | Tipo de evaluación programada | 1P, 2P, EF, 2T |
@@ -118,7 +118,7 @@ mindmap
   * opcion_b: 2. [Texto de la proposición 2]
   * opcion_c: 3. [Texto de la proposición 3]
   * opcion_d: 4. [Texto de la proposición 4]
-  * opcion_e: *Deshabilitada / Vacía*
+  * opcion_e: *Deshabilitada / Vacía*. La letra E no se escribe aquí.
   * espuesta_correcta: Clave institucional de combinación (A, B, C, D o E):
     * **A:** 1, 2 y 3 son verdaderas
     * **B:** 1 y 3 son verdaderas

@@ -92,7 +92,7 @@ def main() -> None:
     typst_generado = open(variante["archivoTypstPath"], encoding="utf-8").read()
     assert 'paper: "us-letter"' not in typst_generado
     assert "CARTILLA" not in typst_generado
-    assert 'font: "Times New Roman"' in typst_generado
+    assert f'font: "{config.TIPOGRAFIA}"' in typst_generado
     assert 'size: 11pt' in typst_generado
     assert 'leading: 0.8em' in typst_generado
     assert 'spacing: 0.8em' in typst_generado

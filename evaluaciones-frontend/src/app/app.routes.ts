@@ -16,6 +16,7 @@ import { ExamenVirtualComponent } from './pages/examen-virtual/examen-virtual.co
 import { SalaVirtualComponent } from './pages/sala-virtual/sala-virtual.component';
 import { CambiarContrasenaComponent } from './pages/auth/cambiar-contrasena.component';
 import { UsuariosSistemaComponent } from './pages/usuarios-sistema/usuarios-sistema.component';
+import { RespaldosComponent } from './pages/respaldos/respaldos.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard], title: 'Acceso - Sistema de Evaluaciones' },
@@ -39,7 +40,8 @@ export const routes: Routes = [
       { path: 'reporte-evaluaciones', component: ReporteEvaluacionesComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'VICERRECTOR'])], title: 'Reporte Evaluaciones - Sistema de Evaluaciones' },
       { path: 'rol-examenes', component: RolExamenesComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA'])], title: 'Rol de Exámenes - Sistema de Evaluaciones' },
       { path: 'auditoria', component: AuditoriaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Auditoría & Bitácora - Sistema de Evaluaciones' },
-      { path: 'usuarios-sistema', component: UsuariosSistemaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Usuarios y accesos - Sistema de Evaluaciones' }
+      { path: 'usuarios-sistema', component: UsuariosSistemaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Usuarios y accesos - Sistema de Evaluaciones' },
+      { path: 'respaldos', component: RespaldosComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Respaldos y contingencia - Sistema de Evaluaciones' }
     ]
   },
   { path: '**', redirectTo: 'dashboard' }

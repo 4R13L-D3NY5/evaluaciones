@@ -28,7 +28,7 @@ public class CalificacionOmr {
     @Column(name = "estudiante_nombre_completo", nullable = false, length = 200)
     private String estudianteNombreCompleto;
 
-    @Column(name = "letra_variante", nullable = false, length = 1)
+    @Column(name = "letra_variante", nullable = false, length = 4)
     private String letraVariante;
 
     @Column(name = "total_reactivos", nullable = false)

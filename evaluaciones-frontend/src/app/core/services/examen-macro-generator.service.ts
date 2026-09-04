@@ -17,8 +17,8 @@ export interface ReactivoExamen {
 }
 
 export interface VarianteCompilada {
-  tipo: 'TIPO A' | 'TIPO B' | 'TIPO C' | 'TIPO D' | 'TIPO E';
-  letraVariante: 'A' | 'B' | 'C' | 'D' | 'E';
+  tipo: string;
+  letraVariante: string;
   semilla: number;
   paginaInicio: number;
   totalPaginas: number;

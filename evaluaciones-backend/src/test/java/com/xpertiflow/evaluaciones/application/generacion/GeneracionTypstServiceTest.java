@@ -5,11 +5,14 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionTypstRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionTypstResultadoDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
+import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
+import com.xpertiflow.evaluaciones.domain.repository.GeneracionTypstJobRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
@@ -40,9 +43,13 @@ class GeneracionTypstServiceTest {
     @Mock
     private ExamenVarianteRepository varianteRepository;
     @Mock
+    private GeneracionTypstJobRepository generacionTypstJobRepository;
+    @Mock
     private MapeoEstudianteVarianteRepository mapeoRepository;
     @Mock
     private RolExamenService rolExamenService;
+    @Mock
+    private ConfiguracionEvaluacionesService configuracionEvaluacionesService;
     @Mock
     private UnitepcGatewayClient unitepcGatewayClient;
 
@@ -58,8 +65,10 @@ class GeneracionTypstServiceTest {
                 bancoRepository,
                 rolRepository,
                 varianteRepository,
+                generacionTypstJobRepository,
                 mapeoRepository,
                 rolExamenService,
+                configuracionEvaluacionesService,
                 properties,
                 unitepcGatewayClient);
     }
@@ -86,6 +95,9 @@ class GeneracionTypstServiceTest {
         request.setVariantes(List.of("A", "B", "C"));
         when(rolExamenService.resolverGrupoOficial(rol)).thenReturn("GROUP-001");
         when(rolExamenService.resolverNombreDocenteOficial(rol)).thenReturn("DOCENTE OFICIAL");
+        ConfiguracionEvaluacionesDto configuracion = new ConfiguracionEvaluacionesDto();
+        configuracion.setRatioEstudiantesPorVariante(5);
+        when(configuracionEvaluacionesService.obtener()).thenReturn(configuracion);
 
         GeneracionTypstResultadoDto respuesta = service.solicitarGeneracion(request);
 

@@ -57,6 +57,11 @@ app:
     client-id: ${UNITEPC_CLIENT_ID}
     client-secret: ${UNITEPC_CLIENT_SECRET}
     system-client-id: ${UNITEPC_SYSTEM_CLIENT_ID:sea-evaluaciones}
+  backups:
+    external-path: ${BACKUP_EXTERNAL_PATH:/app/backups-external}
+    local-repository: ${BACKUP_LOCAL_REPOSITORY:/app/backups/repository}
+    external-repository: ${BACKUP_EXTERNAL_REPOSITORY:/app/backups-external/repository}
+    password-file: ${BACKUP_RESTIC_PASSWORD_FILE:/run/secrets/restic_password}
 
 logging:
   level:

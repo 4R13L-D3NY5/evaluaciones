@@ -23,6 +23,7 @@ VAULT_TOKEN_FILE = os.getenv("VAULT_TOKEN_FILE", "")
 VAULT_TOKEN = os.getenv("VAULT_TOKEN", "")
 VAULT_TRANSIT_KEY_NAME = os.getenv("VAULT_TRANSIT_KEY_NAME", "sea-banco-kek")
 VAULT_TIMEOUT_SECONDS = int(os.getenv("VAULT_TIMEOUT_SECONDS", "10"))
+MAINTENANCE_MARKER = os.getenv("MAINTENANCE_MARKER", "/app/storage/.sea-maintenance")
 
 # Semillas fijas para reproducibilidad de variantes en el MVP.
 SEED_POR_VARIANTE = {"A": 100, "B": 153, "C": 206, "D": 259, "E": 312}
@@ -35,9 +36,11 @@ CUOTA_MEDIAS = 16
 CUOTA_DIFICILES = 7
 TOTAL_PREGUNTAS = CUOTA_FACILES + CUOTA_MEDIAS + CUOTA_DIFICILES
 
-# Configuración oficial de diagramación vigente para el primer ciclo.
+# Configuración oficial de diagramación vigente para el primer ciclo. Esta
+# familia está incluida en la imagen del worker para que la generación sea
+# reproducible tanto en local como en el servidor.
 FORMATO_HOJA = "Oficio (Folio UNITEPC)"
-TIPOGRAFIA = "Times New Roman"
+TIPOGRAFIA = os.getenv("TYPST_FONT", "Libertinus Serif")
 TAMANO_FUENTE_PT = 11
 LEADING = "0.8em"
 SEPARACION_PREGUNTAS = "1.2em"

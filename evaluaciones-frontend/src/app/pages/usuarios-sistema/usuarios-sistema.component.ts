@@ -7,6 +7,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import { UsuariosSistemaService, UsuarioSistema, RolSistema, AlcanceAcademico, UsuarioSistemaRequest, ImportacionUsuariosResponse, CredencialTemporal, AnalisisDocentesSeaResponse, DocenteSeaAnalisis, SincronizacionDocentesSeaResponse } from '../../core/services/usuarios-sistema.service';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
 
 interface RolCatalogo extends RolSistema {
@@ -238,6 +239,7 @@ export class UsuariosSistemaComponent implements OnInit {
   private readonly service = inject(UsuariosSistemaService);
   private readonly gateway = inject(UnitepcGatewayService);
   private readonly auth = inject(AuthService);
+  private readonly feedback = inject(UiFeedbackService);
 
   public readonly usuarios = signal<UsuarioSistema[]>([]);
   public readonly roles = signal<RolSistema[]>([]);
@@ -446,10 +448,15 @@ export class UsuariosSistemaComponent implements OnInit {
     if (!cis.length) { this.mostrarError({ error: { message: 'Selecciona al menos un docente para sincronizar.' } }); return; }
     this.ejecutarSincronizacion(cis, false);
   }
-  public sincronizarTodos(): void {
+  public async sincronizarTodos(): Promise<void> {
     const analisis = this.analisisDocentesSea();
     if (!analisis || (!analisis.nuevos && !analisis.sinAcceso && !analisis.yaNoEstan)) return;
-    if (!window.confirm(`Se sincronizarán los docentes de la gestión ${analisis.gestion} y se desactivarán las cuentas docentes que ya no aparezcan en SEA. ¿Deseas continuar?`)) return;
+    if (!await this.feedback.confirmar(
+      `Se sincronizarán los docentes de la gestión ${analisis.gestion} y se desactivarán las cuentas docentes que ya no aparezcan en SEA. ¿Deseas continuar?`,
+      'Sincronizar docentes SEA',
+      'warning',
+      'Sincronizar'
+    )) return;
     this.ejecutarSincronizacion([], true);
   }
   public etiquetaEstadoDocente(estado: DocenteSeaAnalisis['estado']): string {
@@ -483,7 +490,15 @@ export class UsuariosSistemaComponent implements OnInit {
     columnas.forEach((_, index) => { usuarios['!cols'] = usuarios['!cols'] || []; usuarios['!cols']![index] = { wch: Math.min(Math.max(columnas[index].length + 3, 12), 34) }; });
     XLSX.writeFile(libro, 'plantilla_usuarios.xlsx');
   }
-  public restablecer(usuario: UsuarioSistema): void { if (!window.confirm(`¿Restablecer la contraseña de ${usuario.nombreCompleto}? Volverá a ser su CI.`)) return; this.service.restablecerContrasena(usuario.id).subscribe({ next: credencial => { this.credencialMostrada.set(credencial); this.cargarUsuarios(); }, error: error => this.mostrarError(error) }); }
+  public async restablecer(usuario: UsuarioSistema): Promise<void> {
+    if (!await this.feedback.confirmar(
+      `¿Restablecer la contraseña de ${usuario.nombreCompleto}? Volverá a ser su CI.`,
+      'Restablecer contraseña',
+      'warning',
+      'Restablecer'
+    )) return;
+    this.service.restablecerContrasena(usuario.id).subscribe({ next: credencial => { this.credencialMostrada.set(credencial); this.cargarUsuarios(); }, error: error => this.mostrarError(error) });
+  }
 
   public resumenAlcance(usuario: UsuarioSistema): string { const sedes = usuario.sedes?.length || 0; const carreras = usuario.carreras?.length || 0; return `${sedes} sede${sedes === 1 ? '' : 's'} · ${carreras} carrera${carreras === 1 ? '' : 's'}`; }
   public nombresAlcance(usuario: UsuarioSistema): string { return [...(usuario.sedes || []).map(item => item.codigo), ...(usuario.carreras || []).map(item => item.codigo)].join(' · ') || 'Sin alcance específico registrado'; }

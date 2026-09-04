@@ -8,9 +8,11 @@ import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unite
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
+import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
+import { PrevisualizacionTypstRequest } from '../../core/models/generacion-typst.model';
 import { DocumentoSinCartilla, ExamenSinCartillaService } from '../../core/services/examen-sin-cartilla.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
-import { of } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -39,6 +41,12 @@ export interface PreguntaValidada {
   formulaTypst?: string;
   valido: boolean;
   errores: string[];
+}
+
+interface DetalleErrorDocente {
+  regla: string;
+  problema: string;
+  correccion: string;
 }
 
 type TamanoImagen = 'GRANDE' | 'MEDIANA' | 'PEQUENA' | 'MUY_PEQUENA';
@@ -122,10 +130,10 @@ export interface DiaCalendario {
             </div>
             <div>
               <h1 class="text-2xl font-black tracking-tight text-foreground">
-                Gestión y Validación de Evaluaciones
+                Banco de preguntas
               </h1>
               <p class="text-xs text-muted-foreground font-medium mt-0.5">
-                Validador oficial de banco de preguntas y calendario interactivo de exámenes.
+                Carga, revisión y aprobación de reactivos para cada evaluación.
               </p>
             </div>
           </div>
@@ -138,7 +146,7 @@ export interface DiaCalendario {
             [class]="tabActiva() === 'validador' ? 'bg-purple-700 text-white font-black shadow-xs' : 'text-muted-foreground hover:text-foreground font-bold'"
             class="px-4 py-2 text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer">
             <i class="pi pi-verified text-xs"></i>
-            <span>Validador de Examen</span>
+            <span>Banco de preguntas</span>
           </button>
 
           <button 
@@ -146,10 +154,27 @@ export interface DiaCalendario {
             [class]="tabActiva() === 'calendario' ? 'bg-purple-700 text-white font-black shadow-xs' : 'text-muted-foreground hover:text-foreground font-bold'"
             class="px-4 py-2 text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer">
             <i class="pi pi-calendar text-xs"></i>
-            <span>Fechas y Calendario</span>
+            <span>Calendario de exámenes</span>
           </button>
         </div>
       </div>
+
+      @if (tabActiva() === 'validador') {
+        <div class="grid grid-cols-1 gap-2 rounded-2xl border border-border bg-card p-2 shadow-xs text-[10px] sm:grid-cols-3 sm:text-xs">
+          <div class="flex items-center gap-2 rounded-xl bg-purple-50 px-3 py-2 font-black text-purple-900">
+            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-700 text-white">1</span>
+            <span>Contexto del examen</span>
+          </div>
+          <div [class]="preguntasCargadas().length > 0 ? 'flex items-center gap-2 rounded-xl bg-indigo-50 px-3 py-2 font-black text-indigo-900' : 'flex items-center gap-2 rounded-xl px-3 py-2 text-muted-foreground'">
+            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">2</span>
+            <span>Cargar y validar</span>
+          </div>
+          <div [class]="esBancoTotalmenteValido() ? 'flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 font-black text-emerald-900' : 'flex items-center gap-2 rounded-xl px-3 py-2 text-muted-foreground'">
+            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">3</span>
+            <span>Revisar y aprobar</span>
+          </div>
+        </div>
+      }
 
       <!-- ================================================================= -->
       <!-- TAB 1: VALIDADOR DE EXAMEN (DEFAULT - LIMPIO Y ENFOCADO EN EL EXAMEN) -->
@@ -296,7 +321,8 @@ export interface DiaCalendario {
             }
           </div>
           
-          @if (esSinCartillaActivo()) {
+          @if (rolExamenActivo()) {
+            @if (esSinCartillaActivo()) {
             <!-- Flujo específico: examen presencial sin cartilla -->
             <div class="bg-card border border-emerald-200 rounded-2xl p-6 shadow-xs space-y-5">
               <div class="flex items-start gap-3 border-b border-emerald-100 pb-4">
@@ -329,7 +355,7 @@ export interface DiaCalendario {
                 <button (click)="subirDocumentoSinCartilla()" [disabled]="!archivoSinCartillaSeleccionado() || !rolPuedeCargarBanco() || cargandoDocumentoSinCartilla()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="cargandoDocumentoSinCartilla()" [class.pi-spinner]="cargandoDocumentoSinCartilla()" [class.pi-check]="!cargandoDocumentoSinCartilla()"></i> {{ cargandoDocumentoSinCartilla() ? 'Subiendo y validando...' : 'Subir y validar examen' }}</button>
               </div>
             </div>
-          } @else {
+            } @else {
           <!-- Barra Superior de Acciones y Recursos del Examen -->
           <div class="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -358,10 +384,10 @@ export interface DiaCalendario {
 
               <button 
                 (click)="abrirModalEjemplos()"
-                title="Abrir la Guía Oficial interactiva con las 6 tipologías pedagógicas de UNITEPC"
+                title="Abrir la guía visual del formato oficial del examen"
                 class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
                 <i class="pi pi-book text-xs"></i>
-                <span>Guía de Reglas (6 Tipologías)</span>
+                <span>Guía del formato del examen</span>
               </button>
             </div>
           </div>
@@ -536,80 +562,87 @@ export interface DiaCalendario {
             </div>
 
             @if (!esSinCartillaActivo()) {
-              <section class="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-5 shadow-xs space-y-4">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h4 class="flex items-center gap-2 text-sm font-black text-indigo-950">
-                      <i class="pi pi-image text-indigo-700"></i>
-                      Imagen de apoyo para una pregunta
-                    </h4>
-                    <p class="mt-1 max-w-3xl text-[11px] leading-relaxed text-indigo-900/75">
-                      Arrastra una imagen para convertirla a Base64 y revisar cómo se verá dentro de una hoja de 8,5 × 13 pulgadas. El tamaño mediano se usa por defecto.
-                    </p>
-                  </div>
-                  @if (imagenBase64Generada()) {
-                    <button (click)="limpiarImagenBase64(); $event.stopPropagation()" type="button" class="shrink-0 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer">
-                      <i class="pi pi-trash mr-1"></i> Limpiar
-                    </button>
-                  }
-                </div>
+              <details class="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-xs" [open]="mostrarHerramientaImagen() || !!imagenBase64Generada()" (toggle)="mostrarHerramientaImagen.set($any($event.target).open)">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl text-indigo-950 outline-none focus:ring-2 focus:ring-indigo-300">
+                  <span class="flex items-center gap-2 text-sm font-black">
+                    <i class="pi pi-image text-indigo-700"></i>
+                    Herramienta opcional: imágenes de apoyo
+                  </span>
+                  <span class="flex items-center gap-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
+                    @if (imagenBase64Generada()) { <span class="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">Imagen lista</span> } @else { <span>Mostrar herramienta</span> }
+                    <i class="pi pi-chevron-down text-xs"></i>
+                  </span>
+                </summary>
 
-                <div class="grid gap-4 lg:grid-cols-[minmax(240px,0.75fr)_minmax(320px,1.25fr)]">
-                  <div
-                    (click)="triggerImageInput()"
-                    (dragover)="onImageDragOver($event)"
-                    (drop)="onImageDrop($event)"
-                    (paste)="onImagePaste($event)"
-                    tabindex="0"
-                    class="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-indigo-300 bg-white/80 p-5 text-center transition hover:border-indigo-600 hover:bg-white focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-xl text-indigo-700">
-                      <i [class]="procesandoImagen() ? 'pi pi-spin pi-spinner' : 'pi pi-upload'"></i>
-                    </div>
-                    <p class="mt-3 text-xs font-black text-indigo-950">
-                      {{ procesandoImagen() ? 'Preparando imagen...' : (imagenNombre() || 'Haz clic o arrastra una imagen aquí') }}
+                <div class="mt-4 space-y-4 border-t border-indigo-200 pt-4">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <p class="max-w-3xl text-[11px] leading-relaxed text-indigo-900/75">
+                      Convierte una imagen a Base64 y revisa cómo se verá dentro de una hoja de 8,5 × 13 pulgadas. Esta herramienta solo es necesaria cuando el reactivo incluye una imagen, ecuación u otro apoyo visual.
                     </p>
-                    <p class="mt-1 text-[10px] text-indigo-900/65">PNG, JPG, WEBP o GIF · también puedes pegar con Ctrl + V</p>
-                    @if (errorImagen()) {
-                      <p class="mt-2 text-[11px] font-bold text-rose-700">{{ errorImagen() }}</p>
+                    @if (imagenBase64Generada()) {
+                      <button (click)="limpiarImagenBase64(); $event.stopPropagation()" type="button" class="shrink-0 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer">
+                        <i class="pi pi-trash mr-1"></i> Limpiar
+                      </button>
                     }
                   </div>
 
-                  <div class="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                    <div class="mx-auto w-36 rounded-lg border border-indigo-200 bg-slate-200 p-2 shadow-inner" style="aspect-ratio: 8.5 / 13">
-                      @if (imagenBase64Generada(); as imagen) {
-                        <div class="flex h-full w-full items-center justify-center bg-white p-3 shadow-sm">
-                          <img [src]="imagen" alt="Previsualización de imagen en hoja 8,5 x 13" class="max-w-full object-contain" [style.max-height.%]="alturaImagenPrevisualizacion()" />
-                        </div>
-                      } @else {
-                        <div class="flex h-full items-center justify-center bg-white p-3 text-center text-[10px] font-bold text-slate-400">Vista de hoja 8,5 × 13</div>
+                  <div class="grid gap-4 lg:grid-cols-[minmax(240px,0.75fr)_minmax(320px,1.25fr)]">
+                    <div
+                      (click)="triggerImageInput()"
+                      (dragover)="onImageDragOver($event)"
+                      (drop)="onImageDrop($event)"
+                      (paste)="onImagePaste($event)"
+                      tabindex="0"
+                      class="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-indigo-300 bg-white/80 p-5 text-center transition hover:border-indigo-600 hover:bg-white focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                      <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-xl text-indigo-700">
+                        <i [class]="procesandoImagen() ? 'pi pi-spin pi-spinner' : 'pi pi-upload'"></i>
+                      </div>
+                      <p class="mt-3 text-xs font-black text-indigo-950">
+                        {{ procesandoImagen() ? 'Preparando imagen...' : (imagenNombre() || 'Haz clic o arrastra una imagen aquí') }}
+                      </p>
+                      <p class="mt-1 text-[10px] text-indigo-900/65">PNG, JPG, WEBP o GIF · también puedes pegar con Ctrl + V</p>
+                      @if (errorImagen()) {
+                        <p class="mt-2 text-[11px] font-bold text-rose-700">{{ errorImagen() }}</p>
                       }
                     </div>
 
-                    <div class="space-y-3">
-                      <div>
-                        <p class="text-[10px] font-black uppercase tracking-wide text-indigo-900">Tamaño de visualización</p>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                          @for (tamano of tamanosImagen; track tamano.valor) {
-                            <button type="button" (click)="tamanoImagen.set(tamano.valor)" [class]="tamanoImagen() === tamano.valor ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-indigo-200 bg-white text-indigo-800 hover:bg-indigo-100'" class="rounded-lg border px-3 py-2 text-[11px] font-black cursor-pointer">
-                              {{ tamano.etiqueta }}{{ tamano.valor === 'MEDIANA' ? ' (predeterminado)' : '' }}
-                            </button>
-                          }
-                        </div>
+                    <div class="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
+                      <div class="mx-auto w-36 rounded-lg border border-indigo-200 bg-slate-200 p-2 shadow-inner" style="aspect-ratio: 8.5 / 13">
+                        @if (imagenBase64Generada(); as imagen) {
+                          <div class="flex h-full w-full items-center justify-center bg-white p-3 shadow-sm">
+                            <img [src]="imagen" alt="Previsualización de imagen en hoja 8,5 x 13" class="max-w-full object-contain" [style.max-height.%]="alturaImagenPrevisualizacion()" />
+                          </div>
+                        } @else {
+                          <div class="flex h-full items-center justify-center bg-white p-3 text-center text-[10px] font-bold text-slate-400">Vista de hoja 8,5 × 13</div>
+                        }
                       </div>
-                      <div>
-                        <div class="mb-1 flex items-center justify-between gap-2">
-                          <label class="text-[10px] font-black uppercase tracking-wide text-indigo-900">Base64 listo para copiar</label>
-                          <button type="button" (click)="copiarImagenBase64()" [disabled]="!imagenBase64Generada()" title="Copiar Base64" aria-label="Copiar Base64" class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">
-                            <i class="pi pi-copy text-xs"></i>
-                          </button>
+
+                      <div class="space-y-3">
+                        <div>
+                          <p class="text-[10px] font-black uppercase tracking-wide text-indigo-900">Tamaño de visualización</p>
+                          <div class="mt-2 flex flex-wrap gap-2">
+                            @for (tamano of tamanosImagen; track tamano.valor) {
+                              <button type="button" (click)="tamanoImagen.set(tamano.valor)" [class]="tamanoImagen() === tamano.valor ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-indigo-200 bg-white text-indigo-800 hover:bg-indigo-100'" class="rounded-lg border px-3 py-2 text-[11px] font-black cursor-pointer">
+                                {{ tamano.etiqueta }}{{ tamano.valor === 'MEDIANA' ? ' (predeterminado)' : '' }}
+                              </button>
+                            }
+                          </div>
                         </div>
-                        <textarea [value]="imagenBase64ParaCopiar()" readonly rows="4" placeholder="Aquí aparecerá el texto Base64 de la imagen" class="w-full resize-none rounded-xl border border-indigo-200 bg-white px-3 py-2 font-mono text-[10px] text-slate-700 outline-none focus:border-indigo-500"></textarea>
-                        <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/65">Pega este valor en la columna <code>imagen_base64</code> del Excel. El tamaño se conserva como metadato de la data URI, sin agregar otra columna.</p>
+                        <div>
+                          <div class="mb-1 flex items-center justify-between gap-2">
+                            <label class="text-[10px] font-black uppercase tracking-wide text-indigo-900">Base64 listo para copiar</label>
+                            <button type="button" (click)="copiarImagenBase64()" [disabled]="!imagenBase64Generada()" title="Copiar Base64" aria-label="Copiar Base64" class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">
+                              <i class="pi pi-copy text-xs"></i>
+                            </button>
+                          </div>
+                          <textarea [value]="imagenBase64ParaCopiar()" readonly rows="4" placeholder="Aquí aparecerá el texto Base64 de la imagen" class="w-full resize-none rounded-xl border border-indigo-200 bg-white px-3 py-2 font-mono text-[10px] text-slate-700 outline-none focus:border-indigo-500"></textarea>
+                          <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/65">Pega este valor en la columna <code>imagen_base64</code> del Excel. El tamaño se conserva como metadato de la data URI, sin agregar otra columna.</p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </section>
+              </details>
             }
 
             <!-- Resumen de Errores si el archivo no es válido -->
@@ -617,12 +650,13 @@ export interface DiaCalendario {
               <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 space-y-2 text-xs animate-fade-in">
                 <div class="flex items-center gap-2 font-black text-rose-900">
                   <i class="pi pi-exclamation-triangle text-rose-600"></i>
-                  <span>Observaciones encontradas que deben corregirse antes de aprobar:</span>
+                  <span>Observaciones que debes corregir antes de aprobar el banco:</span>
                 </div>
                 <div class="rounded-lg border border-rose-200 bg-white/70 px-3 py-2 text-[11px] leading-relaxed text-rose-900">
                   <strong>¿Dónde corregir la opción?</strong> La aplicación no mueve incisos automáticamente. Corrige la fila en el Excel original,
                   usando las columnas oficiales <code>respuesta_correcta</code> y <code>opcion_a</code> a <code>opcion_e</code>.
-                  Si la respuesta es <code>E</code>, la columna <code>opcion_e</code> debe contener el texto de esa alternativa.
+                  En <strong>Selección de la mejor respuesta</strong> y <strong>Subítem de caso o problema</strong>, si la respuesta es <code>E</code>, <code>opcion_e</code> debe contener el texto de esa alternativa.
+                  En <strong>Verdadero o Falso Complejas</strong>, <code>opcion_e</code> debe quedar vacía: la letra <code>E</code> sí puede registrarse en <code>respuesta_correcta</code> porque identifica una combinación de las cuatro proposiciones.
                   Luego vuelve a cargar el archivo para ejecutar nuevamente todas las validaciones.
                 </div>
                 <ul class="list-disc pl-5 space-y-1 text-rose-800 text-[11px]">
@@ -632,8 +666,18 @@ export interface DiaCalendario {
                   @if (preguntasConErrores().length > 0) {
                     <li>Hay {{ preguntasConErrores().length }} filas con errores específicos:</li>
                     @for (errItem of preguntasConErrores(); track errItem.fila) {
-                      <li class="ml-4">
-                        <strong>Fila {{ errItem.fila }}:</strong> {{ errItem.errores.join(', ') }} <em>({{ errItem.enunciado ? (errItem.enunciado | slice:0:60) + '...' : 'Sin enunciado' }})</em>
+                      <li class="ml-4 list-none space-y-1.5">
+                        <div class="font-black text-rose-950">Fila {{ errItem.fila }} · {{ getTipoNombreAmigable(errItem.tipo) }}</div>
+                        <div class="rounded-lg border border-rose-200 bg-white px-3 py-2 space-y-1.5">
+                          <div class="text-[10px] font-black uppercase tracking-wide text-rose-700">{{ errItem.enunciado ? (errItem.enunciado | slice:0:90) + (errItem.enunciado.length > 90 ? '...' : '') : 'Sin enunciado' }}</div>
+                          @for (detalle of getDetalleErroresDocente(errItem); track detalle.regla + detalle.problema) {
+                            <div class="border-t border-rose-100 pt-1.5 text-[11px] leading-relaxed">
+                              <strong class="text-rose-950">{{ detalle.regla }}:</strong>
+                              <span class="text-rose-900"> {{ detalle.problema }}</span>
+                              <div class="mt-0.5 text-rose-700"><strong>Corrección:</strong> {{ detalle.correccion }}</div>
+                            </div>
+                          }
+                        </div>
                       </li>
                     }
                   }
@@ -641,6 +685,7 @@ export interface DiaCalendario {
               </div>
             }
           </div>
+          @if (preguntasCargadas().length > 0) {
           <!-- Paneles de Métricas y Balance del Examen -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
             
@@ -781,7 +826,7 @@ export interface DiaCalendario {
                       <span>Reactivos Procesados del Banco ({{ preguntasCargadas().length }} Filas)</span>
                     </h4>
                     <p class="text-[11px] text-muted-foreground">
-                      Inspección detallada de las 6 tipologías pedagógicas según <code>formato_banco_preguntas_asig_EF.xlsx</code>
+                      Inspección detallada de los reactivos según el formato oficial del cuadernillo y su plantilla Excel.
                     </p>
                   </div>
 
@@ -884,6 +929,16 @@ export interface DiaCalendario {
                 </div>
               </div>
             }
+            }
+          }
+          } @else {
+            <div class="flex items-start gap-3 rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-4 text-xs text-muted-foreground">
+              <i class="pi pi-arrow-up-right mt-0.5 text-purple-700"></i>
+              <div>
+                <strong class="block text-foreground">Selecciona un rol de examen para continuar</strong>
+                <span>El cargador, la validación y las métricas aparecerán cuando exista una asignatura, grupo y parcial compatibles.</span>
+              </div>
+            </div>
           }
 
         </div>
@@ -1455,11 +1510,11 @@ export interface DiaCalendario {
                   <div class="flex items-center gap-2">
                     <h3 class="text-base font-black">Previsualización de Cuadernillo de Examen (Formato oficial)</h3>
                     <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
-                      100% del Banco ({{ preguntasValidasParaPdf().length }} Reactivos)
+                      Excel actual · {{ preguntasValidasParaPdf().length }} reactivos
                     </span>
                   </div>
                   <p class="text-xs text-slate-300 font-mono">
-                    {{ parcialActivo() | uppercase }} · UNITEPC GESTIÓN II-2026 · UNA COLUMNA
+                    {{ parcialActivo() | uppercase }} · {{ nombreArchivoCargado() || 'Excel actual' }} · UNA COLUMNA
                   </p>
                 </div>
               </div>
@@ -1898,9 +1953,9 @@ export interface DiaCalendario {
                   <i class="pi pi-book"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-black">Guía Oficial de Reactivos y Renderizado de Examen</h3>
+                  <h3 class="text-base font-black">Guía del formato oficial del examen</h3>
                   <p class="text-xs text-white/80 font-medium">
-                    Lineamientos de llenado en Excel y previsualización exacta de cómo se imprimirá cada tipo de pregunta en el examen.
+                    Cómo llenar el Excel y cómo se organiza cada sección dentro del cuadernillo impreso.
                   </p>
                 </div>
               </div>
@@ -1916,50 +1971,62 @@ export interface DiaCalendario {
                 (click)="filtroGuiaTipo.set('TODOS')"
                 [class]="filtroGuiaTipo() === 'TODOS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                Todas las Tipologías
+                 Todas las secciones
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('VF_SIMPLE')"
                 [class]="filtroGuiaTipo() === 'VF_SIMPLE' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                1. V/F Simple
+                 1. V/F Simple
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('VF_COMPLEJAS')"
                 [class]="filtroGuiaTipo() === 'VF_COMPLEJAS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                2. V/F Complejas (1-4)
+                 2. V/F Complejas (1-4)
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('PREMISAS')"
                 [class]="filtroGuiaTipo() === 'PREMISAS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                3. Premisas A/B/Ambas/Ninguna
+                 3. Premisas A/B/Ambas/Ninguna
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('SELECCION')"
                 [class]="filtroGuiaTipo() === 'SELECCION' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                4. Selección de la Mejor Rpta
+                 4. Selección de la Mejor Rpta
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('CASOS')"
                 [class]="filtroGuiaTipo() === 'CASOS' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                5. Casos Clínicos y Problemas
+                 5. Casos Clínicos y Problemas
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('EMPAREJAMIENTO')"
                 [class]="filtroGuiaTipo() === 'EMPAREJAMIENTO' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                6. Emparejamiento Ampliado
+                 6. Emparejamiento Ampliado
               </button>
               <button 
                 (click)="filtroGuiaTipo.set('TYPST')"
                 [class]="filtroGuiaTipo() === 'TYPST' ? 'bg-purple-700 text-white font-black shadow-2xs' : 'bg-card text-muted-foreground hover:text-foreground font-bold'"
                 class="px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                7. Fórmulas matemáticas ($ ... $)
+                 Apoyo transversal: fórmulas ($ ... $)
               </button>
+            </div>
+
+            <!-- Resumen visual del formato de impresión -->
+            <div class="border-b border-border bg-white px-4 py-3 text-[10px] text-slate-700 sm:px-6">
+              <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <span class="font-black uppercase tracking-wide text-purple-900">Formato del cuadernillo</span>
+                <span class="inline-flex items-center gap-1.5"><i class="pi pi-id-card text-purple-600"></i> Identificación del estudiante</span>
+                <span class="inline-flex items-center gap-1.5"><i class="pi pi-list text-purple-600"></i> Cuestionario con numeración corrida</span>
+                <span class="inline-flex items-center gap-1.5"><i class="pi pi-th-large text-purple-600"></i> Secciones I a VI</span>
+                <span class="inline-flex items-center gap-1.5"><i class="pi pi-check-square text-purple-600"></i> Opciones A a E</span>
+              </div>
+              <p class="mt-2 text-[10px] text-slate-500">Las fórmulas, imágenes y casos se integran dentro de la sección del reactivo; no crean una sección independiente.</p>
             </div>
 
             <!-- Cuerpo de Ejemplos con Comparador Dual (Excel vs PDF Impreso) -->
@@ -1970,7 +2037,7 @@ export interface DiaCalendario {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-emerald-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 1</span>
+                      <span class="bg-emerald-600 text-white font-black px-2.5 py-1 rounded text-xs">SECCIÓN I</span>
                       <h4 class="text-sm font-black text-foreground">Verdadero o Falso Simple</h4>
                     </div>
                     <span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
@@ -2046,7 +2113,7 @@ export interface DiaCalendario {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-teal-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 2</span>
+                      <span class="bg-teal-600 text-white font-black px-2.5 py-1 rounded text-xs">SECCIÓN II</span>
                       <h4 class="text-sm font-black text-foreground">Verdadero o Falso Complejas (Proposiciones 1, 2, 3 y 4)</h4>
                     </div>
                     <span class="bg-teal-100 text-teal-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
@@ -2061,14 +2128,14 @@ export interface DiaCalendario {
                         <span>1. Cómo se completa en el archivo Excel:</span>
                       </div>
                       <p class="text-[11px] text-muted-foreground">
-                        Use las columnas <code class="bg-muted px-1 rounded">opcion_a</code> a <code class="bg-muted px-1 rounded">opcion_d</code> para las proposiciones 1 a 4. La respuesta usa la lista canónica:
+                        Use las columnas <code class="bg-muted px-1 rounded">opcion_a</code> a <code class="bg-muted px-1 rounded">opcion_d</code> para las proposiciones 1 a 4. Deje <code class="bg-muted px-1 rounded">opcion_e</code> vacía. La respuesta usa la lista canónica A–E; la letra E es válida como combinación, aunque no exista texto en la columna opcion_e:
                       </p>
                       <div class="bg-muted/40 p-2.5 rounded text-[10px] font-mono space-y-1">
                         <div><strong>opcion_a:</strong> 1. Gasto respaldado con facturas originales</div>
                         <div><strong>opcion_b:</strong> 2. Gasto vinculado a la actividad gravada</div>
                         <div><strong>opcion_c:</strong> 3. Bancarización en pagos &gt;= Bs 50.000</div>
                         <div><strong>opcion_d:</strong> 4. Donaciones deducibles hasta el 50% (Falso)</div>
-                        <div><strong>respuesta:</strong> A (1, 2 y 3 son verdaderas) | <strong>dificultad:</strong> 2</div>
+                        <div><strong>respuesta_correcta:</strong> A (1, 2 y 3 son verdaderas) | <strong>opcion_e:</strong> vacía | <strong>dificultad:</strong> 2</div>
                       </div>
                     </div>
 
@@ -2105,7 +2172,7 @@ export interface DiaCalendario {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-cyan-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 3</span>
+                      <span class="bg-cyan-600 text-white font-black px-2.5 py-1 rounded text-xs">SECCIÓN III</span>
                       <h4 class="text-sm font-black text-foreground">Respuesta A/B/Ambas/Ninguna (Premisas I y II)</h4>
                     </div>
                     <span class="bg-cyan-100 text-cyan-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
@@ -2156,7 +2223,7 @@ export interface DiaCalendario {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-blue-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 4</span>
+                      <span class="bg-blue-600 text-white font-black px-2.5 py-1 rounded text-xs">SECCIÓN IV</span>
                       <h4 class="text-sm font-black text-foreground">Selección de la Mejor Respuesta (5 Opciones A-E)</h4>
                     </div>
                     <span class="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
@@ -2207,7 +2274,7 @@ export interface DiaCalendario {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-indigo-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 5</span>
+                      <span class="bg-indigo-600 text-white font-black px-2.5 py-1 rounded text-xs">SECCIÓN V</span>
                       <h4 class="text-sm font-black text-foreground">Ítems Agrupados por Caso Clínico o Problema (Tronco + Subítems)</h4>
                     </div>
                     <span class="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
@@ -2281,7 +2348,7 @@ export interface DiaCalendario {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-amber-600 text-white font-black px-2.5 py-1 rounded text-xs">TIPOLOGÍA 6</span>
+                      <span class="bg-amber-600 text-white font-black px-2.5 py-1 rounded text-xs">SECCIÓN VI</span>
                       <h4 class="text-sm font-black text-foreground">Emparejamiento Ampliado (Claves Maestras + Opciones)</h4>
                     </div>
                     <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
@@ -2325,17 +2392,17 @@ export interface DiaCalendario {
                 <div class="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                   <div class="flex items-center justify-between border-b border-border pb-3">
                     <div class="flex items-center gap-2">
-                      <span class="bg-purple-700 text-white font-black px-2.5 py-1 rounded text-xs">MOTOR OFICIAL</span>
+                      <span class="bg-purple-700 text-white font-black px-2.5 py-1 rounded text-xs">APOYO TRANSVERSAL</span>
                       <h4 class="text-sm font-black text-foreground">Renderizado de Fórmulas Matemáticas y Químicas ($ ... $)</h4>
                     </div>
                     <span class="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                      Todas las Tipologías
+                      Aplica dentro de las secciones correspondientes
                     </span>
                   </div>
 
                   <div class="p-4 bg-card border border-border rounded-xl space-y-3">
                     <p class="text-xs text-muted-foreground">
-                      Puedes insertar fórmulas matemáticas en el enunciado o en las opciones envolviendo la expresión con el signo de dólar <code class="bg-muted px-1 rounded font-mono">$ ... $</code>.
+                      Puedes insertar fórmulas matemáticas o químicas en el enunciado y en las opciones envolviendo la expresión con <code class="bg-muted px-1 rounded font-mono">$ ... $</code>. La previsualización usa el mismo motor Typst del examen final para interpretar raíces, potencias, subíndices, multiplicación, flechas y ±.
                     </p>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-[11px]">
                       <div class="p-3 bg-muted/40 rounded-xl border border-border">
@@ -2361,7 +2428,7 @@ export interface DiaCalendario {
             <div class="bg-muted/40 border-t border-border p-4 flex items-center justify-between">
               <span class="text-xs text-muted-foreground">
                 <i class="pi pi-info-circle text-primary mr-1"></i>
-                Descarga la <strong>Plantilla Oficial (3 Hojas)</strong> para empezar a completar tus preguntas.
+                 Descarga la <strong>Plantilla Oficial</strong> para empezar a completar tus preguntas.
               </span>
 
               <div class="flex items-center gap-2">
@@ -2435,6 +2502,7 @@ export class BancoPreguntasComponent implements OnInit {
   private readonly _rolService = inject(RolExamenService);
   private readonly _bancoService = inject(BancoPreguntasService);
   private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
+  private readonly _generacionTypst = inject(GeneracionTypstService);
   private readonly _sinCartillaService = inject(ExamenSinCartillaService);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
@@ -2735,6 +2803,7 @@ export class BancoPreguntasComponent implements OnInit {
   public nombreArchivoCargado = signal<string | null>(null);
   public imagenBase64Generada = signal<string | null>(null);
   public imagenNombre = signal<string | null>(null);
+  public mostrarHerramientaImagen = signal<boolean>(false);
   public tamanoImagen = signal<TamanoImagen>('MEDIANA');
   public procesandoImagen = signal<boolean>(false);
   public errorImagen = signal<string>('');
@@ -2985,23 +3054,162 @@ export class BancoPreguntasComponent implements OnInit {
     const validas = this.totalPreguntasValidas();
 
     if (preguntas.length < cuotas.total) {
-      observaciones.push(`Cantidad total: se encontraron ${preguntas.length} reactivos y se requieren como mínimo ${cuotas.total}.`);
+      observaciones.push(`Cantidad total insuficiente: se encontraron ${preguntas.length} reactivos y se requieren como mínimo ${cuotas.total}. Corrección: agrega ${cuotas.total - preguntas.length} reactivo(s) válido(s) en el Excel.`);
     }
     if (validas < cuotas.total) {
-      observaciones.push(`Preguntas válidas: hay ${validas} y se requieren como mínimo ${cuotas.total} para aprobar el examen.`);
+      observaciones.push(`Preguntas válidas insuficientes: hay ${validas} y se requieren como mínimo ${cuotas.total}. Corrección: corrige las filas observadas y vuelve a cargar el archivo.`);
     }
     if (this.countFaciles() < cuotas.facil) {
-      observaciones.push(`Dificultad fácil: hay ${this.countFaciles()} y se requieren como mínimo ${cuotas.facil}.`);
+      observaciones.push(`Cuota de dificultad fácil incompleta: hay ${this.countFaciles()} y se requieren como mínimo ${cuotas.facil}. Corrección: agrega o corrige ${cuotas.facil - this.countFaciles()} reactivo(s) con dificultad 1.`);
     }
     if (this.countMedias() < cuotas.medio) {
-      observaciones.push(`Dificultad media: hay ${this.countMedias()} y se requieren como mínimo ${cuotas.medio}.`);
+      observaciones.push(`Cuota de dificultad media incompleta: hay ${this.countMedias()} y se requieren como mínimo ${cuotas.medio}. Corrección: agrega o corrige ${cuotas.medio - this.countMedias()} reactivo(s) con dificultad 2.`);
     }
     if (this.countDificiles() < cuotas.dificil) {
-      observaciones.push(`Dificultad difícil: hay ${this.countDificiles()} y se requieren como mínimo ${cuotas.dificil}.`);
+      observaciones.push(`Cuota de dificultad difícil incompleta: hay ${this.countDificiles()} y se requieren como mínimo ${cuotas.dificil}. Corrección: agrega o corrige ${cuotas.dificil - this.countDificiles()} reactivo(s) con dificultad 3.`);
     }
 
     return observaciones;
   });
+
+  public getDetalleErroresDocente(pregunta: PreguntaValidada): DetalleErrorDocente[] {
+    return pregunta.errores.map(error => this.detallarErrorDocente(pregunta, error));
+  }
+
+  private detallarErrorDocente(pregunta: PreguntaValidada, error: string): DetalleErrorDocente {
+    const opciones = [
+      { campo: 'opcion_a', valor: pregunta.opcion_a },
+      { campo: 'opcion_b', valor: pregunta.opcion_b },
+      { campo: 'opcion_c', valor: pregunta.opcion_c },
+      { campo: 'opcion_d', valor: pregunta.opcion_d },
+      { campo: 'opcion_e', valor: pregunta.opcion_e }
+    ];
+
+    if (error === 'Las opciones no pueden repetir el mismo texto') {
+      const repetidas = new Map<string, string[]>();
+      opciones.filter(opcion => opcion.valor?.trim()).forEach(opcion => {
+        const huella = this.huellaTextoExcel(opcion.valor);
+        repetidas.set(huella, [...(repetidas.get(huella) || []), opcion.campo]);
+      });
+      const gruposRepetidos = [...repetidas.values()].filter(campos => campos.length > 1);
+      const valoresRepetidos = gruposRepetidos.map(campos => {
+        const valor = opciones.find(opcion => opcion.campo === campos[0])?.valor || '';
+        return `${campos.join(' y ')} = "${valor}"`;
+      });
+      return {
+        regla: 'Opciones repetidas',
+        problema: `Se encontró el mismo texto en ${valoresRepetidos.join('; ')}.`,
+        correccion: 'Cambia una de esas opciones por una alternativa diferente y conserva solo una respuesta correcta. No copies la misma opción en dos columnas.'
+      };
+    }
+
+    if (error === 'Falta tipo de reactivo') {
+      return { regla: 'Columna tipo', problema: 'La columna tipo está vacía.', correccion: 'Selecciona una tipología válida, por ejemplo SELECCIÓN_MEJOR_RESPUESTA.' };
+    }
+    if (error.startsWith('Tipo de reactivo no reconocido:')) {
+      return { regla: 'Columna tipo', problema: `El valor registrado no pertenece al catálogo oficial: ${error.replace('Tipo de reactivo no reconocido: ', '')}.`, correccion: 'Usa una tipología disponible en la guía del formato del examen y vuelve a cargar el Excel.' };
+    }
+    if (error === 'Falta enunciado de la pregunta') {
+      return { regla: 'Columna enunciado', problema: 'El reactivo no tiene pregunta o enunciado.', correccion: 'Escribe el enunciado completo en la columna enunciado.' };
+    }
+    if (error.includes('código de grupo')) {
+      return { regla: 'Columna grupo', problema: 'El reactivo agrupado no tiene un código para relacionarlo con su fila principal.', correccion: 'Escribe el mismo código de grupo en la fila madre y en todas sus filas hijas.' };
+    }
+    if (error === 'El grupo supera el máximo de 100 caracteres') {
+      return { regla: 'Columna grupo', problema: 'El código de grupo supera los 100 caracteres.', correccion: 'Usa un código breve, único y compartido por las filas del mismo caso o emparejamiento.' };
+    }
+    if (error === 'El enunciado supera el máximo de 10000 caracteres') {
+      return { regla: 'Columna enunciado', problema: 'El enunciado supera los 10.000 caracteres.', correccion: 'Reduce el texto del enunciado o divide el contenido en reactivos relacionados.' };
+    }
+    if (error.includes('Una opción supera el máximo de 2000')) {
+      const camposLargos = opciones.filter(opcion => opcion.valor.length > 2000).map(opcion => opcion.campo);
+      return { regla: 'Opciones A–E', problema: `${camposLargos.join(', ')} supera(n) los 2.000 caracteres.`, correccion: 'Resume la alternativa manteniendo una sola idea y un texto legible para el cuadernillo.' };
+    }
+    if (error === 'Respuesta en V/F debe ser A (Verdadero) o B (Falso)') {
+      return { regla: 'Respuesta correcta', problema: 'La tipología Verdadero o Falso solo admite A o B.', correccion: 'Registra A para Verdadero o B para Falso y deja vacías las opciones C, D y E.' };
+    }
+    if (error.includes('Respuesta en premisas')) {
+      return { regla: 'Respuesta correcta', problema: 'La tipología de premisas solo admite las claves A, B, C o D.', correccion: 'Registra una de esas cuatro letras y verifica las dos premisas.' };
+    }
+    if (error.includes('Requiere las 4 proposiciones')) {
+      return { regla: 'Proposiciones 1–4', problema: 'Falta una o más proposiciones en las columnas opcion_a a opcion_d.', correccion: 'Completa exactamente las cuatro proposiciones y no uses opcion_e para esta tipología.' };
+    }
+    if (error.includes('Respuesta en V/F complejas')) {
+      return { regla: 'Clave de respuesta', problema: 'La respuesta no corresponde a una clave A–E de Verdadero o Falso Complejas.', correccion: 'Registra la letra de la combinación correcta según la guía: A, B, C, D o E.' };
+    }
+    if (error.includes('Requiere 5 opciones completas')) {
+      const faltantes = opciones.filter(opcion => !opcion.valor?.trim()).map(opcion => opcion.campo);
+      return { regla: 'Opciones A–E', problema: `Faltan opciones obligatorias: ${faltantes.join(', ')}.`, correccion: 'Completa las cinco alternativas con textos diferentes antes de volver a cargar el archivo.' };
+    }
+    if (error === 'Respuesta debe ser una letra entre A y E') {
+      return { regla: 'Respuesta correcta', problema: 'La clave registrada no es válida para una pregunta de selección.', correccion: 'Escribe únicamente A, B, C, D o E y asegúrate de que esa columna tenga texto.' };
+    }
+    if (error.includes('opciones de referencia')) {
+      return { regla: 'Fila madre de emparejamiento', problema: 'La fila principal debe tener entre 2 y 5 opciones de referencia.', correccion: 'Completa opcion_a hasta opcion_e con entre 2 y 5 conceptos y deja vacía respuesta_correcta.' };
+    }
+    if (error.includes('Emparejamiento madre')) {
+      return { regla: 'Fila madre de emparejamiento', problema: 'La fila principal contiene una respuesta correcta que no corresponde.', correccion: 'Deja vacía la columna respuesta_correcta de la fila madre; la clave se registra en cada fila hija.' };
+    }
+    if (error.includes('Respuesta de emparejamiento')) {
+      return { regla: 'Respuesta de emparejamiento', problema: 'La clave de la fila hija no corresponde a una opción A–E.', correccion: 'Registra la letra de la opción relacionada: A, B, C, D o E.' };
+    }
+    if (error.includes('V/F simple solo permite')) {
+      return { regla: 'Opciones V/F', problema: 'La fila contiene opciones adicionales a Verdadero y Falso.', correccion: 'Deja únicamente opcion_a y opcion_b; elimina los valores de opcion_c, opcion_d y opcion_e.' };
+    }
+    if (error.includes('V/F complejas debe dejar vacía opcion_e')) {
+      return { regla: 'Opción E deshabilitada', problema: 'La columna opcion_e tiene contenido, pero esta tipología reserva la letra E para una combinación de respuestas.', correccion: 'Borra el contenido de opcion_e. Mantén la letra E, si corresponde, únicamente en respuesta_correcta.' };
+    }
+    if (error.includes('no permite opción E')) {
+      return { regla: 'Opciones permitidas', problema: 'Esta tipología no utiliza la columna opcion_e.', correccion: 'Elimina el contenido de opcion_e y conserva únicamente las columnas permitidas por la guía.' };
+    }
+    if (error.includes('fila madre de caso')) {
+      return { regla: 'Fila madre de caso', problema: 'La fila principal contiene opciones o respuesta correcta.', correccion: 'Deja la fila madre solo con tipo, grupo y enunciado; registra opciones y respuesta en los subítems.' };
+    }
+    if (error.includes('opción de emparejamiento no debe')) {
+      return { regla: 'Fila hija de emparejamiento', problema: 'La fila hija contiene valores en opcion_a a opcion_e.', correccion: 'Deja vacías las opciones A–E y coloca la clave únicamente en respuesta_correcta.' };
+    }
+    if (error.includes('no tiene una opción activa')) {
+      return { regla: 'Respuesta correcta', problema: `${error}.`, correccion: 'Completa la opción indicada o cambia respuesta_correcta a una letra que tenga texto.' };
+    }
+    if (error.includes('Dificultad obligatoria')) {
+      return { regla: 'Columna dificultad', problema: 'El reactivo no tiene nivel de dificultad.', correccion: 'Registra 1 para fácil, 2 para medio o 3 para difícil.' };
+    }
+    if (error.includes('tipología madre no debe llevar dificultad')) {
+      return { regla: 'Columna dificultad', problema: 'La fila madre tiene una dificultad que se asigna únicamente a los subítems.', correccion: 'Deja vacía dificultad en la fila madre y registra el nivel en las filas respondibles.' };
+    }
+    if (error.startsWith('Dificultad inválida:')) {
+      return { regla: 'Columna dificultad', problema: `El valor registrado no es válido: ${error.replace('Dificultad inválida: ', '')}.`, correccion: 'Usa únicamente 1/Fácil, 2/Medio o 3/Difícil.' };
+    }
+    if (error.startsWith('Parcial ')) {
+      return { regla: 'Columna parcial', problema: `${error}.`, correccion: `Selecciona el parcial correcto para este banco: ${this.parcialActivo()}.` };
+    }
+    if (error.startsWith('Peso inválido')) {
+      return { regla: 'Columna peso', problema: 'El valor de peso no cumple el formato permitido.', correccion: 'Usa un número mayor que 0, hasta 100 y con máximo dos decimales.' };
+    }
+    if (error.includes('fórmula inválida')) {
+      return { regla: 'Fórmula o contenido', problema: 'El enunciado u opción contiene un error de Excel, caracteres no permitidos o signos $ desbalanceados.', correccion: 'Corrige la fórmula o cierra correctamente cada expresión entre signos $.' };
+    }
+    if (error.includes('imagen_base64')) {
+      return { regla: 'Imagen de apoyo', problema: `${error}.`, correccion: 'Usa una imagen PNG, JPG, WEBP o GIF válida, de hasta 512 KB, en formato Base64.' };
+    }
+    if (error.includes('pregunta está duplicada')) {
+      return { regla: 'Pregunta duplicada', problema: 'Existe otra fila con el mismo tipo, grupo y enunciado.', correccion: 'Elimina la fila repetida o cambia su grupo y enunciado si realmente representa otro reactivo.' };
+    }
+    if (error.includes('necesita primero')) {
+      return { regla: 'Orden del grupo', problema: `${error}.`, correccion: 'Coloca primero la fila madre y luego sus subítems consecutivos con el mismo código de grupo.' };
+    }
+    if (error.includes('debe aparecer inmediatamente')) {
+      return { regla: 'Orden del grupo', problema: `${error}.`, correccion: 'Mueve la fila hija inmediatamente después de la fila madre correspondiente, sin intercalar otra pregunta.' };
+    }
+    if (error.includes('solo puede tener un enunciado principal')) {
+      return { regla: 'Grupo duplicado', problema: `${error}.`, correccion: 'Conserva una sola fila madre por grupo y mueve las preguntas relacionadas como subítems.' };
+    }
+    if (error.includes('necesita entre 2 y 10')) {
+      return { regla: 'Cantidad de subítems', problema: `${error}.`, correccion: 'Agrega o elimina filas hijas hasta dejar entre 2 y 10 preguntas relacionadas.' };
+    }
+
+    return { regla: 'Validación del reactivo', problema: `${error}.`, correccion: 'Revisa la fila según la guía del formato del examen y vuelve a cargar el Excel.' };
+  }
 
   public filtroPdfDificultad = signal<'TODAS' | '1' | '2' | '3'>('TODAS');
   // Se conserva el tipo por compatibilidad con la maqueta histórica oculta;
@@ -3617,7 +3825,10 @@ export class BancoPreguntasComponent implements OnInit {
         if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && (opC || opD || opE)) {
           errores.push('V/F simple solo permite opciones A y B');
         }
-        if ((tipoNorm === 'VERDADERO_O_FALSO_COMPLEJAS' || tipoNorm === 'RESPUESTA_PREMISAS_ABCD') && opE) {
+        if (tipoNorm === 'VERDADERO_O_FALSO_COMPLEJAS' && opE) {
+          errores.push('V/F complejas debe dejar vacía opcion_e');
+        }
+        if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD' && opE) {
           errores.push(`${tipoNorm} no permite opción E`);
         }
         if (tipoNorm === 'CASO_CLINICO_TRONCO' && (opA || opB || opC || opD || opE || respRaw)) {
@@ -3626,7 +3837,7 @@ export class BancoPreguntasComponent implements OnInit {
         if (tipoNorm === 'OPCION_EMPAREJAMIENTO' && (opA || opB || opC || opD || opE)) {
           errores.push('La opción de emparejamiento no debe llevar opciones A-E');
         }
-        if (!['CASO_CLINICO_TRONCO', 'EMPAREJAMIENTO_TRONCO', 'OPCION_EMPAREJAMIENTO'].includes(tipoNorm)
+        if (!['CASO_CLINICO_TRONCO', 'EMPAREJAMIENTO_TRONCO', 'OPCION_EMPAREJAMIENTO', 'VERDADERO_O_FALSO_COMPLEJAS'].includes(tipoNorm)
           && respNorm && !({ A: opA, B: opB, C: opC, D: opD, E: opE } as Record<string, string>)[respNorm]) {
           errores.push(`La respuesta correcta ${respNorm} no tiene una opción activa`);
         }
@@ -3997,7 +4208,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     this._liberarPdfPreview();
     this.documentoRecorridoCompleto.set(false);
     try {
-      const pdf = await this._crearPdfPreviewOficial(preguntas);
+      const pdf = await this._crearPdfPreviewConTypst(preguntas);
       this.pdfPreviewObjectUrl = URL.createObjectURL(pdf);
       this.pdfPreviewUrl.set(this._sanitizer.bypassSecurityTrustResourceUrl(this.pdfPreviewObjectUrl));
       this.dialogPrevisualizacionPdf.set(true);
@@ -4013,6 +4224,38 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       this._liberarPdfPreview();
       this._mostrarToast('No se pudo generar el PDF oficial de previsualización.', 'error');
     }
+  }
+
+  private async _crearPdfPreviewConTypst(preguntas: PreguntaValidada[]): Promise<Blob> {
+    const rol = this.rolExamenActivo();
+    if (!rol?.id) throw new Error('No existe un rol de examen activo para previsualizar');
+    const request: PrevisualizacionTypstRequest = {
+      jobId: `PREVIEW-${crypto.randomUUID()}`,
+      rolExamenId: rol.id,
+      preguntas: preguntas.map(pregunta => ({
+        id: pregunta.fila,
+        fila: pregunta.fila,
+        tipo: pregunta.tipo,
+        grupo: pregunta.grupo,
+        enunciado: pregunta.enunciado,
+        imagen_base64: pregunta.imagen_base64,
+        opcion_a: pregunta.opcion_a,
+        opcion_b: pregunta.opcion_b,
+        opcion_c: pregunta.opcion_c,
+        opcion_d: pregunta.opcion_d,
+        opcion_e: pregunta.opcion_e,
+        respuesta_correcta: pregunta.respuesta_correcta,
+        dificultad: pregunta.dificultad,
+      }))
+    };
+    const accepted = await firstValueFrom(this._generacionTypst.solicitarPrevisualizacion(request));
+    const resultado = await firstValueFrom(this._generacionTypst.esperarResultado(accepted.jobId, 1000, 90));
+    if (String(resultado.estado || '').startsWith('ERROR')) {
+      throw new Error(resultado.mensaje || 'Typst no pudo generar la previsualización');
+    }
+    const path = resultado.variantes?.[0]?.archivoPdfPath;
+    if (!path) throw new Error('Typst terminó sin devolver el PDF de previsualización');
+    return firstValueFrom(this._generacionTypst.descargarArchivo(path));
   }
 
   private async _crearPdfPreviewOficial(preguntas: PreguntaValidada[]): Promise<Blob> {
@@ -4043,6 +4286,59 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [ancho, alto], compress: true });
     let pagina = 1;
     let y = margen;
+
+    // Método histórico de respaldo para la previsualización. La ruta activa
+    // utiliza el mismo motor Typst del examen final. No basta
+    // con enviar el texto de Excel tal cual: jsPDF no interpreta los
+    // delimitadores $...$ ni la sintaxis Typst. Esta conversión conserva el
+    // contenido normal y transforma la notación académica más utilizada en
+    // una representación legible para las fuentes estándar de jsPDF. Las
+    // fuentes integradas no soportan de forma confiable todos los glifos
+    // Unicode (subíndices, raíces y flechas), por lo que la ecuación se
+    // imprime en una línea independiente con una notación ASCII clara.
+    const convertirDecoradoresFormula = (formula: string): string => {
+      let resultado = formula
+        .replace(/\\(?:text|mathrm)\s*\{([^{}]*)\}/gi, '$1')
+        .replace(/\\(?:times|cdot)\b/gi, '*')
+        .replace(/\\(?:rightarrow|to)\b/gi, '->')
+        .replace(/\\(?:pm)\b/gi, '+/-')
+        .replace(/\b(?:times|cdot)\b/gi, '*')
+        .replace(/\b(?:arrow|rightarrow)\b/gi, '->')
+        .replace(/\bpm\b/gi, '+/-')
+        .replace(/\+\s*-/g, '+/-')
+        .replace(/-\s*\+/g, '-/+')
+        .replace(/=>|->/g, '->')
+        .replace(/\\sqrt\s*/gi, 'sqrt')
+        .replace(/\bsqrt\s*/gi, 'sqrt')
+        .replace(/\\(alpha|beta|gamma|delta|epsilon|theta|lambda|mu|sigma|omega|phi|psi)\b/gi, '$1');
+
+      // Convierte _2 y _{n} a subíndices visibles en línea base (H2SO4),
+      // y conserva ^2 como notación explícita para no perder el exponente.
+      resultado = resultado.replace(/([_^])\s*(?:\{([^{}]*)\}|([A-Za-z0-9+()=\-]+))/g, (_match, operador: string, grupo: string, simple: string) => {
+        const valor = grupo ?? simple ?? '';
+        return operador === '_' ? valor : `^${valor}`;
+      });
+
+      // En fórmulas químicas es habitual separar los símbolos con espacios
+      // para facilitar la carga en Excel: H_2 S O_4 / N a O H.
+      return resultado
+        .replace(/(?<=[A-Za-z0-9])\s+(?=[A-Za-z0-9])/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    };
+
+    const textoPdfConFormula = (texto: string): string => {
+      if (!texto) return '';
+      const segmentos = texto.split(/(\$[^$]*\$)/g);
+      return segmentos.map((segmento, indice) => {
+        if (!segmento) return '';
+        return indice % 2 === 1
+          // Cada expresión se separa para evitar que una fórmula larga
+          // desplace el texto vecino o salga del ancho de la hoja.
+          ? `\n${convertirDecoradoresFormula(segmento.slice(1, -1))}\n`
+          : segmento;
+      }).join('').replace(/\n{3,}/g, '\n\n').trim();
+    };
 
     const cargarLogo = (): Promise<string | null> => new Promise(resolve => {
       const imagen = new Image();
@@ -4130,7 +4426,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       fuente(estilo, tamanoFuente);
       // Mantener los saltos semánticos del Excel (premisas, claves y casos)
       // mientras se ajusta cada línea al ancho de la hoja.
-      const lineas = (texto || '').split(/\r?\n/).flatMap(linea =>
+      const lineas = textoPdfConFormula(texto || '').split(/\r?\n/).flatMap(linea =>
         doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), anchoDisponible) as string[]
       );
       const altoTexto = Math.max(1, lineas.length) * salto;
@@ -4187,7 +4483,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     };
 
     const dibujarTarjeta = (lineas: string[]): void => {
-      const contenido = lineas.flatMap(linea => doc.splitTextToSize(linea, ancho - margen * 2 - 8) as string[]);
+      const contenido = lineas.flatMap(linea => doc.splitTextToSize(textoPdfConFormula(linea), ancho - margen * 2 - 8) as string[]);
       const altoTarjeta = Math.max(interlineado * 2, contenido.length * interlineado + 7);
       if (y + altoTarjeta > alto - margen - pieReservado) nuevaPagina();
       doc.setFillColor(248, 250, 252);
@@ -4207,7 +4503,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       const prefijo = `${numero}. ___`;
       fuente('bold', tamanoFuente);
       const anchoPrefijo = doc.getTextWidth(prefijo) + 1;
-      const lineasEnunciado = (enunciado || '').split(/\r?\n/).flatMap((linea, indice) =>
+      const lineasEnunciado = textoPdfConFormula(enunciado || '').split(/\r?\n/).flatMap((linea, indice) =>
         doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), indice === 0 ? ancho - margen * 2 - anchoPrefijo : ancho - margen * 2) as string[]
       );
       const altoPregunta = Math.max(1, lineasEnunciado.length) * interlineado;
@@ -4286,7 +4582,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     let numeroPregunta = 0;
     const tieneTroncoEmparejamiento = preguntas.some(item => item.tipo === 'EMPAREJAMIENTO_TRONCO');
     const medirLineas = (texto: string, anchoDisponible: number): string[] => (
-      (texto || '').split(/\r?\n/).flatMap(linea =>
+      textoPdfConFormula(texto || '').split(/\r?\n/).flatMap(linea =>
         doc.splitTextToSize(linea.replace(/\s+/g, ' ').trim(), anchoDisponible) as string[]
       )
     );
@@ -4512,29 +4808,29 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     switch (tipo) {
       case 'VERDADERO_O_FALSO_SIMPLE':
       case 'FALSO_VERDADERO':
-        return '1. V/F Simple';
+        return 'Verdadero o Falso Simple';
       case 'VERDADERO_O_FALSO_COMPLEJAS':
       case 'PREGUNTA_CON_CLAVE':
-        return '2. V/F Complejas';
+        return 'Verdadero o Falso Complejas';
       case 'RESPUESTA_PREMISAS_ABCD':
       case 'RESPUESTA_COMPUESTA':
-        return '3. Premisas A/B/Ambas/Ninguna';
+        return 'Respuesta A/B/Ambas/Ninguna';
       case 'SELECCION_MEJOR_RESPUESTA':
       case 'SELECCION_SIMPLE':
       case 'SELECCION_UNICA':
-        return '4. Selección Mejor Respuesta';
+        return 'Selección de la mejor respuesta';
       case 'CASO_CLINICO_TRONCO':
       case 'PROBLEMA':
       case 'CASO_CLINICO':
-        return '5. Caso Clínico (Tronco)';
+        return 'Ítems agrupados por caso clínico o problema';
       case 'SUBITEM_CASO':
       case 'SUBPROBLEMA':
-        return '5.1 Subítem de Caso';
+        return 'Subítem de caso o problema';
       case 'EMPAREJAMIENTO_TRONCO':
       case 'EMPAREJAMIENTO':
-        return '6. Emparejamiento (Claves)';
+        return 'Emparejamiento Ampliado';
       case 'OPCION_EMPAREJAMIENTO':
-        return '6.1 Enunciado a Emparejar';
+        return 'Opción de Emparejamiento Ampliado';
       default:
         return tipo;
     }

@@ -6,7 +6,7 @@ export interface MapeoEstudianteExamen {
   apellido1: string;
   apellido2: string;
   variante: string;
-  letraVariante: 'A' | 'B' | 'C' | 'D' | 'E';
+  letraVariante: string;
   hashSeguridad: string;
   materiaCodigo: string;
   grupo: string;
@@ -43,6 +43,7 @@ export interface RolExamenPersistedItem {
   nombreArchivoExcel?: string;
   hashEncriptacion?: string;
   fechaValidacion?: string;
+  bancoPreguntasCargado?: boolean;
   preguntasValidadasCount?: number;
   estudiantesInscritosCount?: number;
   estudiantesPorVarianteParam?: number;

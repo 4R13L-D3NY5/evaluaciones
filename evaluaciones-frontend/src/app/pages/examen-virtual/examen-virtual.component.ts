@@ -2,6 +2,7 @@ import { Component, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 interface OpcionVirtual { letra: string; texto: string; }
 interface PreguntaVirtual {
@@ -67,6 +68,7 @@ interface AccesoVirtual {
 })
 export class ExamenVirtualComponent implements OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly feedback = inject(UiFeedbackService);
   vista = signal<'acceso' | 'espera' | 'preinicio' | 'examen' | 'finalizado'>('acceso');
   acceso = signal<AccesoVirtual | null>(null); secciones = signal<SeccionVirtual[]>([]); cargando = signal(false); error = signal('');
   codigoSala = ''; codigoEstudiante = ''; token = ''; respuestas: Record<number, string> = {};
@@ -87,8 +89,13 @@ export class ExamenVirtualComponent implements OnDestroy {
     this.http.put('/api/examen-virtual/respuestas', { numeroPregunta: pregunta.numeroPregunta, reactivoId: pregunta.reactivoId, respuesta }, { headers }).subscribe({ error: () => this.error.set('No se pudo guardar la última respuesta.') });
   }
 
-  enviar(confirmar = true): void {
-    if (confirmar && !confirm('¿Deseas finalizar y enviar el examen?')) return;
+  async enviar(confirmar = true): Promise<void> {
+    if (confirmar && !await this.feedback.confirmar(
+      '¿Deseas finalizar y enviar el examen? Esta acción no se puede deshacer.',
+      'Finalizar examen',
+      'warning',
+      'Finalizar y enviar'
+    )) return;
     const headers = new HttpHeaders({ 'X-Examen-Token': this.acceso()?.tokenSesion || this.token });
     this.http.post('/api/examen-virtual/enviar', {}, { headers }).subscribe({ next: () => { this.detener(); this.vista.set('finalizado'); }, error: err => this.error.set(err?.error?.error || err?.error?.message || 'No se pudo enviar el examen.') });
   }

@@ -2,11 +2,14 @@ package com.xpertiflow.evaluaciones.application;
 
 import com.xpertiflow.evaluaciones.api.mapper.RolExamenMapper;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
+import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
+import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +36,8 @@ class RolExamenServiceTest {
     @Mock
     private AuditoriaEvaluacionRepository auditoriaRepository;
     @Mock
+    private BancoPreguntasRepository bancoPreguntasRepository;
+    @Mock
     private RolExamenMapper mapper;
     @Mock
     private UnitepcGatewayClient unitepcGatewayClient;
@@ -43,7 +48,7 @@ class RolExamenServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, mapper, unitepcGatewayClient, accesoAcademicoService);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, mapper, unitepcGatewayClient, accesoAcademicoService);
     }
 
     @Test
@@ -146,6 +151,34 @@ class RolExamenServiceTest {
 
         verify(rolExamenRepository, never()).save(rol);
         verify(auditoriaRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void alDevolverUnaCartillaPasaAutomaticamenteAPendienteDeCalificacion() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-TEST-CARTILLA-001")
+                .modalidad(ModalidadExamen.PRESENCIAL_CARTILLA)
+                .estadoFlujo(EstadoFlujo.ENTREGADO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(rolExamenRepository.save(rol)).thenReturn(rol);
+        when(mapper.toResponseDto(rol)).thenReturn(null);
+
+        service.transicionarEstado(rol.getId(), TransicionEstadoRequestDto.builder()
+                .nuevoEstado(EstadoFlujo.DEVUELTO)
+                .usuario("PERSONAL_EVALUACIONES")
+                .ipOrigen("10.0.0.10")
+                .build());
+
+        assertThat(rol.getEstadoFlujo()).isEqualTo(EstadoFlujo.PENDIENTE_NOTAS);
+        verify(rolExamenRepository, org.mockito.Mockito.times(2)).save(rol);
+        ArgumentCaptor<AuditoriaEvaluacion> auditorias = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
+        verify(auditoriaRepository, org.mockito.Mockito.times(2)).save(auditorias.capture());
+        assertThat(auditorias.getAllValues().get(0).getEtapaOrigen()).isEqualTo("ENTREGADO");
+        assertThat(auditorias.getAllValues().get(0).getEtapaDestino()).isEqualTo("DEVUELTO");
+        assertThat(auditorias.getAllValues().get(1).getEtapaOrigen()).isEqualTo("DEVUELTO");
+        assertThat(auditorias.getAllValues().get(1).getEtapaDestino()).isEqualTo("PENDIENTE_NOTAS");
+        assertThat(auditorias.getAllValues().get(1).getAccion()).isEqualTo("INICIO_CALIFICACION_OMR");
     }
 
     @Test

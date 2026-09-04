@@ -5,6 +5,7 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionTypstResultadoDt
 import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionColaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.DocumentoExamenDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.ConfiguracionGeneracionResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.generacion.PrevisualizacionTypstRequestDto;
 import com.xpertiflow.evaluaciones.application.generacion.GeneracionTypstService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +28,14 @@ public class GeneracionTypstController {
     @Operation(summary = "Solicitar generación de exámenes")
     public ResponseEntity<GeneracionTypstResultadoDto> solicitar(@Valid @RequestBody GeneracionTypstRequestDto request) {
         return ResponseEntity.ok(generacionTypstService.solicitarGeneracion(request));
+    }
+
+    @PostMapping("/previsualizacion")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE')")
+    @Operation(summary = "Generar previsualización Typst sin persistir el banco")
+    public ResponseEntity<GeneracionTypstResultadoDto> solicitarPrevisualizacion(
+            @Valid @RequestBody PrevisualizacionTypstRequestDto request) {
+        return ResponseEntity.ok(generacionTypstService.solicitarPrevisualizacion(request));
     }
 
     @GetMapping("/cola")

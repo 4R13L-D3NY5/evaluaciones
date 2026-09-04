@@ -11,7 +11,7 @@ export interface EstudianteInscrito {
   apellido2: string;
   courseState?: string;
   varianteAsignada?: string;
-  letraVariante?: 'A' | 'B' | 'C' | 'D' | 'E';
+  letraVariante?: string;
   hashControl?: string;
 }
 

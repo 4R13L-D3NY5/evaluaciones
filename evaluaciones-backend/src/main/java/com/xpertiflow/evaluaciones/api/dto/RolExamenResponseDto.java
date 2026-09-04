@@ -40,6 +40,7 @@ public class RolExamenResponseDto {
     private String campus;
     private Integer estudiantesInscritosCount;
     private Integer variantesGeneradasCount;
+    private boolean bancoPreguntasCargado;
     private String hashEncriptacion;
     private LocalDateTime fechaValidacion;
     private LocalDateTime fechaGeneracion;

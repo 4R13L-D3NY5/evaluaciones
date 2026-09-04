@@ -112,13 +112,67 @@ div[class*="fixed inset-0"] {
   bottom: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  z-index: 9999 !important;
   display: flex !important;
-  align-items: center !important;
+  align-items: flex-start !important;
   justify-content: center !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
   margin: 0 !important;
   padding: 1rem !important;
   box-sizing: border-box !important;
+}
+
+/* En pantallas amplias conserva la presentación centrada; en pantallas
+   pequeñas el modal empieza arriba y el overlay permite recorrerlo completo. */
+@media (min-width: 640px) {
+  .sea-modal-backdrop,
+  div[class*="fixed inset-0"] {
+    align-items: center !important;
+  }
+}
+
+/* Modales con la clase reutilizable del módulo de usuarios. */
+.modal-backdrop {
+  overflow-y: auto !important;
+  place-items: start center !important;
+}
+
+@media (min-width: 640px) {
+  .modal-backdrop {
+    place-items: center !important;
+  }
+}
+
+/* Cabeceras de tablas visibles mientras se recorre el contenido. */
+table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--surface-card) !important;
+  box-shadow: 0 1px 0 var(--surface-border);
+}
+
+/* En la tabla de roles, la barra horizontal ocupa el primer nivel fijo y la
+   cabecera queda pegada justo debajo, sin dejar una franja con filas visibles. */
+.roles-tabla-viewport {
+  position: relative;
+  isolation: isolate;
+}
+
+.roles-tabla-scroll-superior {
+  height: 12px;
+  margin-bottom: 0 !important;
+  background-color: var(--surface-card) !important;
+}
+
+.roles-tabla thead th {
+  top: 12px;
+  background-color: var(--surface-card) !important;
+}
+
+/* Mantiene disponible el desplazamiento horizontal en tablas extensas. */
+table {
+  max-width: none;
 }
 
 .app-toast {
@@ -169,6 +223,15 @@ div[class*="fixed inset-0"] {
     max-width: 100% !important;
     max-height: none !important;
     overflow: visible !important;
+  }
+
+  table thead th {
+    position: static !important;
+    box-shadow: none !important;
+  }
+
+  .roles-tabla thead th {
+    top: auto !important;
   }
 
   .print\:break-after-page {

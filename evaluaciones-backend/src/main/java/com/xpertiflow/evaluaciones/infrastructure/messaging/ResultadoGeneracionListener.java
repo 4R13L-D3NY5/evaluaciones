@@ -25,7 +25,8 @@ public class ResultadoGeneracionListener {
         try {
             GeneracionTypstResultadoDto resultado = objectMapper.readValue(mensajeJson, GeneracionTypstResultadoDto.class);
 
-            if ("COMPLETADO".equalsIgnoreCase(resultado.getEstado())) {
+            if ("COMPLETADO".equalsIgnoreCase(resultado.getEstado())
+                    && !Boolean.TRUE.equals(resultado.getModoPrevisualizacion())) {
                 try {
                     generacionTypstService.persistirResultado(resultado);
                 } catch (Exception persistenceEx) {

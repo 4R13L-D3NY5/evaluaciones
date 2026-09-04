@@ -4,12 +4,13 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { globalLoadingInterceptor } from './core/interceptors/global-loading.interceptor';
+import { authSessionInterceptor } from './core/interceptors/auth-session.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withComponentInputBinding(), withViewTransitions()),
     provideAnimationsAsync(),
-    provideHttpClient(withFetch(), withInterceptors([globalLoadingInterceptor]))
+    provideHttpClient(withFetch(), withInterceptors([globalLoadingInterceptor, authSessionInterceptor]))
   ]
 };

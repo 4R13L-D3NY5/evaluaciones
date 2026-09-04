@@ -5,6 +5,7 @@ import {
   EvaluacionesStorageService, 
   AuditoriaAccesoItem 
 } from '../../core/services/evaluaciones-storage.service';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'sea-auditoria',
@@ -356,6 +357,7 @@ import {
 })
 export class AuditoriaComponent {
   public readonly storage = inject(EvaluacionesStorageService);
+  private readonly feedback = inject(UiFeedbackService);
 
   public busquedaTexto = '';
   public filtroModulo = 'TODOS';
@@ -410,7 +412,11 @@ export class AuditoriaComponent {
   }
 
   public exportarExcel(): void {
-    alert('Exportando BITACORA_AUDITORIA_UNITEPC_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+    void this.feedback.mostrar(
+      `La bitácora se preparará como BITACORA_AUDITORIA_UNITEPC_${new Date().toISOString().slice(0, 10)}.xlsx.`,
+      'Exportación de bitácora',
+      'info'
+    );
   }
 
   public imprimirActa(): void {

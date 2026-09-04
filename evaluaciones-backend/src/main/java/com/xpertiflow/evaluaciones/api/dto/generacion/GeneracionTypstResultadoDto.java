@@ -11,6 +11,7 @@ public class GeneracionTypstResultadoDto {
     private String rolExamenId;
     private String estado;
     private String mensaje;
+    private Boolean modoPrevisualizacion;
     private List<VarianteResultadoDto> variantes;
     private List<MapeoResultadoDto> mapeos;
 }

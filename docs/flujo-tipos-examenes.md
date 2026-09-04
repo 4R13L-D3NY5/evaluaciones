@@ -30,7 +30,7 @@ flowchart TB
         C3 -->|Imprimir PDF y cartilla| C4[Impreso]
         C4 -->|Registrar entrega| C5[Entregado]
         C5 -->|Registrar devolución| C6[Devuelto]
-        C6 -->|Preparar calificación| C7[Pendiente de notas]
+        C6 -->|Automático: entregar a Evaluaciones| C7[Pendiente de calificación]
         C7 -->|⚙ Escaneado + parámetros OMR| C8[Calificado]
     end
 
@@ -71,7 +71,7 @@ flowchart TB
 | Todas | `Programado → Validado` | Rol de examen oficial, grupo, asignatura, docente, horario y banco de preguntas cargado/validado. La validación encripta el examen del docente. |
 | Con cartilla | `Validado → Generado` | Ratio de estudiantes por variante, nómina oficial de SEA y parámetros de diagramación. Se generan variantes, PDF y mapeo estudiante-variante. |
 | Sin cartilla | `Validado → Generado` | Ratio de estudiantes por variante, nómina oficial de SEA y parámetros de diagramación. Se generan variantes y cuadernillos PDF, sin cartilla OMR. |
-| Con cartilla | `Devuelto → Pendiente de notas → Calificado` | El estado intermedio habilita el procesamiento OMR; la confirmación de lecturas pasa a calificado. |
+| Con cartilla | `Devuelto → Pendiente de calificación → Calificado` | Al registrar la devolución, el sistema avanza automáticamente al estado operativo que habilita el procesamiento OMR; la confirmación de lecturas pasa a calificado. Internamente se conserva como `PENDIENTE_NOTAS` para compatibilidad del flujo. |
 | Sin cartilla | `Devuelto → Pendiente de notas → Calificado` | El estado intermedio queda preparado para la futura carga manual de notas del docente. |
 | Virtual | `Validado → Preparar variantes y sala` | Ratio institucional, nómina oficial de SEA, banco validado y duración del examen. No se genera PDF. |
 | Virtual | `Sala preparada → Sala abierta` | El personal autorizado publica la sala y comparte el código de sala y cada token individual. |

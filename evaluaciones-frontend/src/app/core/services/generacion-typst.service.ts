@@ -8,7 +8,8 @@ import {
   GeneracionTypstResultado,
   GeneracionColaResponse,
   DocumentoExamen,
-  ConfiguracionGeneracion
+  ConfiguracionGeneracion,
+  PrevisualizacionTypstRequest
 } from '../models/generacion-typst.model';
 
 /**
@@ -35,6 +36,22 @@ export class GeneracionTypstService {
         return throwError(() => err);
       })
     );
+  }
+
+  public solicitarPrevisualizacion(request: PrevisualizacionTypstRequest): Observable<GeneracionTypstResultado> {
+    return this._http.post<GeneracionTypstResultado>(`${this._baseUrl}/previsualizacion`, request).pipe(
+      catchError(err => {
+        console.error('[GeneracionTypstService] Error al solicitar previsualización Typst:', err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public descargarArchivo(path: string): Observable<Blob> {
+    return this._http.get('/api/archivos', {
+      params: { path },
+      responseType: 'blob'
+    });
   }
 
   /**

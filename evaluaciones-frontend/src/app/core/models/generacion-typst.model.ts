@@ -5,7 +5,7 @@
  */
 
 export interface GeneracionTypstVariante {
-  letra: 'A' | 'B' | 'C' | 'D' | 'E';
+  letra: string;
   semilla: number;
   totalPreguntas?: number;
   archivoPdfPath: string;
@@ -18,7 +18,7 @@ export interface GeneracionTypstMapeo {
   nombres?: string;
   apellidoPaterno?: string;
   apellidoMaterno?: string;
-  letraVariante: 'A' | 'B' | 'C' | 'D' | 'E';
+  letraVariante: string;
   hashControl: string;
   cuadernilloPdfPath: string;
 }
@@ -34,7 +34,7 @@ export interface GeneracionTypstRequest {
   rolExamenId: string;
   bancoPreguntasId: string;
   seaGroupId?: string;
-  variantes: ('A' | 'B' | 'C' | 'D' | 'E')[];
+  variantes: string[];
   ratioEstudiantesPorVariante?: number;
   soloVirtual?: boolean;
   outputBasePath?: string;
@@ -45,8 +45,15 @@ export interface GeneracionTypstResultado {
   rolExamenId: string;
   estado: string;
   mensaje: string;
+  modoPrevisualizacion?: boolean;
   variantes: GeneracionTypstVariante[];
   mapeos: GeneracionTypstMapeo[];
+}
+
+export interface PrevisualizacionTypstRequest {
+  jobId?: string;
+  rolExamenId: string;
+  preguntas: Array<Record<string, unknown>>;
 }
 
 export interface GeneracionColaItem {

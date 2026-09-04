@@ -34,7 +34,7 @@ public class MapeoEstudianteVariante {
     @Column(name = "apellido_materno", length = 80, nullable = false)
     private String apellidoMaterno;
 
-    @Column(name = "letra_variante", length = 1, nullable = false)
+    @Column(name = "letra_variante", length = 4, nullable = false)
     private String letraVariante;
 
     @Column(name = "hash_control_seguridad", length = 128, nullable = false)

@@ -260,7 +260,7 @@ interface DashboardTurno {
         <!-- KPI 3: Variantes y Paquetes Generados -->
         <div class="bg-card border border-border rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all group">
           <div class="flex items-center justify-between mb-3">
-            <span class="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">Variantes del examen (A-E)</span>
+            <span class="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">Variantes del examen</span>
             <div class="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 border border-blue-200 dark:border-blue-900 flex items-center justify-center group-hover:scale-110 transition-transform">
               <i class="pi pi-file-pdf text-base"></i>
             </div>

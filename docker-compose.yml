@@ -61,7 +61,7 @@ services:
     ports:
       - "127.0.0.1:${VAULT_PORT:-8200}:8200"
     volumes:
-      - vaultdata:/vault/data
+      - vaultdata:/vault/file
       - ./vault/config.hcl:/vault/config/vault.hcl:ro
       - ./vault/policies:/vault/policies:ro
     networks:
@@ -129,13 +129,19 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_BACKEND_TOKEN}
       VAULT_TRANSIT_KEY_NAME: ${VAULT_TRANSIT_KEY_NAME:-sea-banco-kek}
+      PDF_LOGO_PATH: /app/assets/logo_unitepc_clean.png
+      MAINTENANCE_MARKER: /app/storage/.sea-maintenance
       KMS_MIGRATION_ENABLED: ${KMS_MIGRATION_ENABLED:-false}
       KMS_ROTATION_ENABLED: ${KMS_ROTATION_ENABLED:-false}
       STORAGE_BASE_PATH: /app/storage
+      BACKUP_EXTERNAL_PATH: /app/backups-external
+      BACKUP_LOCAL_REPOSITORY: /app/backups/repository
+      BACKUP_EXTERNAL_REPOSITORY: /app/backups-external/repository
     ports:
       - "${SERVER_PORT:-8080}:8080"
     volumes:
       - ./storage:/app/storage
+      - ./evaluaciones-frontend/src/assets/logo_unitepc_clean.png:/app/assets/logo_unitepc_clean.png:ro
     networks:
       - eval-network
     healthcheck:
@@ -194,6 +200,7 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_WORKER_TOKEN}
       VAULT_TRANSIT_KEY_NAME: ${VAULT_TRANSIT_KEY_NAME:-sea-banco-kek}
+      MAINTENANCE_MARKER: /app/storage/.sea-maintenance
     volumes:
       - ./storage:/app/storage
       - ./bases:/app/bases:ro
@@ -236,11 +243,56 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_OMR_TOKEN}
       VAULT_TRANSIT_KEY_NAME: ${VAULT_TRANSIT_KEY_NAME:-sea-banco-kek}
+      MAINTENANCE_MARKER: /app/storage/.sea-maintenance
     volumes:
       - ./storage:/app/storage
       - ./bases:/app/bases:ro
       - ./evaluaciones-workers/main_omr.py:/app/main_omr.py:ro
       - ./evaluaciones-workers/src:/app/src:ro
+    networks:
+      - eval-network
+
+  # ---------------------------------------------------------------------------
+  # Worker de respaldos Restic - snapshots deduplicados y restauración
+  # ---------------------------------------------------------------------------
+  worker-backup:
+    build:
+      context: ./evaluaciones-workers
+      dockerfile: Dockerfile.backup
+    container_name: evaluaciones-worker-backup
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      vault-bootstrap:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      BACKUP_QUEUE: evaluaciones.backups
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-sea_evaluaciones}
+      DB_USER: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      STORAGE_BASE_PATH: /app/storage
+      BACKUPS_BASE_PATH: /app/backups
+      BACKUPS_EXTERNAL_PATH: /app/backups-external
+      BACKUP_LOCAL_REPOSITORY: /app/backups/repository
+      BACKUP_EXTERNAL_REPOSITORY: /app/backups-external/repository
+      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
+      MAINTENANCE_MARKER: /app/storage/.sea-maintenance
+    volumes:
+      - ./storage:/app/storage
+      - ${BACKUP_LOCAL_PATH:-./backups}:/app/backups
+      - ${BACKUP_EXTERNAL_PATH:-./backups-external}:/app/backups-external
+      - ${BACKUP_RESTIC_PASSWORD_FILE:-./vault/secrets/restic-password}:/run/secrets/restic_password:ro
     networks:
       - eval-network
 

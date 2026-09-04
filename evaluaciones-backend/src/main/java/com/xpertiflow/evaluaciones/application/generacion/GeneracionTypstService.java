@@ -12,19 +12,23 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.DocumentoExamenDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.ConfiguracionGeneracionResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.MapeoResultadoDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.VarianteResultadoDto;
+import com.xpertiflow.evaluaciones.api.dto.generacion.PrevisualizacionTypstRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.TimeFrameDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
+import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
+import com.xpertiflow.evaluaciones.domain.entity.GeneracionTypstJob;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
+import com.xpertiflow.evaluaciones.domain.repository.GeneracionTypstJobRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.infrastructure.messaging.RabbitMQConfig;
@@ -46,6 +50,7 @@ import java.util.Comparator;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -57,8 +62,10 @@ public class GeneracionTypstService {
     private final BancoPreguntasRepository bancoRepository;
     private final RolExamenRepository rolRepository;
     private final ExamenVarianteRepository varianteRepository;
+    private final GeneracionTypstJobRepository generacionTypstJobRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final RolExamenService rolExamenService;
+    private final ConfiguracionEvaluacionesService configuracionEvaluacionesService;
     private final AppProperties appProperties;
     private final UnitepcGatewayClient unitepcGatewayClient;
 
@@ -97,8 +104,14 @@ public class GeneracionTypstService {
         mensaje.put("rolExamenId", request.getRolExamenId());
         mensaje.put("bancoPreguntasId", request.getBancoPreguntasId());
         mensaje.put("variantes", request.getVariantes());
-        mensaje.put("ratioEstudiantesPorVariante", request.getRatioEstudiantesPorVariante() != null
-                ? request.getRatioEstudiantesPorVariante() : 5);
+        Integer ratio = request.getRatioEstudiantesPorVariante();
+        if (ratio == null) {
+            ratio = configuracionEvaluacionesService.obtener().getRatioEstudiantesPorVariante();
+        }
+        if (ratio == null) {
+            ratio = 5;
+        }
+        mensaje.put("ratioEstudiantesPorVariante", ratio);
         mensaje.put("soloVirtual", Boolean.TRUE.equals(request.getSoloVirtual()) || rol.getModalidad() == ModalidadExamen.VIRTUAL);
         mensaje.put("outputBasePath", outputBase);
         mensaje.put("estudiantes", obtenerEstudiantesOficiales(rol, request.getSeaGroupId()));
@@ -109,6 +122,7 @@ public class GeneracionTypstService {
         estadoInicial.setEstado("PENDIENTE");
         estadoInicial.setMensaje("Generación encolada, esperando el motor de generación");
         estados.put(jobId, estadoInicial);
+        guardarEstadoPersistente(estadoInicial);
 
         try {
             String json = objectMapper.writeValueAsString(mensaje);
@@ -122,6 +136,48 @@ public class GeneracionTypstService {
             throw e;
         }
 
+        return estadoInicial;
+    }
+
+    /**
+     * Genera un PDF temporal con los reactivos que están en revisión en el
+     * navegador. No crea banco, variantes, mapeos ni cambia el estado del rol.
+     */
+    public GeneracionTypstResultadoDto solicitarPrevisualizacion(PrevisualizacionTypstRequestDto request) {
+        rolRepository.findById(request.getRolExamenId())
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + request.getRolExamenId()));
+
+        String jobId = request.getJobId();
+        if (jobId == null || jobId.isBlank()) jobId = "PREVIEW-" + UUID.randomUUID();
+        String previewDirectory = jobId.replaceAll("[^A-Za-z0-9_-]", "_");
+
+        String outputBase = Path.of(appProperties.getStorage().getBasePath(), "generados", "previsualizaciones", previewDirectory).toString()
+                .replace("/", java.io.File.separator);
+        Map<String, Object> mensaje = new HashMap<>();
+        mensaje.put("jobId", jobId);
+        mensaje.put("rolExamenId", request.getRolExamenId());
+        mensaje.put("modoPrevisualizacion", true);
+        mensaje.put("preguntasPreview", request.getPreguntas());
+        mensaje.put("outputBasePath", outputBase);
+
+        GeneracionTypstResultadoDto estadoInicial = new GeneracionTypstResultadoDto();
+        estadoInicial.setJobId(jobId);
+        estadoInicial.setRolExamenId(request.getRolExamenId());
+        estadoInicial.setEstado("PENDIENTE");
+        estadoInicial.setModoPrevisualizacion(true);
+        estadoInicial.setMensaje("Previsualización Typst encolada, esperando el motor de generación");
+        estadoInicial.setVariantes(List.of());
+        estadoInicial.setMapeos(List.of());
+        estados.put(jobId, estadoInicial);
+        guardarEstadoPersistente(estadoInicial);
+
+        try {
+            rabbitTemplate.convertAndSend(RabbitMQConfig.QUEUE_GENERACION_TYPST,
+                    objectMapper.writeValueAsString(mensaje));
+        } catch (JsonProcessingException | RuntimeException exception) {
+            estados.remove(jobId, estadoInicial);
+            throw new RuntimeException("No se pudo encolar la previsualización Typst", exception);
+        }
         return estadoInicial;
     }
 
@@ -189,7 +245,13 @@ public class GeneracionTypstService {
     }
 
     public GeneracionTypstResultadoDto consultarEstado(String jobId) {
-        return estados.get(jobId);
+        GeneracionTypstResultadoDto estado = estados.get(jobId);
+        if (estado != null) {
+            return estado;
+        }
+        return generacionTypstJobRepository.findById(jobId)
+                .map(this::reconstruirResultadoPersistido)
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -285,7 +347,88 @@ public class GeneracionTypstService {
 
     public void actualizarEstado(GeneracionTypstResultadoDto resultado) {
         estados.put(resultado.getJobId(), resultado);
+        guardarEstadoPersistente(resultado);
         log.info("Job {} actualizado a estado {}", resultado.getJobId(), resultado.getEstado());
+    }
+
+    /**
+     * Guarda el estado fuera de la memoria del proceso. Esto permite que otra
+     * instancia del backend, o una instancia reiniciada, responda el polling
+     * del navegador. No se copia el contenido cifrado del examen al historial.
+     */
+    private void guardarEstadoPersistente(GeneracionTypstResultadoDto resultado) {
+        if (resultado == null || resultado.getJobId() == null || resultado.getJobId().isBlank()) return;
+        try {
+            GeneracionTypstJob registro = generacionTypstJobRepository.findById(resultado.getJobId())
+                    .orElseGet(GeneracionTypstJob::new);
+            registro.setJobId(resultado.getJobId());
+            registro.setRolExamenId(resultado.getRolExamenId() == null ? "" : resultado.getRolExamenId());
+            registro.setEstado(resultado.getEstado() == null ? "PENDIENTE" : resultado.getEstado());
+            registro.setMensaje(resultado.getMensaje());
+            registro.setResultadoJson(objectMapper.writeValueAsString(resumenResultado(resultado)));
+            if (registro.getSolicitadoEn() == null) registro.setSolicitadoEn(LocalDateTime.now());
+            registro.setActualizadoEn(LocalDateTime.now());
+            generacionTypstJobRepository.save(registro);
+        } catch (Exception exception) {
+            // El historial no debe interrumpir la generación ni el ACK de RabbitMQ.
+            log.error("No se pudo persistir el estado del job {}", resultado.getJobId(), exception);
+        }
+    }
+
+    private GeneracionTypstResultadoDto reconstruirResultadoPersistido(GeneracionTypstJob registro) {
+        try {
+            return objectMapper.readValue(registro.getResultadoJson(), GeneracionTypstResultadoDto.class);
+        } catch (Exception exception) {
+            GeneracionTypstResultadoDto resultado = new GeneracionTypstResultadoDto();
+            resultado.setJobId(registro.getJobId());
+            resultado.setRolExamenId(registro.getRolExamenId());
+            resultado.setEstado(registro.getEstado());
+            resultado.setMensaje(registro.getMensaje());
+            resultado.setVariantes(List.of());
+            resultado.setMapeos(List.of());
+            return resultado;
+        }
+    }
+
+    private GeneracionTypstResultadoDto resumenResultado(GeneracionTypstResultadoDto original) {
+        GeneracionTypstResultadoDto resumen = new GeneracionTypstResultadoDto();
+        resumen.setJobId(original.getJobId());
+        resumen.setRolExamenId(original.getRolExamenId());
+        resumen.setEstado(original.getEstado());
+        resumen.setMensaje(original.getMensaje());
+        resumen.setModoPrevisualizacion(original.getModoPrevisualizacion());
+
+        List<VarianteResultadoDto> variantes = new ArrayList<>();
+        if (original.getVariantes() != null) {
+            for (VarianteResultadoDto originalVariante : original.getVariantes()) {
+                VarianteResultadoDto variante = new VarianteResultadoDto();
+                variante.setLetra(originalVariante.getLetra());
+                variante.setSemilla(originalVariante.getSemilla());
+                variante.setTotalPreguntas(originalVariante.getTotalPreguntas());
+                variante.setArchivoPdfPath(originalVariante.getArchivoPdfPath());
+                variante.setArchivoTypstPath(originalVariante.getArchivoTypstPath());
+                variante.setArchivoRemarkXlsxPath(originalVariante.getArchivoRemarkXlsxPath());
+                variantes.add(variante);
+            }
+        }
+        resumen.setVariantes(variantes);
+
+        List<MapeoResultadoDto> mapeos = new ArrayList<>();
+        if (original.getMapeos() != null) {
+            for (MapeoResultadoDto originalMapeo : original.getMapeos()) {
+                MapeoResultadoDto mapeo = new MapeoResultadoDto();
+                mapeo.setCodigoEstudiante(originalMapeo.getCodigoEstudiante());
+                mapeo.setNombres(originalMapeo.getNombres());
+                mapeo.setApellidoPaterno(originalMapeo.getApellidoPaterno());
+                mapeo.setApellidoMaterno(originalMapeo.getApellidoMaterno());
+                mapeo.setLetraVariante(originalMapeo.getLetraVariante());
+                mapeo.setHashControl(originalMapeo.getHashControl());
+                mapeo.setCuadernilloPdfPath(originalMapeo.getCuadernilloPdfPath());
+                mapeos.add(mapeo);
+            }
+        }
+        resumen.setMapeos(mapeos);
+        return resumen;
     }
 
     private GeneracionColaItemDto mapearTareaCola(GeneracionTypstResultadoDto estado) {

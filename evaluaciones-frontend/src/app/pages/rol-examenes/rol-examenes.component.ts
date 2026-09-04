@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { RolExamenPersistedItem } from '../../core/services/evaluaciones-db.service';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
@@ -11,9 +12,26 @@ import {
   RolExamenResponse,
   RolExamenService
 } from '../../core/services/rol-examen.service';
-import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
+import { catchError, forkJoin, from, map, mergeMap, of, switchMap, toArray } from 'rxjs';
 
 export type RolExamenItem = RolExamenPersistedItem;
+
+type SeveridadAdvertenciaHorario = 'AMARILLA' | 'ROJA';
+
+interface AdvertenciaHorarioImportacion {
+  severidad: SeveridadAdvertenciaHorario;
+  fila: number;
+  materia: string;
+  grupo: string;
+  tipo: string;
+  mensaje: string;
+}
+
+interface InstanciaImportacionItem {
+  fila: number;
+  item: RolExamenItem;
+}
 
 /**
  * Componente: Rol de Exámenes (Persistente en Base de Datos de Evaluaciones)
@@ -22,7 +40,7 @@ export type RolExamenItem = RolExamenPersistedItem;
 @Component({
   selector: 'sea-rol-examenes',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
     <div class="space-y-6">
       
@@ -42,13 +60,21 @@ export type RolExamenItem = RolExamenPersistedItem;
           </p>
         </div>
 
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center justify-end gap-2.5 flex-wrap">
           <!-- Botón Subir Excel -->
           <button 
             (click)="abrirModalSubirExcel()"
             class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
             <i class="pi pi-file-excel"></i>
             <span>Subir Excel</span>
+          </button>
+
+          <!-- Botón exclusivo para 2da Instancia -->
+          <button
+            (click)="abrirModalSubirInstancias()"
+            class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+            <i class="pi pi-calendar-plus"></i>
+            <span>Subir 2da Instancia</span>
           </button>
 
           <!-- Botón Añadir Manual -->
@@ -253,8 +279,14 @@ export type RolExamenItem = RolExamenPersistedItem;
           </div>
 
         } @else {
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
+          <!-- Barra horizontal fija junto a la cabecera; se mantiene sincronizada con la tabla. -->
+          <div #rolesTablaViewport class="roles-tabla-viewport max-h-[calc(100vh-19rem)] overflow-auto"
+            (scroll)="rolesTablaScrollSuperior.scrollLeft = $any($event.target).scrollLeft">
+            <div #rolesTablaScrollSuperior class="roles-tabla-scroll-superior sticky top-0 z-20 overflow-x-auto rounded-t-xl border border-border/60 bg-muted/20"
+              (scroll)="rolesTablaViewport.scrollLeft = $any($event.target).scrollLeft">
+              <div class="h-3 min-w-[1450px]"></div>
+            </div>
+            <table class="roles-tabla w-full min-w-[1450px] text-left border-collapse text-xs">
               <thead>
                 <tr class="bg-muted/40 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
                   <th class="p-3.5">Código</th>
@@ -339,16 +371,21 @@ export type RolExamenItem = RolExamenPersistedItem;
                     <!-- Estado -->
                     <td class="p-3.5 text-center">
                       <span [class]="getEstadoBadgeClass(row.estado)" class="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase shadow-2xs">
-                        {{ row.estado }}
+                        {{ getEstadoLabel(row) }}
                       </span>
                     </td>
 
                     <!-- Fecha de Examen -->
-                    <td class="p-3.5">
+                    <td class="p-3.5" [title]="getDetalleHorarioFila(row)">
                       @if (row.fechaDisplay && row.fechaDisplay !== 'Por Programar') {
                         <div class="flex items-center gap-1.5 font-mono font-bold text-foreground">
                           <i class="pi pi-calendar text-[11px] text-primary"></i>
                           <span>{{ row.fechaDisplay }}</span>
+                          <i class="pi pi-info-circle text-[10px]"
+                            [class.text-rose-600]="getAdvertenciaHorarioFila(row) === 'ROJA'"
+                            [class.text-amber-500]="getAdvertenciaHorarioFila(row) === 'AMARILLA'"
+                            [class.text-emerald-600]="!getAdvertenciaHorarioFila(row)"
+                            [attr.aria-label]="getDetalleHorarioFila(row)"></i>
                         </div>
                         <span class="text-[10px] text-muted-foreground font-medium">{{ row.dia }} (Sem {{ row.semana }})</span>
                       } @else {
@@ -400,6 +437,11 @@ export type RolExamenItem = RolExamenPersistedItem;
             </table>
           </div>
 
+          <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-2 text-[10px] text-muted-foreground">
+            <span class="inline-flex items-center gap-1.5"><i class="pi pi-circle-fill text-[7px] text-amber-500"></i> Amarillo: grupo que no corresponde a una clase teórica TA.</span>
+            <span class="inline-flex items-center gap-1.5"><i class="pi pi-circle-fill text-[7px] text-rose-500"></i> Rojo: fecha u hora fuera del horario oficial.</span>
+          </div>
+
           <!-- Barra inferior de Conteo -->
           <div class="p-3.5 border-t border-border bg-muted/20 flex items-center justify-between text-xs text-muted-foreground font-bold">
             <span>Total exámenes programados: {{ examenesFiltrados().length }}</span>
@@ -418,8 +460,8 @@ export type RolExamenItem = RolExamenPersistedItem;
 
       <!-- MODAL 1: SUBIR EXCEL DE ROL DE EXÁMENES (REAL CON XLSX) -->
       @if (dialogSubirExcel()) {
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div class="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-scale-in">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center overflow-y-auto p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto w-full p-6 shadow-2xl space-y-4 animate-scale-in">
             
             <div class="flex items-start justify-between border-b border-border pb-3">
               <div class="flex items-center gap-2.5">
@@ -445,7 +487,7 @@ export type RolExamenItem = RolExamenPersistedItem;
                 <div class="text-xs font-bold text-foreground">
                   {{ excelCargadoNombre() || 'Haz clic aquí para seleccionar el archivo Excel (.xlsx)' }}
                 </div>
-                    <p class="text-[10px] text-muted-foreground mt-1">Hoja “Rol de Examenes”, desde la fila 12: exámenes teóricos y segunda instancia. Modalidad predeterminada: Con Cartilla.</p>
+                    <p class="text-[10px] text-muted-foreground mt-1">Hoja “Rol de Examenes”, desde la fila 12: exámenes de 1er Parcial, 2do Parcial y Final. Las instancias se cargan desde su botón exclusivo.</p>
               </div>
 
               @if (excelCargadoNombre()) {
@@ -463,6 +505,44 @@ export type RolExamenItem = RolExamenPersistedItem;
                     <li>{{ error }}</li>
                   }
                 </ul>
+              </div>
+            }
+
+            @if (excelAdvertenciasHorario().length > 0) {
+              <div class="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-950 space-y-2">
+                <div class="flex items-center gap-2 font-black text-amber-900">
+                  <i class="pi pi-exclamation-triangle"></i>
+                  <span>Advertencias de fecha, hora y tipo de clase</span>
+                  <span class="ml-auto rounded-full bg-white/70 px-2 py-0.5 font-mono text-[10px]">
+                    {{ excelAdvertenciasHorario().length }}
+                  </span>
+                </div>
+                <p class="text-[10px] leading-relaxed text-amber-900/80">
+                  Estas observaciones no impiden cargar el rol. Verifica especialmente las advertencias rojas antes de confirmar la programación.
+                </p>
+                <div class="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                  @for (advertencia of excelAdvertenciasHorario(); track advertencia.fila + '-' + advertencia.tipo + '-' + advertencia.mensaje) {
+                    <div class="flex items-start gap-2 rounded-lg border bg-white/70 px-2.5 py-2"
+                      [class.border-amber-300]="advertencia.severidad === 'AMARILLA'"
+                      [class.border-rose-300]="advertencia.severidad === 'ROJA'">
+                      <span class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[9px] font-black"
+                        [class.bg-amber-100]="advertencia.severidad === 'AMARILLA'"
+                        [class.text-amber-800]="advertencia.severidad === 'AMARILLA'"
+                        [class.bg-rose-100]="advertencia.severidad === 'ROJA'"
+                        [class.text-rose-800]="advertencia.severidad === 'ROJA'">
+                        {{ advertencia.severidad === 'AMARILLA' ? 'AMARILLA' : 'ROJA' }}
+                      </span>
+                      <span class="min-w-0 leading-relaxed">
+                        <strong>Fila {{ advertencia.fila }} · {{ advertencia.materia }} · {{ advertencia.grupo }} · {{ advertencia.tipo }}:</strong>
+                        {{ advertencia.mensaje }}
+                      </span>
+                    </div>
+                  }
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 border-t border-amber-200 pt-2 text-[10px] text-amber-900/80">
+                  <span><i class="pi pi-circle-fill mr-1 text-[7px] text-amber-500"></i>Amarillo: grupo que no es clase teórica TA.</span>
+                  <span><i class="pi pi-circle-fill mr-1 text-[7px] text-rose-500"></i>Rojo: fecha o hora fuera del horario oficial.</span>
+                </div>
               </div>
             }
 
@@ -496,13 +576,37 @@ export type RolExamenItem = RolExamenPersistedItem;
               </div>
             }
 
-            <div class="flex justify-end gap-2 pt-2 border-t border-border">
+            @if (confirmarReemplazoImportacion()) {
+              <div class="rounded-xl border border-rose-300 bg-rose-50 p-3 text-[11px] text-rose-900 space-y-2">
+                <div class="flex items-start gap-2 font-black">
+                  <i class="pi pi-exclamation-triangle mt-0.5 text-rose-600"></i>
+                  <span>Confirma el reemplazo de los roles coincidentes</span>
+                </div>
+                <p>
+                  Se eliminarán {{ rolesImportacionReemplazables().length }} roles en estado PROGRAMADO o VALIDADO y luego se cargarán los registros del Excel.
+                  Los {{ rolesImportacionProtegidos().length }} roles avanzados permanecerán sin cambios.
+                </p>
+                <div class="flex justify-end gap-2 pt-1">
+                  <button (click)="confirmarReemplazoImportacion.set(false)" class="px-3 py-1.5 rounded-lg border border-border bg-white text-xs font-bold cursor-pointer">Cancelar</button>
+                  <button (click)="procesarImportacionExcel(true)" [disabled]="cargando()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-black disabled:opacity-50 cursor-pointer">Confirmar y subir</button>
+                </div>
+              </div>
+            }
+
+            @if (cargando()) {
+              <div class="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs font-bold text-primary flex items-center gap-2">
+                <i class="pi pi-spin pi-spinner"></i>
+                <span>Procesando la carga de roles. No cierres esta ventana…</span>
+              </div>
+            }
+
+            <div class="sticky bottom-0 flex justify-end gap-2 bg-card pt-3 border-t border-border">
               <button (click)="cerrarModalSubirExcel()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
               <button 
-                [disabled]="excelItemsImportados().length === 0 || cargando()"
+                [disabled]="excelItemsImportados().length === 0 || cargando() || confirmarReemplazoImportacion()"
                 (click)="procesarImportacionExcel()"
                 class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-                Importar al Rol de Examen
+                @if (cargando()) { <i class="pi pi-spin pi-spinner mr-1"></i> Procesando... } @else { Importar al Rol de Examen }
               </button>
             </div>
 
@@ -510,10 +614,121 @@ export type RolExamenItem = RolExamenPersistedItem;
         </div>
       }
 
-      <!-- MODAL 2: AÑADIR / EDITAR EXAMEN -->
+      <!-- MODAL 2: SUBIR ÚNICAMENTE 2DA INSTANCIA -->
+      @if (dialogSubirInstancias()) {
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-start sm:items-center justify-center overflow-y-auto p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto w-full p-6 shadow-2xl space-y-4 animate-scale-in">
+            <div class="flex items-start justify-between border-b border-border pb-3">
+              <div class="flex items-center gap-2.5">
+                <div class="h-9 w-9 rounded-xl bg-rose-100 text-rose-800 flex items-center justify-center">
+                  <i class="pi pi-calendar-plus text-base"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Subir Rol 2da Instancia</h3>
+                  <p class="text-xs text-muted-foreground">Importación exclusiva de fechas y horarios de segunda instancia</p>
+                </div>
+              </div>
+              <button (click)="cerrarModalSubirInstancias()" class="text-muted-foreground hover:text-foreground text-sm cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-900">
+              <div class="flex items-start gap-2">
+                <i class="pi pi-info-circle mt-0.5"></i>
+                <p>Descarga la plantilla base, completa los campos obligatorios y vuelve a subirla desde este modal. El archivo registrará solamente roles de <strong>2da Instancia</strong>.</p>
+              </div>
+            </div>
+
+            <button
+              (click)="descargarPlantillaInstancias()"
+              class="border border-rose-500 text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-lg text-xs font-black flex items-center gap-2 cursor-pointer">
+              <i class="pi pi-download"></i>
+              Descargar Excel Base
+            </button>
+
+            <div class="rounded-xl border border-border bg-muted/20 p-3 text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-2 font-black text-foreground mb-1">
+                <i class="pi pi-list text-rose-600"></i>
+                Columnas requeridas
+              </div>
+              <p><strong>Código Materia, Grupo, Semana, Fecha, Hora Inicio, Hora Fin</strong></p>
+              <p class="mt-1 text-[10px]">La sede y carrera se toman de los filtros seleccionados en esta pantalla.</p>
+            </div>
+
+            <label class="border-2 border-dashed border-border hover:border-rose-500 rounded-xl p-6 text-center space-y-2 bg-muted/20 hover:bg-muted/40 transition-all cursor-pointer block">
+              <input type="file" (change)="onArchivoInstanciasSeleccionado($event)" accept=".xlsx, .xls" class="hidden">
+              <i class="pi pi-cloud-upload text-3xl text-rose-600"></i>
+              <div class="text-xs font-bold text-foreground">
+                {{ instanciasCargadasNombre() || 'Arrastra el Excel completado aquí o selecciónalo' }}
+              </div>
+              <p class="text-[10px] text-muted-foreground">Formato .xlsx o .xls</p>
+              @if (instanciasCargadasNombre()) {
+                <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold mt-2">
+                  <i class="pi pi-check text-xs"></i> {{ instanciasItemsImportados().length }} registros listos para subir
+                </span>
+              }
+            </label>
+
+            @if (instanciasErroresImportacion().length > 0) {
+              <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-800">
+                <div class="font-black mb-1">Registros rechazados:</div>
+                <ul class="list-disc pl-4 space-y-0.5 max-h-32 overflow-y-auto">
+                  @for (error of instanciasErroresImportacion(); track error) {
+                    <li>{{ error }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (instanciasAdvertenciasHorario().length > 0) {
+              <div class="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-950 space-y-2">
+                <div class="flex items-center gap-2 font-black text-amber-900">
+                  <i class="pi pi-exclamation-triangle"></i>
+                  <span>Advertencias de fecha, hora y tipo de clase</span>
+                  <span class="ml-auto rounded-full bg-white/70 px-2 py-0.5 font-mono text-[10px]">{{ instanciasAdvertenciasHorario().length }}</span>
+                </div>
+                <p class="text-[10px] leading-relaxed text-amber-900/80">Estas observaciones no impiden cargar las instancias. Verifica especialmente las advertencias rojas.</p>
+                <div class="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                  @for (advertencia of instanciasAdvertenciasHorario(); track advertencia.fila + '-' + advertencia.tipo + '-' + advertencia.mensaje) {
+                    <div class="flex items-start gap-2 rounded-lg border bg-white/70 px-2.5 py-2"
+                      [class.border-amber-300]="advertencia.severidad === 'AMARILLA'"
+                      [class.border-rose-300]="advertencia.severidad === 'ROJA'">
+                      <span class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[9px] font-black"
+                        [class.bg-amber-100]="advertencia.severidad === 'AMARILLA'"
+                        [class.text-amber-800]="advertencia.severidad === 'AMARILLA'"
+                        [class.bg-rose-100]="advertencia.severidad === 'ROJA'"
+                        [class.text-rose-800]="advertencia.severidad === 'ROJA'">
+                        {{ advertencia.severidad === 'AMARILLA' ? 'AMARILLA' : 'ROJA' }}
+                      </span>
+                      <span class="min-w-0 leading-relaxed"><strong>Fila {{ advertencia.fila }} · {{ advertencia.materia }} · {{ advertencia.grupo }}:</strong> {{ advertencia.mensaje }}</span>
+                    </div>
+                  }
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 border-t border-amber-200 pt-2 text-[10px] text-amber-900/80">
+                  <span><i class="pi pi-circle-fill mr-1 text-[7px] text-amber-500"></i>Amarillo: grupo que no es clase teórica TA.</span>
+                  <span><i class="pi pi-circle-fill mr-1 text-[7px] text-rose-500"></i>Rojo: fecha u hora fuera del horario oficial.</span>
+                </div>
+              </div>
+            }
+
+            <div class="sticky bottom-0 flex justify-end gap-2 bg-card pt-3 border-t border-border">
+              <button (click)="cerrarModalSubirInstancias()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
+              <button
+                [disabled]="instanciasItemsImportados().length === 0 || cargando()"
+                (click)="procesarImportacionInstancias()"
+                class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+                Subir 2da Instancia
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL 3: AÑADIR / EDITAR EXAMEN -->
       @if (dialogFormulario()) {
         <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div class="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-scale-in">
+          <div class="bg-card border border-border rounded-2xl max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto w-full p-6 shadow-2xl space-y-4 animate-scale-in">
             
             <!-- Cabecera del Modal -->
             <div class="flex items-start justify-between border-b border-border pb-3">
@@ -538,14 +753,14 @@ export type RolExamenItem = RolExamenPersistedItem;
                 <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                   <i class="pi pi-book text-primary text-[10px]"></i> 1. Asignatura oficial
                 </label>
-                <select 
-                  [ngModel]="formMateriaObj()?.syllabusCourseId"
-                  (ngModelChange)="onMateriaFormChange($event)"
-                  class="w-full bg-muted/80 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary cursor-pointer">
-                  @for (m of materias(); track m.syllabusCourseId) {
-                    <option [value]="m.syllabusCourseId">{{ m.courseCode }} - {{ m.courseName }} (Sem {{ m.semester }}°)</option>
-                  }
-                </select>
+                <sea-searchable-select
+                  [options]="materiaOpciones()"
+                  [value]="formMateriaObj()?.syllabusCourseId || ''"
+                  placeholder="Seleccione una asignatura"
+                  searchPlaceholder="Buscar por código o nombre de asignatura..."
+                  noResultsText="No se encontraron asignaturas."
+                  (valueChange)="onMateriaFormChange($event)">
+                </sea-searchable-select>
               </div>
 
               <!-- Selector de Grupos disponibles de la materia en SEA -->
@@ -663,6 +878,7 @@ export type RolExamenItem = RolExamenPersistedItem;
 export class RolExamenesComponent implements OnInit {
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _rolService = inject(RolExamenService);
+  private readonly _feedback = inject(UiFeedbackService);
   public readonly storage = inject(EvaluacionesStorageService);
 
   // Estados de Datos Reales de SEA
@@ -674,6 +890,16 @@ export class RolExamenesComponent implements OnInit {
 
   public materias = signal<Course[]>([]);
   public grupos = signal<GroupItem[]>([]);
+
+  public materiaOpciones = computed<SearchableSelectOption[]>(() =>
+    [...this.materias()]
+      .sort((a, b) => a.courseCode.localeCompare(b.courseCode, 'es', { numeric: true, sensitivity: 'base' }))
+      .map(materia => ({
+        value: materia.syllabusCourseId,
+        label: `${materia.courseCode} - ${materia.courseName} (Sem ${materia.semester}°)`,
+        searchText: `${materia.courseCode} ${materia.courseName}`
+      }))
+  );
 
   // Estados de Carga
   public cargando = signal<boolean>(false);
@@ -695,7 +921,15 @@ export class RolExamenesComponent implements OnInit {
   public excelCargadoNombre = signal<string | null>(null);
   public excelItemsImportados = signal<RolExamenItem[]>([]);
   public excelErroresImportacion = signal<string[]>([]);
+  public excelAdvertenciasHorario = signal<AdvertenciaHorarioImportacion[]>([]);
   public reemplazarRolesPermitidos = signal<boolean>(false);
+  public confirmarReemplazoImportacion = signal<boolean>(false);
+
+  public dialogSubirInstancias = signal<boolean>(false);
+  public instanciasCargadasNombre = signal<string | null>(null);
+  public instanciasItemsImportados = signal<InstanciaImportacionItem[]>([]);
+  public instanciasErroresImportacion = signal<string[]>([]);
+  public instanciasAdvertenciasHorario = signal<AdvertenciaHorarioImportacion[]>([]);
 
   public dialogFormulario = signal<boolean>(false);
   public itemEditando = signal<RolExamenItem | null>(null);
@@ -860,14 +1094,19 @@ export class RolExamenesComponent implements OnInit {
     this.filtroFechaHasta.set('');
   }
 
-  public vaciarRol(): void {
+  public async vaciarRol(): Promise<void> {
     const programados = this.examenes().filter(item => item.estado === 'PROGRAMADO');
     const protegidos = this.examenes().length - programados.length;
     if (programados.length === 0) {
       this._mostrarToast('No existen exámenes PROGRAMADOS que puedan eliminarse.');
       return;
     }
-    if (!window.confirm(`Se eliminarán ${programados.length} exámenes PROGRAMADOS del servidor. ¿Deseas continuar?`)) {
+    if (!await this._feedback.confirmar(
+      `Se eliminarán ${programados.length} exámenes PROGRAMADOS del servidor. ¿Deseas continuar?`,
+      'Vaciar rol de examen',
+      'warning',
+      'Eliminar'
+    )) {
       return;
     }
 
@@ -935,7 +1174,9 @@ export class RolExamenesComponent implements OnInit {
 
     this._gateway.getCourses(sede.code, carrera.careerCode).subscribe({
       next: materias => {
-        this.materias.set(materias);
+        this.materias.set([...materias].sort((a, b) =>
+          a.courseCode.localeCompare(b.courseCode, 'es', { numeric: true, sensitivity: 'base' })
+        ));
 
         this._gateway.getGroups('2-2026', sede.branchOfficeId, carrera.careerId, undefined, sede.code, carrera.careerCode).subscribe({
           next: grupos => {
@@ -1000,17 +1241,311 @@ export class RolExamenesComponent implements OnInit {
     }
   }
 
+  public getEstadoLabel(row: RolExamenItem): string {
+    if (row.estado === 'PENDIENTE_NOTAS' && row.modalidad === 'PRESENCIAL_CARTILLA') {
+      return 'PENDIENTE DE CALIFICACIÓN';
+    }
+    return row.estado;
+  }
+
+  public getAdvertenciaHorarioFila(item: RolExamenItem): SeveridadAdvertenciaHorario | null {
+    const grupo = this.grupos().find(actual => actual.groupId === item.seaGroupId)
+      || this.grupos().find(actual => actual.code === item.grupo && actual.syllabusCourseId === item.seaSyllabusCourseId);
+    if (!grupo) return 'ROJA';
+
+    const horarios = (grupo.schedules || []).filter(Boolean);
+    if (horarios.length === 0) return 'ROJA';
+
+    const diaExamen = this._diaSemanaDeFecha(item.fecha);
+    const horariosDelDia = horarios.filter(horario => this._diaSemanaCodigo(horario.day) === diaExamen);
+    const horaExamen = this._horaAMinutos(item.horario);
+    const coincideHorario = horaExamen !== null && horariosDelDia.some(horario => {
+      const inicio = this._horaAMinutos(horario.startTime);
+      const fin = this._horaAMinutos(horario.endTime);
+      return inicio !== null && fin !== null && horaExamen >= inicio && horaExamen < fin;
+    });
+    if (horariosDelDia.length === 0 || !coincideHorario) return 'ROJA';
+
+    const clase = this._normalizar(grupo.classType || '');
+    const codigoGrupo = this._normalizar(grupo.code || '');
+    const esClaseTeoricaTa = clase === 'ta' || codigoGrupo === 'ta' || codigoGrupo.startsWith('ta-');
+    return esClaseTeoricaTa ? null : 'AMARILLA';
+  }
+
+  public getDetalleHorarioFila(item: RolExamenItem): string {
+    const advertencia = this.getAdvertenciaHorarioFila(item);
+    if (advertencia === 'AMARILLA') return 'Advertencia amarilla: el grupo no corresponde a una clase teórica TA.';
+    if (advertencia === 'ROJA') return 'Advertencia roja: la fecha u hora no coincide con el horario oficial del grupo.';
+    return 'Fecha y hora coinciden con el horario oficial del grupo TA.';
+  }
+
   // Modales
   public abrirModalSubirExcel(): void {
     this.excelCargadoNombre.set(null);
     this.excelItemsImportados.set([]);
     this.excelErroresImportacion.set([]);
+    this.excelAdvertenciasHorario.set([]);
     this.reemplazarRolesPermitidos.set(false);
+    this.confirmarReemplazoImportacion.set(false);
     this.dialogSubirExcel.set(true);
   }
 
   public cerrarModalSubirExcel(): void {
     this.dialogSubirExcel.set(false);
+    this.confirmarReemplazoImportacion.set(false);
+  }
+
+  public abrirModalSubirInstancias(): void {
+    this.instanciasCargadasNombre.set(null);
+    this.instanciasItemsImportados.set([]);
+    this.instanciasErroresImportacion.set([]);
+    this.instanciasAdvertenciasHorario.set([]);
+    this.dialogSubirInstancias.set(true);
+  }
+
+  public cerrarModalSubirInstancias(): void {
+    this.dialogSubirInstancias.set(false);
+  }
+
+  public descargarPlantillaInstancias(): void {
+    const hojaInstancias = XLSX.utils.aoa_to_sheet([
+      ['CÓDIGO MATERIA', 'GRUPO', 'SEMANA', 'FECHA', 'HORA INICIO', 'HORA FIN'],
+      ['SIS-111', 'TA-01', 1, '17/12/2026', '08:15', '09:45']
+    ]);
+    hojaInstancias['!cols'] = [
+      { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 14 }
+    ];
+
+    const hojaInstrucciones = XLSX.utils.aoa_to_sheet([
+      ['PLANTILLA PARA REGISTRAR 2DA INSTANCIA'],
+      ['CÓDIGO MATERIA', 'Código oficial de la asignatura en la carrera seleccionada.'],
+      ['GRUPO', 'Código oficial del grupo, por ejemplo TA-01.'],
+      ['SEMANA', 'Número de semana académica; si no aplica, colocar 1.'],
+      ['FECHA', 'Fecha de la segunda instancia en formato dd/mm/aaaa.'],
+      ['HORA INICIO', 'Hora de inicio en formato HH:MM.'],
+      ['HORA FIN', 'Hora de finalización en formato HH:MM.'],
+      ['NOTA', 'La sede y la carrera se toman de la selección actual del módulo.'],
+      ['NOTA', 'Las advertencias amarillas y rojas no impiden la carga, pero deben revisarse.']
+    ]);
+    hojaInstrucciones['!cols'] = [{ wch: 24 }, { wch: 95 }];
+
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hojaInstancias, '2DA_INSTANCIA');
+    XLSX.utils.book_append_sheet(libro, hojaInstrucciones, 'INSTRUCCIONES');
+    XLSX.writeFile(libro, 'PLANTILLA_2DA_INSTANCIA.xlsx');
+    this._mostrarToast('Se descargó la plantilla de 2da Instancia.');
+  }
+
+  public onArchivoInstanciasSeleccionado(event: any): void {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    this.instanciasCargadasNombre.set(file.name);
+    this.instanciasItemsImportados.set([]);
+    this.instanciasErroresImportacion.set([]);
+    this.instanciasAdvertenciasHorario.set([]);
+
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const normalizarEncabezado = (valor: unknown): string => this._normalizar(this._textoCelda(valor)).replace(/[^a-z0-9]/g, '');
+        const sheetName = workbook.SheetNames.find(name => {
+          const normalizado = normalizarEncabezado(name);
+          return normalizado === '2dainstancia' || normalizado === 'segundainstancia';
+        }) || workbook.SheetNames[0];
+
+        if (!sheetName) {
+          this.instanciasErroresImportacion.set(['El archivo no contiene hojas para importar.']);
+          return;
+        }
+
+        const filas = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+          header: 1,
+          raw: true,
+          defval: ''
+        }) as any[][];
+        const indiceEncabezado = filas.slice(0, 15).findIndex(row => {
+          const encabezados = row.map(normalizarEncabezado);
+          return encabezados.some(valor => valor.includes('codigomateria') || valor === 'codigo')
+            && encabezados.some(valor => valor.includes('grupo'))
+            && encabezados.some(valor => valor.includes('fecha'));
+        });
+
+        if (indiceEncabezado < 0) {
+          this.instanciasErroresImportacion.set(['No se encontró la fila de encabezados. Descarga y completa la plantilla oficial de 2da Instancia.']);
+          this._mostrarToast('El archivo no tiene el formato de 2da Instancia.');
+          return;
+        }
+
+        const encabezados = filas[indiceEncabezado].map(normalizarEncabezado);
+        const buscarColumna = (alias: string[]): number => encabezados.findIndex(encabezado => alias.some(valor => encabezado === valor || encabezado.includes(valor)));
+        const columnas = {
+          codigo: buscarColumna(['codigomateria', 'codigo']),
+          grupo: buscarColumna(['grupo']),
+          semana: buscarColumna(['semana']),
+          fecha: buscarColumna(['fecha']),
+          horaInicio: buscarColumna(['horainicio', 'inicio']),
+          horaFin: buscarColumna(['horafin', 'fin'])
+        };
+        const columnasObligatorias: Array<[string, number]> = [
+          ['Código Materia', columnas.codigo],
+          ['Grupo', columnas.grupo],
+          ['Fecha', columnas.fecha],
+          ['Hora Inicio', columnas.horaInicio],
+          ['Hora Fin', columnas.horaFin]
+        ];
+        const columnaFaltante = columnasObligatorias.find(([, indice]) => indice < 0);
+        if (columnaFaltante) {
+          this.instanciasErroresImportacion.set([`Falta la columna obligatoria '${columnaFaltante[0]}'. Descarga la plantilla oficial para corregir el archivo.`]);
+          this._mostrarToast('Faltan columnas obligatorias en el Excel.');
+          return;
+        }
+
+        const sede = this.sedeSeleccionada();
+        const carrera = this.carreraSeleccionada();
+        const items: InstanciaImportacionItem[] = [];
+        const errores: string[] = [];
+        const advertencias: AdvertenciaHorarioImportacion[] = [];
+        const clavesExactas = new Set<string>();
+        const siguienteVersion = new Map<string, number>();
+        for (const existente of this.examenes()) {
+          const clave = this._claveVersion(existente.seaGroupId, '2da Instancia');
+          siguienteVersion.set(clave, Math.max(siguienteVersion.get(clave) || 0, existente.version || 1));
+        }
+
+        filas.slice(indiceEncabezado + 1).forEach((row, indiceFila) => {
+          const filaExcel = indiceEncabezado + indiceFila + 2;
+          const filaVacia = row.every(valor => this._textoCelda(valor) === '');
+          if (filaVacia) return;
+
+          const codigo = this._textoCelda(row[columnas.codigo]);
+          const grupoCodigo = this._textoCelda(row[columnas.grupo]);
+          const fecha = this._leerFechaExcel(row[columnas.fecha]);
+          const horaInicio = this._leerHoraExcel(row[columnas.horaInicio]);
+          const horaFin = this._leerHoraExcel(row[columnas.horaFin]);
+          const semanaTexto = columnas.semana >= 0 ? this._textoCelda(row[columnas.semana]) : '1';
+          const semana = Number(semanaTexto) || 1;
+
+          if (!codigo || !grupoCodigo || !fecha.iso || !horaInicio || !horaFin) {
+            errores.push(`Fila ${filaExcel}: completa código, grupo, fecha, hora inicio y hora fin con formatos válidos.`);
+            return;
+          }
+
+          const inicioMinutos = this._horaAMinutos(horaInicio);
+          const finMinutos = this._horaAMinutos(horaFin);
+          if (inicioMinutos === null || finMinutos === null || finMinutos <= inicioMinutos) {
+            errores.push(`Fila ${filaExcel}: la hora fin debe ser posterior a la hora inicio y usar el formato HH:MM.`);
+            return;
+          }
+
+          const materia = this.materias().find(item => this._normalizar(item.courseCode) === this._normalizar(codigo));
+          const grupo = materia
+            ? this.grupos().find(item => item.syllabusCourseId === materia.syllabusCourseId && this._normalizar(item.code) === this._normalizar(grupoCodigo))
+            : undefined;
+          if (!materia) {
+            errores.push(`Fila ${filaExcel}: el código de asignatura '${codigo}' no existe en la carrera seleccionada.`);
+            return;
+          }
+          if (!grupo) {
+            errores.push(`Fila ${filaExcel}: el grupo '${grupoCodigo}' no existe para ${materia.courseCode}.`);
+            return;
+          }
+
+          const claveVersion = this._claveVersion(grupo.groupId, '2da Instancia');
+          const claveExacta = `${claveVersion}|${fecha.iso}`;
+          if (clavesExactas.has(claveExacta)) {
+            errores.push(`Fila ${filaExcel}: la 2da Instancia de ${materia.courseCode} y grupo ${grupo.code} está repetida en el archivo.`);
+            return;
+          }
+
+          const version = (siguienteVersion.get(claveVersion) || 0) + 1;
+          const horarioImportado = `${horaInicio} - ${horaFin}`;
+          const horarios = grupo.schedules || [];
+          const diaFecha = this._diaSemanaDeFecha(fecha.iso);
+          const horarioOficial = horarios.find(horario => this._diaSemanaCodigo(horario.day) === diaFecha) || horarios[0];
+          advertencias.push(...this._evaluarHorarioImportacion(
+            filaExcel,
+            materia.courseName || materia.courseCode,
+            grupo,
+            '2da Instancia',
+            fecha.iso,
+            horaInicio,
+            horarioImportado,
+            true
+          ));
+
+          const item: RolExamenItem = {
+            id: this._crearRolId(grupo.groupId, '2da Instancia', fecha.iso, version),
+            seaGroupId: grupo.groupId,
+            seaSyllabusCourseId: materia.syllabusCourseId,
+            sedeCode: sede?.code,
+            careerCode: carrera?.careerCode,
+            codigo: materia.courseCode,
+            materia: materia.courseName,
+            semestre: materia.semester || 1,
+            grupo: grupo.code,
+            tipoClase: grupo.classType || 'TA',
+            docenteNombre: this._nombreDocenteOficial(grupo),
+            docenteCI: grupo.teacherIdentityNumber || '',
+            tipo: '2da Instancia',
+            version,
+            estado: 'PROGRAMADO',
+            modalidad: 'PRESENCIAL_CARTILLA',
+            conCartilla: true,
+            semana,
+            dia: this._nombreDiaSemana(diaFecha),
+            fecha: fecha.iso,
+            fechaDisplay: fecha.display,
+            horario: horarioImportado,
+            aula: horarioOficial?.classroom || 'Por definir',
+            campus: horarioOficial?.campus || 'Por definir'
+          };
+          items.push({ fila: filaExcel, item });
+          clavesExactas.add(claveExacta);
+          siguienteVersion.set(claveVersion, version);
+        });
+
+        this.instanciasItemsImportados.set(items);
+        this.instanciasErroresImportacion.set(errores);
+        this.instanciasAdvertenciasHorario.set(advertencias);
+        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} instancias listas, ${errores.length} observaciones y ${advertencias.length} advertencias.`);
+      } catch (err) {
+        console.error('Error al procesar archivo de 2da Instancia:', err);
+        this.instanciasItemsImportados.set([]);
+        this.instanciasAdvertenciasHorario.set([]);
+        this.instanciasErroresImportacion.set(['No se pudo leer el archivo. Descarga y completa la plantilla oficial de 2da Instancia.']);
+        this._mostrarToast('Error al leer el archivo de 2da Instancia.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  public procesarImportacionInstancias(): void {
+    const importados = this.instanciasItemsImportados().map(registro => registro.item);
+    if (importados.length === 0) return;
+
+    this.cargando.set(true);
+    forkJoin(importados.map(item => this._rolService.crear(this._toRequest(item)).pipe(
+      map(rol => ({ rol, error: null as unknown })),
+      catchError(error => of({ rol: null as RolExamenResponse | null, error }))
+    ))).subscribe({
+      next: resultados => {
+        const creados = resultados.filter(resultado => resultado.rol).length;
+        const fallidos = resultados.filter(resultado => resultado.error).length;
+        this.cargando.set(false);
+        this.cerrarModalSubirInstancias();
+        this._cargarRolesOficiales();
+        this._mostrarToast(fallidos > 0
+          ? `${creados} instancias registradas y ${fallidos} rechazadas por el servidor.`
+          : `${creados} roles de 2da Instancia registrados correctamente en PostgreSQL.`);
+      },
+      error: err => {
+        this.cargando.set(false);
+        this._mostrarToast(this._mensajeError(err, 'No se pudieron registrar las instancias.'));
+      }
+    });
   }
 
   public onArchivoExcelSeleccionado(event: any): void {
@@ -1030,6 +1565,7 @@ export class RolExamenesComponent implements OnInit {
         if (!sheetName) {
           this.excelItemsImportados.set([]);
           this.excelErroresImportacion.set(['No se encontró la hoja “Rol de Examenes”. Verifica que estés usando el archivo oficial de roles de examen.']);
+          this.excelAdvertenciasHorario.set([]);
           this._mostrarToast('El archivo no contiene la hoja oficial “Rol de Examenes”.');
           return;
         }
@@ -1043,6 +1579,7 @@ export class RolExamenesComponent implements OnInit {
 
         const items: RolExamenItem[] = [];
         const errores: string[] = [];
+        const advertenciasHorario: AdvertenciaHorarioImportacion[] = [];
         const clavesExactasDelArchivo = new Set<string>();
         const siguienteVersionPorClave = new Map<string, number>();
         for (const existente of this.examenes()) {
@@ -1051,25 +1588,27 @@ export class RolExamenesComponent implements OnInit {
         }
 
         // La plantilla oficial tiene cinco hojas y la hoja de roles empieza en la fila 12.
-        // Como la hoja inicia en B, sheet_to_json devuelve B como índice 0.
-        // Índices relativos: B materia, C código, D semestre, E grupo, F docente,
-        // G:L teóricos y AN:AO segunda instancia.
+        // La hoja conserva una columna A vacía; por ello sheet_to_json mantiene
+        // esa posición y los datos comienzan en el índice 1 (columna B).
+        // Índices reales: B materia, C código, D semestre, E grupo, F docente,
+        // G:L contienen los exámenes que se importan desde este modal.
+        // La 2da Instancia se carga exclusivamente mediante su plantilla.
         const examenesDeFila = (fila: any[]) => [
-          { tipo: '1er Parcial' as RolExamenItem['tipo'], columnaFecha: 5, columnaHora: 6 },
-          { tipo: '2do Parcial' as RolExamenItem['tipo'], columnaFecha: 7, columnaHora: 8 },
-          { tipo: 'Final' as RolExamenItem['tipo'], columnaFecha: 9, columnaHora: 10 },
-          { tipo: '2da Instancia' as RolExamenItem['tipo'], columnaFecha: 38, columnaHora: 39 }
+          { tipo: '1er Parcial' as RolExamenItem['tipo'], columnaFecha: 6, columnaHora: 7 },
+          { tipo: '2do Parcial' as RolExamenItem['tipo'], columnaFecha: 8, columnaHora: 9 },
+          { tipo: 'Final' as RolExamenItem['tipo'], columnaFecha: 10, columnaHora: 11 }
         ].map(examen => ({
           ...examen,
           fecha: this._leerFechaExcel(fila[examen.columnaFecha]),
-          hora: this._leerHoraExcel(fila[examen.columnaHora])
+          hora: this._leerHoraExcel(fila[examen.columnaHora]),
+          valorHora: fila[examen.columnaHora]
         }));
 
         filas.slice(11).forEach((row, idx) => {
           const filaExcel = idx + 12;
-          const materiaNombreArchivo = this._textoCelda(row[0]);
-          const codigo = this._textoCelda(row[1]);
-          const grupoCodigo = this._textoCelda(row[3]);
+          const materiaNombreArchivo = this._textoCelda(row[1]);
+          const codigo = this._textoCelda(row[2]);
+          const grupoCodigo = this._textoCelda(row[4]);
 
           // Las filas completamente vacías al final de la plantilla no son errores.
           if (!materiaNombreArchivo && !codigo && !grupoCodigo) return;
@@ -1094,9 +1633,21 @@ export class RolExamenesComponent implements OnInit {
 
           const schedule = grupo.schedules?.[0];
           let rolesGeneradosEnFila = 0;
+          const tieneDatosDeExamenGeneral = [6, 8, 10].some(columna => {
+            const valor = row[columna];
+            return valor !== null && valor !== undefined && this._textoCelda(valor) !== '';
+          });
           for (const examen of examenesDeFila(row)) {
             if (!examen.fecha.iso) {
-              errores.push(`Fila ${filaExcel}: no se registró fecha para ${examen.tipo} de ${materia.courseCode}.`);
+              const fechaInformada = row[examen.columnaFecha] !== null
+                && row[examen.columnaFecha] !== undefined
+                && this._textoCelda(row[examen.columnaFecha]) !== '';
+              const horaInformada = row[examen.columnaHora] !== null
+                && row[examen.columnaHora] !== undefined
+                && this._textoCelda(row[examen.columnaHora]) !== '';
+              if (fechaInformada || horaInformada) {
+                errores.push(`Fila ${filaExcel}: no se registró una fecha válida para ${examen.tipo} de ${materia.courseCode}.`);
+              }
               continue;
             }
 
@@ -1109,7 +1660,20 @@ export class RolExamenesComponent implements OnInit {
             const version = (siguienteVersionPorClave.get(claveVersion) || 0) + 1;
             const id = this._crearRolId(grupo.groupId, examen.tipo, examen.fecha.iso, version);
 
-            const horario = examen.hora || (schedule ? `${schedule.startTime} - ${schedule.endTime}` : 'Por definir');
+          const horario = examen.hora || (schedule ? `${schedule.startTime} - ${schedule.endTime}` : 'Por definir');
+            const celdaHoraTieneContenido = examen.valorHora !== null
+              && examen.valorHora !== undefined
+              && this._textoCelda(examen.valorHora) !== '';
+            advertenciasHorario.push(...this._evaluarHorarioImportacion(
+              filaExcel,
+              materia.courseName || materia.courseCode,
+              grupo,
+              examen.tipo,
+              examen.fecha.iso,
+              examen.hora,
+              horario,
+              celdaHoraTieneContenido
+            ));
             items.push({
               id,
               seaGroupId: grupo.groupId,
@@ -1141,46 +1705,52 @@ export class RolExamenesComponent implements OnInit {
             rolesGeneradosEnFila++;
           }
 
-          if (rolesGeneradosEnFila === 0) {
+          if (rolesGeneradosEnFila === 0 && tieneDatosDeExamenGeneral) {
             errores.push(`Fila ${filaExcel}: no se pudo generar ningún examen porque faltan fechas o ya existen registros.`);
           }
         });
 
         this.excelItemsImportados.set(items);
         this.excelErroresImportacion.set(errores);
-        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} registros oficiales listos y ${errores.length} observaciones.`);
+        this.excelAdvertenciasHorario.set(advertenciasHorario);
+        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} registros oficiales listos, ${errores.length} observaciones y ${advertenciasHorario.length} advertencias de horario.`);
       } catch (err) {
         console.error('Error al procesar archivo Excel:', err);
+        this.excelAdvertenciasHorario.set([]);
         this._mostrarToast('Error al leer el archivo Excel.');
       }
     };
     reader.readAsArrayBuffer(file);
   }
 
-  public procesarImportacionExcel(): void {
+  public procesarImportacionExcel(confirmado = false): void {
     const importados = this.excelItemsImportados();
     if (importados.length === 0) return;
 
     const reemplazables = this.rolesImportacionReemplazables();
-    const protegidos = this.rolesImportacionProtegidos();
-    if (this.reemplazarRolesPermitidos() && reemplazables.length > 0) {
-      const confirmado = window.confirm(
-        `Se eliminarán ${reemplazables.length} roles de examen coincidentes en estado PROGRAMADO o VALIDADO y luego se subirá el Excel. ` +
-        `${protegidos.length} roles de examen en GENERADO o posterior se conservarán. ¿Deseas continuar?`
-      );
-      if (!confirmado) return;
+    if (this.reemplazarRolesPermitidos() && reemplazables.length > 0 && !confirmado) {
+      this.confirmarReemplazoImportacion.set(true);
+      return;
     }
+    this.confirmarReemplazoImportacion.set(false);
 
     this.cargando.set(true);
     const eliminar$ = this.reemplazarRolesPermitidos() && reemplazables.length > 0
-      ? forkJoin(reemplazables.map(item => this._rolService.eliminar(item.id)))
+      ? from(reemplazables).pipe(
+        mergeMap(item => this._rolService.eliminar(item.id), 6),
+        toArray()
+      )
       : of([]);
-
-    eliminar$.pipe(
-      switchMap(() => forkJoin(importados.map(item => this._rolService.crear(this._toRequest(item)).pipe(
+    const crear$ = from(importados).pipe(
+      mergeMap(item => this._rolService.crear(this._toRequest(item)).pipe(
         map(rol => ({ rol, error: null as unknown })),
         catchError(error => of({ rol: null as RolExamenResponse | null, error }))
-      ))))
+      ), 6),
+      toArray()
+    );
+
+    eliminar$.pipe(
+      switchMap(() => crear$)
     ).subscribe({
       next: resultados => {
         const creados = resultados.filter(resultado => resultado.rol).map(resultado => resultado.rol!);
@@ -1197,7 +1767,7 @@ export class RolExamenesComponent implements OnInit {
       },
       error: err => {
         this.cargando.set(false);
-      this._mostrarToast(this._mensajeError(err, 'No se pudieron eliminar los roles de examen permitidos; no se realizó la nueva carga.'));
+        this._mostrarToast(this._mensajeError(err, 'No se pudieron eliminar los roles de examen permitidos; no se realizó la nueva carga.'));
         this._cargarRolesOficiales();
       }
     });
@@ -1328,12 +1898,17 @@ export class RolExamenesComponent implements OnInit {
     });
   }
 
-  public eliminarExamen(item: RolExamenItem): void {
+  public async eliminarExamen(item: RolExamenItem): Promise<void> {
     if (!this.puedeEditarEliminar(item)) {
       this._mostrarToast('Solo se pueden eliminar roles de examen en estado PROGRAMADO o VALIDADO.');
       return;
     }
-    if (!window.confirm(`¿Deseas eliminar el examen ${item.codigo} del rol de examen oficial?`)) return;
+    if (!await this._feedback.confirmar(
+      `¿Deseas eliminar el examen ${item.codigo} del rol de examen oficial?`,
+      'Eliminar examen',
+      'warning',
+      'Eliminar'
+    )) return;
 
     this._rolService.eliminar(item.id).subscribe({
       next: () => {
@@ -1521,6 +2096,129 @@ export class RolExamenesComponent implements OnInit {
     const texto = this._textoCelda(valor);
     const hora = texto.match(/(\d{1,2}):(\d{2})/);
     return hora ? `${hora[1].padStart(2, '0')}:${hora[2]}` : '';
+  }
+
+  private _evaluarHorarioImportacion(
+    fila: number,
+    materia: string,
+    grupo: GroupItem,
+    tipo: string,
+    fechaIso: string,
+    horaImportada: string,
+    horarioImportado: string,
+    horaInformada: boolean
+  ): AdvertenciaHorarioImportacion[] {
+    const advertencias: AdvertenciaHorarioImportacion[] = [];
+    const horarios = (grupo.schedules || []).filter(Boolean);
+    const codigoClase = this._normalizar(grupo.classType || '');
+    const codigoGrupo = this._normalizar(grupo.code || '');
+    const esClaseTeoricaTa = codigoClase === 'ta' || codigoGrupo === 'ta' || codigoGrupo.startsWith('ta-');
+
+    if (!esClaseTeoricaTa) {
+      advertencias.push({
+        severidad: 'AMARILLA',
+        fila,
+        materia,
+        grupo: grupo.code || 'Sin grupo',
+        tipo,
+        mensaje: `el grupo está clasificado como ${grupo.classType || 'no TA'}, no como clase teórica TA.`
+      });
+    }
+
+    if (horarios.length === 0) {
+      advertencias.push({
+        severidad: 'ROJA',
+        fila,
+        materia,
+        grupo: grupo.code || 'Sin grupo',
+        tipo,
+        mensaje: 'no existe un horario oficial disponible en SEA para validar la fecha y la hora.'
+      });
+      return advertencias;
+    }
+
+    if (horaInformada && !horaImportada) {
+      advertencias.push({
+        severidad: 'ROJA',
+        fila,
+        materia,
+        grupo: grupo.code || 'Sin grupo',
+        tipo,
+        mensaje: 'la hora informada en el Excel no pudo interpretarse; revisa el formato HH:MM.'
+      });
+    }
+
+    const diaExamen = this._diaSemanaDeFecha(fechaIso);
+    const horariosDelDia = horarios.filter(horario => this._diaSemanaCodigo(horario.day) === diaExamen);
+    const horaExamen = this._horaAMinutos(horaImportada || horarioImportado);
+    const horaValida = horaExamen !== null && horariosDelDia.some(horario => {
+      const inicio = this._horaAMinutos(horario.startTime);
+      const fin = this._horaAMinutos(horario.endTime);
+      return inicio !== null && fin !== null && horaExamen >= inicio && horaExamen < fin;
+    });
+
+    if (horariosDelDia.length === 0) {
+      advertencias.push({
+        severidad: 'ROJA',
+        fila,
+        materia,
+        grupo: grupo.code || 'Sin grupo',
+        tipo,
+        mensaje: `la fecha ${this._formatearFechaCorta(fechaIso)} cae en ${this._nombreDiaSemana(diaExamen)}, día que no coincide con el horario oficial del grupo.`
+      });
+    } else if (horaImportada && !horaValida) {
+      const horariosEsperados = horariosDelDia
+        .map(horario => `${horario.startTime}–${horario.endTime}`)
+        .join(', ');
+      advertencias.push({
+        severidad: 'ROJA',
+        fila,
+        materia,
+        grupo: grupo.code || 'Sin grupo',
+        tipo,
+        mensaje: `la hora ${horaImportada} está fuera del horario oficial (${horariosEsperados}).`
+      });
+    }
+
+    return advertencias;
+  }
+
+  private _diaSemanaDeFecha(fechaIso: string): number {
+    if (!fechaIso) return -1;
+    const [anio, mes, dia] = fechaIso.split('-').map(Number);
+    if (!anio || !mes || !dia) return -1;
+    return new Date(Date.UTC(anio, mes - 1, dia)).getUTCDay();
+  }
+
+  private _diaSemanaCodigo(valor: string): number {
+    const dia = this._normalizar(valor).replace(/[^a-z0-9]/g, '');
+    const dias: Record<string, number> = {
+      domingo: 0, dom: 0, su: 0, sun: 0,
+      lunes: 1, lun: 1, lu: 1, monday: 1, mo: 1,
+      martes: 2, mar: 2, ma: 2, tuesday: 2, tu: 2,
+      miercoles: 3, mie: 3, mi: 3, wednesday: 3, we: 3,
+      jueves: 4, jue: 4, ju: 4, thursday: 4, th: 4,
+      viernes: 5, vie: 5, vi: 5, friday: 5, fr: 5,
+      sabado: 6, sab: 6, sa: 6, saturday: 6
+    };
+    return dias[dia] ?? -1;
+  }
+
+  private _horaAMinutos(valor: string): number | null {
+    const coincidencia = String(valor || '').match(/(\d{1,2}):(\d{2})/);
+    if (!coincidencia) return null;
+    const horas = Number(coincidencia[1]);
+    const minutos = Number(coincidencia[2]);
+    return horas >= 0 && horas <= 23 && minutos >= 0 && minutos <= 59 ? horas * 60 + minutos : null;
+  }
+
+  private _nombreDiaSemana(dia: number): string {
+    return ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][dia] || 'día no identificado';
+  }
+
+  private _formatearFechaCorta(fechaIso: string): string {
+    const partes = fechaIso.split('-');
+    return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : fechaIso;
   }
 
   private _normalizarTipoParcial(valor: string): RolExamenItem['tipo'] | null {

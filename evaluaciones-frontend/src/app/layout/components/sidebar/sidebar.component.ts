@@ -276,6 +276,13 @@ export class SidebarComponent implements OnInit {
       roles: ['ADMINISTRADOR_SISTEMA']
     },
     {
+      label: 'Respaldos y contingencia',
+      route: '/respaldos',
+      icon: 'pi pi-cloud-upload',
+      description: 'Respaldos cifrados, copia externa y recuperación controlada',
+      roles: ['ADMINISTRADOR_SISTEMA']
+    },
+    {
       label: 'Reporte de Evaluaciones',
       route: '/reporte-evaluaciones',
       icon: 'pi pi-file-excel',

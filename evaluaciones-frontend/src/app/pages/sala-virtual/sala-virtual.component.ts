@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Observable, Subscription, interval } from 'rxjs';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 interface Participante { codigoEstudiante: string; nombreEstudiante: string; estado: string; }
 interface Sala { id: string; rolExamenId: string; codigoSala: string; estado: string; duracionMinutos: number; participantes: Participante[]; }
@@ -95,6 +96,7 @@ interface TokenGrupo { codigoSala: string; tokenGrupo: string; }
 })
 export class SalaVirtualComponent implements OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly feedback = inject(UiFeedbackService);
   sala = signal<Sala | null>(null); accesos = signal<Acceso[]>([]); tokenGrupo = signal(''); cargando = signal(false); error = signal(''); mostrarMotivoRestablecimiento = signal(false);
   rolExamenId = ''; duracion = 90; gracia = 10; private monitoreo?: Subscription;
   motivoRestablecimiento = '';
@@ -110,10 +112,15 @@ export class SalaVirtualComponent implements OnDestroy {
     this.ejecutar(this.http.post<Creada>('/api/examenes-virtuales/salas', { rolExamenId: this.rolExamenId.trim(), duracionMinutos: this.duracion, graciaIngresoMinutos: this.gracia }), data => { this.sala.set(data.sala); this.accesos.set(data.accesos || []); this.tokenGrupo.set(data.tokenGrupo || ''); this.iniciarMonitoreo(); });
   }
 
-  emitirTokenGrupo(): void {
+  async emitirTokenGrupo(): Promise<void> {
     const id = this.sala()?.id;
     if (!id) return;
-    if (this.tokenGrupo() && !confirm('Se emitirá un token nuevo y el anterior dejará de funcionar. ¿Deseas continuar?')) return;
+    if (this.tokenGrupo() && !await this.feedback.confirmar(
+      'Se emitirá un token nuevo y el anterior dejará de funcionar. ¿Deseas continuar?',
+      'Renovar token grupal',
+      'warning',
+      'Renovar token'
+    )) return;
     this.ejecutar(this.http.post<TokenGrupo>(`/api/examenes-virtuales/salas/${encodeURIComponent(id)}/token-grupo`, {}), data => this.tokenGrupo.set(data.tokenGrupo));
   }
 

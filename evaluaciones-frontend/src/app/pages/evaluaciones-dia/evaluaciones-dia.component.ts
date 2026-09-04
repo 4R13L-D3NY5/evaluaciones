@@ -38,6 +38,7 @@ import {
   ConfiguracionGeneracion,
   GeneracionTypstVariante
 } from '../../core/models/generacion-typst.model';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
@@ -349,7 +350,9 @@ interface ResultadoVirtual {
                   <th class="p-3.5">Fecha / Hora</th>
                   <th class="p-3.5 text-center">Modalidad</th>
                   <th class="p-3.5 text-center min-w-[310px]">Flujo de Estados</th>
-                  <th class="p-3.5 text-center">Marcas</th>
+                  <th class="p-3.5 text-center min-w-[108px]">
+                    <span class="inline-flex items-center gap-1.5"><i class="pi pi-id-card text-[11px] text-teal-600"></i>Marcas OMR</span>
+                  </th>
                   <th class="p-3.5 text-center">Documentos</th>
                   <th class="p-3.5 text-center min-w-[110px]">Acciones</th>
                 </tr>
@@ -458,10 +461,9 @@ interface ResultadoVirtual {
                         <button
                           (click)="abrirGestionCartillas(item)"
                           [disabled]="!puedeGestionarCartillas(item)"
-                          [title]="marcaImpresa(item) ? 'Marcas OMR impresas' : 'Gestionar marcas OMR'"
-                          [attr.aria-label]="marcaImpresa(item) ? 'Marcas OMR impresas' : 'Gestionar marcas OMR'"
+                          aria-label="Gestionar marcas OMR y lista de estudiantes"
                           [class]="marcaImpresa(item) ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-teal-700 bg-teal-50 border-teal-200'"
-                          class="relative h-7 w-7 rounded-lg hover:bg-teal-100 border flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35">
+                          class="relative h-8 w-8 p-0 rounded-lg hover:bg-teal-100 border flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35">
                           <i class="pi pi-id-card text-xs"></i>
                           @if (marcaImpresa(item)) {
                             <span class="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-emerald-600 text-white border border-white flex items-center justify-center">
@@ -470,7 +472,11 @@ interface ResultadoVirtual {
                           }
                         </button>
                         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/cartillas:flex flex-col items-center z-50 pointer-events-none">
-                          <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">{{ marcaImpresa(item) ? 'Marcas OMR impresas' : 'Sobreimpresión de datos OMR' }}</span>
+                          <div class="bg-slate-900 text-white text-[10px] font-bold py-2 px-2.5 rounded-lg shadow-xl whitespace-nowrap">
+                            <div class="font-extrabold text-white mb-1">Estado de impresión</div>
+                            <div class="flex items-center justify-between gap-3"><span class="text-slate-300">Marcas OMR</span><span [class.text-emerald-300]="textoEstadoMarcas(item) === 'Impresa'" [class.text-amber-300]="textoEstadoMarcas(item) !== 'Impresa'">{{ textoEstadoMarcas(item) }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><span class="text-slate-300">Lista de estudiantes</span><span [class.text-emerald-300]="textoEstadoLista(item) === 'Impresa'" [class.text-amber-300]="textoEstadoLista(item) !== 'Impresa'">{{ textoEstadoLista(item) }}</span></div>
+                          </div>
                           <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                         </div>
                         } @else {
@@ -824,9 +830,20 @@ interface ResultadoVirtual {
                     <i class="pi pi-users text-primary"></i>
                     <span>Nómina de Estudiantes Inscritos ({{ estudiantesInscritos().length }} Alumnos)</span>
                   </div>
-                  <span class="text-[10px] font-mono bg-purple-100 text-purple-900 px-2 py-0.5 rounded font-bold">
-                    Ratio: {{ ratioEstudiantesPorVariante() }} alumnos / variante
-                  </span>
+                  <label class="flex items-center gap-1.5 text-[10px] font-bold text-purple-900">
+                    <span>Ratio por variante</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      class="w-12 rounded border border-purple-300 bg-white px-1.5 py-1 text-center font-mono text-[10px] font-black text-purple-900 outline-none focus:ring-2 focus:ring-purple-300"
+                      [value]="ratioEstudiantesPorVariante()"
+                      (input)="onRatioEstudiantesPorVarianteChange($event)"
+                      aria-label="Cantidad de estudiantes por variante"
+                    />
+                    <span>alumnos</span>
+                  </label>
+                  <span class="text-[10px] text-purple-700">Predeterminado por Administración; editable para este examen.</span>
                 </div>
 
                 <!-- Lista de Estudiantes (Solo Código + Nombres + Apellidos) -->
@@ -886,7 +903,7 @@ interface ResultadoVirtual {
                 [disabled]="consultandoSalaVirtual() || generandoTypst() || cargandoEstudiantesInscritos()"
                 class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-102 disabled:opacity-50 disabled:cursor-wait">
                 <i class="pi" [class.pi-spin]="consultandoSalaVirtual()" [class.pi-spinner]="consultandoSalaVirtual()" [class.pi-desktop]="!consultandoSalaVirtual() && evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL'" [class.pi-bolt]="!consultandoSalaVirtual() && evaluacionSeleccionadaParaParametrizar()?.modalidad !== 'VIRTUAL'"></i>
-                <span>{{ consultandoSalaVirtual() ? 'Consultando sala existente...' : (evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL' ? 'Preparar sala virtual y accesos' : 'Generar examen PDF (30 preguntas A-E)') }}</span>
+                <span>{{ consultandoSalaVirtual() ? 'Consultando sala existente...' : (evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL' ? 'Preparar sala virtual y accesos' : 'Generar examen PDF (variantes según la nómina)') }}</span>
               </button>
             </div>
 
@@ -1601,50 +1618,94 @@ interface ResultadoVirtual {
 
       @if (evaluacionSeleccionadaCartillas(); as evaluacionCartillas) {
         <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div class="bg-card border border-border rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden">
+          <div class="bg-card border border-border rounded-2xl max-w-4xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
             <div class="p-5 border-b border-border flex items-start justify-between gap-4">
               <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center"><i class="pi pi-id-card text-lg"></i></div>
                 <div>
-                  <h3 class="text-sm font-black text-foreground">Sobreimpresión de datos OMR</h3>
-                  <p class="text-xs text-muted-foreground">{{ evaluacionCartillas.codigo }} · {{ evaluacionCartillas.grupo }} · solo datos para imprimir sobre cartillas preimpresas.</p>
+                  <h3 class="text-sm font-black text-foreground">Marcas OMR y lista de estudiantes</h3>
+                  <p class="text-xs text-muted-foreground">{{ evaluacionCartillas.codigo }} · {{ evaluacionCartillas.grupo }} · dos documentos independientes para imprimir.</p>
                 </div>
               </div>
               <button (click)="cerrarGestionCartillas()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
             </div>
-            <div class="p-5 space-y-4">
+            <div class="p-5 space-y-4 overflow-y-auto">
               @if (cargandoCartillas()) {
                 <div class="py-10 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spinner pi-spin text-primary mr-2"></i>Consultando nómina oficial...</div>
               } @else {
                 @if (loteCartillasActual(); as preparacion) {
-                  <div class="rounded-xl border border-teal-200 bg-teal-50/40 p-4 text-xs text-teal-900 leading-relaxed">
-                    La nómina se consulta directamente del SEA. Las marcas se generan en memoria únicamente al imprimir; no se guarda el PDF ni un lote de cartillas en el sistema.
+                  <div class="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs text-indigo-950 leading-relaxed flex gap-3 items-start">
+                    <i class="pi pi-info-circle text-indigo-600 text-base mt-0.5"></i>
+                    <span>La lista se consulta directamente del SEA. Puedes volver a generar cualquiera de los dos PDF para obtener la información actualizada. Cada documento tiene su propia confirmación de impresión.</span>
                   </div>
-                  <div class="grid grid-cols-3 gap-2 text-center">
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                     <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Estudiantes</span><strong class="text-lg text-foreground">{{ preparacion.totalCartillas }}</strong></div>
-                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Impresión</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresion === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresion === 'PENDIENTE'">{{ preparacion.estadoImpresion }}</strong></div>
-                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">1 por página A4</strong></div>
+                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Marcas OMR</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresion === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresion === 'PENDIENTE'">{{ preparacion.estadoImpresion }}</strong></div>
+                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Lista</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresionLista === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresionLista === 'PENDIENTE'">{{ preparacion.estadoImpresionLista }}</strong></div>
+                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">PDF separados</strong></div>
                   </div>
-                  <div class="max-h-48 overflow-y-auto rounded-xl border border-border divide-y divide-border text-xs">
+                  <div class="rounded-2xl border border-border overflow-hidden">
+                    <div class="px-4 py-3 bg-muted/40 border-b border-border flex items-center justify-between gap-3">
+                      <div>
+                        <h4 class="text-xs font-black text-foreground">Lista de estudiantes</h4>
+                        <p class="text-[11px] text-muted-foreground mt-0.5">Vista previa de la lista que acompañará el control de firmas.</p>
+                      </div>
+                      <span class="px-2.5 py-1 rounded-full bg-background border border-border text-[10px] font-black text-muted-foreground">{{ preparacion.totalCartillas }} registros</span>
+                    </div>
+                    <div class="max-h-48 overflow-y-auto divide-y divide-border text-xs">
+                      <div class="grid grid-cols-[36px_110px_1fr] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
+                        <span>N°</span><span>Código</span><span>Estudiante</span>
+                      </div>
                     @for (estudiante of preparacion.estudiantes; track estudiante.codigoEstudiante) {
-                      <div class="grid grid-cols-[36px_90px_1fr] gap-2 p-2.5 items-center">
+                      <div class="grid grid-cols-[36px_110px_1fr] gap-2 px-3 py-2.5 items-center">
                         <span class="font-mono text-muted-foreground">{{ estudiante.numeroOrden }}</span>
                         <span class="font-mono font-bold">{{ estudiante.codigoEstudiante }}</span>
                         <span class="truncate font-medium">{{ estudiante.nombreCompleto }}</span>
                       </div>
                     }
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <section class="rounded-2xl border border-teal-200 bg-teal-50/30 p-4">
+                      <div class="flex items-start justify-between gap-3 mb-3">
+                        <div class="flex items-center gap-2.5">
+                          <div class="h-9 w-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center"><i class="pi pi-id-card"></i></div>
+                          <div><h4 class="text-xs font-black text-foreground">Marcas OMR</h4><p class="text-[11px] text-muted-foreground">Una cartilla por estudiante.</p></div>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-[10px] font-black" [class.bg-emerald-100]="preparacion.estadoImpresion === 'IMPRESO'" [class.text-emerald-700]="preparacion.estadoImpresion === 'IMPRESO'" [class.bg-amber-100]="preparacion.estadoImpresion === 'PENDIENTE'" [class.text-amber-700]="preparacion.estadoImpresion === 'PENDIENTE'">{{ preparacion.estadoImpresion }}</span>
+                      </div>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button (click)="imprimirCartillas()" [disabled]="generandoCartillas() || generandoListaCartillas()" class="h-10 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi mr-1.5" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-print]="!generandoCartillas()"></i>{{ generandoCartillas() ? 'Preparando...' : 'Imprimir marcas' }}</button>
+                        @if (preparacion.estadoImpresion !== 'IMPRESO') {
+                          <button (click)="confirmarImpresionCartillas()" [disabled]="generandoCartillas() || generandoListaCartillas()" class="h-10 rounded-xl border border-teal-300 bg-background text-teal-800 hover:bg-teal-100 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-check mr-1.5"></i>Marcar impreso</button>
+                        } @else {
+                          <div class="h-10 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-black flex items-center justify-center"><i class="pi pi-check-circle mr-1.5"></i>Impresión confirmada</div>
+                        }
+                      </div>
+                    </section>
+                    <section class="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4">
+                      <div class="flex items-start justify-between gap-3 mb-3">
+                        <div class="flex items-center gap-2.5">
+                          <div class="h-9 w-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center"><i class="pi pi-list"></i></div>
+                          <div><h4 class="text-xs font-black text-foreground">Lista de estudiantes</h4><p class="text-[11px] text-muted-foreground">Incluye espacio para firma.</p></div>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-[10px] font-black" [class.bg-emerald-100]="preparacion.estadoImpresionLista === 'IMPRESO'" [class.text-emerald-700]="preparacion.estadoImpresionLista === 'IMPRESO'" [class.bg-amber-100]="preparacion.estadoImpresionLista === 'PENDIENTE'" [class.text-amber-700]="preparacion.estadoImpresionLista === 'PENDIENTE'">{{ preparacion.estadoImpresionLista }}</span>
+                      </div>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button (click)="imprimirListaEstudiantes()" [disabled]="generandoCartillas() || generandoListaCartillas()" class="h-10 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi mr-1.5" [class.pi-spinner]="generandoListaCartillas()" [class.pi-spin]="generandoListaCartillas()" [class.pi-list]="!generandoListaCartillas()"></i>{{ generandoListaCartillas() ? 'Preparando...' : 'Imprimir lista' }}</button>
+                        @if (preparacion.estadoImpresionLista !== 'IMPRESO') {
+                          <button (click)="confirmarImpresionLista()" [disabled]="generandoCartillas() || generandoListaCartillas()" class="h-10 rounded-xl border border-indigo-300 bg-background text-indigo-800 hover:bg-indigo-100 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-check mr-1.5"></i>Marcar impresa</button>
+                        } @else {
+                          <div class="h-10 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-black flex items-center justify-center"><i class="pi pi-check-circle mr-1.5"></i>Impresión confirmada</div>
+                        }
+                      </div>
+                    </section>
                   </div>
                 }
               }
             </div>
-            <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2">
-              <button (click)="cerrarGestionCartillas()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
-              @if (loteCartillasActual(); as preparacion) {
-                <button (click)="imprimirCartillas()" [disabled]="generandoCartillas()" class="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spinner]="generandoCartillas()" [class.pi-spin]="generandoCartillas()" [class.pi-print]="!generandoCartillas()"></i>{{ generandoCartillas() ? 'Preparando impresión...' : 'Imprimir marcas' }}</button>
-                @if (preparacion.estadoImpresion !== 'IMPRESO') {
-                  <button (click)="confirmarImpresionCartillas()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"><i class="pi pi-check mr-1.5"></i>Marcar como impreso</button>
-                }
-              }
+            <div class="p-4 border-t border-border flex justify-end shrink-0 bg-muted/20">
+              <button (click)="cerrarGestionCartillas()" class="px-5 py-2.5 rounded-xl border border-border bg-background hover:bg-muted text-xs font-black text-foreground cursor-pointer">Cerrar</button>
             </div>
           </div>
         </div>
@@ -1927,6 +1988,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   private readonly _omrService = inject(OmrProcesamientoService);
   private readonly _configuracionEvaluaciones = inject(ConfiguracionEvaluacionesService);
   private readonly _sinCartillaService = inject(ExamenSinCartillaService);
+  private readonly _feedback = inject(UiFeedbackService);
 
   // Sedes y Carreras desde SEA Gateway
   public sedes = signal<BranchOffice[]>([]);
@@ -1991,6 +2053,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   public configuracionGeneracion = signal<ConfiguracionGeneracion | null>(null);
   public cargandoConfiguracionGeneracion = signal<boolean>(false);
   public estadoMarcas = signal<Record<string, string>>({});
+  public estadoListas = signal<Record<string, string>>({});
 
   // Generación real vía backend
   public bancoSeleccionado = signal<BancoPreguntasResponse | null>(null);
@@ -2037,6 +2100,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   public loteCartillasActual = signal<PreparacionCartillasOmr | null>(null);
   public cargandoCartillas = signal<boolean>(false);
   public generandoCartillas = signal<boolean>(false);
+  public generandoListaCartillas = signal<boolean>(false);
 
   // Calificación OMR integrada al flujo de estados.
   public dialogCalificacionOmr = signal<boolean>(false);
@@ -2097,9 +2161,17 @@ export class EvaluacionesDiaComponent implements OnInit {
     const totalEst = this.estudiantesInscritos().length;
     const ratio = this.ratioEstudiantesPorVariante() || 5;
     if (totalEst <= 0) return 1;
-    const num = Math.ceil(totalEst / ratio);
-    return Math.min(Math.max(num, 1), 5);
+    let num = Math.max(1, Math.floor(totalEst / ratio + 0.5));
+    if (totalEst > ratio && num === 1) num = 2;
+    return Math.max(Math.min(num, 702), 1);
   });
+
+  public onRatioEstudiantesPorVarianteChange(event: Event): void {
+    const valor = Number((event.target as HTMLInputElement).value);
+    if (Number.isFinite(valor)) {
+      this.ratioEstudiantesPorVariante.set(Math.min(30, Math.max(1, Math.trunc(valor))));
+    }
+  }
 
   private _normalizar(texto: string): string {
     if (!texto) return '';
@@ -2338,7 +2410,8 @@ export class EvaluacionesDiaComponent implements OnInit {
       fechaValidacion: rol.fechaValidacion,
       etapa,
       hora: rol.horario.split('-')[0]?.trim() || '08:15',
-      variantesGeneradas: rol.variantesGeneradasCount
+      variantesGeneradas: rol.variantesGeneradasCount,
+      bancoPreguntasCargado: rol.bancoPreguntasCargado
     };
   }
 
@@ -2397,21 +2470,44 @@ export class EvaluacionesDiaComponent implements OnInit {
     return this.estadoMarcas()[item.id] === 'IMPRESO';
   }
 
+  public textoEstadoMarcas(item: EvaluacionItemUI): string {
+    return this.textoEstadoImpresion(this.estadoMarcas()[item.id]);
+  }
+
+  public textoEstadoLista(item: EvaluacionItemUI): string {
+    return this.textoEstadoImpresion(this.estadoListas()[item.id]);
+  }
+
+  public textoEstadoImpresion(estado?: string): string {
+    if (estado === 'IMPRESO') return 'Impresa';
+    if (estado === 'PENDIENTE') return 'Pendiente';
+    return 'Consultando…';
+  }
+
   public bancoPreguntasCargado(item: EvaluacionItemUI): boolean {
     return item.bancoPreguntasCargado === true || this.estadoBancos()[item.id] === true;
   }
 
   private _cargarEstadoBancos(items: EvaluacionItemUI[]): void {
-    this.estadoBancos.set({});
+    const estadosIniciales: Record<string, boolean> = {};
+    items.forEach(item => {
+      if (item.bancoPreguntasCargado !== undefined) {
+        estadosIniciales[item.id] = item.bancoPreguntasCargado;
+      }
+    });
+    this.estadoBancos.set(estadosIniciales);
     if (items.length === 0) return;
 
-    const consultas = items.map(item => this._bancoService.obtenerPorRol(item.id).pipe(
+    const itemsSinIndicador = items.filter(item => item.bancoPreguntasCargado === undefined);
+    if (itemsSinIndicador.length === 0) return;
+
+    const consultas = itemsSinIndicador.map(item => this._bancoService.obtenerPorRol(item.id).pipe(
       catchError(() => of(null))
     ));
     forkJoin(consultas).subscribe(bancos => {
-      const estados: Record<string, boolean> = {};
+      const estados: Record<string, boolean> = { ...this.estadoBancos() };
       bancos.forEach((banco, indice) => {
-        estados[items[indice].id] = banco !== null;
+        estados[itemsSinIndicador[indice].id] = banco !== null;
       });
       this.estadoBancos.set(estados);
     });
@@ -2419,16 +2515,29 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   private _cargarEstadoMarcas(items: EvaluacionItemUI[]): void {
     this.estadoMarcas.set({});
+    this.estadoListas.set({});
     items.filter(item => this.puedeGestionarCartillas(item)).forEach(item => {
       this._cartillasOmr.obtenerPreparacion(item.id).subscribe({
-        next: preparacion => this.estadoMarcas.update(estados => ({
-          ...estados,
-          [item.id]: preparacion.estadoImpresion
-        })),
-        error: () => this.estadoMarcas.update(estados => ({
-          ...estados,
-          [item.id]: 'SIN_GENERAR'
-        }))
+        next: preparacion => {
+          this.estadoMarcas.update(estados => ({
+            ...estados,
+            [item.id]: preparacion.estadoImpresion
+          }));
+          this.estadoListas.update(estados => ({
+            ...estados,
+            [item.id]: preparacion.estadoImpresionLista
+          }));
+        },
+        error: () => {
+          this.estadoMarcas.update(estados => ({
+            ...estados,
+            [item.id]: 'SIN_GENERAR'
+          }));
+          this.estadoListas.update(estados => ({
+            ...estados,
+            [item.id]: 'SIN_GENERAR'
+          }));
+        }
       });
     });
   }
@@ -2441,6 +2550,8 @@ export class EvaluacionesDiaComponent implements OnInit {
     this._cartillasOmr.obtenerPreparacion(item.id).subscribe({
       next: preparacion => {
         this.loteCartillasActual.set(preparacion);
+        this.estadoMarcas.update(estados => ({ ...estados, [item.id]: preparacion.estadoImpresion }));
+        this.estadoListas.update(estados => ({ ...estados, [item.id]: preparacion.estadoImpresionLista }));
         this.cargandoCartillas.set(false);
       },
       error: () => {
@@ -2470,16 +2581,45 @@ export class EvaluacionesDiaComponent implements OnInit {
         }
         window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
         this.generandoCartillas.set(false);
-        this._mostrarToast('Marcas generadas temporalmente. Puedes imprimirlas desde la ventana del PDF.');
+        this._mostrarToast('Marcas OMR generadas. Puedes imprimirlas desde la ventana del PDF.');
       },
         error: err => {
           ventana?.close();
           this.generandoCartillas.set(false);
           this._mostrarToast(
             err?.error?.message || err?.error?.error || err?.message ||
-            'No se pudo preparar la impresión de marcas.',
+            'No se pudo preparar el PDF de marcas.',
             'error'
           );
+      }
+    });
+  }
+
+  public imprimirListaEstudiantes(): void {
+    const item = this.evaluacionSeleccionadaCartillas();
+    if (!item || this.generandoListaCartillas()) return;
+    this.generandoListaCartillas.set(true);
+    const ventana = window.open('', '_blank');
+    this._cartillasOmr.imprimirLista(item.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        if (ventana) {
+          ventana.location.href = url;
+        } else {
+          window.open(url, '_blank');
+        }
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        this.generandoListaCartillas.set(false);
+        this._mostrarToast('Lista de estudiantes generada. Puedes imprimirla desde la ventana del PDF.');
+      },
+      error: err => {
+        ventana?.close();
+        this.generandoListaCartillas.set(false);
+        this._mostrarToast(
+          err?.error?.message || err?.error?.error || err?.message ||
+          'No se pudo preparar el PDF de la lista de estudiantes.',
+          'error'
+        );
       }
     });
   }
@@ -2494,6 +2634,19 @@ export class EvaluacionesDiaComponent implements OnInit {
         this._mostrarToast('La impresión de marcas fue confirmada.');
       },
       error: () => this._mostrarToast('No se pudo confirmar la impresión de marcas.', 'error')
+    });
+  }
+
+  public confirmarImpresionLista(): void {
+    const item = this.evaluacionSeleccionadaCartillas();
+    if (!item) return;
+    this._cartillasOmr.marcarListaImpresaTemporal(item.id).subscribe({
+      next: actualizado => {
+        this.loteCartillasActual.set(actualizado);
+        this._mostrarToast('La impresión de la lista de estudiantes fue confirmada.');
+        this.estadoListas.update(estados => ({ ...estados, [item.id]: actualizado.estadoImpresionLista }));
+      },
+      error: () => this._mostrarToast('No se pudo confirmar la impresión de la lista.', 'error')
     });
   }
 
@@ -2563,7 +2716,10 @@ export class EvaluacionesDiaComponent implements OnInit {
         { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
       ];
     }
-    return this.flujoOficial;
+    return this.flujoOficial.map(step => step.key === 'Pendiente de notas'
+      && item.modalidad === 'PRESENCIAL_CARTILLA'
+      ? { ...step, label: 'Pendiente de calificación' }
+      : step);
   }
 
   public getPasoBotonClass(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): string {
@@ -2612,7 +2768,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     if (pasoIdx === currentIdx) return `Estado actual: ${st.label}`;
     if (pasoIdx === currentIdx + 1) {
       if (st.key === 'Validado') return 'Clic para Validar y Encriptar Examen de Docente';
-      if (st.key === 'Generado') return 'Clic para generar el examen PDF (30 preguntas A-E)';
+      if (st.key === 'Generado') return 'Clic para generar el examen PDF';
       if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') return 'Preparar sala virtual, variantes y tokens de acceso';
       if (st.key === 'Pendiente de notas') return 'Habilita la carga de notas del docente o el procesamiento OMR';
       return `Clic para avanzar a: ${st.label}`;
@@ -2663,7 +2819,7 @@ export class EvaluacionesDiaComponent implements OnInit {
         next: rolActualizado => {
           const actualizado = this._mapearRolResponseA_UI(rolActualizado);
           this.evaluaciones.update(items => items.map(actual => actual.id === item.id ? actualizado : actual));
-          this._mostrarToast(`${item.codigo}: Estado avanzado a '${pasoKey}'.`);
+          this._mostrarToast(`${item.codigo}: Estado avanzado a '${this.etiquetaPaso(actualizado, actualizado.etapa)}'.`);
         },
         error: err => this._mostrarToast(err?.error?.message || 'No se pudo actualizar el estado oficial del examen.', 'error')
       });
@@ -2682,6 +2838,12 @@ export class EvaluacionesDiaComponent implements OnInit {
       'Calificado': 'CALIFICADO'
     };
     return estados[etapa];
+  }
+
+  private etiquetaPaso(item: EvaluacionItemUI, etapa: EtapaEvaluacion): string {
+    return item.modalidad === 'PRESENCIAL_CARTILLA' && etapa === 'Pendiente de notas'
+      ? 'Pendiente de calificación'
+      : etapa;
   }
 
   public abrirCalificacionOmr(item: EvaluacionItemUI): void {
@@ -2907,13 +3069,16 @@ export class EvaluacionesDiaComponent implements OnInit {
     }));
   }
 
-  public recalibrarPaginaOmr(lectura: OmrLecturaResponse): void {
+  public async recalibrarPaginaOmr(lectura: OmrLecturaResponse): Promise<void> {
     const item = this.evaluacionSeleccionadaOmr();
     const codigo = this.codigoOmr(lectura).trim();
     if (!item || !codigo || this.recalibrandoOmr()[lectura.pagina]) return;
 
-    const confirmar = window.confirm(
-      `El código ${codigo} se cotejará con la nómina oficial del grupo ${item.grupo}. ¿Confirmar y recalibrar esta página?`
+    const confirmar = await this._feedback.confirmar(
+      `El código ${codigo} se cotejará con la nómina oficial del grupo ${item.grupo}. ¿Confirmar y recalibrar esta página?`,
+      'Recalibrar página OMR',
+      'warning',
+      'Recalibrar'
     );
     if (!confirmar) return;
 
@@ -3281,10 +3446,22 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.evaluacionSeleccionadaParaParametrizar.set(null);
   }
 
-  public getLetraVarianteParaIndice(idx: number): 'A' | 'B' | 'C' | 'D' | 'E' {
+  public getLetraVarianteParaIndice(idx: number): string {
     const numVariantes = this.variantesCalculadas();
-    const letras: ('A' | 'B' | 'C' | 'D' | 'E')[] = ['A', 'B', 'C', 'D', 'E'];
+    const letras = this.generarEtiquetasVariantes(numVariantes);
     return letras[idx % numVariantes];
+  }
+
+  private generarEtiquetasVariantes(cantidad: number): string[] {
+    return Array.from({ length: Math.max(1, cantidad) }, (_, indice) => {
+      let valor = indice;
+      let etiqueta = '';
+      do {
+        etiqueta = String.fromCharCode(65 + (valor % 26)) + etiqueta;
+        valor = Math.floor(valor / 26) - 1;
+      } while (valor >= 0);
+      return etiqueta;
+    });
   }
 
   public ejecutarGeneracionVariantes(): void {
@@ -3299,8 +3476,7 @@ export class EvaluacionesDiaComponent implements OnInit {
 
     const cantVariantes = this.variantesCalculadas();
     const estudiantes = this.estudiantesInscritos();
-    const letras: ('A' | 'B' | 'C' | 'D' | 'E')[] = ['A', 'B', 'C', 'D', 'E'];
-    const variantes = letras.slice(0, cantVariantes);
+    const variantes = this.generarEtiquetasVariantes(cantVariantes);
     const esVirtual = item.modalidad === 'VIRTUAL';
 
     if (esVirtual && this.rolVirtualVerificadoParaGenerar !== item.id) {
@@ -3563,10 +3739,15 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.motivoRestablecimientoSalaVirtual = '';
   }
 
-  public emitirTokenGrupoDesdeLista(): void {
+  public async emitirTokenGrupoDesdeLista(): Promise<void> {
     const sala = this.salaVirtualCreada();
     if (!sala || this.emitiendoTokenGrupoVirtual()) return;
-    const confirmar = window.confirm('Se emitirá un token grupal nuevo y el anterior dejará de funcionar. ¿Deseas continuar?');
+    const confirmar = await this._feedback.confirmar(
+      'Se emitirá un token grupal nuevo y el anterior dejará de funcionar. ¿Deseas continuar?',
+      'Renovar token grupal',
+      'warning',
+      'Renovar token'
+    );
     if (!confirmar) return;
 
     this.emitiendoTokenGrupoVirtual.set(true);

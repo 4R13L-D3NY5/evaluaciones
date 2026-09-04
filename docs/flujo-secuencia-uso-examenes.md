@@ -112,14 +112,12 @@ sequenceDiagram
     Sistema-->>Personal: Rol ENTREGADO
     Estudiante->>Personal: Devuelve examen y cartilla marcada
     Personal->>Sistema: Registra devolución
-    Sistema-->>Personal: Rol DEVUELTO
+    Sistema-->>Personal: Registra DEVUELTO en bitácora y deja el rol PENDIENTE_NOTAS
     Personal->>OMR: Carga PDF o imágenes escaneadas
     OMR->>OMR: Detecta código, marcas y variante
     OMR->>Sistema: Devuelve respuestas y lecturas
     Sistema->>Sistema: Calcula aciertos y notas
     Personal->>Sistema: Corrige lecturas excepcionales si corresponde
-    Personal->>Sistema: Confirma resultados
-    Sistema-->>Personal: Rol PENDIENTE_NOTAS
     Personal->>Sistema: Confirma resultados OMR
     Sistema-->>Personal: Rol CALIFICADO y notas persistidas
 ```

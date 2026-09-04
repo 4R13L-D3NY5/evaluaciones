@@ -38,11 +38,22 @@ public class CartillaOmrController {
 
     @PostMapping(value = "/imprimir", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
-    @Operation(summary = "Generar temporalmente la sobreimpresión OMR y devolverla al navegador")
+    @Operation(summary = "Generar temporalmente las marcas OMR y devolverlas al navegador")
     public ResponseEntity<byte[]> imprimir(@PathVariable String rolExamenId) {
         byte[] pdf = cartillaOmrService.generarPdfTemporal(rolExamenId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=marcas-omr-" + rolExamenId + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @PostMapping(value = "/imprimir-lista", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @Operation(summary = "Generar temporalmente la lista de estudiantes y devolverla al navegador")
+    public ResponseEntity<byte[]> imprimirLista(@PathVariable String rolExamenId) {
+        byte[] pdf = cartillaOmrService.generarListaPdfTemporal(rolExamenId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=lista-estudiantes-" + rolExamenId + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
     }
@@ -54,6 +65,15 @@ public class CartillaOmrController {
                                                                               @RequestBody(required = false) GenerarCartillasOmrRequestDto request) {
         String usuario = request == null ? null : request.usuario();
         return ResponseEntity.ok(cartillaOmrService.marcarImpresion(rolExamenId, usuario));
+    }
+
+    @PostMapping("/marcar-lista-impresa")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @Operation(summary = "Registrar la confirmación de impresión de la lista de estudiantes")
+    public ResponseEntity<PreparacionCartillasOmrResponseDto> marcarListaImpresa(@PathVariable String rolExamenId,
+                                                                                   @RequestBody(required = false) GenerarCartillasOmrRequestDto request) {
+        String usuario = request == null ? null : request.usuario();
+        return ResponseEntity.ok(cartillaOmrService.marcarListaImpresion(rolExamenId, usuario));
     }
 
     @PostMapping("/generar")

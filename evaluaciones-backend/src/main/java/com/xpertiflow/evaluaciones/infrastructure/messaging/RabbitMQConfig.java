@@ -11,6 +11,7 @@ public class RabbitMQConfig {
     public static final String QUEUE_GENERACION_RESULTADO = "evaluaciones.generacion.resultado";
     public static final String QUEUE_OMR_PROCESAR = "evaluaciones.omr.procesar";
     public static final String QUEUE_OMR_RESULTADO = "evaluaciones.omr.resultado";
+    public static final String QUEUE_BACKUPS = "evaluaciones.backups";
 
     @Bean
     public Queue generacionTypstQueue() {
@@ -30,5 +31,10 @@ public class RabbitMQConfig {
     @Bean
     public Queue omrResultadoQueue() {
         return new Queue(QUEUE_OMR_RESULTADO, true);
+    }
+
+    @Bean
+    public Queue backupsQueue() {
+        return new Queue(QUEUE_BACKUPS, true);
     }
 }

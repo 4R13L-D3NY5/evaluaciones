@@ -9,6 +9,32 @@ from src import config, db, generator, messaging, vault_crypto
 
 logger = logging.getLogger(__name__)
 
+MAX_VARIANTES = 702
+
+
+def _etiqueta_variante(indice: int) -> str:
+    """Devuelve etiquetas tipo Excel: A..Z, AA..ZZ."""
+    if indice < 0:
+        raise ValueError("El índice de variante no puede ser negativo")
+    etiqueta = ""
+    valor = indice
+    while True:
+        valor, residuo = divmod(valor, 26)
+        etiqueta = chr(65 + residuo) + etiqueta
+        if valor == 0:
+            return etiqueta
+        valor -= 1
+
+
+def _catalogo_variantes(cantidad: int) -> list[str]:
+    if cantidad < 1:
+        return []
+    if cantidad > MAX_VARIANTES:
+        raise ValueError(
+            f"La generación requiere {cantidad} variantes y supera el máximo seguro de {MAX_VARIANTES}"
+        )
+    return [_etiqueta_variante(indice) for indice in range(cantidad)]
+
 
 def _normalizar_estudiante(estudiante: dict[str, Any]) -> dict[str, Any]:
     """Normaliza estudiantes oficiales enviados por el backend o leídos de DB."""
@@ -25,12 +51,87 @@ def _normalizar_estudiante(estudiante: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _normalizar_reactivo_previsualizacion(item: dict[str, Any], indice: int) -> dict[str, Any]:
+    """Adapta un reactivo aún no persistido al contrato del generador Typst."""
+    tipo = item.get("tipo_reactivo") or item.get("tipo") or "SELECCION_MEJOR_RESPUESTA"
+    nivel = item.get("nivel_dificultad") or item.get("dificultad")
+    try:
+        nivel = int(nivel)
+    except (TypeError, ValueError):
+        nivel = {"fácil": 1, "facil": 1, "medio": 2, "difícil": 3, "dificil": 3}.get(
+            str(nivel or "").strip().lower(), 2
+        )
+    nivel = max(1, min(3, nivel))
+    opciones = item.get("opciones_json")
+    if not isinstance(opciones, str):
+        respuesta = str(item.get("respuesta_correcta") or "").strip().upper()
+        opciones = json.dumps([
+            {
+                "letra": letra,
+                "texto": item.get(f"opcion_{letra.lower()}") or "",
+                "correcta": respuesta == letra,
+            }
+            for letra in ("A", "B", "C", "D", "E")
+            if item.get(f"opcion_{letra.lower()}")
+        ], ensure_ascii=False)
+    return {
+        "id": item.get("id") or item.get("fila") or f"preview-{indice}",
+        "numero_orden": item.get("numero_orden") or item.get("fila") or indice,
+        "tipo_reactivo": tipo,
+        "grupo_contexto": item.get("grupo_contexto") or item.get("grupo"),
+        "enunciado": item.get("enunciado") or "",
+        "imagen_base64": item.get("imagen_base64"),
+        "nivel_dificultad": nivel,
+        "dificultad": {1: "Fácil", 2: "Medio", 3: "Difícil"}[nivel],
+        "opciones_json": opciones,
+    }
+
+
+def procesar_previsualizacion(payload: dict[str, Any]) -> dict[str, Any]:
+    """Compila una vista temporal sin cifrar ni persistir datos operativos."""
+    rol = db.obtener_rol_examen(payload["rolExamenId"])
+    if not rol:
+        raise ValueError(f"No existe el rol de examen {payload['rolExamenId']}")
+    reactivos = [
+        _normalizar_reactivo_previsualizacion(item, indice)
+        for indice, item in enumerate(payload.get("preguntasPreview") or [], start=1)
+        if isinstance(item, dict)
+    ]
+    if not reactivos or not any(not generator._es_macro(item) for item in reactivos):
+        raise ValueError(
+            "La previsualización requiere al menos una pregunta respondible"
+        )
+    variante = generator.generar_variante(
+        "A",
+        reactivos,
+        rol,
+        payload.get("outputBasePath", "/app/storage/generados/previsualizaciones"),
+        generar_pdf=True,
+        modo_previsualizacion=True,
+    )
+    return {
+        "jobId": payload["jobId"],
+        "rolExamenId": payload["rolExamenId"],
+        "estado": "COMPLETADO",
+        "modoPrevisualizacion": True,
+        "mensaje": "Previsualización Typst generada correctamente",
+        "variantes": [{
+            "letra": "A",
+            "semilla": variante["semilla"],
+            "totalPreguntas": len(json.loads(variante["patronClavesJson"])),
+            "archivoPdfPath": variante["archivoPdfPath"],
+            "archivoTypstPath": variante["archivoTypstPath"],
+        }],
+        "mapeos": [],
+    }
+
+
 def _asignar_variantes_aleatorias(
     estudiantes: list[dict[str, Any]],
     variantes_disponibles: list[str],
     ratio: int,
 ) -> list[str]:
-    """Asigna variantes en grupos de ratio estudiantes, con orden aleatorio."""
+    """Distribuye estudiantes de forma equilibrada entre las variantes."""
     if not estudiantes:
         return []
     if ratio < 1:
@@ -40,14 +141,26 @@ def _asignar_variantes_aleatorias(
     randomizador = random.SystemRandom()
     randomizador.shuffle(indices)
 
+    cantidad_variantes = len(variantes_disponibles)
+    base, sobrantes = divmod(len(estudiantes), cantidad_variantes)
+    cupos = [base] * cantidad_variantes
+    # Los sobrantes se agregan al final: 13 estudiantes en A/B/C queda 4/4/5.
+    for indice in range(sobrantes):
+        cupos[cantidad_variantes - 1 - indice] += 1
+
     asignaciones = [variantes_disponibles[0]] * len(estudiantes)
-    for posicion, indice_estudiante in enumerate(indices):
-        indice_variante = min(posicion // ratio, len(variantes_disponibles) - 1)
-        asignaciones[indice_estudiante] = variantes_disponibles[indice_variante]
+    cursor = 0
+    for indice_variante, cupo in enumerate(cupos):
+        for indice_estudiante in indices[cursor:cursor + cupo]:
+            asignaciones[indice_estudiante] = variantes_disponibles[indice_variante]
+        cursor += cupo
     return asignaciones
 
 
 def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("modoPrevisualizacion"):
+        return procesar_previsualizacion(payload)
+
     job_id = payload["jobId"]
     rol_examen_id = payload["rolExamenId"]
     banco_preguntas_id = payload["bancoPreguntasId"]
@@ -86,19 +199,31 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
     if any(not item.get("codigo_estudiante") or not item.get("nombres") for item in estudiantes):
         raise ValueError("La nómina oficial contiene estudiantes sin código o nombre completo")
 
-    cantidad_requerida = max(1, (len(estudiantes) + max(ratio, 1) - 1) // max(ratio, 1))
-    letras_catalogo = ["A", "B", "C", "D", "E"]
+    # El ratio orienta cuántas variantes se preparan. Cuando la división no es
+    # exacta se redondea al número de variantes más razonable y luego se
+    # reparte la nómina con diferencia máxima de un estudiante.
+    cantidad_requerida = max(1, int(len(estudiantes) / max(ratio, 1) + 0.5))
+    if len(estudiantes) > ratio and cantidad_requerida == 1:
+        cantidad_requerida = 2
+    letras_catalogo = _catalogo_variantes(MAX_VARIANTES)
     if not variantes_letras:
         variantes_letras = letras_catalogo[:cantidad_requerida]
     else:
         variantes_letras = [letra for letra in variantes_letras if letra in letras_catalogo]
         variantes_letras = variantes_letras[:max(cantidad_requerida, 1)]
+        # El cliente puede ser antiguo y enviar solamente A-E. Completar el
+        # catálogo evita rechazar ratio 1 cuando hay más de cinco estudiantes.
+        for letra in letras_catalogo:
+            if len(variantes_letras) >= cantidad_requerida:
+                break
+            if letra not in variantes_letras:
+                variantes_letras.append(letra)
     if not variantes_letras:
         raise ValueError("No se definieron variantes válidas para generar el examen")
-    if len(estudiantes) > ratio * len(letras_catalogo):
+    if len(variantes_letras) < cantidad_requerida:
         raise ValueError(
-            f"El rol tiene {len(estudiantes)} estudiantes y supera el máximo de "
-            f"{ratio * len(letras_catalogo)} con ratio {ratio}"
+            f"No se pudieron preparar {cantidad_requerida} variantes para "
+            f"{len(estudiantes)} estudiantes con ratio {ratio}"
         )
 
     variantes_result = []

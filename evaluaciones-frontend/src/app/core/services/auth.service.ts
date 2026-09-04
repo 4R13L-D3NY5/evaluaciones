@@ -13,6 +13,7 @@ export class AuthService {
 
   public readonly usuario = signal<UsuarioSesion | null>(null);
   public readonly cargando = signal(false);
+  private readonly sesionExpirada = signal(false);
 
   public iniciarSesion(usuario: string, contrasena: string): Observable<UsuarioSesion> {
     this.cargando.set(true);
@@ -26,6 +27,7 @@ export class AuthService {
       tap(sesion => {
         this.usuario.set(sesion);
         this._sessionRequest = of(sesion);
+        this.sesionExpirada.set(false);
         this.cargando.set(false);
       }),
       catchError(error => {
@@ -51,6 +53,7 @@ export class AuthService {
       tap(sesion => {
         this.usuario.set(sesion);
         this.cargando.set(false);
+        this.sesionExpirada.set(false);
       }),
       map(sesion => sesion),
       catchError(error => {
@@ -74,8 +77,18 @@ export class AuthService {
       tap(() => {
         this.usuario.set(null);
         this._sessionRequest = of(null);
+        this.sesionExpirada.set(false);
       })
     );
+  }
+
+  /** Limpia el estado local cuando el servidor informa que la sesión ya no es válida. */
+  public notificarSesionExpirada(): boolean {
+    if (this.sesionExpirada()) return false;
+    this.sesionExpirada.set(true);
+    this.usuario.set(null);
+    this._sessionRequest = of(null);
+    return true;
   }
 
   public cambiarContrasena(contrasenaActual: string, contrasenaNueva: string): Observable<UsuarioSesion> {
@@ -86,6 +99,7 @@ export class AuthService {
       tap(sesion => {
         this.usuario.set(sesion);
         this._sessionRequest = of(sesion);
+        this.sesionExpirada.set(false);
       })
     );
   }

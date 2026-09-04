@@ -18,7 +18,7 @@ public class ExamenVariante {
     @Column(name = "rol_examen_id", length = 64, nullable = false)
     private String rolExamenId;
 
-    @Column(name = "letra_variante", length = 1, nullable = false)
+    @Column(name = "letra_variante", length = 4, nullable = false)
     private String letraVariante;
 
     @Column(name = "nombre_variante", length = 20, nullable = false)

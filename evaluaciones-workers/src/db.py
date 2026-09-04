@@ -46,10 +46,17 @@ def obtener_reactivos_por_banco(banco_preguntas_id: str) -> list[dict[str, Any]]
     reactivos = descifrar_json(banco, contexto)
     if not isinstance(reactivos, list):
         raise RuntimeError("El paquete cifrado del banco no contiene una lista de reactivos")
-    return [
-        {
-            "id": item.get("id"),
-            "numero_orden": item.get("numeroOrden", item.get("numero_orden")),
+    resultado = []
+    for posicion, item in enumerate(reactivos, start=1):
+        if not isinstance(item, dict):
+            continue
+        numero_orden = item.get("numeroOrden", item.get("numero_orden")) or posicion
+        # Los bancos cifrados antes de la asignación del id de PostgreSQL
+        # traen id nulo. La posición garantiza selección y agrupación estable
+        # también para esos bancos ya existentes.
+        resultado.append({
+            "id": item.get("id") or f"reactivo-{numero_orden}",
+            "numero_orden": numero_orden,
             "tipo_reactivo": item.get("tipoReactivo", item.get("tipo_reactivo")),
             "dificultad": item.get("dificultad"),
             "nivel_dificultad": item.get("nivelDificultad", item.get("nivel_dificultad")),
@@ -59,10 +66,8 @@ def obtener_reactivos_por_banco(banco_preguntas_id: str) -> list[dict[str, Any]]
             "opciones_json": item.get("opcionesJson", item.get("opciones_json", "[]")),
             "respuesta_correcta": item.get("respuestaCorrecta", item.get("respuesta_correcta")),
             "peso_puntos": item.get("pesoPuntos", item.get("peso_puntos")),
-        }
-        for item in reactivos
-        if isinstance(item, dict)
-    ]
+        })
+    return resultado
 
 
 def obtener_paquete_cifrado_por_banco(banco_preguntas_id: str) -> dict[str, Any]:

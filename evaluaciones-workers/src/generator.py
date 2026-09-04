@@ -101,21 +101,46 @@ def _sanitize_math(math_text: str) -> str:
     entre comillas para mostrarse como texto. Se respetan funciones y
     constantes matemáticas comunes, así como variables de una sola letra.
     """
+    # Alias frecuentes de la plantilla oficial. Se convierten a símbolos
+    # Typst antes de envolver palabras de texto para que no aparezcan como
+    # texto literal en el PDF final. Nunca se alteran cadenas entre comillas.
+    math_text = _replace_math_outside_quotes(math_text, r"\\(?:times|cdot)\b", "times", re.IGNORECASE)
+    math_text = _replace_math_outside_quotes(math_text, r"\\(?:rightarrow|to)\b", "arrow", re.IGNORECASE)
+    math_text = _replace_math_outside_quotes(math_text, r"\\pm\b", "plus.minus")
+    math_text = _replace_math_outside_quotes(math_text, r"\+\s*-", "plus.minus")
+    math_text = _replace_math_outside_quotes(math_text, r"-\s*\+", "minus.plus")
+    math_text = _replace_math_outside_quotes(math_text, r"=>|->", "arrow")
+
     funciones = {
         "log", "ln", "lg", "sin", "cos", "tan", "cot", "sec", "csc",
         "arcsin", "arccos", "arctan", "arcsinh", "arccosh", "arctanh",
         "sinh", "cosh", "tanh", "exp", "sqrt", "lim", "sum", "prod",
         "int", "pi", "alpha", "beta", "gamma", "delta", "epsilon",
         "theta", "lambda", "mu", "sigma", "omega", "phi", "psi",
+        "times", "arrow", "plus", "minus",
     }
 
     def _repl(match: re.Match) -> str:
         word = match.group(0)
+        if word.startswith('"') and word.endswith('"'):
+            return word
         if len(word) == 1 or word.lower() in funciones:
             return word
         return f'"{word}"'
 
-    return re.sub(r"[A-Za-z]+", _repl, math_text)
+    # Las cadenas ya delimitadas por comillas son texto Typst válido. El
+    # sanitizador anterior volvía a envolverlas y producía `""Reparo""`,
+    # que Typst interpretaba como una variable no definida.
+    return re.sub(r'"(?:\\.|[^"\\])*"|[A-Za-z]+', _repl, math_text)
+
+
+def _replace_math_outside_quotes(text: str, pattern: str, replacement: str, flags: int = 0) -> str:
+    """Aplica una sustitución dentro de una fórmula sin tocar textos citados."""
+    segmentos = re.split(r'("(?:\\.|[^"\\])*")', text)
+    return "".join(
+        segmento if indice % 2 == 1 else re.sub(pattern, replacement, segmento, flags=flags)
+        for indice, segmento in enumerate(segmentos)
+    )
 
 
 def _typst_content(texto: str) -> str:
@@ -124,7 +149,9 @@ def _typst_content(texto: str) -> str:
     El texto plano se envuelve en #raw(..., block: false) para evitar que
     caracteres como #, _, * o @ se interpreten como comandos o marcado.
     Los bloques delimitados por $...$ se sanitizan para que palabras de
-    texto se muestren correctamente en modo matemático.
+    texto se muestren correctamente en modo matemático. Las fórmulas se
+    colocan en una línea propia para que una ecuación larga no desborde el
+    ancho de la hoja ni altere el formato del texto que la acompaña.
     """
     if not texto:
         return '#raw("", block: false)'
@@ -138,15 +165,20 @@ def _typst_content(texto: str) -> str:
         if idx % 2 == 1:
             # Segmento matemático: sanitizar palabras de texto.
             math_body = segmento[1:-1]
+            if any(part.strip() for part in segmentos[:idx]):
+                partes.append("#linebreak()")
             partes.append(f"$ {_sanitize_math(math_body)} $")
+            if any(part.strip() for part in segmentos[idx + 1:]):
+                partes.append("#linebreak()")
         else:
             # Texto plano: escapar comillas dobles para el raw de Typst.
             escapado = segmento.replace("\\", "\\\\").replace('"', '\\"')
             partes.append(f'#raw("{escapado}", block: false)')
 
-    if len(partes) == 1:
-        return partes[0]
-    return " + ".join(partes)
+    # En Typst el contenido se concatena por adyacencia. El signo `+` no es
+    # un operador de concatenación en este contexto y terminaría apareciendo
+    # impreso entre el texto y la fórmula.
+    return "".join(partes)
 
 
 def _preparar_imagen_typst(imagen_base64: Any, image_dir: str | None, indice: int) -> str | None:
@@ -258,42 +290,78 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
     # Los macros de caso/emparejamiento son contexto, no preguntas que el
     # estudiante pueda responder. Nunca deben consumir una cuota.
     respondibles = [r for r in reactivos if not _es_macro(r)]
-    faciles = [r for r in respondibles if r["nivel_dificultad"] == 1 or r["dificultad"] == "Fácil"]
-    medias = [r for r in respondibles if r["nivel_dificultad"] == 2 or r["dificultad"] == "Medio"]
-    dificiles = [r for r in respondibles if r["nivel_dificultad"] == 3 or r["dificultad"] == "Difícil"]
+    # Los bancos antiguos pueden no tener id de PostgreSQL dentro del
+    # paquete cifrado. En ese caso se usa la posición del reactivo, que es
+    # estable durante toda esta selección y evita perder preguntas simples.
+    identidades = {
+        id(pregunta): pregunta.get("id") or pregunta.get("numero_orden") or f"reactivo-pos-{indice}"
+        for indice, pregunta in enumerate(respondibles, start=1)
+    }
 
-    def _tomar(lista: list, n: int) -> list:
-        if len(lista) < n:
-            logger.warning("No hay suficientes reactivos de la dificultad solicitada (%d < %d)", len(lista), n)
-            return lista
-        return rng.sample(lista, n)
+    # Un caso clínico o un emparejamiento es una unidad indivisible. La
+    # selección anterior elegía reactivos sueltos y luego expandía el grupo,
+    # por eso una configuración de 30 podía terminar en 38. Se resuelve ahora
+    # como un problema de selección de unidades: el algoritmo busca primero
+    # exactamente TOTAL_PREGUNTAS y, entre esas soluciones, la distribución de
+    # dificultad más cercana a las cuotas institucionales.
+    unidades_por_clave: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    for pregunta in respondibles:
+        grupo = _clave_grupo(pregunta)
+        clave: tuple[Any, ...] = ("grupo", *grupo) if grupo is not None else ("reactivo", identidades[id(pregunta)])
+        unidades_por_clave.setdefault(clave, []).append(pregunta)
 
-    seleccionadas_respondibles = (
-        _tomar(faciles, config.CUOTA_FACILES)
-        + _tomar(medias, config.CUOTA_MEDIAS)
-        + _tomar(dificiles, config.CUOTA_DIFICILES)
+    unidades = list(unidades_por_clave.values())
+    rng.shuffle(unidades)
+    cuotas = (config.CUOTA_FACILES, config.CUOTA_MEDIAS, config.CUOTA_DIFICILES)
+
+    def _conteo_dificultad(unidad: list[dict[str, Any]]) -> tuple[int, int, int]:
+        conteos = [0, 0, 0]
+        for pregunta in unidad:
+            nivel = pregunta.get("nivel_dificultad")
+            if nivel not in (1, 2, 3):
+                dificultad = str(pregunta.get("dificultad") or "").strip().lower()
+                nivel = 1 if dificultad == "fácil" else 2 if dificultad == "medio" else 3 if dificultad == "difícil" else 0
+            if nivel in (1, 2, 3):
+                conteos[nivel - 1] += 1
+        return tuple(conteos)
+
+    # Estado: (total, fáciles, medias, difíciles) -> índices de unidades.
+    estados: dict[tuple[int, int, int, int], tuple[int, ...]] = {(0, 0, 0, 0): ()}
+    for indice, unidad in enumerate(unidades):
+        faciles, medias, dificiles = _conteo_dificultad(unidad)
+        tamano = len(unidad)
+        siguientes = dict(estados)
+        for (total, facil, medio, dificil), seleccion in estados.items():
+            nuevo_total = total + tamano
+            if nuevo_total > config.TOTAL_PREGUNTAS:
+                continue
+            estado = (nuevo_total, facil + faciles, medio + medias, dificil + dificiles)
+            siguientes.setdefault(estado, seleccion + (indice,))
+        estados = siguientes
+
+    candidatos = [
+        (estado, seleccion)
+        for estado, seleccion in estados.items()
+        if estado[0] == config.TOTAL_PREGUNTAS
+    ]
+    if not candidatos:
+        logger.warning("No existe una combinación de bloques que complete exactamente %d preguntas", config.TOTAL_PREGUNTAS)
+        candidatos = [
+            (estado, seleccion)
+            for estado, seleccion in estados.items()
+            if estado[0] == max(estado_candidato[0] for estado_candidato in estados)
+        ]
+    if not candidatos:
+        raise ValueError("El banco no contiene una combinación válida de preguntas para generar la variante")
+
+    _, indices_elegidos = min(
+        candidatos,
+        key=lambda item: sum(abs(item[0][indice + 1] - cuotas[indice]) for indice in range(3)),
     )
-
-    # Los grupos de caso clínico/problema y emparejamiento son bloques
-    # indivisibles. Si la selección por cuota toma un subítem, se incorporan
-    # todos los hermanos del mismo grupo. La cuota se aplica a reactivos
-    # respondibles, pero un bloque puede superar la cuota porque nunca se
-    # permite dejar fuera parte del caso ni alterar el orden de sus subítems.
-    claves_grupos_seleccionadas = {
-        clave
-        for pregunta in seleccionadas_respondibles
-        if (clave := _clave_grupo(pregunta)) is not None
-    }
-    ids_seleccionados = {
-        pregunta.get("id")
-        for pregunta in seleccionadas_respondibles
-        if pregunta.get("id") is not None
-    }
     seleccionadas_respondibles = [
         pregunta
-        for pregunta in respondibles
-        if pregunta.get("id") in ids_seleccionados
-        or _clave_grupo(pregunta) in claves_grupos_seleccionadas
+        for indice in indices_elegidos
+        for pregunta in unidades[indice]
     ]
 
     # Agregar cada macro que sea necesario y colocarlo inmediatamente antes
@@ -314,7 +382,7 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
         tipo: [p for p in seleccionadas_respondibles if p["tipo_reactivo"] == tipo]
         for tipo in TIPOLOGIAS_ORDEN
     }
-    ordenadas: list[dict[str, Any]] = []
+    bloques: list[list[dict[str, Any]]] = []
     for tipo in TIPOLOGIAS_ORDEN:
         if tipo in TIPOS_MACRO:
             continue
@@ -326,27 +394,38 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
                               or (tipo == "SUBITEM_CASO" and clave[0] == "CASO"))
             ]
             grupos_tipo.sort(key=lambda item: min(_numero_orden(hijo) for hijo in item[1]))
+            bloque_tipo: list[dict[str, Any]] = []
             for clave, hijos in grupos_tipo:
                 macro = macros_por_grupo.get(clave)
                 if macro is not None:
-                    ordenadas.append(macro)
-                ordenadas.extend(sorted(hijos, key=_numero_orden))
+                    bloque_tipo.append(macro)
+                bloque_tipo.extend(sorted(hijos, key=_numero_orden))
             # Algunos bancos antiguos no traen grupo_contexto en los hijos;
             # siguen siendo preguntas válidas y no deben desaparecer.
-            ordenadas.extend(
+            bloque_tipo.extend(
                 pregunta for pregunta in por_tipo[tipo]
                 if _clave_grupo(pregunta) is None
             )
+            if bloque_tipo:
+                bloques.append(bloque_tipo)
         else:
-            ordenadas.extend(por_tipo[tipo])
+            bloque = sorted(por_tipo[tipo], key=_numero_orden)
+            if bloque:
+                bloques.append(bloque)
 
     # Conserva tipologías nuevas que no estén todavía en TIPOLOGIAS_ORDEN.
     tipos_conocidos = set(TIPOLOGIAS_ORDEN) | TIPOS_MACRO
-    ordenadas.extend(
-        pregunta for pregunta in seleccionadas_respondibles
-        if pregunta.get("tipo_reactivo") not in tipos_conocidos
-    )
-    return ordenadas
+    tipos_nuevos = {}
+    for pregunta in seleccionadas_respondibles:
+        tipo_nuevo = pregunta.get("tipo_reactivo")
+        if tipo_nuevo not in tipos_conocidos:
+            tipos_nuevos.setdefault(tipo_nuevo, []).append(pregunta)
+    bloques.extend(sorted(tipos_nuevos.values(), key=lambda bloque: min(_numero_orden(p) for p in bloque)))
+
+    # El orden de las secciones cambia por variante, pero cada sección y cada
+    # bloque agrupado conserva su orden interno para no alterar su formato.
+    rng.shuffle(bloques)
+    return [pregunta for bloque in bloques for pregunta in bloque]
 
 
 def _nombre_completo(estudiante: dict[str, Any]) -> str:
@@ -357,8 +436,13 @@ def _nombre_completo(estudiante: dict[str, Any]) -> str:
     )
 
 
-def _cabecera_institucional(rol: dict[str, Any], estudiante: dict[str, Any] | None = None) -> str:
+def _cabecera_institucional(
+    rol: dict[str, Any],
+    estudiante: dict[str, Any] | None = None,
+    total_preguntas: int | None = None,
+) -> str:
     tipo_parcial = _mayusculas(rol.get("tipo_parcial", "1er Parcial"))
+    total_visible = total_preguntas if total_preguntas is not None else config.TOTAL_PREGUNTAS
     cabecera = f"""#table(
   columns: (25%, 75%),
   stroke: 0.5pt + black,
@@ -384,7 +468,7 @@ def _cabecera_institucional(rol: dict[str, Any], estudiante: dict[str, Any] | No
     cabecera += f"""
 #v({config.LEADING})
 #align(center)[
-  #text(weight: "bold")[CUESTIONARIO DE PREGUNTAS ({config.TOTAL_PREGUNTAS})]
+  #text(weight: "bold")[CUESTIONARIO DE PREGUNTAS ({total_visible})]
 ]
 
 #v({config.LEADING})
@@ -598,6 +682,7 @@ def _generar_typst(
     preguntas: list[dict[str, Any]],
     rol: dict[str, Any],
     image_dir: str | None = None,
+    total_preguntas: int | None = None,
 ) -> str:
     """Genera un documento individual compatible para pruebas y compatibilidad."""
     return f'''#set text(
@@ -610,7 +695,7 @@ def _generar_typst(
 
 #set par(leading: {config.LEADING}, spacing: {config.LEADING})
 {_pagina_con_pie(estudiante)}
-{_cabecera_institucional(rol, estudiante)}
+{_cabecera_institucional(rol, estudiante, total_preguntas)}
 {_cuestionario_typst(preguntas, image_dir)}
 '''
 
@@ -666,18 +751,35 @@ def generar_variante(
     rol: dict[str, Any],
     output_base: str,
     generar_pdf: bool = True,
+    modo_previsualizacion: bool = False,
 ) -> dict[str, Any]:
-    seed = config.SEED_POR_VARIANTE.get(letra, 100 + ord(letra))
-    preguntas = seleccionar_preguntas(reactivos, seed)
+    if letra in config.SEED_POR_VARIANTE:
+        seed = config.SEED_POR_VARIANTE[letra]
+    else:
+        # Mantiene una semilla estable también para AA, AB, etc.
+        valor = 0
+        for caracter in letra:
+            valor = valor * 26 + (ord(caracter) - ord("A") + 1)
+        seed = 100 + valor * 53
+    # La generación oficial aplica la selección institucional de 30 reactivos
+    # y distribuye las tipologías entre variantes. La previsualización tiene
+    # otro objetivo: permitir que el docente revise el banco completo, por lo
+    # que debe conservar exactamente la lista recibida y su orden original.
+    preguntas = list(reactivos) if modo_previsualizacion else seleccionar_preguntas(reactivos, seed)
 
     total_respondibles = sum(1 for pregunta in preguntas if not _es_macro(pregunta))
-    if total_respondibles < config.TOTAL_PREGUNTAS:
+    if modo_previsualizacion and total_respondibles == 0:
+        raise ValueError("La previsualización requiere al menos una pregunta respondible")
+    if not modo_previsualizacion and total_respondibles != config.TOTAL_PREGUNTAS:
         raise ValueError(
-            f"No se pudieron seleccionar {config.TOTAL_PREGUNTAS} preguntas respondibles para la variante {letra}"
+            f"La variante {letra} requiere exactamente {config.TOTAL_PREGUNTAS} preguntas respondibles, "
+            f"pero se seleccionaron {total_respondibles}"
         )
 
-    # Barajar opciones de cada pregunta de forma determinística.
-    preguntas = [_barajar_opciones_pregunta(p, seed + idx) for idx, p in enumerate(preguntas)]
+    # Las opciones también deben conservar el orden del banco durante la
+    # revisión. Solo se barajan para la generación oficial de variantes.
+    if not modo_previsualizacion:
+        preguntas = [_barajar_opciones_pregunta(p, seed + idx) for idx, p in enumerate(preguntas)]
 
     # Contrato seguro para el examen web: conserva exactamente el orden y los
     # incisos que se imprimen, pero elimina cualquier marca de respuesta correcta.
@@ -721,7 +823,14 @@ def generar_variante(
         typ_path = os.path.join(work_dir, f"{base_name}.typ")
         pdf_path = os.path.join(work_dir, f"{base_name}.pdf")
 
-        typ_code = _generar_typst(estudiante_default, letra, preguntas, rol, work_dir)
+        typ_code = _generar_typst(
+            estudiante_default,
+            letra,
+            preguntas,
+            rol,
+            work_dir,
+            total_preguntas=total_respondibles if modo_previsualizacion else None,
+        )
         with open(typ_path, "w", encoding="utf-8") as f:
             f.write(typ_code)
 

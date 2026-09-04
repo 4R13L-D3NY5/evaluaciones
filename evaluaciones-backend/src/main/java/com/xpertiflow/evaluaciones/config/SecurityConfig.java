@@ -18,6 +18,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import com.xpertiflow.evaluaciones.infrastructure.security.CambioContrasenaInterceptor;
+import com.xpertiflow.evaluaciones.infrastructure.security.MantenimientoInterceptor;
 
 @Configuration
 @EnableWebSecurity
@@ -25,14 +26,17 @@ import com.xpertiflow.evaluaciones.infrastructure.security.CambioContrasenaInter
 public class SecurityConfig implements WebMvcConfigurer {
 
     private final CambioContrasenaInterceptor cambioContrasenaInterceptor;
+    private final MantenimientoInterceptor mantenimientoInterceptor;
 
-    public SecurityConfig(CambioContrasenaInterceptor cambioContrasenaInterceptor) {
+    public SecurityConfig(CambioContrasenaInterceptor cambioContrasenaInterceptor, MantenimientoInterceptor mantenimientoInterceptor) {
         this.cambioContrasenaInterceptor = cambioContrasenaInterceptor;
+        this.mantenimientoInterceptor = mantenimientoInterceptor;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(cambioContrasenaInterceptor);
+        registry.addInterceptor(mantenimientoInterceptor);
     }
 
     @Bean

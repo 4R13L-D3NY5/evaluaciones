@@ -6,6 +6,7 @@ import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.servi
 import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { AuthService } from '../../core/services/auth.service';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -534,6 +535,7 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
 })
 export class PlanEstudiosComponent implements OnInit {
   public readonly storage = inject(EvaluacionesStorageService);
+  private readonly feedback = inject(UiFeedbackService);
   private readonly gateway = inject(UnitepcGatewayService);
   private readonly rolService = inject(RolExamenService);
   private readonly bancoService = inject(BancoPreguntasService);
@@ -681,7 +683,11 @@ export class PlanEstudiosComponent implements OnInit {
       roles: this.rolService.listar(codigoSede, codigoCarrera)
     }).subscribe({
       next: ({ cursos, grupos, roles }) => {
-        const consultasBanco = roles.map(rol => this.bancoService.obtenerPorRol(rol.id).pipe(
+        // El listado de roles ya informa si existe banco. Solo se consulta el
+        // detalle para los roles que realmente tienen uno, evitando respuestas
+        // 400 esperables para evaluaciones aún sin banco cargado.
+        const rolesConBanco = roles.filter(rol => rol.bancoPreguntasCargado === true);
+        const consultasBanco = rolesConBanco.map(rol => this.bancoService.obtenerPorRol(rol.id).pipe(
           catchError(() => of(null))
         ));
 
@@ -695,7 +701,7 @@ export class PlanEstudiosComponent implements OnInit {
           next: bancos => {
             const bancosPorRol = new Map<string, BancoPreguntasResponse>();
             bancos.forEach((banco, indice) => {
-              if (banco) bancosPorRol.set(roles[indice].id, banco);
+              if (banco) bancosPorRol.set(rolesConBanco[indice].id, banco);
             });
             this.planSemestres.set(this.construirPlan(cursos, grupos, roles, bancosPorRol));
             this.cargandoPlan.set(false);
@@ -970,7 +976,11 @@ export class PlanEstudiosComponent implements OnInit {
   }
 
   public descargarMalla(): void {
-    alert('Simulación: Descargando Malla Curricular PDF oficial de la Carrera.');
+    void this.feedback.mostrar(
+      'La descarga de la malla curricular oficial estará disponible cuando el servicio académico publique el documento.',
+      'Malla curricular',
+      'info'
+    );
   }
 
   private _mostrarToast(msg: string): void {

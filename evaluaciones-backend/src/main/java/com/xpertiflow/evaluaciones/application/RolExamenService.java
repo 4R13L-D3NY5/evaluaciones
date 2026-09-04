@@ -11,6 +11,7 @@ import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
+import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.CourseDto;
@@ -35,6 +36,7 @@ public class RolExamenService {
 
     private final RolExamenRepository rolExamenRepository;
     private final AuditoriaEvaluacionRepository auditoriaRepository;
+    private final BancoPreguntasRepository bancoPreguntasRepository;
     private final RolExamenMapper mapper;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AccesoAcademicoService accesoAcademicoService;
@@ -169,15 +171,24 @@ public class RolExamenService {
     }
 
     private List<RolExamenResponseDto> mapearRolesConDocenteOficial(List<RolExamen> roles) {
+        if (roles.isEmpty()) {
+            return List.of();
+        }
         Map<String, GroupItemDto> gruposOficiales = resolverGruposOficiales(roles);
+        Set<String> rolesConBanco = bancoPreguntasRepository.findByRolExamenIdIn(
+                        roles.stream().map(RolExamen::getId).collect(Collectors.toSet()))
+                .stream()
+                .map(banco -> banco.getRolExamenId())
+                .collect(Collectors.toSet());
         return roles.stream()
-                .map(rol -> mapearRol(rol, gruposOficiales.get(rol.getId())))
+                .map(rol -> mapearRol(rol, gruposOficiales.get(rol.getId()), rolesConBanco.contains(rol.getId())))
                 .collect(Collectors.toList());
     }
 
     private RolExamenResponseDto mapearRolConDocenteOficial(RolExamen rol) {
         Map<String, GroupItemDto> gruposOficiales = resolverGruposOficiales(List.of(rol));
-        return mapearRol(rol, gruposOficiales.get(rol.getId()));
+        boolean tieneBanco = bancoPreguntasRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rol.getId()).isPresent();
+        return mapearRol(rol, gruposOficiales.get(rol.getId()), tieneBanco);
     }
 
     public String resolverNombreDocenteOficial(RolExamen rol) {
@@ -205,8 +216,9 @@ public class RolExamenService {
                 : null;
     }
 
-    private RolExamenResponseDto mapearRol(RolExamen rol, GroupItemDto grupoOficial) {
+    private RolExamenResponseDto mapearRol(RolExamen rol, GroupItemDto grupoOficial, boolean tieneBanco) {
         RolExamenResponseDto dto = mapper.toResponseDto(rol);
+        dto.setBancoPreguntasCargado(tieneBanco);
         // Los campos locales del rol nunca son una fuente de presentación.
         dto.setDocenteNombre(null);
         dto.setDocenteCi(null);
@@ -540,6 +552,21 @@ public class RolExamenService {
         registrarAuditoria(guardado, origen, destino, accion,
                 dto.getUsuario() != null ? dto.getUsuario() : "Sistema",
                 dto.getIpOrigen() != null ? dto.getIpOrigen() : "127.0.0.1");
+
+        // En un examen con cartilla, la devolución entrega las cartillas al
+        // personal de Evaluaciones para su lectura OMR. La devolución se
+        // conserva en la bitácora, pero el estado operativo debe quedar
+        // inmediatamente en espera de calificación, sin exigir un segundo
+        // clic manual.
+        if (destino == EstadoFlujo.DEVUELTO
+                && rol.getModalidad() == ModalidadExamen.PRESENCIAL_CARTILLA) {
+            rol.setEstadoFlujo(EstadoFlujo.PENDIENTE_NOTAS);
+            guardado = rolExamenRepository.save(rol);
+            registrarAuditoria(guardado, EstadoFlujo.DEVUELTO, EstadoFlujo.PENDIENTE_NOTAS,
+                    "INICIO_CALIFICACION_OMR",
+                    dto.getUsuario() != null ? dto.getUsuario() : "Sistema",
+                    dto.getIpOrigen() != null ? dto.getIpOrigen() : "127.0.0.1");
+        }
 
         return mapper.toResponseDto(guardado);
     }

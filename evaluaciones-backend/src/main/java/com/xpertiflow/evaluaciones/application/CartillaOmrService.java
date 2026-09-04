@@ -37,6 +37,7 @@ import java.util.UUID;
 public class CartillaOmrService {
 
     private static final String ACCION_IMPRESION_MARCAS = "IMPRESION_MARCAS_OMR";
+    private static final String ACCION_IMPRESION_LISTA = "IMPRESION_LISTA_ESTUDIANTES";
 
     private static final Set<EstadoFlujo> ESTADOS_PERMITIDOS_MARCAS = Set.of(
             EstadoFlujo.PROGRAMADO,
@@ -68,6 +69,8 @@ public class CartillaOmrService {
         List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
         Optional<AuditoriaEvaluacion> impresion = auditoriaRepository
                 .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, ACCION_IMPRESION_MARCAS);
+        Optional<AuditoriaEvaluacion> impresionLista = auditoriaRepository
+                .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, ACCION_IMPRESION_LISTA);
         List<DatosCartillaOmrDto> datos = java.util.stream.IntStream.range(0, estudiantes.size())
                 .mapToObj(indice -> {
                     DatosEstudiante estudiante = estudiantes.get(indice);
@@ -78,7 +81,10 @@ public class CartillaOmrService {
                 rol.getId(), rol.getCarreraNombre(), rol.getMateriaCodigo(), rol.getGrupo(),
                 estudiantes.size(), impresion.isPresent() ? "IMPRESO" : "PENDIENTE",
                 impresion.map(AuditoriaEvaluacion::getFechaEvento).orElse(null),
-                impresion.map(AuditoriaEvaluacion::getUsuario).orElse(null), datos);
+                impresion.map(AuditoriaEvaluacion::getUsuario).orElse(null), datos,
+                impresionLista.isPresent() ? "IMPRESO" : "PENDIENTE",
+                impresionLista.map(AuditoriaEvaluacion::getFechaEvento).orElse(null),
+                impresionLista.map(AuditoriaEvaluacion::getUsuario).orElse(null));
     }
 
     @Transactional
@@ -86,22 +92,24 @@ public class CartillaOmrService {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
         validarEstadoParaMarcas(rol);
-        List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
-        List<CartillaOmr> cartillas = new java.util.ArrayList<>();
-        for (int indice = 0; indice < estudiantes.size(); indice++) {
-            DatosEstudiante estudiante = estudiantes.get(indice);
-            CartillaOmr cartilla = new CartillaOmr();
-            cartilla.setNumeroOrden(indice + 1);
-            cartilla.setCodigoMateria(rol.getMateriaCodigo());
-            cartilla.setGrupo(rol.getGrupo());
-            cartilla.setCodigoEstudiante(estudiante.codigo());
-            cartilla.setNombreCompleto(estudiante.nombreCompleto());
-            cartillas.add(cartilla);
-        }
+        List<CartillaOmr> cartillas = construirCartillas(rolExamenId, rol);
         try {
             return pdfService.generarBytes(rol, cartillas);
         } catch (IOException exception) {
             throw new IllegalStateException("No se pudo generar la sobreimpresión temporal de datos OMR", exception);
+        }
+    }
+
+    @Transactional
+    public byte[] generarListaPdfTemporal(String rolExamenId) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        validarEstadoParaMarcas(rol);
+        List<CartillaOmr> cartillas = construirCartillas(rolExamenId, rol);
+        try {
+            return pdfService.generarListaBytes(rol, cartillas);
+        } catch (IOException exception) {
+            throw new IllegalStateException("No se pudo generar la lista de estudiantes", exception);
         }
     }
 
@@ -112,6 +120,16 @@ public class CartillaOmrService {
         validarEstadoParaMarcas(rol);
         List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
         registrarAuditoria(rol, ACCION_IMPRESION_MARCAS, usuario, estudiantes.size(), null);
+        return obtenerPreparacion(rolExamenId);
+    }
+
+    @Transactional
+    public PreparacionCartillasOmrResponseDto marcarListaImpresion(String rolExamenId, String usuario) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        validarEstadoParaMarcas(rol);
+        List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
+        registrarAuditoria(rol, ACCION_IMPRESION_LISTA, usuario, estudiantes.size(), null);
         return obtenerPreparacion(rolExamenId);
     }
 
@@ -197,6 +215,22 @@ public class CartillaOmrService {
             }
             return new DatosEstudiante(estudiante.getStudentCode().trim(), estudiante.getFullName().trim());
         }).sorted(Comparator.comparing(DatosEstudiante::codigo)).toList();
+    }
+
+    private List<CartillaOmr> construirCartillas(String rolExamenId, RolExamen rol) {
+        List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
+        List<CartillaOmr> cartillas = new java.util.ArrayList<>();
+        for (int indice = 0; indice < estudiantes.size(); indice++) {
+            DatosEstudiante estudiante = estudiantes.get(indice);
+            CartillaOmr cartilla = new CartillaOmr();
+            cartilla.setNumeroOrden(indice + 1);
+            cartilla.setCodigoMateria(rol.getMateriaCodigo());
+            cartilla.setGrupo(rol.getGrupo());
+            cartilla.setCodigoEstudiante(estudiante.codigo());
+            cartilla.setNombreCompleto(estudiante.nombreCompleto());
+            cartillas.add(cartilla);
+        }
+        return cartillas;
     }
 
     /**

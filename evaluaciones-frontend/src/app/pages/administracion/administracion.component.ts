@@ -598,7 +598,7 @@ export interface ParcialConfig {
                       <span class="text-xs font-bold text-foreground">estudiantes / variante</span>
                     </div>
                     <p class="text-[10px] text-muted-foreground mt-1">
-                      La generación calcula ceil(nómina / ratio) y utiliza como máximo 5 variantes (A–E).
+                      La generación calcula ceil(nómina / ratio) y crea las variantes necesarias (A, B, C...; luego AA, AB...).
                     </p>
                   </div>
 
@@ -609,7 +609,7 @@ export interface ParcialConfig {
                       <br>
                       Variantes = ceil(12 / {{ ratioEstudiantesPorVariante }}) =
                       <strong class="text-purple-700 font-mono text-xs ml-1">
-                        {{ Math.min(Math.ceil(12 / (ratioEstudiantesPorVariante || 1)), 5) }} Variantes
+                        {{ Math.min(Math.ceil(12 / (ratioEstudiantesPorVariante || 1)), 702) }} Variantes
                       </strong>
                     </p>
                   </div>

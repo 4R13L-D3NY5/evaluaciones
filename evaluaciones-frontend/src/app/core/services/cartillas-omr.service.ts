@@ -20,6 +20,9 @@ export interface PreparacionCartillasOmr {
   impresoEn?: string;
   usuarioImpresion?: string;
   estudiantes: CartillaOmr[];
+  estadoImpresionLista: 'PENDIENTE' | 'IMPRESO';
+  listaImpresaEn?: string;
+  usuarioImpresionLista?: string;
 }
 
 export interface LoteCartillasOmr {
@@ -48,9 +51,22 @@ export class CartillasOmrService {
     });
   }
 
+  public imprimirLista(rolExamenId: string): Observable<Blob> {
+    return this._http.post(`/api/roles-examen/${rolExamenId}/cartillas/imprimir-lista`, {}, {
+      responseType: 'blob'
+    });
+  }
+
   public marcarImpresoTemporal(rolExamenId: string): Observable<PreparacionCartillasOmr> {
     return this._http.post<PreparacionCartillasOmr>(
       `/api/roles-examen/${rolExamenId}/cartillas/marcar-impreso`,
+      { usuario: 'ADMIN_EVALUACIONES' }
+    );
+  }
+
+  public marcarListaImpresaTemporal(rolExamenId: string): Observable<PreparacionCartillasOmr> {
+    return this._http.post<PreparacionCartillasOmr>(
+      `/api/roles-examen/${rolExamenId}/cartillas/marcar-lista-impresa`,
       { usuario: 'ADMIN_EVALUACIONES' }
     );
   }

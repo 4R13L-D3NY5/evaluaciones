@@ -1,5 +1,6 @@
 ﻿# Dependencias Node / Angular
 **/node_modules/
+**/__pycache__/
 **/.angular/
 **/dist/
 **/tmp/
@@ -53,3 +54,9 @@ bases/test_*
 # Llaves y secretos locales de Vault (nunca versionar)
 vault/secrets/*
 !vault/secrets/README.md
+
+# Repositorios locales y externos de Restic
+backups/*
+!backups/.gitkeep
+backups-external/*
+!backups-external/.gitkeep

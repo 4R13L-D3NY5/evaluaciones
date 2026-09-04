@@ -13,6 +13,7 @@ public class AppProperties {
 
     private Storage storage = new Storage();
     private Kms kms = new Kms();
+    private Backups backups = new Backups();
 
     @Getter
     @Setter
@@ -34,5 +35,14 @@ public class AppProperties {
         private String token = "";
         private String transitKeyName = "sea-banco-kek";
         private int timeoutSeconds = 10;
+    }
+
+    @Getter
+    @Setter
+    public static class Backups {
+        private String externalPath = "/app/backups-external";
+        private String localRepository = "/app/backups/repository";
+        private String externalRepository = "/app/backups-external/repository";
+        private String passwordFile = "/run/secrets/restic_password";
     }
 }

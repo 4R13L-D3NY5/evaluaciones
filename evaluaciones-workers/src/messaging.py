@@ -1,6 +1,7 @@
 """Consumidor y publicador RabbitMQ para el worker Typst."""
 import json
 import logging
+import time
 from typing import Any, Callable
 
 import pika
@@ -57,6 +58,11 @@ def start_consumer(handler: Callable[[dict[str, Any]], dict[str, Any]]) -> None:
         properties: Any,
         body: bytes,
     ) -> None:
+        if config.MAINTENANCE_MARKER and __import__("os").path.exists(config.MAINTENANCE_MARKER):
+            logger.warning("Sistema en mantenimiento; se difiere el mensaje")
+            time.sleep(2)
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+            return
         try:
             payload = json.loads(body.decode("utf-8"))
             job_id = payload.get("jobId", "N/A")

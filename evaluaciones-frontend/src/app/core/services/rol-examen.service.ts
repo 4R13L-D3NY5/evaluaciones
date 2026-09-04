@@ -31,6 +31,7 @@ export interface RolExamenResponse {
   campus: string;
   estudiantesInscritosCount: number;
   variantesGeneradasCount: number;
+  bancoPreguntasCargado: boolean;
   hashEncriptacion?: string;
   fechaValidacion?: string;
   fechaGeneracion?: string;

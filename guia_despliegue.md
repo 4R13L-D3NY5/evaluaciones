@@ -540,3 +540,138 @@ ejecutarse contra un Vault ya inicializado.
 - [ ] Se probó al menos una restauración en un ambiente separado.
 - [ ] Docker inicia automáticamente según la política del servidor.
 - [ ] Existe un responsable de guardia y un procedimiento de recuperación.
+# 15. Respaldos administrables de base de datos y archivos
+
+El sistema incorpora el módulo administrativo **Respaldos y contingencia**. Está disponible únicamente para `ADMINISTRADOR_SISTEMA` y permite generar, copiar, verificar, conservar, eliminar localmente y restaurar snapshots cifrados.
+
+## 15.1 Qué se respalda y dónde se almacena
+
+| Contenido | Ubicación de origen | Incluido |
+|---|---|---|
+| Base PostgreSQL completa | Servicio `db` | Sí, como `pg_dump` lógico en formato custom |
+| Exámenes, cartillas y documentos | `storage/generados` | Sí |
+| Escaneos y resultados OMR | `storage/omr` | Sí |
+| Imágenes materializadas | Dentro de `storage` | Sí |
+| Imágenes originales de preguntas | Banco cifrado en PostgreSQL | Sí, a través del dump de la base |
+| Manifiesto e integridad | Cada snapshot | Sí |
+| `.env`, tokens y contraseñas | Configuración del servidor | No |
+| Llaves de desbloqueo y secretos de Vault | `vaultdata`/secreto técnico | No |
+
+En Docker, `storage` se monta como `/app/storage`, el repositorio local como `/app/backups` y la carpeta externa como `/app/backups-external`. PostgreSQL conserva sus datos en el volumen Docker `pgdata`; Vault conserva su estado en `vaultdata`.
+
+Restic guarda snapshots deduplicados. Cada ejecución genera el dump lógico completo, pero el repositorio solo almacena bloques nuevos o modificados. Por eso cada snapshot permite recuperación completa sin duplicar todo el contenido.
+
+## 15.2 Preparación inicial del servidor
+
+1. Crear las carpetas persistentes junto al archivo `docker-compose.yml`:
+
+   ```text
+   backups/
+   backups-external/
+   ```
+
+2. Definir en `.env` el destino externo. Puede ser una carpeta local, un disco montado o una ruta compartida que Docker pueda montar:
+
+   ```dotenv
+   BACKUP_EXTERNAL_PATH=./backups-external
+   BACKUP_LOCAL_PATH=./backups
+   BACKUP_RESTIC_PASSWORD_FILE=./vault/secrets/restic-password
+   ```
+
+   En Windows se puede usar una ruta absoluta, por ejemplo `D:/SEA/respaldos-externos`. La ruta se configura durante el despliegue; no se acepta una ruta arbitraria desde la interfaz.
+
+3. Crear el archivo `vault/secrets/restic-password` con una contraseña larga y aleatoria. No debe enviarse por el chat, incluirse en Git ni guardarse en PostgreSQL. En producción se recomienda administrar este archivo mediante Docker Secrets o el almacén seguro del servidor.
+
+4. Restringir los permisos del archivo de contraseña para que solo el usuario que ejecuta Docker pueda leerlo.
+
+5. Verificar que el volumen externo tenga espacio suficiente y que el usuario de Docker pueda escribir en él.
+
+6. No borrar `pgdata`, `vaultdata`, `storage`, `backups` ni `backups-external` durante un reinicio normal.
+
+## 15.3 Puesta en marcha
+
+Desde la carpeta del proyecto:
+
+```text
+docker compose config --quiet
+docker compose build worker-backup
+docker compose up -d
+docker compose ps
+```
+
+El servicio `worker-backup` tiene `restart: unless-stopped`, espera a PostgreSQL, RabbitMQ, backend y Vault disponibles, y vuelve a conectarse si RabbitMQ o el servidor se reinician.
+
+El primer respaldo inicializa automáticamente los repositorios Restic local y externo. Si el destino externo no está disponible, el respaldo local puede quedar generado, pero la copia no se marcará como verificada y nunca se eliminará localmente.
+
+## 15.4 Programación y retención
+
+En **Respaldos y contingencia** se puede activar o desactivar la ejecución automática, definir la frecuencia en minutos y establecer los días de retención. Los valores deben ser mayores que cero.
+
+El programador revisa la configuración cada minuto. No crea otro snapshot mientras existe una operación activa. La limpieza local usa la retención definida en el sistema y no elimina copias externas verificadas.
+
+## 15.5 Flujo operativo recomendado
+
+1. Seleccionar **Generar respaldo ahora** o activar la programación.
+2. Esperar el estado `Generado`.
+3. Seleccionar **Copiar al destino externo**.
+4. Esperar el estado `Copiado`.
+5. Seleccionar **Verificar integridad** y esperar `Verificado`.
+6. Solo después de `Verificado` se habilita **Eliminar copia local**.
+7. Conservar al menos una copia externa verificada fuera del servidor principal.
+
+Los estados `Solicitado`, `En proceso`, `Copiando`, `Verificando` y `Restaurando` indican que la operación sigue en curso. Si aparece `Error`, revisar el log del worker y corregir el problema antes de reintentar desde el módulo.
+
+## 15.6 Restauración controlada
+
+La restauración está restringida al administrador y solo acepta un snapshot externo verificado.
+
+1. Seleccionar **Restaurar respaldo**.
+2. Confirmar la advertencia inicial.
+3. Escribir manualmente `RESTAURAR <identificador>`; por ejemplo `RESTAURAR BKP-...`.
+4. Confirmar la segunda advertencia.
+5. El worker restaura el dump PostgreSQL y los archivos de `storage`.
+6. El worker verifica el repositorio Restic, valida los hashes del manifiesto, confirma que la migración de respaldos esté aplicada y comprueba que exista un administrador activo.
+7. Revisar los logs de backend, workers, PostgreSQL y Vault antes de habilitar la operación normal.
+
+Durante la restauración el sistema debe considerarse en mantenimiento. No iniciar cargas, generaciones, lecturas OMR ni cambios de configuración desde otros usuarios. Si la restauración falla, el respaldo original externo permanece intacto y el registro queda auditado con estado `Error`.
+
+## 15.7 Vault y recuperación de bancos cifrados
+
+El módulo de respaldos no reemplaza el respaldo técnico de Vault. Restaurar PostgreSQL y `storage` no permite descifrar bancos de preguntas si se perdió el estado de Vault o su material de desbloqueo.
+
+También deben conservarse, por un procedimiento independiente y seguro:
+
+- Snapshot o copia del volumen `vaultdata`.
+- Las llaves de desbloqueo de Vault.
+- La clave Transit `sea-banco-kek`.
+- Las políticas y tokens técnicos necesarios.
+- El registro de qué versión de Vault estaba activa.
+
+Después de levantar Vault se debe comprobar que esté inicializado y desbloqueado, restaurar sus políticas y validar la clave Transit antes de arrancar backend y workers. Nunca se deben introducir llaves de Vault en la interfaz de respaldos ni en la base de datos.
+
+## 15.8 Contingencias frecuentes
+
+| Situación | Comportamiento esperado |
+|---|---|
+| PostgreSQL no disponible | El worker reintenta al recuperar la conexión; no genera un respaldo incompleto |
+| RabbitMQ no disponible | El worker vuelve a conectarse; las solicitudes permanecen en la cola durable |
+| Vault sellado o sin secreto | Backend y workers no deben operar con bancos cifrados; primero se desbloquea Vault |
+| Destino externo caído | Se conserva la copia local y no se habilita su eliminación |
+| Disco local lleno | La operación queda en error; no se presenta como respaldo válido |
+| Reinicio de Docker | Los repositorios y datos permanecen en sus carpetas/volúmenes; los servicios vuelven a iniciar |
+| Restauración incompleta | Se conserva el snapshot externo y debe intervenir el administrador técnico |
+
+## 15.9 Auditoría y comprobaciones
+
+Cada cambio de configuración y cada solicitud de generación, copia, verificación, eliminación o restauración se registra en `sea_auditoria_respaldos`. El historial del módulo conserva fechas, estado, snapshots, tamaño, cantidad de archivos y errores sin incluir contraseñas ni contenido sensible.
+
+Para una prueba controlada:
+
+1. Crear un respaldo manual.
+2. Confirmar que incluya la base, un PDF generado, un escaneo OMR y un archivo de imagen.
+3. Modificar o agregar un archivo y ejecutar un segundo respaldo.
+4. Comparar el tamaño del repositorio y confirmar deduplicación.
+5. Copiar y verificar ambos snapshots en el destino externo.
+6. Intentar eliminar una copia no verificada y confirmar que la interfaz la bloquee.
+7. Restaurar únicamente en una ventana de contingencia autorizada.
+8. Reiniciar Docker y confirmar que el historial y los repositorios continúen disponibles.

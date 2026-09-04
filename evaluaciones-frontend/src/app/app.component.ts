@@ -1,12 +1,13 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { GlobalLoadingComponent } from './shared/components/global-loading/global-loading.component';
+import { UiFeedbackComponent } from './shared/components/ui-feedback/ui-feedback.component';
 
 @Component({
   selector: 'sea-root',
   standalone: true,
-  imports: [RouterModule, GlobalLoadingComponent],
-  template: `<sea-global-loading></sea-global-loading><router-outlet></router-outlet>`
+  imports: [RouterModule, GlobalLoadingComponent, UiFeedbackComponent],
+  template: `<sea-global-loading></sea-global-loading><sea-ui-feedback></sea-ui-feedback><router-outlet></router-outlet>`
 })
 export class AppComponent {
   title = 'sistema-evaluaciones-ui';
