@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: evaluaciones-backend
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:sea_evaluaciones}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 100MB
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  storage:
+    base-path: ${STORAGE_BASE_PATH:C:/laragon/www/evaluaciones/storage}
+  kms:
+    migration-enabled: ${KMS_MIGRATION_ENABLED:false}
+    rotation-enabled: ${KMS_ROTATION_ENABLED:false}
+    vault:
+      address: ${VAULT_ADDR:http://localhost:8200}
+      token-file: ${VAULT_TOKEN_FILE:}
+      token: ${VAULT_TOKEN:}
+      transit-key-name: ${VAULT_TRANSIT_KEY_NAME:sea-banco-kek}
+      timeout-seconds: ${VAULT_TIMEOUT_SECONDS:10}
+  unitepc:
+    gateway-base-url: ${UNITEPC_GATEWAY_BASE_URL:https://gw-dev.unitepc.solutions}
+    client-id: ${UNITEPC_CLIENT_ID}
+    client-secret: ${UNITEPC_CLIENT_SECRET}
+    system-client-id: ${UNITEPC_SYSTEM_CLIENT_ID:sea-evaluaciones}
+  backups:
+    external-path: ${BACKUP_EXTERNAL_PATH:/app/backups-external}
+    local-repository: ${BACKUP_LOCAL_REPOSITORY:/app/backups/repository}
+    external-repository: ${BACKUP_EXTERNAL_REPOSITORY:/app/backups-external/repository}
+    password-file: ${BACKUP_RESTIC_PASSWORD_FILE:/run/secrets/restic_password}
+
+logging:
+  level:
+    com.xpertiflow.evaluaciones: DEBUG
