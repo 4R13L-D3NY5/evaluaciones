@@ -21,6 +21,7 @@ export interface RolExamenPersistedItem {
   seaSyllabusCourseId: string;
   sedeCode?: string;
   careerCode?: string;
+  carreraNombre?: string;
   codigo: string;
   materia: string;
   semestre: number;

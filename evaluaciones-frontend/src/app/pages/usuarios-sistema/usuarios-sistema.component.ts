@@ -244,17 +244,11 @@ interface RolCatalogo extends RolSistema {
                 </div>
               } @else if (esPersonalEvaluacionesSeleccionado()) {
                 <div class="assignment-panel campus-access-panel">
-                  <div class="section-title"><i class="pi pi-map-marker"></i><span>Sedes y campus asignados</span><small>puedes marcar varias sedes y campus</small></div>
-                  <p class="assignment-help">El personal podrá trabajar únicamente con los campus habilitados. Puedes deshabilitar un campus temporalmente sin eliminar la asignación.</p>
-                  <div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div>
+                  <div class="section-title"><i class="pi pi-map-marker"></i><span>Campus asignados</span><small>puedes marcar varios campus</small></div>
+                  <p class="assignment-help">Selecciona directamente los campus donde trabajará el personal. La sede se toma automáticamente del catálogo oficial SEA.</p>
+                  @if (!campusesDisponibles().length && sedes.length) {<p class="assignment-empty">No hay campus disponibles en SEA.</p>}
+                  <div class="check-grid campus-grid">@for (item of campusesDisponibles(); track claveCampus(item.sede.code, item.campus)) {<label class="check-item" [class.campus-disabled]="tieneCampus(item.sede.code, item.campus) && !campusHabilitado(item.sede.code, item.campus)"><input type="checkbox" [checked]="tieneCampus(item.sede.code, item.campus)" (change)="alternarCampus(item.sede, item.campus)"><span><strong>{{ item.campus.name }} ({{ item.sede.name }})</strong><small>@if (item.campus.code) {Código {{ item.campus.code }}} @else if (item.campus.campusId) {ID institucional {{ item.campus.campusId }}}</small></span>@if (tieneCampus(item.sede.code, item.campus)) {<button type="button" class="campus-status" [class.enabled]="campusHabilitado(item.sede.code, item.campus)" (click)="$event.preventDefault(); $event.stopPropagation(); alternarEstadoCampus(item.sede.code, item.campus)" [title]="campusHabilitado(item.sede.code, item.campus) ? 'Deshabilitar campus' : 'Habilitar campus'"><i [class]="campusHabilitado(item.sede.code, item.campus) ? 'pi pi-check-circle' : 'pi pi-ban'"></i>{{ campusHabilitado(item.sede.code, item.campus) ? 'Habilitado' : 'Deshabilitado' }}</button>}</label>}</div>
                   @if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}
-                  @for (sede of sedesParaCampus(); track sede.code) {
-                    <div class="campus-group">
-                      <div class="campus-group-title"><span><strong>{{ sede.code }}</strong> · {{ sede.name }}</span><small>Campus autorizados</small></div>
-                      @if (!campusDeSede(sede.code).length) {<p class="assignment-empty">No hay campus disponibles para esta sede.</p>}
-                      <div class="check-grid campus-grid">@for (campus of campusDeSede(sede.code); track campus.campusId || campus.code || campus.name) {<label class="check-item" [class.campus-disabled]="tieneCampus(sede.code, campus) && !campusHabilitado(sede.code, campus)"><input type="checkbox" [checked]="tieneCampus(sede.code, campus)" (change)="alternarCampus(sede, campus)"><span><strong>{{ campus.code || campus.campusId || 'Campus' }}</strong><small>{{ campus.name }}</small></span>@if (tieneCampus(sede.code, campus)) {<button type="button" class="campus-status" [class.enabled]="campusHabilitado(sede.code, campus)" (click)="$event.preventDefault(); $event.stopPropagation(); alternarEstadoCampus(sede.code, campus)" [title]="campusHabilitado(sede.code, campus) ? 'Deshabilitar campus' : 'Habilitar campus'"><i [class]="campusHabilitado(sede.code, campus) ? 'pi pi-check-circle' : 'pi pi-ban'"></i>{{ campusHabilitado(sede.code, campus) ? 'Habilitado' : 'Deshabilitado' }}</button>}</label>}</div>
-                    </div>
-                  }
                 </div>
               } @else if (esRolConAlcanceSimple()) {
                 <div><div class="section-title"><i class="pi pi-building"></i><span>Sedes asignadas</span><small>puedes marcar varias</small></div><div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div>@if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}</div>
@@ -464,12 +458,12 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public abrirNuevo(): void {
-    this.usuarioEditando = null; this.form = this.formularioVacio(); this.sedesSeleccionadas.clear(); this.carrerasSeleccionadas.clear(); this.campusesSeleccionados.clear(); this.campusesPorSede.clear(); this.limpiarConstructorAsignaciones(); this.error.set(null); this.formularioAbierto.set(true);
+    this.usuarioEditando = null; this.form = this.formularioVacio(); this.sedesSeleccionadas.clear(); this.carrerasSeleccionadas.clear(); this.campusesSeleccionados.clear(); this.limpiarConstructorAsignaciones(); this.error.set(null); this.formularioAbierto.set(true);
   }
 
   public editar(usuario: UsuarioSistema): void {
     const campuses = [...(usuario.campuses || [])];
-    this.usuarioEditando = usuario; this.form = { ci: usuario.ci, nombreCompleto: usuario.nombreCompleto, rolCodigo: usuario.rol, activo: usuario.activo, sedes: [...usuario.sedes], carreras: [...usuario.carreras], campuses, asignaciones: [...(usuario.asignaciones || [])] }; this.sedesSeleccionadas = new Map(usuario.sedes.map(item => [item.codigo, item])); this.carrerasSeleccionadas = new Map(usuario.carreras.map(item => [item.codigo, item])); this.campusesSeleccionados = new Map(campuses.map(item => [this.claveCampus(item.sedeCodigo, item), item])); this.campusesPorSede.clear(); this.asignacionesSeleccionadas = [...(usuario.asignaciones || [])]; this.limpiarSeleccionAsignacion(); this.error.set(null); this.formularioAbierto.set(true);
+    this.usuarioEditando = usuario; this.form = { ci: usuario.ci, nombreCompleto: usuario.nombreCompleto, rolCodigo: usuario.rol, activo: usuario.activo, sedes: [...usuario.sedes], carreras: [...usuario.carreras], campuses, asignaciones: [...(usuario.asignaciones || [])] }; this.sedesSeleccionadas = new Map(usuario.sedes.map(item => [item.codigo, item])); this.carrerasSeleccionadas = new Map(usuario.carreras.map(item => [item.codigo, item])); this.campusesSeleccionados = new Map(campuses.map(item => [this.claveCampus(item.sedeCodigo, item), item])); this.asignacionesSeleccionadas = [...(usuario.asignaciones || [])]; this.limpiarSeleccionAsignacion(); this.error.set(null); this.formularioAbierto.set(true);
     this.sedesParaCampus().forEach(sede => this.cargarCampusSede(sede));
   }
 
@@ -491,6 +485,9 @@ export class UsuariosSistemaComponent implements OnInit {
   public esPersonalEvaluacionesSeleccionado(): boolean { return this.form.rolCodigo === 'PERSONAL_EVALUACIONES'; }
   public sedesParaCampus(): BranchOffice[] { return this.sedes.filter(sede => this.tieneSede(sede.code)); }
   public campusDeSede(sedeCodigo: string): Campus[] { return this.campusesPorSede.get(sedeCodigo) || []; }
+  public campusesDisponibles(): Array<{ sede: BranchOffice; campus: Campus }> {
+    return this.sedes.flatMap(sede => this.campusDeSede(sede.code).map(campus => ({ sede, campus })));
+  }
   public cargarCampusSede(sede: BranchOffice): void {
     if (this.campusesPorSede.has(sede.code)) return;
     this.gateway.getCampuses(sede.branchOfficeId).pipe(catchError(() => of([] as Campus[]))).subscribe(campuses => {
@@ -604,7 +601,9 @@ export class UsuariosSistemaComponent implements OnInit {
     this.error.set(null); this.guardando.set(true);
     const asignaciones = this.requiereAsignacionesAcademicas() ? [...this.asignacionesSeleccionadas] : [];
     const usaRelacionesNuevas = this.requiereAsignacionesAcademicas() && asignaciones.length > 0;
-    const sedes = usaRelacionesNuevas
+    const sedes = this.esPersonalEvaluacionesSeleccionado()
+      ? this.sedesDesdeCampuses()
+      : usaRelacionesNuevas
       ? this.alcancesDesdeAsignaciones(asignaciones, 'sede')
       : [...this.sedesSeleccionadas.values()];
     const carreras = usaRelacionesNuevas
@@ -669,8 +668,8 @@ export class UsuariosSistemaComponent implements OnInit {
     return clases[estado];
   }
   public descargarPlantilla(): void {
-    const columnas = ['CI', 'NOMBRE_COMPLETO', 'ROL', ...this.sedes.map(sede => `SEDE [${sede.code}]`), ...this.carreras.map(carrera => `CARRERA [${carrera.careerCode}]`)];
-    const ejemplo = ['1234567', 'APELLIDO1 APELLIDO2 NOMBRES', 'DOCENTE', ...this.sedes.map((_, index) => index === 0 ? 'X' : ''), ...this.carreras.map((_, index) => index === 0 ? 'X' : '')];
+    const columnas = ['CI', 'NOMBRE_COMPLETO', 'ROL', ...this.sedes.map(sede => `SEDE [${sede.code}]`), ...this.carreras.map(carrera => `CARRERA [${carrera.careerCode}]`), 'CAMPUS'];
+    const ejemplo = ['1234567', 'APELLIDO1 APELLIDO2 NOMBRES', 'DOCENTE', ...this.sedes.map((_, index) => index === 0 ? 'X' : ''), ...this.carreras.map((_, index) => index === 0 ? 'X' : ''), 'CBA||COL|COLONIAL|SI'];
     const usuarios = XLSX.utils.aoa_to_sheet([columnas, ejemplo]);
     const instrucciones = XLSX.utils.aoa_to_sheet([
       ['PLANTILLA DE USUARIOS SEA'],
@@ -678,6 +677,7 @@ export class UsuariosSistemaComponent implements OnInit {
       ['NOMBRE_COMPLETO', 'Obligatorio. Conservar exactamente el orden recibido desde SEA.'],
       ['ROL', 'Usar el código del rol asignado, por ejemplo DOCENTE o DIRECTOR_CARRERA.'],
       ['SEDE [...] / CARRERA [...]', 'Marcar con X las columnas que correspondan. Se pueden marcar varias.'],
+      ['CAMPUS', 'Solo para PERSONAL_EVALUACIONES: SEDE_CODIGO|CAMPUS_ID|CAMPUS_CODIGO|CAMPUS_NOMBRE|SI o NO. Separe varios campus con punto y coma.'],
       ['Nota', 'No elimines ni cambies los códigos entre corchetes; son los códigos oficiales del catálogo SEA.']
     ]);
     const libro = XLSX.utils.book_new();
@@ -699,12 +699,19 @@ export class UsuariosSistemaComponent implements OnInit {
   public resumenAlcance(usuario: UsuarioSistema): string { const asignaciones = usuario.asignaciones?.length || 0; if (asignaciones) return `${asignaciones} asignación${asignaciones === 1 ? '' : 'es'}`; const campuses = usuario.campuses?.length || 0; if (campuses) { const habilitados = usuario.campuses.filter(item => item.habilitado).length; return `${usuario.sedes?.length || 0} sede${(usuario.sedes?.length || 0) === 1 ? '' : 's'} · ${campuses} campus · ${habilitados} habilitado${habilitados === 1 ? '' : 's'}`; } const sedes = usuario.sedes?.length || 0; const carreras = usuario.carreras?.length || 0; return `${sedes} sede${sedes === 1 ? '' : 's'} · ${carreras} carrera${carreras === 1 ? '' : 's'}`; }
   public nombresAlcance(usuario: UsuarioSistema): string { if (usuario.asignaciones?.length) return usuario.asignaciones.map(item => `${item.sedeCodigo}/${item.carreraCodigo}${item.asignaturaCodigo ? '/' + item.asignaturaCodigo : ''}`).join(' · '); if (usuario.campuses?.length) return usuario.campuses.map(item => `${item.sedeCodigo}/${item.campusCodigo || item.campusNombre} · ${item.habilitado ? 'Habilitado' : 'Deshabilitado'}`).join(' · '); return [...(usuario.sedes || []).map(item => item.codigo), ...(usuario.carreras || []).map(item => item.codigo)].join(' · ') || 'Sin alcance específico registrado'; }
 
-  private formularioVacio(): UsuarioSistemaRequest { return { ci: '', nombreCompleto: '', rolCodigo: 'DOCENTE', activo: true, sedes: [], carreras: [], campuses: [], asignaciones: [] }; }
+  private formularioVacio(): UsuarioSistemaRequest { return { ci: '', nombreCompleto: '', rolCodigo: this.contexto === 'EVALUACIONES' ? 'PERSONAL_EVALUACIONES' : 'DOCENTE', activo: true, sedes: [], carreras: [], campuses: [], asignaciones: [] }; }
   private cargarUsuarios(): void { this.service.listar(this.contexto).subscribe({ next: usuarios => this.usuarios.set(usuarios), error: error => this.mostrarError(error) }); }
-  private cargarCatalogo(): void { this.gateway.getBranchOffices().pipe(switchMap(sedes => { this.sedes = sedes; return sedes.length ? forkJoin(sedes.map(sede => this.gateway.getCareers(sede.code).pipe(catchError(() => of([] as Career[]))))).pipe(map(listas => listas.flat())) : of([] as Career[]); })).subscribe({ next: carreras => { const unicas = new Map<string, Career>(); carreras.forEach(carrera => unicas.set(carrera.careerCode, carrera)); this.carreras = [...unicas.values()].sort((a, b) => a.careerCode.localeCompare(b.careerCode)); }, error: () => { this.sedes = []; this.carreras = []; } }); }
+  private cargarCatalogo(): void { this.gateway.getBranchOffices().pipe(switchMap(sedes => { this.sedes = sedes; return sedes.length ? forkJoin(sedes.map(sede => this.gateway.getCareers(sede.code).pipe(catchError(() => of([] as Career[]))))).pipe(map(listas => listas.flat())) : of([] as Career[]); })).subscribe({ next: carreras => { const unicas = new Map<string, Career>(); carreras.forEach(carrera => unicas.set(carrera.careerCode, carrera)); this.carreras = [...unicas.values()].sort((a, b) => a.careerCode.localeCompare(b.careerCode)); this.sedes.forEach(sede => this.cargarCampusSede(sede)); }, error: () => { this.sedes = []; this.carreras = []; } }); }
   private esRolDeAsignaciones(rol: string): boolean { return rol === 'DIRECTOR_CARRERA' || rol === 'DOCENTE'; }
   private limpiarSeleccionAsignacion(): void { this.sedeAsignacionCodigo = ''; this.carreraAsignacionCodigo = ''; this.asignaturaAsignacionCodigo = ''; this.carrerasAsignacion = []; this.asignaturasAsignacion = []; this.cargandoCarreras = false; this.cargandoAsignaturas = false; }
   private limpiarConstructorAsignaciones(): void { this.limpiarSeleccionAsignacion(); }
+  private sedesDesdeCampuses(): AlcanceAcademico[] {
+    const unicas = new Map<string, AlcanceAcademico>();
+    this.campusesSeleccionados.forEach(item => {
+      if (item.sedeCodigo) unicas.set(item.sedeCodigo, { codigo: item.sedeCodigo, nombre: item.sedeNombre });
+    });
+    return [...unicas.values()];
+  }
   private alcancesDesdeAsignaciones(asignaciones: AsignacionAcademica[], tipo: 'sede' | 'carrera'): AlcanceAcademico[] {
     const unicos = new Map<string, AlcanceAcademico>();
     asignaciones.forEach(item => {

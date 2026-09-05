@@ -2,10 +2,13 @@ package com.xpertiflow.evaluaciones.api.controller;
 
 import com.xpertiflow.evaluaciones.api.dto.gateway.*;
 import com.xpertiflow.evaluaciones.application.AccesoAcademicoService;
+import com.xpertiflow.evaluaciones.application.CampusCarrerasService;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,7 @@ public class CatalogoAcademicoController {
 
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AccesoAcademicoService accesoAcademicoService;
+    private final CampusCarrerasService campusCarrerasService;
 
     @GetMapping("/sedes")
     @Operation(summary = "Listar sedes UNITEPC")
@@ -101,6 +105,31 @@ public class CatalogoAcademicoController {
                 .findFirst()
                 .orElse(null);
         return ResponseEntity.ok(accesoAcademicoService.filtrarCampusParaUsuario(campuses, sedeCodigo, authentication));
+    }
+
+    @GetMapping("/campus-carreras")
+    @Operation(summary = "Listar carreras asignadas a un campus")
+    public ResponseEntity<List<CampusCarreraItemDto>> campusCarreras(
+            @RequestParam String sedeCodigo,
+            @RequestParam(required = false) String campusId,
+            @RequestParam(required = false) String campusCodigo,
+            @RequestParam String campusNombre,
+            Authentication authentication) {
+        CampusCarrerasRequestDto request = new CampusCarrerasRequestDto();
+        request.setSedeCodigo(sedeCodigo);
+        request.setCampusId(campusId);
+        request.setCampusCodigo(campusCodigo);
+        request.setCampusNombre(campusNombre);
+        return ResponseEntity.ok(campusCarrerasService.listar(request, authentication));
+    }
+
+    @PutMapping("/campus-carreras")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Guardar carreras asignadas a un campus")
+    public ResponseEntity<List<CampusCarreraItemDto>> guardarCampusCarreras(
+            @Valid @RequestBody CampusCarrerasRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(campusCarrerasService.guardar(request, authentication));
     }
 
     private boolean puedeConsultarSedePorId(String branchOfficeId, Authentication authentication) {

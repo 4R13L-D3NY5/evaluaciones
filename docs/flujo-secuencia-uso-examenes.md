@@ -66,7 +66,7 @@ sequenceDiagram
 - Las cuotas son mínimas: pueden existir reactivos adicionales.
 - Hash de integridad y contenido del banco guardados en la base oficial.
 
-El banco tiene como mínimo 60 reactivos, pero cada examen generado utiliza la configuración vigente de preguntas del examen, actualmente **30 preguntas** distribuidas en variantes de `A` a `E`.
+El banco tiene como mínimo 60 reactivos, pero cada examen generado utiliza la configuración vigente de preguntas del parcial. Los valores iniciales son: **30 preguntas** para 1er y 2do parcial, **60** para el examen final y **50** para 2da instancia, distribuidas según las cuotas de dificultad guardadas en Configuración de Exámenes.
 
 ### 4.2. Estados comunes del rol
 
@@ -137,11 +137,11 @@ Se registran por estudiante:
 - Nota sobre 100.
 - Estado: `APROBADO`, `REPROBADO` o `REVISION_MANUAL`.
 
-Fórmulas actuales para un examen de 30 preguntas:
+Las fórmulas se calculan usando el total configurado para el parcial:
 
 ```text
-nota_sobre_30  = aciertos × 30 / 30
-nota_sobre_100 = aciertos × 100 / 30
+nota_sobre_30  = aciertos × 30 / total_preguntas_configurado
+nota_sobre_100 = aciertos × 100 / total_preguntas_configurado
 ```
 
 Una página sin código válido, con una grilla ilegible o con una marca que requiere revisión no se asigna automáticamente por posición. Se mantiene en revisión manual.

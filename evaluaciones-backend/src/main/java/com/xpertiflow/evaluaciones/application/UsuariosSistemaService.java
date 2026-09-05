@@ -418,6 +418,7 @@ public class UsuariosSistemaService {
             List<ColumnaAlcance> carreras = encontrarColumnasAlcance(columnas, false);
             Integer sedesLista = buscarColumna(columnas, "SEDES", "SEDE CODIGOS", "SEDES CODIGOS");
             Integer carrerasLista = buscarColumna(columnas, "CARRERAS", "CARRERA CODIGOS", "CARRERAS CODIGOS");
+            Integer campusesLista = buscarColumna(columnas, "CAMPUS", "CAMPUS ASIGNADOS", "CAMPUS CODIGOS", "CAMPUS NOMBRES");
 
             for (int index = encabezado.getRowNum() + 1; index <= sheet.getLastRowNum(); index++) {
                 Row row = sheet.getRow(index);
@@ -439,6 +440,7 @@ public class UsuariosSistemaService {
                     request.setActivo(true);
                     request.setSedes(resolverAlcances(row, sedes, sedesLista, formatter));
                     request.setCarreras(resolverAlcances(row, carreras, carrerasLista, formatter));
+                    request.setCampuses(resolverCampuses(row, campusesLista, formatter));
 
                     UsuarioSistema existente = usuarioRepository.findByCi(normalizarCi(ci)).orElse(null);
                     // El Excel histórico todavía no contiene columnas de campus. Al actualizar
@@ -478,7 +480,7 @@ public class UsuariosSistemaService {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet usuarios = workbook.createSheet("USUARIOS");
             Row encabezado = usuarios.createRow(0);
-            String[] columnas = {"CI", "NOMBRE_COMPLETO", "ROL", "SEDE [CBA]", "SEDE [LPZ]", "CARRERA [SIS]", "CARRERA [MED]"};
+            String[] columnas = {"CI", "NOMBRE_COMPLETO", "ROL", "SEDE [CBA]", "SEDE [LPZ]", "CARRERA [SIS]", "CARRERA [MED]", "CAMPUS"};
             for (int i = 0; i < columnas.length; i++) encabezado.createCell(i).setCellValue(columnas[i]);
             Row ejemplo = usuarios.createRow(1);
             ejemplo.createCell(0).setCellValue("1234567");
@@ -486,6 +488,7 @@ public class UsuariosSistemaService {
             ejemplo.createCell(2).setCellValue("DOCENTE");
             ejemplo.createCell(3).setCellValue("X");
             ejemplo.createCell(5).setCellValue("X");
+            ejemplo.createCell(7).setCellValue("CBA||COL|COLONIAL|SI");
 
             Sheet instrucciones = workbook.createSheet("INSTRUCCIONES");
             String[] textos = {
@@ -494,6 +497,7 @@ public class UsuariosSistemaService {
                     "ROL: usar ADMINISTRADOR_SISTEMA, RESPONSABLE_EVALUACIONES, PERSONAL_EVALUACIONES, DIRECTOR_CARRERA, DOCENTE o VICERRECTOR.",
                     "Marcar con X las columnas SEDE [...] y CARRERA [...] que correspondan. Se pueden marcar varias.",
                     "Los códigos entre corchetes deben ser los códigos oficiales entregados por SEA.",
+                    "Para PERSONAL_EVALUACIONES, CAMPUS acepta varios registros separados por punto y coma: SEDE_CODIGO|CAMPUS_ID|CAMPUS_CODIGO|CAMPUS_NOMBRE|SI o NO.",
                     "Todos los usuarios nuevos deberán cambiar la contraseña en el primer ingreso."
             };
             for (int i = 0; i < textos.length; i++) instrucciones.createRow(i).createCell(0).setCellValue(textos[i]);
@@ -677,6 +681,45 @@ public class UsuariosSistemaService {
             Arrays.stream(valor(row, lista, formatter).split("[,;|]"))
                     .map(String::trim).filter(item -> !item.isBlank())
                     .forEach(item -> resultado.putIfAbsent(item, new AlcanceAcademicoDto(item, item)));
+        }
+        return new ArrayList<>(resultado.values());
+    }
+
+    private List<AlcanceCampusDto> resolverCampuses(Row row, Integer columna, DataFormatter formatter) {
+        if (columna == null) return new ArrayList<>();
+        String contenido = valor(row, columna, formatter).trim();
+        if (contenido.isBlank()) return new ArrayList<>();
+
+        Map<String, AlcanceCampusDto> resultado = new LinkedHashMap<>();
+        for (String registro : contenido.split("[;\\n]+")) {
+            String[] campos = Arrays.stream(registro.trim().split("\\|", -1))
+                    .map(String::trim)
+                    .toArray(String[]::new);
+            if (campos.length < 3 || campos[0].isBlank() || campos[2].isBlank()) {
+                throw new IllegalArgumentException(
+                        "CAMPUS debe usar SEDE_CODIGO|CAMPUS_ID|CAMPUS_CODIGO|CAMPUS_NOMBRE|SI o NO");
+            }
+
+            String sedeCodigo = campos[0];
+            String campusId = campos.length >= 5 ? campos[1] : "";
+            String campusCodigo = campos.length >= 5 ? campos[2] : campos[1];
+            String campusNombre = campos.length >= 5 ? campos[3] : campos[2];
+            String estado = campos.length >= 5 ? campos[4] : "SI";
+            if (campusCodigo.isBlank() || campusNombre.isBlank()) {
+                throw new IllegalArgumentException("Cada campus debe incluir código y nombre");
+            }
+
+            boolean habilitado = MARCAS_ACTIVAS.contains(estado.toUpperCase(Locale.ROOT))
+                    || estado.equalsIgnoreCase("HABILITADO")
+                    || estado.equalsIgnoreCase("ACTIVO");
+            if (!habilitado && !estado.isBlank()
+                    && !Set.of("NO", "N", "0", "FALSE", "FALSO", "DESHABILITADO", "INACTIVO").contains(estado.toUpperCase(Locale.ROOT))) {
+                throw new IllegalArgumentException("El estado del campus debe ser SI/NO o HABILITADO/DESHABILITADO");
+            }
+
+            String clave = sedeCodigo.toUpperCase(Locale.ROOT) + "|" + campusCodigo.toUpperCase(Locale.ROOT);
+            resultado.put(clave, new AlcanceCampusDto(
+                    sedeCodigo, sedeCodigo, campusId, campusCodigo, campusNombre, habilitado));
         }
         return new ArrayList<>(resultado.values());
     }

@@ -108,6 +108,7 @@ def procesar_previsualizacion(payload: dict[str, Any]) -> dict[str, Any]:
         payload.get("outputBasePath", "/app/storage/generados/previsualizaciones"),
         generar_pdf=True,
         modo_previsualizacion=True,
+        configuracion=payload.get("configuracionGeneracion"),
     )
     return {
         "jobId": payload["jobId"],
@@ -178,11 +179,14 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
     rol = db.obtener_rol_examen(rol_examen_id)
     if not rol:
         raise ValueError(f"No existe el rol de examen {rol_examen_id}")
+    generation_config = generator.normalizar_configuracion_generacion(
+        payload.get("configuracionGeneracion"), rol
+    )
 
     reactivos = db.obtener_reactivos_por_banco(banco_preguntas_id)
-    if len(reactivos) < config.TOTAL_PREGUNTAS:
+    if len(reactivos) < generation_config["totalPreguntas"]:
         raise ValueError(
-            f"El banco {banco_preguntas_id} no tiene suficientes reactivos ({len(reactivos)} < {config.TOTAL_PREGUNTAS})"
+            f"El banco {banco_preguntas_id} no tiene suficientes reactivos ({len(reactivos)} < {generation_config['totalPreguntas']})"
         )
 
     estudiantes_payload = payload.get("estudiantes")
@@ -230,7 +234,11 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
     preguntas_por_variante: dict[str, list[dict[str, Any]]] = {}
 
     for letra in variantes_letras:
-        variante = generator.generar_variante(letra, reactivos, rol, output_base, generar_pdf=False)
+        variante = generator.generar_variante(
+            letra, reactivos, rol, output_base,
+            generar_pdf=False,
+            configuracion=generation_config,
+        )
         contenido_cifrado = vault_crypto.cifrar_json(
             {
                 "patronClavesJson": variante["patronClavesJson"],
@@ -267,6 +275,7 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
             preguntas_por_variante,
             rol,
             output_base,
+            generation_config=generation_config,
         )
 
     for est, letra in estudiantes_documento:

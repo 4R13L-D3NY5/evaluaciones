@@ -1,5 +1,15 @@
 # Módulo de cartillas OMR preimpresas
 
+## Consulta de escaneados después de calificar
+
+En **Lista de Evaluaciones → Notas y escaneados OMR**, las evaluaciones con cartilla en estado pendiente de notas o calificado permiten consultar sus archivos originales mediante **Ver escaneado**. Se muestra un botón por archivo asociado a las calificaciones, aunque varias personas provengan del mismo PDF. El visor abre el PDF completo con navegación por páginas, o la imagen original, en modo de consulta sin recalcular ni modificar notas.
+
+Los archivos se recuperan desde la ruta persistida en `sea_calificaciones_omr.archivo_escaneado_path`; no dependen del archivo seleccionado en el navegador ni de un trabajo OMR temporal en memoria. Los registros históricos sin ruta y los archivos que ya no están en disco se informan como no disponibles. No se infiere una página individual a partir del orden de estudiantes.
+
+`GET /api/omr/{rolExamenId}/calificaciones/{calificacionId}/escaneado` requiere un rol operativo de evaluaciones y acceso al rol de examen. Verifica que la calificación pertenezca a esa evaluación y que el archivo real esté dentro de storage. Solo sirve PDF, PNG o JPEG, con caché desactivada. La consulta no recibe rutas de archivos del navegador.
+
+Verificación: calificar una evaluación con varias páginas, cerrar y recargar la lista, abrir sus notas y consultar cada archivo. Comprobar que las páginas se pueden recorrer y que las notas y el estado no cambian; probar también una calificación sin archivo y un acceso fuera del alcance del usuario.
+
 ## Alcance de la primera iteración
 
 El módulo prepara la sobreimpresión de cartillas OMR separada del cuadernillo de examen. La nómina oficial se consulta siempre al abrir la operación y el PDF se genera bajo demanda en memoria, con un estudiante por página A4. No se guarda el PDF ni se crean lotes de cartillas para la impresión normal. El PDF no reproduce la cartilla preimpresa: contiene únicamente los datos operativos que deben caer dentro de sus tres casillas:

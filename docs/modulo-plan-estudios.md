@@ -8,6 +8,8 @@ La vista **Plan de Estudios** consulta el catálogo oficial de SEA y muestra las
 
 Para cada asignatura se muestra la información del parcial seleccionado en los filtros. El docente puede cambiar el parcial mediante los botones de seguimiento:
 
+La vista también permite generar el **Reporte diario de seguimiento de evaluaciones** como un PDF horizontal tamaño oficio (8,5 x 13 pulgadas). El documento conserva la fecha y los filtros seleccionados, ordena las evaluaciones por el resultado visible en la lista y presenta una fila por evaluación con materia/grupo, docente, modalidad y espacios manuales para registrar hora y cantidad de recojo, firmas, devolución y observaciones. Cuando el volumen supera la capacidad de una página, el encabezado se repite automáticamente.
+
 - 1er Parcial.
 - 2do Parcial.
 - Examen Final.

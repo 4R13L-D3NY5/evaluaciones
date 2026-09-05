@@ -5,6 +5,14 @@ import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
 import com.xpertiflow.evaluaciones.application.OmrProcesamientoService;
+import com.xpertiflow.evaluaciones.application.OmrEscaneadoService;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.MediaType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +30,23 @@ import java.util.List;
 @Tag(name = "Procesamiento OMR", description = "Lectura de códigos y respuestas de cartillas escaneadas")
 public class OmrProcesamientoController {
     private final OmrProcesamientoService omrProcesamientoService;
+    private final OmrEscaneadoService omrEscaneadoService;
+
+    @GetMapping("/{rolExamenId}/calificaciones/{calificacionId}/escaneado")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Consultar el escaneado original asociado a una calificación OMR")
+    public ResponseEntity<Resource> escaneado(@PathVariable String rolExamenId, @PathVariable Long calificacionId) {
+        return omrEscaneadoService.buscar(rolExamenId, calificacionId)
+                .map(archivo -> ResponseEntity.ok()
+                        .cacheControl(CacheControl.noStore())
+                        .header("X-Content-Type-Options", "nosniff")
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                ContentDisposition.inline().filename(archivo.getFileName().toString()).build().toString())
+                        .contentType(MediaTypeFactory.getMediaType(archivo.getFileName().toString())
+                                .orElse(MediaType.APPLICATION_OCTET_STREAM))
+                        .body((Resource) new FileSystemResource(archivo)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
     @PostMapping("/{rolExamenId}/procesar")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
