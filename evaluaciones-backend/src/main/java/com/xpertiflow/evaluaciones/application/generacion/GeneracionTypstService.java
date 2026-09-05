@@ -16,6 +16,7 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.PrevisualizacionTypstReque
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.TimeFrameDto;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
 import com.xpertiflow.evaluaciones.config.AppProperties;
@@ -112,6 +113,8 @@ public class GeneracionTypstService {
             ratio = 5;
         }
         mensaje.put("ratioEstudiantesPorVariante", ratio);
+        mensaje.put("configuracionGeneracion", configuracionParaWorker(
+                rol.getTipoParcial() == null ? null : rol.getTipoParcial().getValor()));
         mensaje.put("soloVirtual", Boolean.TRUE.equals(request.getSoloVirtual()) || rol.getModalidad() == ModalidadExamen.VIRTUAL);
         mensaje.put("outputBasePath", outputBase);
         mensaje.put("estudiantes", obtenerEstudiantesOficiales(rol, request.getSeaGroupId()));
@@ -144,7 +147,7 @@ public class GeneracionTypstService {
      * navegador. No crea banco, variantes, mapeos ni cambia el estado del rol.
      */
     public GeneracionTypstResultadoDto solicitarPrevisualizacion(PrevisualizacionTypstRequestDto request) {
-        rolRepository.findById(request.getRolExamenId())
+        RolExamen rol = rolRepository.findById(request.getRolExamenId())
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + request.getRolExamenId()));
 
         String jobId = request.getJobId();
@@ -159,6 +162,8 @@ public class GeneracionTypstService {
         mensaje.put("modoPrevisualizacion", true);
         mensaje.put("preguntasPreview", request.getPreguntas());
         mensaje.put("outputBasePath", outputBase);
+        mensaje.put("configuracionGeneracion", configuracionParaWorker(
+                rol.getTipoParcial() == null ? null : rol.getTipoParcial().getValor()));
 
         GeneracionTypstResultadoDto estadoInicial = new GeneracionTypstResultadoDto();
         estadoInicial.setJobId(jobId);
@@ -232,6 +237,18 @@ public class GeneracionTypstService {
                     "apellido_materno", ""
             ));
         }
+        return resultado;
+    }
+
+    private Map<String, Object> configuracionParaWorker(String tipoParcial) {
+        ConfiguracionEvaluacionesDto configuracion = configuracionEvaluacionesService.obtener();
+        Map<String, Object> resultado = new HashMap<>();
+        resultado.put("tipoParcial", tipoParcial);
+        resultado.put("formatoHoja", configuracion.getFormatoHoja());
+        resultado.put("tipoLetra", configuracion.getTipoLetra());
+        resultado.put("tamanoLetraPt", configuracion.getTamanoLetraPt());
+        resultado.put("espaciadoLeading", configuracion.getEspaciadoLeading());
+        resultado.put("estructuraPreguntas", configuracion.getEstructuraPreguntas());
         return resultado;
     }
 

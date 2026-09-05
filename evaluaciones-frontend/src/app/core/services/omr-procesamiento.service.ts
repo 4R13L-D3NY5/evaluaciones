@@ -118,6 +118,12 @@ export class OmrProcesamientoService {
     return this._http.get<CalificacionOmrResponse[]>(`/api/omr/${rolExamenId}/calificaciones`);
   }
 
+  public obtenerEscaneado(rolExamenId: string, calificacionId: number): Observable<Blob> {
+    return this._http.get(`/api/omr/${encodeURIComponent(rolExamenId)}/calificaciones/${calificacionId}/escaneado`, {
+      responseType: 'blob'
+    });
+  }
+
   public obtenerConfiguracion(): Observable<ConfiguracionOmr> {
     return this._http.get<ConfiguracionOmr>('/api/omr/configuracion');
   }

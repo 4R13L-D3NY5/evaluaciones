@@ -1,11 +1,13 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { forkJoin, Observable, of, throwError } from 'rxjs';
+import { forkJoin, Observable, of, throwError, Subscription } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
+import { jsPDF } from 'jspdf';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { AuthService } from '../../core/services/auth.service';
 import { RolExamenPersistedItem, MapeoEstudianteExamen } from '../../core/services/evaluaciones-db.service';
@@ -40,6 +42,7 @@ import {
   GeneracionTypstVariante
 } from '../../core/models/generacion-typst.model';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
+import { CampusCarrerasService, CarreraCampusAsignada } from '../../core/services/campus-carreras.service';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
@@ -144,7 +147,9 @@ interface CampusDisponible extends Campus {
             </div>
           </div>
           <p class="text-xs text-muted-foreground mt-1">
-            Gestión y seguimiento de exámenes: 30 preguntas (7 fáciles, 16 medias y 7 difíciles) y exportación oficial.
+            Gestión y seguimiento de exámenes: {{ configuracionParcialActual().totalPreguntas }} preguntas
+            ({{ configuracionParcialActual().facil }} fáciles, {{ configuracionParcialActual().medio }} medias y
+            {{ configuracionParcialActual().dificil }} difíciles) y exportación oficial.
           </p>
         </div>
 
@@ -167,7 +172,7 @@ interface CampusDisponible extends Campus {
             (click)="abrirModalReporteDiario()"
             class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
             <i class="pi pi-print"></i>
-            <span>Imprimir Lista de Seguimiento (Diario)</span>
+            <span>Generar reporte PDF (diario)</span>
           </button>
         </div>
       </div>
@@ -177,8 +182,8 @@ interface CampusDisponible extends Campus {
         
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
           
-          @if (esPersonalEvaluaciones()) {
-            <!-- El personal trabaja sobre los campus que pertenecen a sus sedes autorizadas. -->
+          @if (esEvaluacionesPorCampus()) {
+            <!-- Personal y responsables trabajan sobre un campus y sus carreras. -->
             <div>
               <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                 <i class="pi pi-building text-primary text-[10px]"></i> Campus
@@ -211,16 +216,19 @@ interface CampusDisponible extends Campus {
             </div>
           }
 
-          <!-- Carrera (SEA Gateway) -->
+          <!-- Carrera disponible dentro del campus seleccionado -->
           <div class="lg:col-span-2">
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
               <i class="pi pi-graduation-cap text-primary text-[10px]"></i> Carrera
             </label>
             <select 
-              [ngModel]="carreraSeleccionada()?.careerCode"
+              [ngModel]="todasCarrerasSeleccionadas() ? carreraTodasCodigo : (carreraSeleccionada()?.careerCode || '')"
               (ngModelChange)="onCarreraChange($event)"
               [disabled]="cargandoCarreras()"
               class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
+              @if (esEvaluacionesPorCampus()) {
+                <option [value]="carreraTodasCodigo">Todas las carreras del campus</option>
+              }
               @for (carrera of carreras(); track carrera.careerId) {
                 <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
               }
@@ -260,7 +268,7 @@ interface CampusDisponible extends Campus {
             </select>
           </div>
 
-          <!-- Fecha Inicio (por defecto se consultan todas las fechas) -->
+          <!-- Fecha Inicio (por defecto: hoy) -->
           <div>
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
               <i class="pi pi-calendar text-primary text-[10px]"></i> Fecha Inicio
@@ -272,7 +280,7 @@ interface CampusDisponible extends Campus {
               class="w-full bg-muted/70 border border-border rounded-xl px-2 py-1.5 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
           </div>
 
-          <!-- Fecha Fin (por defecto se consultan todas las fechas) -->
+          <!-- Fecha Fin (por defecto: hoy; esta fecha se usa en la planilla diaria) -->
           <div>
             <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
               <i class="pi pi-calendar-plus text-primary text-[10px]"></i> Fecha Fin
@@ -394,7 +402,7 @@ interface CampusDisponible extends Campus {
                         <span class="font-black text-foreground text-xs">{{ item.materia }}</span>
                       </div>
                       <div class="text-[10px] text-muted-foreground font-medium">
-                        {{ carreraSeleccionada()?.careerName }} · Sem. {{ item.semestre }}° · <strong>{{ item.grupo }}</strong>
+                        {{ carreraSeleccionada()?.careerName || item.carreraNombre }} · Sem. {{ item.semestre }}° · <strong>{{ item.grupo }}</strong>
                       </div>
                       @if (bancoPreguntasCargado(item)) {
                         <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
@@ -590,13 +598,13 @@ interface CampusDisponible extends Campus {
                           <div class="relative group/notas">
                             <button
                               (click)="abrirNotasOmr(item)"
-                              title="Ver notas OMR"
-                              aria-label="Ver notas OMR"
+                              title="Ver notas y escaneados OMR"
+                              aria-label="Ver notas y escaneados OMR"
                               class="h-7 w-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center cursor-pointer transition-colors">
                               <i class="pi pi-chart-bar text-xs"></i>
                             </button>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/notas:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Notas OMR /30 y /100</span>
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Notas y escaneados OMR</span>
                               <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                             </div>
                           </div>
@@ -906,9 +914,9 @@ interface CampusDisponible extends Campus {
                 <div class="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between text-[11px] text-indigo-950">
                   <div class="flex items-center gap-2 font-bold">
                     <i class="pi pi-file-edit text-indigo-700"></i>
-                    <span>30 preguntas · 7 fáciles, 16 medias y 7 difíciles · hoja de respuestas externa</span>
+                    <span>{{ configuracionParcialActual().totalPreguntas }} preguntas · {{ configuracionParcialActual().facil }} fáciles, {{ configuracionParcialActual().medio }} medias y {{ configuracionParcialActual().dificil }} difíciles · hoja de respuestas externa</span>
                   </div>
-                  <span class="text-[10px] font-mono text-indigo-800 font-black">Oficio · Times New Roman 11 pt</span>
+                  <span class="text-[10px] font-mono text-indigo-800 font-black">{{ configuracionParcialActual().formatoHoja }} · {{ configuracionParcialActual().tipoLetra }} {{ configuracionParcialActual().tamanoLetraPt }} pt</span>
                 </div>
                 }
               </div>
@@ -1684,17 +1692,21 @@ interface CampusDisponible extends Campus {
             <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 text-white p-4 flex flex-wrap items-center justify-between gap-3 shadow-md shrink-0">
               <h3 class="text-sm font-black">Planilla Oficial de Control de Entrega y Recepción (Diario)</h3>
               <div class="flex items-center gap-2">
-                <button (click)="imprimirVentanaLimpia()" class="bg-purple-600 hover:bg-purple-500 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer">
-                  <i class="pi pi-print"></i>
-                  <span>Imprimir Planilla</span>
+                <button (click)="imprimirListaSeguimientoDiario()" class="bg-purple-600 hover:bg-purple-500 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer">
+                  <i class="pi pi-file-pdf"></i>
+                  <span>Generar PDF</span>
                 </button>
                 <button (click)="cerrarModalReporteDiario()" class="text-white/80 hover:text-white p-2 text-base cursor-pointer"><i class="pi pi-times"></i></button>
               </div>
             </div>
             <div class="p-6 overflow-y-auto max-h-[80vh] space-y-4 bg-muted/20">
               <div class="bg-white text-slate-950 p-6 rounded-xl shadow-lg border border-slate-300 font-sans">
-                <h2 class="text-sm font-black uppercase text-center mb-4">PLANILLA OFICIAL DE CONTROL DE ENTREGA Y RECEPCIÓN DE EVALUACIONES</h2>
-                <div class="text-xs">Sede: {{ sedeSeleccionada()?.name }} · Carrera: {{ carreraSeleccionada()?.careerName }}</div>
+                <div class="flex items-start justify-between gap-4 border-b-2 border-indigo-900 pb-3">
+                  <div><p class="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-800">Sistema de Evaluaciones UNITEPC</p><h2 class="mt-1 text-sm font-black uppercase">Reporte diario de seguimiento</h2><p class="mt-1 text-[10px] text-slate-500">Control de entrega y recepción de evaluaciones</p></div>
+                  <div class="text-right text-[10px] text-slate-500"><strong class="block text-slate-900">Fecha: {{ formatearFechaReporteDiario() }}</strong><span>{{ evaluacionesParaReporteDiario().length }} evaluaciones</span></div>
+                </div>
+                <div class="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[10px]"><span><strong class="text-slate-500">CAMPUS</strong><br>{{ campusSeleccionado()?.name || 'Todos' }}</span><span><strong class="text-slate-500">SEDE</strong><br>{{ sedeSeleccionada()?.name || 'Todas' }}</span><span><strong class="text-slate-500">CARRERA</strong><br>{{ etiquetaCarreraSeleccionada() }}</span><span><strong class="text-slate-500">PARCIAL</strong><br>{{ filtroParcial }}</span></div>
+                <div class="mt-4 overflow-x-auto"><table class="w-full text-[10px]"><thead><tr class="bg-indigo-950 text-white text-left uppercase tracking-wide"><th class="p-2 text-center">N°</th><th class="p-2">Hora</th><th class="p-2">Materia / grupo</th><th class="p-2">Docente</th><th class="p-2 text-center">Modalidad</th><th class="p-2 text-center">Recojo</th><th class="p-2 text-center">Cant.</th><th class="p-2">Firma</th><th class="p-2 text-center">Dev.</th><th class="p-2 text-center">Cant.</th><th class="p-2">Firma</th><th class="p-2">Observaciones</th></tr></thead><tbody>@for (item of evaluacionesParaReporteDiario(); track item.id) {<tr class="border-b border-slate-200"><td class="p-2 text-center font-bold">{{ $index + 1 }}</td><td class="p-2 font-mono font-bold">{{ item.hora || item.horario || '-' }}</td><td class="p-2"><strong>{{ item.codigo }} - {{ item.materia }}</strong><br><span class="text-[9px] text-slate-500">{{ item.carreraNombre || item.careerCode }} - {{ item.grupo }}</span></td><td class="p-2">{{ item.docenteNombre || '-' }}</td><td class="p-2 text-center">{{ etiquetaModalidad(item) }}</td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td></tr>} @if (!evaluacionesParaReporteDiario().length) {<tr><td colspan="12" class="p-5 text-center text-slate-500">No hay evaluaciones para la fecha seleccionada.</td></tr>}</tbody></table></div>
               </div>
             </div>
             <div class="bg-muted/60 border-t border-border p-3 flex items-center justify-end shrink-0">
@@ -1980,8 +1992,39 @@ interface CampusDisponible extends Campus {
             <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0"><div><h3 class="text-sm font-black text-foreground">Notas OMR de la evaluación</h3><p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotas()?.codigo }} · resultados guardados en el servidor</p></div><button (click)="cerrarNotasOmr()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button></div>
             <div class="p-5 overflow-y-auto">
               @if (cargandoNotasOmr()) { <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-xl text-purple-700"></i><p class="mt-2">Cargando notas...</p></div> }
-              @else if (notasOmr().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen calificaciones OMR guardadas para esta evaluación.</div> }
-              @else { <div class="border border-border rounded-xl overflow-hidden"><div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Variante</span><span>/30</span><span>/100</span><span>Estado</span></div><div class="divide-y divide-border">@for (nota of notasOmr(); track nota.id) {<div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 px-3 py-2.5 items-center text-xs"><span class="font-mono text-muted-foreground">{{ $index + 1 }}</span><span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span><span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span><strong>{{ nota.notaSobre30 }}</strong><strong>{{ nota.notaSobre100 }}</strong><span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="nota.estadoCalificacion !== 'APROBADO'">{{ nota.estadoCalificacion }}</span></div>}</div></div> }
+              @if (!cargandoNotasOmr() && notasOmr().length > 0) {
+                <section class="mb-4 rounded-xl border border-border bg-muted/20 p-4" aria-label="Escaneados guardados">
+                  <h4 class="text-sm font-black text-foreground">Escaneados de la evaluación</h4>
+                  <p class="mt-1 text-xs text-muted-foreground">Consulta el archivo original completo y recorre sus páginas. Las notas permanecen guardadas.</p>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    @for (archivo of escaneadosNotasOmr(); track archivo.id) {
+                      <button type="button" (click)="verEscaneadoOmr(archivo.id)" class="rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary hover:bg-muted cursor-pointer" [attr.aria-pressed]="escaneadoOmrSeleccionado() === archivo.id">
+                        <i class="pi pi-eye mr-1"></i> Ver escaneado {{ $index + 1 }} · {{ archivo.estudiantes }} estudiante(s)
+                      </button>
+                    } @empty {
+                      <p class="text-xs text-muted-foreground">Estas calificaciones no tienen un escaneado asociado.</p>
+                    }
+                  </div>
+                  @if (cargandoEscaneadoOmr()) {
+                    <p role="status" class="mt-3 text-xs text-muted-foreground"><i class="pi pi-spin pi-spinner mr-1"></i> Cargando escaneado...</p>
+                  }
+                  @if (errorEscaneadoOmr(); as error) {
+                    <p role="alert" class="mt-3 text-xs text-foreground">{{ error }}</p>
+                  }
+                  @if (previewEscaneadoGuardado(); as preview) {
+                    <div class="mt-3 flex justify-end">
+                      <button type="button" (click)="cerrarEscaneadoOmr()" class="text-xs font-bold text-muted-foreground hover:text-foreground cursor-pointer">Ocultar escaneado</button>
+                    </div>
+                    @if (preview.pdf) {
+                      <iframe [src]="preview.segura" title="Escaneado original de la evaluación" class="mt-2 w-full h-[65vh] rounded-lg border border-border bg-card"></iframe>
+                    } @else {
+                      <img [src]="preview.url" alt="Escaneado original de la evaluación" class="mt-2 max-w-full h-auto rounded-lg border border-border" />
+                    }
+                  }
+                </section>
+              }
+              @if (!cargandoNotasOmr() && notasOmr().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen calificaciones OMR guardadas para esta evaluación.</div> }
+              @else if (!cargandoNotasOmr()) { <div class="border border-border rounded-xl overflow-hidden"><div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Variante</span><span>/30</span><span>/100</span><span>Estado</span></div><div class="divide-y divide-border">@for (nota of notasOmr(); track nota.id) {<div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 px-3 py-2.5 items-center text-xs"><span class="font-mono text-muted-foreground">{{ $index + 1 }}</span><span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span><span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span><strong>{{ nota.notaSobre30 }}</strong><strong>{{ nota.notaSobre100 }}</strong><span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="nota.estadoCalificacion !== 'APROBADO'">{{ nota.estadoCalificacion }}</span></div>}</div></div> }
             </div>
             <div class="p-4 border-t border-border flex justify-end shrink-0"><button (click)="cerrarNotasOmr()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
           </div>
@@ -2065,7 +2108,8 @@ interface CampusDisponible extends Campus {
     </div>
   `
 })
-export class EvaluacionesDiaComponent implements OnInit {
+export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
+  private readonly _sanitizer = inject(DomSanitizer);
   private readonly _http = inject(HttpClient);
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _auth = inject(AuthService);
@@ -2078,6 +2122,7 @@ export class EvaluacionesDiaComponent implements OnInit {
   private readonly _configuracionEvaluaciones = inject(ConfiguracionEvaluacionesService);
   private readonly _sinCartillaService = inject(ExamenSinCartillaService);
   private readonly _feedback = inject(UiFeedbackService);
+  private readonly _campusCarreras = inject(CampusCarrerasService);
 
   // Sedes y Carreras desde SEA Gateway
   public sedes = signal<BranchOffice[]>([]);
@@ -2094,6 +2139,14 @@ export class EvaluacionesDiaComponent implements OnInit {
   public readonly esPersonalEvaluaciones = computed(
     () => this._auth.usuario()?.rol === 'PERSONAL_EVALUACIONES'
   );
+  public readonly esResponsableEvaluaciones = computed(
+    () => this._auth.usuario()?.rol === 'RESPONSABLE_EVALUACIONES'
+  );
+  public readonly esEvaluacionesPorCampus = computed(
+    () => this.esPersonalEvaluaciones() || this.esResponsableEvaluaciones()
+  );
+  public readonly carreraTodasCodigo = '__TODAS_LAS_CARRERAS__';
+  public todasCarrerasSeleccionadas = signal(false);
   public readonly esDirectorCarrera = computed(
     () => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA'
   );
@@ -2110,8 +2163,8 @@ export class EvaluacionesDiaComponent implements OnInit {
   
   // La lista debe abrir mostrando la programación disponible. El usuario
   // puede acotar el rango manualmente cuando necesite revisar una fecha.
-  public filtroFechaInicio = '';
-  public filtroFechaFin = '';
+  public filtroFechaInicio = this.fechaActualLocal();
+  public filtroFechaFin = this.fechaActualLocal();
 
   public busquedaTexto = '';
   public filtrosActualizados = signal(0);
@@ -2186,6 +2239,20 @@ export class EvaluacionesDiaComponent implements OnInit {
   // Configuración global administrable: cantidad máxima de estudiantes por variante.
   public ratioEstudiantesPorVariante = signal<number>(5);
   public duracionExamenVirtualMinutos = signal<number>(45);
+  public configuracionParcialActual = computed(() => {
+    const item = this.evaluacionSeleccionadaParaParametrizar();
+    const tipo = item?.tipo?.toLowerCase() || '';
+    const clave = tipo.includes('final')
+      ? 'FINAL'
+      : tipo.includes('2da')
+        ? '2DA_INSTANCIA'
+        : tipo.includes('2do')
+          ? '2P'
+          : '1P';
+    const configuracion = this._configuracionEvaluaciones.configuracion();
+    const parcial = configuracion.estructuraPreguntas?.[clave] || { totalPreguntas: 30, facil: 7, medio: 16, dificil: 7 };
+    return { ...parcial, formatoHoja: configuracion.formatoHoja, tipoLetra: configuracion.tipoLetra, tamanoLetraPt: configuracion.tamanoLetraPt };
+  });
   public estudianteSeleccionadoIdx = signal<number>(0);
   public variantesCompiladas = signal<VarianteCompilada[]>([]);
   public modoUnificado = signal<boolean>(false);
@@ -2235,6 +2302,21 @@ export class EvaluacionesDiaComponent implements OnInit {
   public evaluacionSeleccionadaNotas = signal<EvaluacionItemUI | null>(null);
   public notasOmr = signal<CalificacionOmrResponse[]>([]);
   public cargandoNotasOmr = signal<boolean>(false);
+  public escaneadosNotasOmr = computed(() => {
+    const archivos = new Map<string, { id: number; estudiantes: number }>();
+    for (const nota of this.notasOmr()) {
+      if (!nota.archivoEscaneadoPath) continue;
+      const archivo = archivos.get(nota.archivoEscaneadoPath);
+      if (archivo) archivo.estudiantes++;
+      else archivos.set(nota.archivoEscaneadoPath, { id: nota.id, estudiantes: 1 });
+    }
+    return [...archivos.values()];
+  });
+  public escaneadoOmrSeleccionado = signal<number | null>(null);
+  public cargandoEscaneadoOmr = signal(false);
+  public errorEscaneadoOmr = signal<string | null>(null);
+  public previewEscaneadoGuardado = signal<{ url: string; segura: SafeResourceUrl; pdf: boolean } | null>(null);
+  private _consultaEscaneadoOmr?: Subscription;
 
   // Carga manual de notas para exámenes sin cartilla.
   public dialogNotasDocente = signal<boolean>(false);
@@ -2399,6 +2481,13 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public onCarreraChange(careerCode: string): void {
+    if (this.esEvaluacionesPorCampus() && careerCode === this.carreraTodasCodigo) {
+      this.todasCarrerasSeleccionadas.set(true);
+      this.carreraSeleccionada.set(null);
+      this._cargarEvaluaciones();
+      return;
+    }
+    this.todasCarrerasSeleccionadas.set(false);
     const carrera = this.carreras().find(c => c.careerCode === careerCode);
     if (carrera) {
       this.carreraSeleccionada.set(carrera);
@@ -2411,7 +2500,7 @@ export class EvaluacionesDiaComponent implements OnInit {
     this._gateway.getBranchOffices().subscribe({
       next: sedes => {
         this.sedes.set(sedes);
-        if (this.esPersonalEvaluaciones()) {
+        if (this.esEvaluacionesPorCampus()) {
           this._cargarCampus(sedes);
           return;
         }
@@ -2470,14 +2559,40 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   private _cargarCarreras(branchCode: string): void {
     this.cargandoCarreras.set(true);
-    this._gateway.getCareers(branchCode).subscribe({
-      next: carreras => {
-        this.carreras.set(carreras);
+    const campus = this.campusSeleccionado();
+    const carrerasCatalogo$ = this._gateway.getCareers(branchCode);
+    const carrerasCampus$ = this.esEvaluacionesPorCampus() && campus
+      ? this._rolService.listar(branchCode).pipe(
+        catchError(() => of([] as RolExamenResponse[]))
+      )
+      : of([] as RolExamenResponse[]);
+    const carrerasAsignadas$ = this.esEvaluacionesPorCampus() && campus
+      ? this._campusCarreras.listarRemoto({
+        sedeCodigo: branchCode,
+        campusId: campus.campusId,
+        campusCodigo: campus.code,
+        campusNombre: campus.name
+      }).pipe(catchError(() => of([] as CarreraCampusAsignada[])))
+      : of([] as CarreraCampusAsignada[]);
+
+    forkJoin({ carreras: carrerasCatalogo$, rolesCampus: carrerasCampus$, carrerasAsignadas: carrerasAsignadas$ }).subscribe({
+      next: ({ carreras, rolesCampus, carrerasAsignadas }) => {
+        const carrerasVisibles = this.esEvaluacionesPorCampus() && campus
+          ? this.carrerasDelCampus(carreras, rolesCampus, campus, carrerasAsignadas)
+          : carreras;
+        this.carreras.set(carrerasVisibles);
         this.cargandoCarreras.set(false);
-        if (carreras.length > 0) {
-          this.carreraSeleccionada.set(carreras[0]);
+        if (carrerasVisibles.length > 0) {
+          if (this.esEvaluacionesPorCampus()) {
+            this.todasCarrerasSeleccionadas.set(true);
+            this.carreraSeleccionada.set(null);
+          } else {
+            this.todasCarrerasSeleccionadas.set(false);
+            this.carreraSeleccionada.set(carreras[0]);
+          }
           this._cargarEvaluaciones();
         } else {
+          this.todasCarrerasSeleccionadas.set(false);
           this.carreraSeleccionada.set(null);
           this.evaluaciones.set([]);
           this.cargando.set(false);
@@ -2490,18 +2605,70 @@ export class EvaluacionesDiaComponent implements OnInit {
     });
   }
 
+  private carrerasDelCampus(
+    catalogo: Career[],
+    rolesSede: RolExamenResponse[],
+    campus: CampusDisponible,
+    carrerasAsignadas: CarreraCampusAsignada[]
+  ): Career[] {
+    const carrerasCatalogo = new Map(catalogo.map(carrera => [carrera.careerCode.toUpperCase(), carrera]));
+    const identidadCampus = {
+      sedeCodigo: campus.branchOfficeCode,
+      campusId: campus.campusId,
+      campusCodigo: campus.code,
+      campusNombre: campus.name
+    };
+    const carrerasConfiguradas = carrerasAsignadas.length
+      ? carrerasAsignadas
+      : this._campusCarreras.listar(identidadCampus);
+    if (carrerasConfiguradas.length) {
+      return carrerasConfiguradas
+        .map(carrera => carrerasCatalogo.get(carrera.codigo.toUpperCase()))
+        .filter((carrera): carrera is Career => !!carrera)
+        .sort((a, b) => a.careerName.localeCompare(b.careerName, 'es'));
+    }
+    const rolesCampus = rolesSede.filter(rol => this.campusCoincide(rol, campus));
+    const codigosCampus = new Set(
+      rolesCampus
+        .map(rol => rol.carreraCodigo?.trim().toUpperCase())
+        .filter((codigo): codigo is string => !!codigo)
+    );
+
+    // El catálogo SEA está organizado por sede. Para un campus, el conjunto
+    // correcto es el de las carreras que tienen evaluaciones registradas en
+    // ese campus; luego se conservan sus nombres oficiales de SEA.
+    if (!codigosCampus.size) return [];
+    return [...codigosCampus]
+      .map(codigo => carrerasCatalogo.get(codigo))
+      .filter((carrera): carrera is Career => !!carrera)
+      .sort((a, b) => a.careerName.localeCompare(b.careerName, 'es'));
+  }
+
+  private campusCoincide(rol: RolExamenResponse, campus: CampusDisponible): boolean {
+    const normalizarCampus = (valor: unknown): string => this._normalizar(String(valor ?? ''))
+      .replace(/^campus\s+/, '');
+    const campusSeleccionado = new Set([
+      campus.name,
+      campus.code,
+      campus.campusId
+    ].map(normalizarCampus).filter(Boolean));
+    const campusDelRol = normalizarCampus(rol.campus);
+    return !!campusDelRol && campusSeleccionado.has(campusDelRol);
+  }
+
   private _cargarEvaluaciones(): void {
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
     const campus = this.campusSeleccionado();
-    if (!sede || !carrera || (this.esPersonalEvaluaciones() && !campus)) return;
+    const todasCarreras = this.esEvaluacionesPorCampus() && this.todasCarrerasSeleccionadas();
+    if (!sede || (!carrera && !todasCarreras) || (this.esEvaluacionesPorCampus() && !campus)) return;
 
     this.cargando.set(true);
 
     this._rolService.listar(
       sede.code,
-      carrera.careerCode,
-      this.esPersonalEvaluaciones() ? campus?.name : undefined
+      todasCarreras ? undefined : carrera?.careerCode,
+      this.esEvaluacionesPorCampus() ? campus?.name : undefined
     ).subscribe({
       next: roles => {
         const uiList: EvaluacionItemUI[] = roles.map(rol => this._mapearRolResponseA_UI(rol));
@@ -2552,6 +2719,7 @@ export class EvaluacionesDiaComponent implements OnInit {
       seaSyllabusCourseId: rol.seaSyllabusCourseId,
       sedeCode: rol.sedeCodigo,
       careerCode: rol.carreraCodigo,
+      carreraNombre: rol.carreraNombre,
       codigo: rol.materiaCodigo,
       materia: rol.materiaNombre,
       semestre: rol.semestre,
@@ -3047,6 +3215,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     return campus.campusId || campus.code || `${campus.branchOfficeCode}-${campus.name}`;
   }
 
+  public etiquetaCarreraSeleccionada(): string {
+    return this.todasCarrerasSeleccionadas() ? 'Todas las carreras del campus' : (this.carreraSeleccionada()?.careerName || '—');
+  }
+
   public onCampusChange(key: string): void {
     const campus = this.campuses().find(item => this.campusKey(item) === key);
     if (!campus) return;
@@ -3487,12 +3659,14 @@ export class EvaluacionesDiaComponent implements OnInit {
 
   public abrirNotasOmr(item: EvaluacionItemUI): void {
     if (!this.puedeMostrarNotas(item)) return;
+    this.cerrarEscaneadoOmr();
     this.evaluacionSeleccionadaNotas.set(item);
     this.notasOmr.set([]);
     this.cargandoNotasOmr.set(true);
     this.dialogNotasOmr.set(true);
     this._omrService.listarCalificaciones(item.id).subscribe({
       next: notas => {
+        if (this.evaluacionSeleccionadaNotas()?.id !== item.id) return;
         this.notasOmr.set(notas);
         this.cargandoNotasOmr.set(false);
       },
@@ -3504,9 +3678,50 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public cerrarNotasOmr(): void {
+    this.cerrarEscaneadoOmr();
     this.dialogNotasOmr.set(false);
     this.evaluacionSeleccionadaNotas.set(null);
     this.notasOmr.set([]);
+  }
+
+  public verEscaneadoOmr(calificacionId: number): void {
+    const item = this.evaluacionSeleccionadaNotas();
+    if (!item || !this.escaneadosNotasOmr().some(archivo => archivo.id === calificacionId)) return;
+    this.cerrarEscaneadoOmr();
+    this.escaneadoOmrSeleccionado.set(calificacionId);
+    this.cargandoEscaneadoOmr.set(true);
+    this._consultaEscaneadoOmr = this._omrService.obtenerEscaneado(item.id, calificacionId).subscribe({
+      next: archivo => {
+        this.cargandoEscaneadoOmr.set(false);
+        if (!['application/pdf', 'image/png', 'image/jpeg'].includes(archivo.type)) {
+          this.errorEscaneadoOmr.set('El formato del escaneado no permite previsualización.');
+          return;
+        }
+        const url = URL.createObjectURL(archivo);
+        this.previewEscaneadoGuardado.set({ url, segura: this._sanitizer.bypassSecurityTrustResourceUrl(url), pdf: archivo.type === 'application/pdf' });
+      },
+      error: error => {
+        this.cargandoEscaneadoOmr.set(false);
+        this.errorEscaneadoOmr.set(error.status === 404
+          ? 'El escaneado asociado ya no está disponible en el servidor.'
+          : 'No se pudo abrir el escaneado. Verifica tu acceso e intenta nuevamente.');
+      }
+    });
+  }
+
+  public cerrarEscaneadoOmr(): void {
+    this._consultaEscaneadoOmr?.unsubscribe();
+    this._consultaEscaneadoOmr = undefined;
+    const preview = this.previewEscaneadoGuardado();
+    if (preview) URL.revokeObjectURL(preview.url);
+    this.previewEscaneadoGuardado.set(null);
+    this.escaneadoOmrSeleccionado.set(null);
+    this.cargandoEscaneadoOmr.set(false);
+    this.errorEscaneadoOmr.set(null);
+  }
+
+  public ngOnDestroy(): void {
+    this.cerrarEscaneadoOmr();
   }
 
   public abrirNotasDocente(item: EvaluacionItemUI): void {
@@ -3837,9 +4052,10 @@ export class EvaluacionesDiaComponent implements OnInit {
     this.queueJobCompleted.set(false);
     this.queueProgress.set(15);
     this.queuePasoActual.set('Encolando tarea en RabbitMQ...');
+    const configuracionActual = this.configuracionParcialActual();
     this.queueLogs.set([
       `[${new Date().toLocaleTimeString()}] ⏳ Solicitud #${jobId} encolada`,
-      `[${new Date().toLocaleTimeString()}] ${esVirtual ? '🖥️ Preparación web: 30 preguntas, sin PDF ni cartilla' : '📄 Configuración oficial: 30 preguntas (7 fáciles, 16 medias, 7 difíciles), Oficio, Times New Roman 11 pt'}`,
+      `[${new Date().toLocaleTimeString()}] ${esVirtual ? `🖥️ Preparación web: ${configuracionActual.totalPreguntas} preguntas, sin PDF ni cartilla` : `📄 Configuración oficial: ${configuracionActual.totalPreguntas} preguntas (${configuracionActual.facil} fáciles, ${configuracionActual.medio} medias, ${configuracionActual.dificil} difíciles), ${configuracionActual.formatoHoja}, ${configuracionActual.tipoLetra} ${configuracionActual.tamanoLetraPt} pt`}`,
       `[${new Date().toLocaleTimeString()}] 👥 Alumnos inscritos: ${estudiantes.length}, Variantes: ${variantes.join(', ')}`
     ]);
 
@@ -4188,6 +4404,166 @@ export class EvaluacionesDiaComponent implements OnInit {
     window.print();
   }
 
+  public evaluacionesParaReporteDiario(): EvaluacionItemUI[] {
+    const fechaFinal = this.filtroFechaFin || this.fechaActualLocal();
+    return this.evaluacionesFiltradas().filter(item => item.fecha === fechaFinal);
+  }
+
+  public formatearFechaReporteDiario(): string {
+    const fecha = this.filtroFechaFin || this.fechaActualLocal();
+    const partes = fecha.split('-');
+    return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : fecha;
+  }
+
+  public etiquetaModalidad(item: EvaluacionItemUI): string {
+    if (item.modalidad === 'PRESENCIAL_CARTILLA') return 'Con cartilla';
+    if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') return 'Sin cartilla';
+    return 'Virtual';
+  }
+
+  public imprimirListaSeguimientoDiario(): void {
+    const items = this.evaluacionesParaReporteDiario();
+    const fechaFinal = this.filtroFechaFin || this.fechaActualLocal();
+    // Oficio horizontal: 13 x 8.5 pulgadas (330.2 x 215.9 mm).
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [330.2, 215.9] });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 12;
+    const contentWidth = pageWidth - margin * 2;
+    const purple = { r: 51, g: 25, b: 111 };
+    const ink = { r: 20, g: 29, b: 49 };
+    const muted = { r: 91, g: 105, b: 128 };
+    const grid = { r: 205, g: 214, b: 228 };
+    const soft = { r: 246, g: 248, b: 252 };
+    const modalidadColor = (item: EvaluacionItemUI): { r: number; g: number; b: number } => {
+      if (item.modalidad === 'VIRTUAL') return { r: 126, g: 58, b: 237 };
+      if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') return { r: 180, g: 83, b: 9 };
+      return { r: 15, g: 118, b: 110 };
+    };
+    const texto = (valor: unknown, fallback = '-'): string => {
+      const limpio = String(valor ?? '').trim();
+      return limpio || fallback;
+    };
+    const textoCortado = (valor: unknown, ancho: number, fallback = '-'): string[] => {
+      return pdf.splitTextToSize(texto(valor, fallback), ancho) as string[];
+    };
+    const dibujarEncabezado = (numeroPagina: number): number => {
+      pdf.setFillColor(purple.r, purple.g, purple.b);
+      pdf.rect(0, 0, pageWidth, 22, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.text('UNITEPC', margin, 9);
+      pdf.setFontSize(13);
+      pdf.text('REPORTE DIARIO DE SEGUIMIENTO DE EVALUACIONES', margin, 16);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.text('CONTROL DE ENTREGA Y RECEPCION', pageWidth - margin, 9, { align: 'right' });
+      pdf.text(`Pagina ${numeroPagina}`, pageWidth - margin, 16, { align: 'right' });
+
+      pdf.setTextColor(ink.r, ink.g, ink.b);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7.5);
+      pdf.text(`CAMPUS: ${texto(this.campusSeleccionado()?.name, 'Todos').toUpperCase()}`, margin, 32);
+      pdf.text(`SEDE: ${texto(this.sedeSeleccionada()?.name, 'Todas').toUpperCase()}`, pageWidth / 2 - 35, 32);
+      pdf.text(`FECHA: ${this.formatearFechaReporteDiario()}`, pageWidth - margin, 32, { align: 'right' });
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.setFontSize(7);
+      pdf.text(`Carrera: ${texto(this.etiquetaCarreraSeleccionada(), 'Todas')}`, margin, 38, { maxWidth: pageWidth / 2 - margin - 8 });
+      pdf.text(`Parcial: ${texto(this.filtroParcial, 'Todos')}  |  Total: ${items.length} evaluacion(es)`, pageWidth - margin, 38, { align: 'right' });
+      return 44;
+    };
+    const columnWidths = [9, 18, 62, 50, 26, 18, 12, 25, 18, 12, 25, 31];
+    const headers = ['N°', 'HORA', 'MATERIA / GRUPO', 'DOCENTE', 'MODALIDAD', 'H. RECOJO', 'CANT.', 'FIRMA', 'H. DEV.', 'CANT.', 'FIRMA', 'OBSERVACIONES'];
+    const headerHeight = 10;
+    let page = 1;
+    let y = dibujarEncabezado(page);
+    const dibujarCabeceraTabla = (): void => {
+      pdf.setFillColor(purple.r, purple.g, purple.b);
+      pdf.rect(margin, y, contentWidth, headerHeight, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.3);
+      pdf.setTextColor(255, 255, 255);
+      let x = margin;
+      headers.forEach((header, index) => {
+        const align = [0, 1, 4, 5, 6, 8, 9].includes(index) ? 'center' : 'left';
+        const textX = align === 'center' ? x + columnWidths[index] / 2 : x + 2;
+        const headerLines = pdf.splitTextToSize(header, columnWidths[index] - 3) as string[];
+        pdf.setDrawColor(116, 96, 160);
+        pdf.rect(x, y, columnWidths[index], headerHeight, 'S');
+        pdf.text(headerLines, textX, y + (headerLines.length > 1 ? 4.2 : 6), { align, maxWidth: columnWidths[index] - 3 });
+        x += columnWidths[index];
+      });
+      y += headerHeight;
+    };
+    dibujarCabeceraTabla();
+
+    items.forEach((item, indice) => {
+      const materia = textoCortado(`${texto(item.codigo)} - ${texto(item.materia)}`, columnWidths[2] - 4).slice(0, 1);
+      const grupo = textoCortado(`${texto(item.carreraNombre || item.careerCode)} - ${texto(item.grupo)}`, columnWidths[2] - 4, '').slice(0, 1);
+      const docente = textoCortado(item.docenteNombre, columnWidths[3] - 4).slice(0, 2);
+      const rowHeight = 10.5;
+      if (y + rowHeight > pageHeight - 14) {
+        pdf.setDrawColor(grid.r, grid.g, grid.b);
+        pdf.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(muted.r, muted.g, muted.b);
+        pdf.text('Documento de control interno - complete manualmente los campos de entrega, devolucion y observaciones.', margin, pageHeight - 6);
+        page += 1;
+        pdf.addPage();
+        y = dibujarEncabezado(page);
+        dibujarCabeceraTabla();
+      }
+      if (indice % 2 === 1) {
+        pdf.setFillColor(soft.r, soft.g, soft.b);
+        pdf.rect(margin, y, contentWidth, rowHeight, 'F');
+      }
+      pdf.setDrawColor(grid.r, grid.g, grid.b);
+      let bordeX = margin;
+      columnWidths.forEach(ancho => {
+        pdf.rect(bordeX, y, ancho, rowHeight, 'S');
+        bordeX += ancho;
+      });
+      let x = margin;
+      const dibujarTexto = (lineas: string[], ancho: number, align: 'left' | 'center' = 'left', bold = false): void => {
+        pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+        pdf.setFontSize(5.6);
+        pdf.setTextColor(ink.r, ink.g, ink.b);
+        const offset = align === 'center' ? ancho / 2 : 2;
+        pdf.text(lineas.slice(0, 2), x + offset, y + 3.3, { align, maxWidth: ancho - 4 });
+        x += ancho;
+      };
+      dibujarTexto([String(indice + 1)], columnWidths[0], 'center', true);
+      dibujarTexto([texto(item.hora || item.horario)], columnWidths[1], 'center', true);
+      dibujarTexto(materia.concat(grupo), columnWidths[2], 'left', true);
+      dibujarTexto(docente, columnWidths[3]);
+      const color = modalidadColor(item);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(5.6);
+      pdf.setTextColor(color.r, color.g, color.b);
+      pdf.text(pdf.splitTextToSize(texto(this.etiquetaModalidad(item)), columnWidths[4] - 4) as string[], x + columnWidths[4] / 2, y + 3.3, { align: 'center', maxWidth: columnWidths[4] - 4 });
+      x += columnWidths[4];
+      [5, 6, 7, 8, 9, 10, 11].forEach(index => {
+        x += columnWidths[index];
+      });
+      y += rowHeight;
+    });
+    if (!items.length) {
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.text('No hay evaluaciones para la fecha seleccionada.', pageWidth / 2, y + 12, { align: 'center' });
+    }
+    pdf.setDrawColor(grid.r, grid.g, grid.b);
+    pdf.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text('Documento de control interno - complete manualmente los campos de entrega, devolucion y observaciones.', margin, pageHeight - 6);
+    pdf.save(`Reporte_Diario_Seguimiento_UNITEPC_${fechaFinal}.pdf`);
+  }
+
   public abrirBitacora(item: EvaluacionItemUI): void {
     this.evaluacionSeleccionadaParaBitacora.set(item);
     this.auditoriaBitacora.set(item.auditoria || []);
@@ -4337,8 +4713,9 @@ export class EvaluacionesDiaComponent implements OnInit {
   }
 
   public limpiarFiltros(): void {
-    this.filtroFechaInicio = '';
-    this.filtroFechaFin = '';
+    const hoy = this.fechaActualLocal();
+    this.filtroFechaInicio = hoy;
+    this.filtroFechaFin = hoy;
     this.filtroParcial = '1er Parcial';
     this.filtroModalidad = 'Todos';
     this.estadosSeleccionados.set([]);
@@ -4378,6 +4755,12 @@ export class EvaluacionesDiaComponent implements OnInit {
   public cambiarBusqueda(valor: string): void {
     this.busquedaTexto = valor || '';
     this.actualizarFiltros();
+  }
+
+  private fechaActualLocal(): string {
+    const hoy = new Date();
+    const pad = (valor: number) => String(valor).padStart(2, '0');
+    return `${hoy.getFullYear()}-${pad(hoy.getMonth() + 1)}-${pad(hoy.getDate())}`;
   }
 
   private _mostrarToast(msg: string, _tipo?: string): void {

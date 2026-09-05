@@ -65,6 +65,61 @@ CLAVE_VF_COMPLEJAS = [
 ]
 
 
+def normalizar_configuracion_generacion(raw: dict[str, Any] | None, rol: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Convierte la configuración persistida en parámetros seguros para Typst."""
+    raw = raw or {}
+    tipo_parcial = str(raw.get("tipoParcial") or (rol or {}).get("tipo_parcial") or "1P").upper()
+    if "FINAL" in tipo_parcial:
+        clave_parcial = "FINAL"
+    elif "2DA" in tipo_parcial or "INSTANCIA" in tipo_parcial:
+        clave_parcial = "2DA_INSTANCIA"
+    elif "2" in tipo_parcial:
+        clave_parcial = "2P"
+    else:
+        clave_parcial = "1P"
+
+    estructura = raw.get("estructuraPreguntas") or {}
+    parcial = estructura.get(clave_parcial) or {}
+
+    def entero(valor: Any, defecto: int, minimo: int, maximo: int) -> int:
+        try:
+            return min(maximo, max(minimo, int(valor)))
+        except (TypeError, ValueError):
+            return defecto
+
+    facil = entero(parcial.get("facil"), config.CUOTA_FACILES, 0, 1000)
+    medio = entero(parcial.get("medio"), config.CUOTA_MEDIAS, 0, 1000)
+    dificil = entero(parcial.get("dificil"), config.CUOTA_DIFICILES, 0, 1000)
+    total = entero(parcial.get("totalPreguntas"), facil + medio + dificil, 1, 1000)
+    if facil + medio + dificil != total:
+        total = facil + medio + dificil
+
+    leading_texto = str(raw.get("espaciadoLeading") or "")
+    factores = re.findall(r"\d+(?:\.\d+)?", leading_texto)
+    leading = f"{factores[0]}em" if factores else config.LEADING
+    separacion = f"{factores[1]}em" if len(factores) > 1 else config.SEPARACION_PREGUNTAS
+    fuente = str(raw.get("tipoLetra") or config.TIPOGRAFIA).strip()
+    # Times New Roman no está disponible dentro de la imagen Linux. Liberation
+    # Serif es su sustituta métrica compatible y evita que falle la compilación.
+    if fuente.lower() == "times new roman":
+        fuente = "Liberation Serif"
+    formato = str(raw.get("formatoHoja") or config.FORMATO_HOJA).strip()
+    ancho = "21cm" if "A4" in formato.upper() else "21.59cm"
+    alto = "29.7cm" if "A4" in formato.upper() else "33.02cm"
+    return {
+        "totalPreguntas": total,
+        "cuotaFaciles": facil,
+        "cuotaMedias": medio,
+        "cuotaDificiles": dificil,
+        "tipoLetra": fuente,
+        "tamanoLetraPt": entero(raw.get("tamanoLetraPt"), config.TAMANO_FUENTE_PT, 8, 18),
+        "leading": leading,
+        "separacionPreguntas": separacion,
+        "anchoPagina": ancho,
+        "altoPagina": alto,
+    }
+
+
 def _slugify(texto: str) -> str:
     t = texto.upper().replace(" ", "_")
     for char, repl in [("É", "E"), ("Í", "I"), ("Ó", "O"), ("Á", "A"), ("Ú", "U"), ("Ñ", "N")]:
@@ -303,8 +358,15 @@ def _numero_orden(pregunta: dict[str, Any]) -> int:
         return 0
 
 
-def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[dict[str, Any]]:
+def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int, generation_config: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     rng = random.Random(seed)
+    generation_config = generation_config or normalizar_configuracion_generacion(None)
+    total_requerido = generation_config["totalPreguntas"]
+    cuotas = (
+        generation_config["cuotaFaciles"],
+        generation_config["cuotaMedias"],
+        generation_config["cuotaDificiles"],
+    )
 
     # Los macros de caso/emparejamiento son contexto, no preguntas que el
     # estudiante pueda responder. Nunca deben consumir una cuota.
@@ -331,7 +393,6 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
 
     unidades = list(unidades_por_clave.values())
     rng.shuffle(unidades)
-    cuotas = (config.CUOTA_FACILES, config.CUOTA_MEDIAS, config.CUOTA_DIFICILES)
 
     def _conteo_dificultad(unidad: list[dict[str, Any]]) -> tuple[int, int, int]:
         conteos = [0, 0, 0]
@@ -352,7 +413,7 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
         siguientes = dict(estados)
         for (total, facil, medio, dificil), seleccion in estados.items():
             nuevo_total = total + tamano
-            if nuevo_total > config.TOTAL_PREGUNTAS:
+            if nuevo_total > total_requerido:
                 continue
             estado = (nuevo_total, facil + faciles, medio + medias, dificil + dificiles)
             siguientes.setdefault(estado, seleccion + (indice,))
@@ -361,10 +422,10 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int) -> list[di
     candidatos = [
         (estado, seleccion)
         for estado, seleccion in estados.items()
-        if estado[0] == config.TOTAL_PREGUNTAS
+        if estado[0] == total_requerido
     ]
     if not candidatos:
-        logger.warning("No existe una combinación de bloques que complete exactamente %d preguntas", config.TOTAL_PREGUNTAS)
+        logger.warning("No existe una combinación de bloques que complete exactamente %d preguntas", total_requerido)
         candidatos = [
             (estado, seleccion)
             for estado, seleccion in estados.items()
@@ -464,9 +525,11 @@ def _cabecera_institucional(
     rol: dict[str, Any],
     estudiante: dict[str, Any] | None = None,
     total_preguntas: int | None = None,
+    generation_config: dict[str, Any] | None = None,
 ) -> str:
+    generation_config = generation_config or normalizar_configuracion_generacion(None, rol)
     tipo_parcial = _mayusculas(rol.get("tipo_parcial", "1er Parcial"))
-    total_visible = total_preguntas if total_preguntas is not None else config.TOTAL_PREGUNTAS
+    total_visible = total_preguntas if total_preguntas is not None else generation_config["totalPreguntas"]
     cabecera = f"""#table(
   columns: (25%, 75%),
   stroke: 0.5pt + black,
@@ -488,22 +551,23 @@ def _cabecera_institucional(
 
 """
     if estudiante is not None:
-        cabecera += _ficha_estudiante(rol, estudiante)
+        cabecera += _ficha_estudiante(rol, estudiante, generation_config)
     cabecera += f"""
-#v({config.LEADING})
+#v({generation_config['leading']})
 #align(center)[
   #text(weight: "bold")[CUESTIONARIO DE PREGUNTAS ({total_visible})]
 ]
 
-#v({config.LEADING})
+#v({generation_config['leading']})
 #line(length: 100%, stroke: 0.75pt + black)
-#v({config.LEADING})
+#v({generation_config['leading']})
 """
     return cabecera
 
 
-def _ficha_estudiante(rol: dict[str, Any], estudiante: dict[str, Any]) -> str:
+def _ficha_estudiante(rol: dict[str, Any], estudiante: dict[str, Any], generation_config: dict[str, Any] | None = None) -> str:
     """Ficha oficial de examen. Los datos provienen de SEA y no incluyen variante."""
+    generation_config = generation_config or normalizar_configuracion_generacion(None, rol)
     nombre = _typst_content(_nombre_completo(estudiante))
     codigo = _typst_content(str(estudiante.get("codigo_estudiante") or ""))
     carrera = _typst_content(_mayusculas(rol.get("carrera_nombre")))
@@ -515,7 +579,7 @@ def _ficha_estudiante(rol: dict[str, Any], estudiante: dict[str, Any]) -> str:
     fecha = _typst_content(_mayusculas(rol.get("fecha_display")))
     horario = _typst_content(_mayusculas(rol.get("horario")))
     return f'''
-#v({config.LEADING})
+#v({generation_config['leading']})
 #table(
   columns: (1fr, 1fr),
   stroke: 0.4pt + black,
@@ -527,12 +591,13 @@ def _ficha_estudiante(rol: dict[str, Any], estudiante: dict[str, Any]) -> str:
   [FIRMA DEL ESTUDIANTE: #h(1em)........................................],
   [CODIGO: #text(size: 15pt)[{codigo}]],
 )
-#v({config.LEADING})
+#v({generation_config['leading']})
 '''
 
 
-def _seccion_typst(titulo: str, instruccion: str) -> str:
+def _seccion_typst(titulo: str, instruccion: str, generation_config: dict[str, Any] | None = None) -> str:
     """Renderiza una sección con las reglas visuales del formato oficial."""
+    generation_config = generation_config or normalizar_configuracion_generacion(None)
     instrucciones = "\n".join(
         f'#text(weight: "regular")[{_typst_content(linea.strip())}]\\'
         for linea in instruccion.splitlines()
@@ -541,18 +606,19 @@ def _seccion_typst(titulo: str, instruccion: str) -> str:
     return f'''
 #block(breakable: false)[
   #line(length: 100%, stroke: 1.5pt + black)
-  #v({config.LEADING})
+  #v({generation_config['leading']})
   #text(weight: "bold")[{_typst_content(_mayusculas(titulo))}]\\
   {instrucciones}
-  #v({config.LEADING})
+  #v({generation_config['leading']})
   #line(length: 100%, stroke: 0.5pt + black)
 ]
-#v({config.LEADING})
+#v({generation_config['leading']})
 '''
 
 
-def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None = None) -> str:
+def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None = None, generation_config: dict[str, Any] | None = None) -> str:
     """Construye el cuestionario sin datos de estudiante ni etiquetas de variante."""
+    generation_config = generation_config or normalizar_configuracion_generacion(None)
     typ_code = ""
     current_section = None
     numero_pregunta = 0
@@ -574,7 +640,7 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
         if seccion_tipo in INSTRUCCIONES_POR_TIPO and current_section != seccion_tipo:
             current_section = seccion_tipo
             titulo, instruccion = INSTRUCCIONES_POR_TIPO[seccion_tipo]
-            typ_code += _seccion_typst(titulo, instruccion)
+            typ_code += _seccion_typst(titulo, instruccion, generation_config)
             if seccion_tipo == "OPCION_EMPAREJAMIENTO" and tipo == "OPCION_EMPAREJAMIENTO":
                 typ_code += '''
 #rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
@@ -632,7 +698,7 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
         enunciado = _typst_content(str(p.get("enunciado", "")))
         if tipo == "VERDADERO_O_FALSO_COMPLEJAS":
             afirmaciones = parsear_opciones(p.get("opciones_json", "[]"))[:4]
-            typ_code += f'\n#block(breakable: false, spacing: {config.SEPARACION_PREGUNTAS})[\n'
+            typ_code += f'\n#block(breakable: false, spacing: {generation_config["separacionPreguntas"]})[\n'
             typ_code += f'  #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}\\\\\n'
             typ_code += imagen_code
             typ_code += '  #v(0.15em)\n'
@@ -653,7 +719,7 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
             p.get("opciones_json", "[]")
         )
         typ_code += f'''
-#block(breakable: false, spacing: {config.SEPARACION_PREGUNTAS})[
+#block(breakable: false, spacing: {generation_config['separacionPreguntas']})[
   #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}\\
 {imagen_code}'''
         if opciones:
@@ -669,13 +735,14 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
     return typ_code
 
 
-def _pagina_con_pie(estudiante: dict[str, Any]) -> str:
+def _pagina_con_pie(estudiante: dict[str, Any], generation_config: dict[str, Any] | None = None) -> str:
     """Configura una página oficial con identidad y numeración del estudiante."""
+    generation_config = generation_config or normalizar_configuracion_generacion(None)
     nombre = _typst_content(_nombre_completo(estudiante))
     codigo_est = str(estudiante["codigo_estudiante"])
     return f'''#set page(
-  width: 21.59cm,
-  height: 33.02cm,
+  width: {generation_config['anchoPagina']},
+  height: {generation_config['altoPagina']},
   margin: 2cm,
   header: none,
   footer: context {{
@@ -702,20 +769,22 @@ def _generar_typst(
     rol: dict[str, Any],
     image_dir: str | None = None,
     total_preguntas: int | None = None,
+    generation_config: dict[str, Any] | None = None,
 ) -> str:
     """Genera un documento individual compatible para pruebas y compatibilidad."""
+    generation_config = generation_config or normalizar_configuracion_generacion(None, rol)
     return f'''#set text(
-  font: "{config.TIPOGRAFIA}",
-  size: {config.TAMANO_FUENTE_PT}pt,
+  font: "{generation_config['tipoLetra']}",
+  size: {generation_config['tamanoLetraPt']}pt,
   lang: "es"
 )
 
-#show raw: set text(font: "{config.TIPOGRAFIA}")
+#show raw: set text(font: "{generation_config['tipoLetra']}")
 
-#set par(leading: {config.LEADING}, spacing: {config.LEADING})
-{_pagina_con_pie(estudiante)}
-{_cabecera_institucional(rol, estudiante, total_preguntas)}
-{_cuestionario_typst(preguntas, image_dir)}
+#set par(leading: {generation_config['leading']}, spacing: {generation_config['leading']})
+{_pagina_con_pie(estudiante, generation_config)}
+{_cabecera_institucional(rol, estudiante, total_preguntas, generation_config)}
+{_cuestionario_typst(preguntas, image_dir, generation_config)}
 '''
 
 
@@ -724,25 +793,27 @@ def _generar_typst_unificado(
     preguntas_por_variante: dict[str, list[dict[str, Any]]],
     rol: dict[str, Any],
     image_dir: str | None = None,
+    generation_config: dict[str, Any] | None = None,
 ) -> str:
     """Genera un único PDF: un examen por estudiante, iniciado en página impar."""
+    generation_config = generation_config or normalizar_configuracion_generacion(None, rol)
     typ_code = f'''#set text(
-  font: "{config.TIPOGRAFIA}",
-  size: {config.TAMANO_FUENTE_PT}pt,
+  font: "{generation_config['tipoLetra']}",
+  size: {generation_config['tamanoLetraPt']}pt,
   lang: "es"
 )
 
-#show raw: set text(font: "{config.TIPOGRAFIA}")
+#show raw: set text(font: "{generation_config['tipoLetra']}")
 
-#set par(leading: {config.LEADING}, spacing: {config.LEADING})
+#set par(leading: {generation_config['leading']}, spacing: {generation_config['leading']})
 '''
 
     for idx, (estudiante, letra) in enumerate(estudiantes_con_variantes):
         if idx > 0:
             typ_code += '\n#pagebreak(to: "odd")\n'
-        typ_code += _pagina_con_pie(estudiante)
-        typ_code += _cabecera_institucional(rol, estudiante)
-        typ_code += _cuestionario_typst(preguntas_por_variante[letra], image_dir)
+        typ_code += _pagina_con_pie(estudiante, generation_config)
+        typ_code += _cabecera_institucional(rol, estudiante, None, generation_config)
+        typ_code += _cuestionario_typst(preguntas_por_variante[letra], image_dir, generation_config)
 
     return typ_code
 
@@ -771,7 +842,9 @@ def generar_variante(
     output_base: str,
     generar_pdf: bool = True,
     modo_previsualizacion: bool = False,
+    configuracion: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    generation_config = normalizar_configuracion_generacion(configuracion, rol)
     if letra in config.SEED_POR_VARIANTE:
         seed = config.SEED_POR_VARIANTE[letra]
     else:
@@ -784,14 +857,14 @@ def generar_variante(
     # y distribuye las tipologías entre variantes. La previsualización tiene
     # otro objetivo: permitir que el docente revise el banco completo, por lo
     # que debe conservar exactamente la lista recibida y su orden original.
-    preguntas = list(reactivos) if modo_previsualizacion else seleccionar_preguntas(reactivos, seed)
+    preguntas = list(reactivos) if modo_previsualizacion else seleccionar_preguntas(reactivos, seed, generation_config)
 
     total_respondibles = sum(1 for pregunta in preguntas if not _es_macro(pregunta))
     if modo_previsualizacion and total_respondibles == 0:
         raise ValueError("La previsualización requiere al menos una pregunta respondible")
-    if not modo_previsualizacion and total_respondibles != config.TOTAL_PREGUNTAS:
+    if not modo_previsualizacion and total_respondibles != generation_config["totalPreguntas"]:
         raise ValueError(
-            f"La variante {letra} requiere exactamente {config.TOTAL_PREGUNTAS} preguntas respondibles, "
+            f"La variante {letra} requiere exactamente {generation_config['totalPreguntas']} preguntas respondibles, "
             f"pero se seleccionaron {total_respondibles}"
         )
 
@@ -849,6 +922,7 @@ def generar_variante(
             rol,
             work_dir,
             total_preguntas=total_respondibles if modo_previsualizacion else None,
+            generation_config=generation_config,
         )
         with open(typ_path, "w", encoding="utf-8") as f:
             f.write(typ_code)
@@ -884,8 +958,10 @@ def generar_documento_unificado(
     preguntas_por_variante: dict[str, list[dict[str, Any]]],
     rol: dict[str, Any],
     output_base: str,
+    generation_config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Compila el documento oficial único con todos los estudiantes del rol."""
+    generation_config = generation_config or normalizar_configuracion_generacion(None, rol)
     work_dir = os.path.join(output_base, rol["id"], "documentos")
     os.makedirs(work_dir, exist_ok=True)
 
@@ -898,7 +974,9 @@ def generar_documento_unificado(
     typ_path = os.path.join(work_dir, f"{base_name}.typ")
     pdf_path = os.path.join(work_dir, f"{base_name}.pdf")
 
-    typ_code = _generar_typst_unificado(estudiantes_con_variantes, preguntas_por_variante, rol, work_dir)
+    typ_code = _generar_typst_unificado(
+        estudiantes_con_variantes, preguntas_por_variante, rol, work_dir, generation_config
+    )
     with open(typ_path, "w", encoding="utf-8") as f:
         f.write(typ_code)
     _compilar_typst(typ_path, pdf_path)

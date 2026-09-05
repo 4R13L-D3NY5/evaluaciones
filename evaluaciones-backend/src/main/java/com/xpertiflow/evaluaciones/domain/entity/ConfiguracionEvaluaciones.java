@@ -41,6 +41,24 @@ public class ConfiguracionEvaluaciones {
     @Column(name = "espaciado_leading", nullable = false, length = 100)
     private String espaciadoLeading;
 
+    @Column(name = "estructura_preguntas_json", nullable = false, columnDefinition = "TEXT")
+    private String estructuraPreguntasJson;
+
+    @Column(name = "minutos_antes_entrega", nullable = false)
+    private Integer minutosAntesEntrega;
+
+    @Column(name = "horas_antes_generacion", nullable = false)
+    private Integer horasAntesGeneracion;
+
+    @Column(name = "horas_post_patron", nullable = false)
+    private Integer horasPostPatron;
+
+    @Column(name = "horas_antes_lista", nullable = false)
+    private Integer horasAntesLista;
+
+    @Column(name = "horas_candado_72", nullable = false)
+    private Integer horasCandado72;
+
     @Column(name = "actualizado_en", nullable = false)
     private LocalDateTime actualizadoEn;
 

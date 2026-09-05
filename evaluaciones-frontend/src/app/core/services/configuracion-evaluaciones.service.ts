@@ -11,6 +11,12 @@ export interface ConfiguracionEvaluaciones {
   tipoLetra: string;
   tamanoLetraPt: number;
   espaciadoLeading: string;
+  estructuraPreguntas: Record<string, { totalPreguntas: number; facil: number; medio: number; dificil: number }>;
+  minutosAntesEntrega: number;
+  horasAntesGeneracion: number;
+  horasPostPatron: number;
+  horasAntesLista: number;
+  horasCandado72: number;
   actualizadoEn?: string;
   actualizadoPor?: string;
 }
@@ -29,7 +35,18 @@ export class ConfiguracionEvaluacionesService {
     formatoHoja: 'Oficio (Folio UNITEPC)',
     tipoLetra: 'Times New Roman',
     tamanoLetraPt: 11,
-    espaciadoLeading: '0.8em (línea) · 1.2em (pregunta)'
+    espaciadoLeading: '0.8em (línea) · 1.2em (pregunta)',
+    estructuraPreguntas: {
+      '1P': { totalPreguntas: 30, facil: 7, medio: 16, dificil: 7 },
+      '2P': { totalPreguntas: 30, facil: 7, medio: 16, dificil: 7 },
+      'FINAL': { totalPreguntas: 60, facil: 15, medio: 30, dificil: 15 },
+      '2DA_INSTANCIA': { totalPreguntas: 50, facil: 10, medio: 25, dificil: 15 }
+    },
+    minutosAntesEntrega: 15,
+    horasAntesGeneracion: 144,
+    horasPostPatron: 8,
+    horasAntesLista: 24,
+    horasCandado72: 72
   });
 
   public cargar(): Observable<ConfiguracionEvaluaciones> {

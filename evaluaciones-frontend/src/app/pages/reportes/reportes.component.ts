@@ -13,7 +13,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
 import * as XLSX from 'xlsx';
 
-type TipoReporte = 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR' | 'AUDITORIA_TRAZABILIDAD' | 'CONCILIACION_REMARK';
+type TipoReporte = 'REPORTE_EVALUACIONES' | 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR' | 'AUDITORIA_TRAZABILIDAD' | 'CONCILIACION_REMARK';
 
 type EstadoConciliacion = 'COINCIDE' | 'DIFERENCIA_RESPUESTAS' | 'SOLO_REMARK' | 'SOLO_SISTEMA';
 
@@ -46,102 +46,64 @@ interface FilaRemark {
   template: `
     <div class="space-y-6 animate-fade-in pb-12">
       
-      <!-- 1. CABECERA PRINCIPAL DEL MÓDULO DE REPORTES -->
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 text-white p-6 rounded-2xl shadow-lg border border-purple-900/50">
+      <!-- 1. CABECERA PRINCIPAL DEL MÓDULO DE REPORTES (referencia SIDOPA) -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div class="space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
-              <i class="pi pi-file-excel"></i> Módulo de Reportes Oficiales · UNITEPC
-            </span>
-            <span class="text-white/60 text-xs">|</span>
-            <span class="text-xs text-white/80 font-mono font-bold">
-              Gestión Activa: {{ storage.gestionActiva() }}
-            </span>
+          <div class="flex items-center gap-3">
+            <div class="h-11 w-11 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center border border-purple-200">
+              <i class="pi pi-clipboard text-xl"></i>
+            </div>
+            <div>
+              <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight">Reporte Evaluaciones</h1>
+              <p class="text-xs text-muted-foreground font-medium">Seguimiento institucional de evaluaciones programadas y su flujo operativo.</p>
+            </div>
           </div>
-
-          <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
-            Reportes y Planillas Oficiales de Evaluación
-          </h1>
-          <p class="text-xs text-purple-200/80 max-w-2xl font-medium">
-            Generación de planillas de firmas para entrega/recepción, auditoría de reactivos de bancos de preguntas y consolidado OMR.
-          </p>
         </div>
 
         <!-- Botones de Acción Global -->
         <div class="flex flex-wrap items-center gap-3">
-          <!-- Selector de Gestión -->
-          <div class="flex items-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-xs transition-colors backdrop-blur-xs">
-            <i class="pi pi-calendar text-amber-300"></i>
-            <select 
-              [ngModel]="storage.gestionActiva()" 
-              (ngModelChange)="storage.setGestionActiva($event)"
-              class="bg-transparent text-white font-bold outline-none cursor-pointer">
-              <option value="II-2026" class="text-slate-900">Gestión II-2026 (Activa)</option>
-              <option value="I-2026" class="text-slate-900">Gestión I-2026 (Anterior)</option>
-              <option value="II-2025" class="text-slate-900">Gestión II-2025 (Histórico)</option>
-            </select>
-          </div>
-
-          <!-- Botón Exportar a Excel -->
-          <button 
-            (click)="exportarReporteActualExcel()" 
-            [disabled]="tipoReporteActivo() === 'CONCILIACION_REMARK' && !resultadosConciliacion().length"
-            class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:scale-105 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-            <i class="pi pi-file-excel text-sm"></i>
-            <span>Exportar Excel (.xlsx)</span>
+          <button (click)="actualizarReportePrincipal()" [disabled]="cargandoReporte()" class="bg-card hover:bg-muted border border-border text-foreground font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50">
+            <i class="pi" [class.pi-refresh]="!cargandoReporte()" [class.pi-spin]="cargandoReporte()" [class.pi-spinner]="cargandoReporte()"></i>
+            <span>Actualizar reporte</span>
           </button>
-
-          <!-- Botón Imprimir / PDF -->
+          <button 
+            (click)="exportarReportePrincipal()"
+            [disabled]="tipoReporteActivo() === 'CONCILIACION_REMARK' && !resultadosConciliacion().length"
+            class="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+            <i class="pi pi-download text-sm"></i>
+            <span>Exportar PDF</span>
+          </button>
           <button 
             (click)="imprimirReporte()" 
-            class="bg-purple-600 hover:bg-purple-500 text-white font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:scale-105 transition-all cursor-pointer">
+            class="bg-card hover:bg-muted border border-border text-foreground font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs cursor-pointer">
             <i class="pi pi-print text-sm"></i>
-            <span>Imprimir Planilla</span>
+            <span>Imprimir</span>
           </button>
         </div>
       </div>
 
-      <!-- 2. PESTAÑAS DE TIPOS DE REPORTE (REPLICANDO SISTEMA MACRO) -->
+      <!-- 2. El reporte principal sigue el patrón de SIDOPA; los demás quedan pendientes. -->
       <div class="flex flex-wrap items-center gap-2 border-b border-border pb-3">
         <button
-          (click)="tipoReporteActivo.set('PLANILLA_RECEPCION')"
-          [class]="tipoReporteActivo() === 'PLANILLA_RECEPCION' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
-          class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
-          <i class="pi pi-check-square"></i>
-          <span>1. Planilla de Control Entrega/Recepción (Firmas)</span>
-        </button>
-
-        <button 
-          (click)="tipoReporteActivo.set('COBERTURA_BANCOS')"
-          [class]="tipoReporteActivo() === 'COBERTURA_BANCOS' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
-          class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
-          <i class="pi pi-database"></i>
-          <span>2. Cobertura y Validación de Bancos</span>
-        </button>
-
-        <button 
-          (click)="tipoReporteActivo.set('CONSOLIDADO_OMR')"
-          [class]="tipoReporteActivo() === 'CONSOLIDADO_OMR' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
+          (click)="tipoReporteActivo.set('REPORTE_EVALUACIONES')"
+          [class]="tipoReporteActivo() === 'REPORTE_EVALUACIONES' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
           class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
           <i class="pi pi-chart-bar"></i>
-          <span>3. Consolidado de Rendimiento y Lectura OMR</span>
+          <span>Reporte de evaluaciones</span>
         </button>
+        <span class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 bg-muted text-muted-foreground font-bold"><i class="pi pi-clock"></i> Cobertura de bancos · Pendiente</span>
+        <span class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 bg-muted text-muted-foreground font-bold"><i class="pi pi-clock"></i> Consolidado OMR · Pendiente</span>
+        <span class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 bg-muted text-muted-foreground font-bold"><i class="pi pi-clock"></i> Auditoría · Pendiente</span>
 
-        <button 
-          (click)="tipoReporteActivo.set('AUDITORIA_TRAZABILIDAD')"
-          [class]="tipoReporteActivo() === 'AUDITORIA_TRAZABILIDAD' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
-          class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
-          <i class="pi pi-history"></i>
-          <span>4. Bitácora de Auditoría y Trazabilidad</span>
-        </button>
-
-        <button
+        @if (puedeConciliarRemark()) {
+          <button
           (click)="abrirConciliacionRemark()"
           [class]="tipoReporteActivo() === 'CONCILIACION_REMARK' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
           class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
           <i class="pi pi-sync"></i>
           <span>5. Conciliación Remark vs. OMR</span>
-        </button>
+          </button>
+        }
       </div>
 
       <!-- 3. BARRA DE FILTROS ESPECÍFICOS SEGÚN EL REPORTE -->
@@ -149,6 +111,14 @@ interface FilaRemark {
         <div class="flex flex-wrap items-center justify-between gap-4">
           
           <div class="flex flex-wrap items-center gap-3">
+            <div class="space-y-1">
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Alcance:</label>
+              <select [ngModel]="filtroAlcance" (ngModelChange)="filtroAlcance = $event" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer"><option value="nacional">Nacional</option><option value="sede">Por sede</option><option value="carrera">Por carrera</option></select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Gestión:</label>
+              <select [ngModel]="storage.gestionActiva()" (ngModelChange)="storage.setGestionActiva($event)" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer"><option value="II-2026">II-2026 (Activa)</option><option value="I-2026">I-2026</option><option value="II-2025">II-2025</option></select>
+            </div>
             <!-- Filtro de Sede -->
             <div class="space-y-1">
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Sede / Campus:</label>
@@ -183,7 +153,8 @@ interface FilaRemark {
             <div class="space-y-1">
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Modalidad:</label>
               <select 
-                [(ngModel)]="filtroModalidad"
+                [ngModel]="filtroModalidad"
+                (ngModelChange)="filtroModalidad = $event; refrescarFiltros()"
                 class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
                 <option value="Todos">Todas las Modalidades</option>
                 <option value="CON_CARTILLA">Solo Con Cartilla</option>
@@ -196,9 +167,33 @@ interface FilaRemark {
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Fecha de Evaluación:</label>
               <input 
                 type="text" 
-                [(ngModel)]="filtroFecha"
+                [ngModel]="filtroFecha"
+                (ngModelChange)="filtroFecha = $event; refrescarFiltros()"
                 placeholder="Ej. 08/06/2026 o vacio para todas"
                 class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none placeholder:text-muted-foreground/60 w-44" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Desde:</label>
+              <input type="date" [ngModel]="filtroFechaInicio" (ngModelChange)="filtroFechaInicio = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Hasta:</label>
+              <input type="date" [ngModel]="filtroFechaFin" (ngModelChange)="filtroFechaFin = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none" />
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Parcial:</label>
+              <select [ngModel]="filtroParcial" (ngModelChange)="filtroParcial = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
+                <option value="Todos">Todos los parciales</option><option value="1er Parcial">1er Parcial</option><option value="2do Parcial">2do Parcial</option><option value="Final">Final</option><option value="2da Instancia">2da Instancia</option>
+              </select>
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Estado:</label>
+              <select [ngModel]="filtroEstadoReporte" (ngModelChange)="filtroEstadoReporte = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
+                <option value="Todos">Todos los estados</option><option value="PROGRAMADO">Programado</option><option value="VALIDADO">Validado</option><option value="GENERADO">Generado</option><option value="IMPRESO">Impreso</option><option value="ENTREGADO">Entregado</option><option value="DEVUELTO">Devuelto</option><option value="CALIFICADO">Calificado</option>
+              </select>
             </div>
           </div>
 
@@ -229,6 +224,26 @@ interface FilaRemark {
             <p class="text-xs mt-1">Verifica que la sede esté publicada correctamente en el catálogo académico oficial.</p>
           </div>
         </div>
+      }
+
+      @if (tipoReporteActivo() === 'REPORTE_EVALUACIONES') {
+        <section class="space-y-4 print-area">
+          @if (errorReporte()) {
+            <div class="rounded-xl border border-rose-200 bg-rose-50 text-rose-800 p-4 text-sm flex items-center gap-2"><i class="pi pi-exclamation-triangle"></i>{{ errorReporte() }}</div>
+          }
+          <div class="rounded-2xl border border-purple-200 bg-purple-50/60 p-4 text-xs text-purple-950 flex flex-wrap items-center justify-between gap-3"><span><i class="pi pi-info-circle mr-1"></i>Reporte generado con los roles de examen visibles para tu usuario. Los filtros se aplican sobre la información oficial del sistema.</span><span class="font-black">Generado: {{ reporteGeneradoEn() | date:'dd/MM/yyyy HH:mm' }}</span></div>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs"><span class="text-[10px] uppercase tracking-wider text-muted-foreground font-black">Total evaluaciones</span><strong class="block text-2xl font-black text-foreground mt-2">{{ reporteResumen().total }}</strong><span class="text-[11px] text-muted-foreground">registros filtrados</span></div>
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs"><span class="text-[10px] uppercase tracking-wider text-emerald-700 font-black">Generadas o posteriores</span><strong class="block text-2xl font-black text-emerald-700 mt-2">{{ reporteResumen().generadas }}</strong><span class="text-[11px] text-muted-foreground">listas para seguimiento</span></div>
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs"><span class="text-[10px] uppercase tracking-wider text-purple-700 font-black">Con banco</span><strong class="block text-2xl font-black text-purple-700 mt-2">{{ reporteResumen().conBanco }}</strong><span class="text-[11px] text-muted-foreground">banco cargado</span></div>
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs"><span class="text-[10px] uppercase tracking-wider text-amber-700 font-black">Estudiantes inscritos</span><strong class="block text-2xl font-black text-amber-700 mt-2">{{ reporteResumen().estudiantes }}</strong><span class="text-[11px] text-muted-foreground">suma de grupos</span></div>
+          </div>
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div class="bg-card border border-border rounded-2xl p-5 shadow-2xs"><div class="flex items-center justify-between border-b border-border pb-3 mb-3"><h2 class="text-sm font-black text-foreground">Distribución por estado</h2><span class="text-[11px] text-muted-foreground">{{ reporteResumen().total }} evaluaciones</span></div><div class="space-y-2">@for (estado of reporteEstados(); track estado.nombre) {<div class="flex items-center gap-3 text-xs"><span class="w-24 font-bold text-muted-foreground">{{ estado.nombre }}</span><div class="h-2 flex-1 rounded-full bg-muted overflow-hidden"><div class="h-full rounded-full bg-primary" [style.width.%]="estado.porcentaje"></div></div><strong class="w-8 text-right">{{ estado.total }}</strong></div>}</div></div>
+            <div class="bg-card border border-border rounded-2xl p-5 shadow-2xs"><div class="flex items-center justify-between border-b border-border pb-3 mb-3"><h2 class="text-sm font-black text-foreground">Resumen por sede</h2><span class="text-[11px] text-muted-foreground">cobertura del alcance</span></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2">@for (sede of reportePorSede(); track sede.nombre) {<div class="rounded-xl bg-muted/50 border border-border p-3 flex justify-between gap-2 text-xs"><span class="font-bold truncate">{{ sede.nombre }}</span><strong>{{ sede.total }}</strong></div>} @if (!reportePorSede().length) {<span class="text-xs text-muted-foreground">No existen registros para los filtros seleccionados.</span>}</div></div>
+          </div>
+          <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden"><div class="p-5 border-b border-border flex flex-wrap items-center justify-between gap-3"><div><h2 class="text-sm font-black text-foreground">Detalle de evaluaciones</h2><p class="text-xs text-muted-foreground mt-1">Inspección de las evaluaciones programadas, su estado y cobertura de banco.</p></div><div class="relative"><i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i><input [(ngModel)]="busquedaReporte" placeholder="Buscar materia, docente o aula..." class="bg-muted border border-border rounded-xl pl-8 pr-3 py-2 text-xs outline-none w-72" /></div></div>@if (cargandoReporte()) {<div class="p-10 text-center text-sm text-muted-foreground"><i class="pi pi-spinner pi-spin mr-2"></i>Cargando reporte...</div>} @else {<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-xs"><thead><tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground"><th class="p-3">Materia / Grupo</th><th class="p-3">Docente titular</th><th class="p-3">Sede / Campus</th><th class="p-3">Carrera</th><th class="p-3">Parcial</th><th class="p-3">Fecha / Hora</th><th class="p-3 text-center">Banco</th><th class="p-3 text-center">Estado</th></tr></thead><tbody class="divide-y divide-border">@for (rol of rolesReporteFiltrados(); track rol.id) {<tr class="hover:bg-muted/30"><td class="p-3"><span class="font-mono text-primary font-black">{{ rol.materiaCodigo }}</span><div class="font-bold text-foreground">{{ rol.materiaNombre }}</div><span class="text-[10px] text-muted-foreground">Grupo {{ rol.grupo }}</span></td><td class="p-3 font-medium uppercase">{{ rol.docenteNombre || 'Por asignar' }}</td><td class="p-3"><div class="font-bold">{{ rol.sedeNombre }}</div><span class="text-[10px] text-muted-foreground">{{ rol.campus || 'Campus no informado' }}</span></td><td class="p-3 font-medium">{{ rol.carreraNombre }} <span class="text-[10px] text-muted-foreground">({{ rol.carreraCodigo }})</span></td><td class="p-3 whitespace-nowrap">{{ rol.tipoParcial }}</td><td class="p-3 whitespace-nowrap"><div class="font-mono font-bold">{{ rol.fecha }}</div><span class="text-[10px] text-muted-foreground">{{ rol.horario || 'Horario no informado' }}</span></td><td class="p-3 text-center"><span [class]="rol.bancoPreguntasCargado ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" class="px-2 py-1 rounded-lg text-[10px] font-black">{{ rol.bancoPreguntasCargado ? 'Sí' : 'Pendiente' }}</span></td><td class="p-3 text-center"><span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-lg text-[10px] font-black">{{ etiquetaEstadoReporte(rol.estadoFlujo) }}</span></td></tr>} @empty {<tr><td colspan="8" class="p-10 text-center text-sm text-muted-foreground">No hay evaluaciones para los filtros seleccionados.</td></tr>}</tbody></table></div>}</div>
+        </section>
       }
 
       @if (tipoReporteActivo() === 'CONCILIACION_REMARK') {
@@ -725,6 +740,10 @@ export class ReporteEvaluacionesComponent implements OnInit {
   public readonly esVicerrector = computed(
     () => this._auth.usuario()?.rol === 'VICERRECTOR'
   );
+  public readonly puedeConciliarRemark = computed(() => {
+    const rol = this._auth.usuario()?.rol;
+    return rol === 'ADMINISTRADOR_SISTEMA' || rol === 'RESPONSABLE_EVALUACIONES';
+  });
   public readonly esConsultaAcademica = computed(
     () => this.esDirectorCarrera() || this.esVicerrector()
   );
@@ -733,7 +752,69 @@ export class ReporteEvaluacionesComponent implements OnInit {
   public cargandoSedes = signal(false);
   public cargandoCarreras = signal(false);
 
-  public tipoReporteActivo = signal<TipoReporte>('PLANILLA_RECEPCION');
+  public tipoReporteActivo = signal<TipoReporte>('REPORTE_EVALUACIONES');
+
+  public rolesReporte = signal<RolExamenResponse[]>([]);
+  public cargandoReporte = signal(false);
+  public errorReporte = signal<string | null>(null);
+  public reporteGeneradoEn = signal(new Date());
+  public busquedaReporte = '';
+  public filtroParcial = 'Todos';
+  public filtroEstadoReporte = 'Todos';
+  public filtroFechaInicio = '';
+  public filtroFechaFin = '';
+  public filtroAlcance = 'nacional';
+
+  public rolesReporteFiltrados(): RolExamenResponse[] {
+    const texto = this.busquedaReporte.trim().toLowerCase();
+    return this.rolesReporte().filter(rol => {
+      if (this.filtroSede !== 'Todos' && rol.sedeCodigo !== this.filtroSede) return false;
+      if (this.filtroCarrera !== 'Todos' && this.filtroCarrera && rol.carreraCodigo !== this.filtroCarrera) return false;
+      if (this.filtroParcial !== 'Todos' && rol.tipoParcial !== this.filtroParcial) return false;
+      if (this.filtroEstadoReporte !== 'Todos' && rol.estadoFlujo !== this.filtroEstadoReporte) return false;
+      if (this.filtroModalidad === 'CON_CARTILLA' && rol.modalidad !== 'PRESENCIAL_CARTILLA') return false;
+      if (this.filtroModalidad === 'SIN_CARTILLA' && rol.modalidad === 'PRESENCIAL_CARTILLA') return false;
+      if (this.filtroFechaInicio && rol.fecha < this.filtroFechaInicio) return false;
+      if (this.filtroFechaFin && rol.fecha > this.filtroFechaFin) return false;
+      if (this.filtroFecha && rol.fecha !== this.filtroFecha) return false;
+      if (!texto) return true;
+      return `${rol.materiaCodigo} ${rol.materiaNombre} ${rol.docenteNombre} ${rol.aula} ${rol.carreraNombre} ${rol.campus}`.toLowerCase().includes(texto);
+    });
+  }
+
+  public reporteResumen() {
+    const filas = this.rolesReporteFiltrados();
+    return {
+      total: filas.length,
+      generadas: filas.filter(rol => ['GENERADO', 'IMPRESO', 'ENTREGADO', 'DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO'].includes(rol.estadoFlujo)).length,
+      conBanco: filas.filter(rol => rol.bancoPreguntasCargado).length,
+      estudiantes: filas.reduce((total, rol) => total + (rol.estudiantesInscritosCount || 0), 0)
+    };
+  }
+
+  public reporteEstados() {
+    const filas = this.rolesReporteFiltrados();
+    const total = filas.length || 1;
+    const estados: Array<[string, RolExamenResponse['estadoFlujo']]> = [
+      ['Programado', 'PROGRAMADO'], ['Validado', 'VALIDADO'], ['Generado', 'GENERADO'],
+      ['Impreso', 'IMPRESO'], ['Entregado', 'ENTREGADO'], ['Devuelto', 'DEVUELTO'], ['Calificado', 'CALIFICADO']
+    ];
+    return estados.map(([nombre, codigo]) => {
+      const cantidad = filas.filter(rol => rol.estadoFlujo === codigo).length;
+      return { nombre, total: cantidad, porcentaje: Math.round((cantidad / total) * 100) };
+    }).filter(item => item.total > 0);
+  }
+
+  public reportePorSede() { return this.agruparReportePor(rol => rol.sedeNombre); }
+
+  private agruparReportePor(selector: (rol: RolExamenResponse) => string): Array<{ nombre: string; total: number }> {
+    const conteo = new Map<string, number>();
+    for (const rol of this.rolesReporteFiltrados()) {
+      const nombre = selector(rol) || 'Sin dato';
+      conteo.set(nombre, (conteo.get(nombre) || 0) + 1);
+    }
+    return Array.from(conteo, ([nombre, total]) => ({ nombre, total })).sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
+  }
 
   public rolesConciliacion = signal<RolExamenResponse[]>([]);
   public rolConciliacionId = '';
@@ -773,6 +854,49 @@ export class ReporteEvaluacionesComponent implements OnInit {
 
   public ngOnInit(): void {
     this.cargarSedes();
+    this.actualizarReportePrincipal();
+  }
+
+  public actualizarReportePrincipal(): void {
+    this.cargandoReporte.set(true);
+    this.errorReporte.set(null);
+    this._roles.listar().subscribe({
+      next: roles => {
+        this.rolesReporte.set(roles || []);
+        this.reporteGeneradoEn.set(new Date());
+        this.cargandoReporte.set(false);
+      },
+      error: error => {
+        this.rolesReporte.set([]);
+        this.cargandoReporte.set(false);
+        this.errorReporte.set(error?.status === 403
+          ? 'Tu usuario no tiene permiso para consultar este reporte.'
+          : 'No se pudo cargar el reporte de evaluaciones. Verifica la conexión con el servidor.');
+      }
+    });
+  }
+
+  public etiquetaEstadoReporte(estado: RolExamenResponse['estadoFlujo']): string {
+    const etiquetas: Record<string, string> = {
+      PROGRAMADO: 'Programado', VALIDADO: 'Validado', GENERADO: 'Generado', IMPRESO: 'Impreso',
+      ENTREGADO: 'Entregado', DEVUELTO: 'Devuelto', PENDIENTE_NOTAS: 'Pendiente de notas',
+      CALIFICADO: 'Calificado', SUSPENDIDO: 'Suspendido'
+    };
+    return etiquetas[estado] || estado;
+  }
+
+  public refrescarFiltros(): void {
+    // Los filtros son propiedades simples para mantener compatibles los reportes pendientes;
+    // el detalle principal se calcula nuevamente en cada ciclo de renderizado.
+  }
+
+  /** El PDF se obtiene mediante el diálogo de impresión, igual que SIDOPA. */
+  public exportarReportePrincipal(): void {
+    if (this.tipoReporteActivo() === 'CONCILIACION_REMARK') {
+      this.exportarConciliacion();
+      return;
+    }
+    window.print();
   }
 
   public onSedeChange(codigoSede: string): void {
@@ -880,6 +1004,7 @@ export class ReporteEvaluacionesComponent implements OnInit {
   });
 
   public abrirConciliacionRemark(): void {
+    if (!this.puedeConciliarRemark()) return;
     this.tipoReporteActivo.set('CONCILIACION_REMARK');
     this.errorConciliacion.set(null);
     if (!this.rolesConciliacion().length && !this.cargandoRolesConciliacion()) {

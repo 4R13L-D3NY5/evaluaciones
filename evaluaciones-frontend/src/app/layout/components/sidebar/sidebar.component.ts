@@ -287,7 +287,7 @@ export class SidebarComponent implements OnInit {
       route: '/reporte-evaluaciones',
       icon: 'pi pi-file-excel',
       description: 'Auditoría, cobertura de bancos y consolidado nacional',
-      roles: ['RESPONSABLE_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA']
     },
     {
       label: 'Usuarios y accesos',
