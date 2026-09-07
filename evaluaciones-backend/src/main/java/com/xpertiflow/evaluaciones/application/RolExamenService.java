@@ -530,11 +530,22 @@ public class RolExamenService {
 
     @Transactional
     public RolExamenResponseDto transicionarEstado(String id, TransicionEstadoRequestDto dto) {
+        return transicionarEstado(id, dto, null);
+    }
+
+    @Transactional
+    public RolExamenResponseDto transicionarEstado(String id, TransicionEstadoRequestDto dto,
+                                                    Authentication authentication) {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
 
         EstadoFlujo origen = rol.getEstadoFlujo();
         EstadoFlujo destino = dto.getNuevoEstado();
+
+        if (destino == EstadoFlujo.VALIDADO) {
+            throw new IllegalStateException(
+                    "El estado VALIDADO se asigna automáticamente cuando el docente carga y se valida el banco de preguntas.");
+        }
 
         if (destino == EstadoFlujo.SUSPENDIDO && origen == EstadoFlujo.SUSPENDIDO) {
             throw new RuntimeException("El rol de examen ya está suspendido");

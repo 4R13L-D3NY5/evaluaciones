@@ -20,6 +20,7 @@ import com.xpertiflow.evaluaciones.security.BancoCifradoService;
 import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -58,16 +59,17 @@ public class ExamenSinCartillaService {
     private final BancoCifradoService cifradoService;
 
     @Transactional(readOnly = true)
-    public DocumentoSinCartillaResponseDto obtenerDocumento(String rolExamenId) {
-        obtenerRolSinCartilla(rolExamenId);
+    public DocumentoSinCartillaResponseDto obtenerDocumento(String rolExamenId, Authentication authentication) {
+        obtenerRolSinCartilla(rolExamenId, authentication);
         return documentoRepository.findByRolExamenId(rolExamenId)
                 .map(this::mapearDocumento)
                 .orElseThrow(() -> new RuntimeException("El examen sin cartilla todavía no tiene un documento cargado."));
     }
 
     @Transactional
-    public DocumentoSinCartillaResponseDto cargarDocumento(String rolExamenId, MultipartFile file, String usuario) {
-        RolExamen rol = obtenerRolSinCartilla(rolExamenId);
+    public DocumentoSinCartillaResponseDto cargarDocumento(String rolExamenId, MultipartFile file, Authentication authentication) {
+        RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
+        String usuario = usuarioAutenticado(authentication);
         validarArchivo(file);
         Path archivo = null;
         try {
@@ -123,8 +125,8 @@ public class ExamenSinCartillaService {
     }
 
     @Transactional(readOnly = true)
-    public List<NotaDocenteResponseDto> listarNotas(String rolExamenId) {
-        RolExamen rol = obtenerRolSinCartilla(rolExamenId);
+    public List<NotaDocenteResponseDto> listarNotas(String rolExamenId, Authentication authentication) {
+        RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
         Map<String, NotaDocente> notas = notaRepository.findByRolExamenId(rolExamenId).stream()
                 .collect(Collectors.toMap(NotaDocente::getCodigoEstudiante, Function.identity()));
         return obtenerEstudiantesOficiales(rol).stream()
@@ -134,7 +136,7 @@ public class ExamenSinCartillaService {
                             .id(nota == null ? null : nota.getId())
                             .codigoEstudiante(estudiante.getStudentCode())
                             .estudianteNombreCompleto(estudiante.getFullName())
-                            .notaSobre30(nota == null ? null : nota.getNotaSobre30())
+                            .notaSobre60(nota == null ? null : nota.getNotaSobre60())
                             .notaSobre100(nota == null ? null : nota.getNotaSobre100())
                             .guardadoEn(nota == null ? null : nota.getGuardadoEn())
                             .guardadoPor(nota == null ? null : nota.getGuardadoPor())
@@ -145,8 +147,10 @@ public class ExamenSinCartillaService {
     }
 
     @Transactional
-    public List<NotaDocenteResponseDto> guardarNotas(String rolExamenId, GuardarNotasDocenteRequestDto request) {
-        RolExamen rol = obtenerRolSinCartilla(rolExamenId);
+    public List<NotaDocenteResponseDto> guardarNotas(String rolExamenId,
+                                                     GuardarNotasDocenteRequestDto request,
+                                                     Authentication authentication) {
+        RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
         if (rol.getEstadoFlujo() != EstadoFlujo.PENDIENTE_NOTAS) {
             throw new IllegalStateException("La carga de notas se habilita únicamente cuando la evaluación está en PENDIENTE_NOTAS.");
         }
@@ -154,8 +158,18 @@ public class ExamenSinCartillaService {
         List<StudentItemDto> estudiantes = obtenerEstudiantesOficiales(rol);
         Map<String, StudentItemDto> oficiales = estudiantes.stream()
                 .collect(Collectors.toMap(StudentItemDto::getStudentCode, Function.identity()));
+        Map<String, Long> frecuencias = request.getNotas().stream()
+                .collect(Collectors.groupingBy(item -> item.getCodigoEstudiante().trim(), Collectors.counting()));
+        Set<String> duplicados = frecuencias.entrySet().stream()
+                .filter(entry -> entry.getValue() > 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+        if (!duplicados.isEmpty()) {
+            throw new IllegalArgumentException("No se puede registrar más de una nota para el mismo estudiante: "
+                    + String.join(", ", duplicados));
+        }
         Map<String, NotaDocenteItemDto> recibidas = request.getNotas().stream()
-                .collect(Collectors.toMap(item -> item.getCodigoEstudiante().trim(), Function.identity(), (primero, ultimo) -> ultimo));
+                .collect(Collectors.toMap(item -> item.getCodigoEstudiante().trim(), Function.identity()));
 
         Set<String> faltantes = oficiales.keySet().stream()
                 .filter(codigo -> !recibidas.containsKey(codigo))
@@ -170,18 +184,18 @@ public class ExamenSinCartillaService {
             throw new IllegalArgumentException("Se recibieron códigos que no pertenecen a la nómina oficial: " + String.join(", ", desconocidos));
         }
 
-        String usuario = usuarioValido(request.getUsuario());
+        String usuario = usuarioAutenticado(authentication);
         for (StudentItemDto estudiante : estudiantes) {
             NotaDocenteItemDto item = recibidas.get(estudiante.getStudentCode());
-            BigDecimal nota30 = item.getNotaSobre30().setScale(2, RoundingMode.HALF_UP);
-            BigDecimal nota100 = nota30.multiply(BigDecimal.valueOf(100))
-                    .divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
+            BigDecimal nota60 = item.getNotaSobre60().setScale(2, RoundingMode.HALF_UP);
+            BigDecimal nota100 = nota60.multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
             NotaDocente nota = notaRepository.findByRolExamenIdAndCodigoEstudiante(rolExamenId, estudiante.getStudentCode())
                     .orElseGet(NotaDocente::new);
             nota.setRolExamenId(rolExamenId);
             nota.setCodigoEstudiante(estudiante.getStudentCode());
             nota.setEstudianteNombreCompleto(estudiante.getFullName());
-            nota.setNotaSobre30(nota30);
+            nota.setNotaSobre60(nota60);
             nota.setNotaSobre100(nota100);
             nota.setGuardadoPor(usuario);
             nota.setGuardadoEn(LocalDateTime.now());
@@ -194,11 +208,11 @@ public class ExamenSinCartillaService {
                 .usuario(usuario)
                 .ipOrigen("127.0.0.1")
                 .build());
-        return listarNotas(rolExamenId);
+        return listarNotas(rolExamenId, authentication);
     }
 
-    public byte[] descargarDocumento(String rolExamenId) {
-        obtenerRolSinCartilla(rolExamenId);
+    public byte[] descargarDocumento(String rolExamenId, Authentication authentication) {
+        obtenerRolSinCartilla(rolExamenId, authentication);
         DocumentoExamenSinCartilla documento = documentoRepository.findByRolExamenId(rolExamenId)
                 .orElseThrow(() -> new RuntimeException("El examen sin cartilla todavía no tiene un documento cargado."));
         if (!documento.isArchivoCifrado()
@@ -232,19 +246,23 @@ public class ExamenSinCartillaService {
         }
     }
 
-    public DocumentoExamenSinCartilla obtenerDocumentoEntidad(String rolExamenId) {
-        obtenerRolSinCartilla(rolExamenId);
+    public DocumentoExamenSinCartilla obtenerDocumentoEntidad(String rolExamenId, Authentication authentication) {
+        obtenerRolSinCartilla(rolExamenId, authentication);
         return documentoRepository.findByRolExamenId(rolExamenId)
                 .orElseThrow(() -> new RuntimeException("El examen sin cartilla todavía no tiene un documento cargado."));
     }
 
-    private RolExamen obtenerRolSinCartilla(String rolExamenId) {
+    private RolExamen obtenerRolSinCartilla(String rolExamenId, Authentication authentication) {
         RolExamen rol = rolRepository.findById(rolExamenId)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
         if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_SIN_CARTILLA) {
             throw new IllegalStateException("Esta operación solo corresponde a exámenes presenciales sin cartilla.");
         }
         return rol;
+    }
+
+    private String usuarioAutenticado(Authentication authentication) {
+        return authentication == null ? "SISTEMA" : usuarioValido(authentication.getName());
     }
 
     private List<StudentItemDto> obtenerEstudiantesOficiales(RolExamen rol) {

@@ -12,8 +12,8 @@ Permitir que un examen presencial sin cartilla se gestione desde la carga del do
 4. El personal de Evaluaciones administra la secuencia desde **Lista de evaluaciones**:
    `VALIDADO` → `IMPRESO` → `ENTREGADO` → `DEVUELTO` → `PENDIENTE_NOTAS`.
 5. Al marcar `PENDIENTE_NOTAS`, el docente puede abrir el registro de notas y visualizar la nómina oficial del grupo obtenida del SEA.
-6. El docente registra una nota sobre 30 para cada estudiante y guarda. El sistema calcula también la nota sobre 100, cambia el rol a `CALIFICADO` y conserva la auditoría.
-7. El personal autorizado puede imprimir el reporte de notas desde el mismo apartado.
+6. El docente registra una nota sobre 60 para cada estudiante y guarda. El sistema calcula también la nota sobre 100, cambia el rol a `CALIFICADO` y conserva la auditoría.
+7. Cuando todas las notas están completas, el docente y el personal responsable autorizado pueden imprimir el reporte de notas desde el mismo apartado.
 
 ## Reglas principales
 
@@ -21,9 +21,13 @@ Permitir que un examen presencial sin cartilla se gestione desde la carga del do
 - No se generan variantes ni PDF para esta modalidad.
 - El documento debe ser `.doc` o `.docx` y no superar 5 MB.
 - El docente debe preparar el documento en tamaño oficio de **8,5 × 13 pulgadas**. Este requisito se muestra en la carga y debe verificarse antes de enviarlo, porque el sistema no garantiza de forma automática el tamaño de página para ambos formatos de Word.
-- Para calificar se exige una nota entre 0 y 30 para cada estudiante oficial del grupo.
+- Para calificar se exige una nota entre 0 y 60 para cada estudiante oficial del grupo.
 - No se aceptan estudiantes que no pertenezcan a la nómina oficial devuelta por el SEA.
+- No se aceptan códigos de estudiante duplicados dentro de una misma carga.
+- El servidor valida que el docente sea el asignado al examen y que el examen pertenezca a su alcance académico. Administrador y responsable mantienen acceso de supervisión.
+- El usuario y la fecha de registro se toman de la sesión autenticada; no se confía en el usuario enviado por el navegador.
 - Mientras el rol está `PENDIENTE_NOTAS`, el docente puede editar y guardar las notas. En `CALIFICADO` el reporte queda disponible en modo consulta.
+- La impresión permanece bloqueada mientras existan notas faltantes o inválidas.
 
 ## Servicios implementados
 
@@ -37,4 +41,4 @@ Permitir que un examen presencial sin cartilla se gestione desde la carga del do
 
 ## Resultado esperado
 
-Para cada estudiante se conserva el código oficial, la nota sobre 30 y la nota calculada sobre 100. El reporte impreso incluye materia, grupo, parcial, docente, estado, código de estudiante y ambas notas.
+Para cada estudiante se conserva el código oficial, la nota sobre 60 y la nota calculada sobre 100. El reporte impreso incluye materia, grupo, parcial, docente, estado, código de estudiante y ambas notas.

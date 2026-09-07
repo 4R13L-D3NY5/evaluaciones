@@ -10,5 +10,5 @@ import java.math.BigDecimal;
 @Data
 public class NotaDocenteItemDto {
     @NotBlank private String codigoEstudiante;
-    @NotNull @DecimalMin("0.00") @DecimalMax("30.00") private BigDecimal notaSobre30;
+    @NotNull @DecimalMin("0.00") @DecimalMax("60.00") private BigDecimal notaSobre60;
 }

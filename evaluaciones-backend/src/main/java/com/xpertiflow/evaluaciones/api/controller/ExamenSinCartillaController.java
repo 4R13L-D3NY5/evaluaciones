@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,25 +33,28 @@ public class ExamenSinCartillaController {
     private final ExamenSinCartillaService service;
 
     @GetMapping("/{rolExamenId}/documento")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
-    public ResponseEntity<DocumentoSinCartillaResponseDto> obtenerDocumento(@PathVariable String rolExamenId) {
-        return ResponseEntity.ok(service.obtenerDocumento(rolExamenId));
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    public ResponseEntity<DocumentoSinCartillaResponseDto> obtenerDocumento(@PathVariable String rolExamenId,
+                                                                             Authentication authentication) {
+        return ResponseEntity.ok(service.obtenerDocumento(rolExamenId, authentication));
     }
 
     @PostMapping("/{rolExamenId}/documento")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     public ResponseEntity<DocumentoSinCartillaResponseDto> cargarDocumento(
             @PathVariable String rolExamenId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "usuario", required = false) String usuario) {
-        return ResponseEntity.ok(service.cargarDocumento(rolExamenId, file, usuario));
+            @RequestParam(value = "usuario", required = false) String usuario,
+            Authentication authentication) {
+        return ResponseEntity.ok(service.cargarDocumento(rolExamenId, file, authentication));
     }
 
     @GetMapping("/{rolExamenId}/documento/archivo")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
-    public ResponseEntity<Resource> descargarDocumento(@PathVariable String rolExamenId) {
-        var documento = service.obtenerDocumentoEntidad(rolExamenId);
-        ByteArrayResource resource = new ByteArrayResource(service.descargarDocumento(rolExamenId));
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    public ResponseEntity<Resource> descargarDocumento(@PathVariable String rolExamenId,
+                                                        Authentication authentication) {
+        var documento = service.obtenerDocumentoEntidad(rolExamenId, authentication);
+        ByteArrayResource resource = new ByteArrayResource(service.descargarDocumento(rolExamenId, authentication));
         MediaType mediaType = documento.getNombreArchivo().toLowerCase().endsWith(".docx")
                 ? MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
                 : MediaType.parseMediaType("application/msword");
@@ -61,16 +65,18 @@ public class ExamenSinCartillaController {
     }
 
     @GetMapping("/{rolExamenId}/notas")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
-    public ResponseEntity<List<NotaDocenteResponseDto>> listarNotas(@PathVariable String rolExamenId) {
-        return ResponseEntity.ok(service.listarNotas(rolExamenId));
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    public ResponseEntity<List<NotaDocenteResponseDto>> listarNotas(@PathVariable String rolExamenId,
+                                                                       Authentication authentication) {
+        return ResponseEntity.ok(service.listarNotas(rolExamenId, authentication));
     }
 
     @PostMapping("/{rolExamenId}/notas")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     public ResponseEntity<List<NotaDocenteResponseDto>> guardarNotas(
             @PathVariable String rolExamenId,
-            @Valid @RequestBody GuardarNotasDocenteRequestDto request) {
-        return ResponseEntity.ok(service.guardarNotas(rolExamenId, request));
+            @Valid @RequestBody GuardarNotasDocenteRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(service.guardarNotas(rolExamenId, request, authentication));
     }
 }

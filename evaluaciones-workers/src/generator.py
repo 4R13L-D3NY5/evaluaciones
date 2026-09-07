@@ -56,15 +56,6 @@ INSTRUCCIONES_POR_TIPO = {
     ),
 }
 
-CLAVE_VF_COMPLEJAS = [
-    ("A", "1, 2 y 3 son verdaderas."),
-    ("B", "1 y 3 son verdaderas."),
-    ("C", "2 y 4 son verdaderas."),
-    ("D", "Solo 4 es verdadera."),
-    ("E", "Todas son verdaderas."),
-]
-
-
 def normalizar_configuracion_generacion(raw: dict[str, Any] | None, rol: dict[str, Any] | None = None) -> dict[str, Any]:
     """Convierte la configuración persistida en parámetros seguros para Typst."""
     raw = raw or {}
@@ -226,9 +217,23 @@ def _typst_content(texto: str) -> str:
             if any(part.strip() for part in segmentos[idx + 1:]):
                 partes.append("#linebreak()")
         else:
-            # Texto plano: escapar comillas dobles para el raw de Typst.
-            escapado = segmento.replace("\\", "\\\\").replace('"', '\\"')
-            partes.append(f'#raw("{escapado}", block: false)')
+            # Algunos bancos antiguos guardan la barra que se usaba como
+            # separador de línea del documento Typst dentro del propio texto.
+            # Si se envía al raw, termina apareciendo como un carácter visible
+            # en el PDF. Se elimina solo al final de una línea y se conservan
+            # las barras que formen parte real del contenido.
+            texto_plano = re.sub(
+                r"[ \t]*\\+[ \t]*(?=\n|$)",
+                "",
+                segmento.replace("\r\n", "\n").replace("\r", "\n"),
+            )
+            lineas = texto_plano.split("\n")
+            for indice_linea, linea in enumerate(lineas):
+                if linea:
+                    escapado = linea.replace("\\", "\\\\").replace('"', '\\"')
+                    partes.append(f'#raw("{escapado}", block: false)')
+                if indice_linea < len(lineas) - 1:
+                    partes.append("#linebreak()")
 
     # En Typst el contenido se concatena por adyacencia. El signo `+` no es
     # un operador de concatenación en este contexto y terminaría apareciendo
@@ -699,17 +704,14 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
         if tipo == "VERDADERO_O_FALSO_COMPLEJAS":
             afirmaciones = parsear_opciones(p.get("opciones_json", "[]"))[:4]
             typ_code += f'\n#block(breakable: false, spacing: {generation_config["separacionPreguntas"]})[\n'
-            typ_code += f'  #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}\\\\\n'
+            typ_code += f'  #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}#linebreak()\n'
             typ_code += imagen_code
             typ_code += '  #v(0.15em)\n'
             typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
             for indice_afirmacion, (_, texto, _) in enumerate(afirmaciones, start=1):
-                typ_code += f'    #text(weight: "regular")[{indice_afirmacion}) {_typst_content(_limpiar_prefijo_opcion(texto))}]\\\\\n'
-            typ_code += '  ]\\\\\n'
-            typ_code += '  #v(0.4em)\n'
-            typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
-            for letra, texto in CLAVE_VF_COMPLEJAS:
-                typ_code += f'    #text(weight: "regular")[{letra}) {_typst_content(texto)}]\\\\\n'
+                typ_code += f'    #text(weight: "regular")[{indice_afirmacion}) {_typst_content(_limpiar_prefijo_opcion(texto))}]#linebreak()\n'
+            # La clave A-E ya aparece una sola vez en las instrucciones de la
+            # sección. Cada pregunta solo necesita sus cuatro afirmaciones.
             typ_code += '  ]\n]\n'
             continue
 

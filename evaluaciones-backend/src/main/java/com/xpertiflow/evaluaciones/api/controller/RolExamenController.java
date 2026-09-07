@@ -78,12 +78,13 @@ public class RolExamenController {
     }
 
     @PostMapping("/{id}/transicion")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
     @Operation(summary = "Transicionar el estado de un rol de examen")
     public ResponseEntity<RolExamenResponseDto> transicionarEstado(
             @PathVariable String id,
-            @Valid @RequestBody TransicionEstadoRequestDto dto) {
-        return ResponseEntity.ok(rolExamenService.transicionarEstado(id, dto));
+            @Valid @RequestBody TransicionEstadoRequestDto dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.transicionarEstado(id, dto, authentication));
     }
 
     @PostMapping("/{id}/restablecer")

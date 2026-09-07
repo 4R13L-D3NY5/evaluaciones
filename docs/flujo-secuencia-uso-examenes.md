@@ -81,7 +81,13 @@ El banco tiene como mínimo 60 reactivos, pero cada examen generado utiliza la c
 | `PENDIENTE_NOTAS` | Se esperan las notas del docente o el procesamiento OMR. | Registrar resultados y calificar. |
 | `CALIFICADO` | Resultados confirmados y notas persistidas. | Consultar bitácora y resultados. |
 
+La transición `PROGRAMADO → VALIDADO` no se realiza desde el control manual de estados. El sistema la asigna al completar correctamente la carga y validación del banco de preguntas del docente —o del documento oficial en la modalidad sin cartilla—, dejando registro de la operación y del hash de integridad.
+
 La modalidad virtual utiliza el mismo rol, pero no recorre los estados físicos `IMPRESO`, `ENTREGADO` y `DEVUELTO`.
+
+### 4.3. Renderizado de verdadero o falso complejas
+
+En la tipología `VERDADERO_O_FALSO_COMPLEJAS`, la clave de respuestas A–E se muestra una sola vez dentro de las instrucciones de la sección. Cada pregunta muestra únicamente su enunciado y las cuatro afirmaciones numeradas, con un salto de línea explícito entre ellas. Las barras invertidas heredadas de bancos antiguos, cuando funcionan como separadores de línea, se limpian antes de generar el PDF para evitar que aparezcan impresas.
 
 ## 5. Modalidad presencial con cartilla
 
@@ -133,14 +139,14 @@ Se registran por estudiante:
 - Blancos.
 - Dobles marcas.
 - Variante confirmada.
-- Nota sobre 30.
+- Nota sobre 60.
 - Nota sobre 100.
 - Estado: `APROBADO`, `REPROBADO` o `REVISION_MANUAL`.
 
 Las fórmulas se calculan usando el total configurado para el parcial:
 
 ```text
-nota_sobre_30  = aciertos × 30 / total_preguntas_configurado
+nota_sobre_60  = aciertos × 60 / total_preguntas_configurado
 nota_sobre_100 = aciertos × 100 / total_preguntas_configurado
 ```
 
@@ -157,7 +163,6 @@ sequenceDiagram
     actor Estudiante as Estudiante
     participant Sistema as Sistema
     participant SEA as Servicios SEA
-    participant Revision as Revisión manual
 
     Personal->>Sistema: Selecciona rol VALIDADO
     Sistema->>SEA: Consulta nómina oficial
@@ -171,12 +176,15 @@ sequenceDiagram
     Personal->>Estudiante: Entrega cuadernillo
     Personal->>Sistema: Registra entrega y devolución
     Sistema-->>Personal: Rol DEVUELTO
-    Personal->>Revision: Registra respuestas o resultado según el mecanismo definido
-    Revision->>Sistema: Ingresa aciertos/respuestas y observaciones
-    Sistema->>Sistema: Calcula nota sobre 30 y sobre 100
-    Personal->>Sistema: Revisa y confirma
-    Sistema-->>Personal: Rol PENDIENTE_NOTAS
-    Note over Docente,Sistema: La carga de notas del docente queda pendiente de implementación
+    Personal->>Sistema: Cambia el rol a PENDIENTE_NOTAS
+    Sistema-->>Docente: Habilita la carga de notas
+    Docente->>Sistema: Abre la nómina oficial del grupo
+    Sistema->>SEA: Consulta estudiantes oficiales
+    SEA-->>Sistema: Nómina oficial
+    Docente->>Sistema: Registra una nota sobre 60 por estudiante
+    Sistema->>Sistema: Valida notas y calcula escala sobre 100
+    Docente->>Sistema: Confirma guardar y calificar
+    Sistema-->>Docente: Rol CALIFICADO y reporte disponible
 ```
 
 ### 6.2. Regla de calificación
@@ -186,12 +194,12 @@ La modalidad sin cartilla no utiliza la lectura OMR ni genera una cartilla separ
 Para cerrar este flujo con notas, la captura debe registrar al menos:
 
 - Rol y estudiante oficial de SEA.
-- Variante asignada.
-- Respuesta por pregunta o cantidad de aciertos.
-- Observaciones del evaluador.
-- Usuario y fecha de revisión.
+- Nota sobre 60 dentro del rango permitido.
+- Nota calculada sobre 100.
+- Usuario y fecha de registro.
+- Auditoría de la carga y del cambio a `CALIFICADO`.
 
-La nota debe usar las mismas fórmulas del examen con cartilla. Mientras no exista la captura manual habilitada para esta modalidad, el rol permanece en `PENDIENTE_NOTAS` sin inventar una nota; queda pendiente la pantalla de carga/revisión manual y su endpoint de persistencia.
+La nota debe usar las mismas fórmulas del examen con cartilla. En `PENDIENTE_NOTAS`, el docente autorizado registra una nota entre 0 y 60 para cada estudiante de la nómina oficial; el sistema calcula la escala sobre 100, registra la auditoría y cambia el rol a `CALIFICADO`. El reporte se puede imprimir cuando la carga está completa y queda en modo consulta después de calificar.
 
 ## 7. Modalidad virtual
 

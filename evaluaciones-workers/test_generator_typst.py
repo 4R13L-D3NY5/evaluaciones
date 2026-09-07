@@ -81,6 +81,27 @@ class FormulasTypstTest(unittest.TestCase):
             self.assertNotIn("unknown variable", salida)
             self.assertTrue(os.path.exists(ruta_pdf))
 
+    def test_verdadero_falso_complejas_solo_muestra_afirmaciones_y_limpia_barras(self):
+        opciones = json.dumps([
+            {"letra": "A", "texto": "1. Primera afirmación\\"},
+            {"letra": "B", "texto": "2) Segunda afirmación\\"},
+            {"letra": "C", "texto": "3. Tercera afirmación"},
+            {"letra": "D", "texto": "4. Cuarta afirmación"},
+        ], ensure_ascii=False)
+        preguntas = [{
+            "tipo_reactivo": "VERDADERO_O_FALSO_COMPLEJAS",
+            "enunciado": "Seleccione los incisos correctos:\\",
+            "opciones_json": opciones,
+        }]
+
+        salida = generator._cuestionario_typst(preguntas)
+
+        self.assertIn("1) #raw(\"Primera afirmación\", block: false)]#linebreak()", salida)
+        self.assertIn("2) #raw(\"Segunda afirmación\", block: false)]#linebreak()", salida)
+        self.assertNotIn("A) #raw(\"1, 2 y 3 son verdaderas.", salida)
+        self.assertNotIn("B) #raw(\"1 y 3 son verdaderas.", salida)
+        self.assertNotIn("#raw(\"Seleccione los incisos correctos:\\\\\", block: false)", salida)
+
 
 if __name__ == "__main__":
     unittest.main()

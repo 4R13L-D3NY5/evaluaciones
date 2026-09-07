@@ -6,6 +6,12 @@ En **Lista de Evaluaciones → Notas y escaneados OMR**, las evaluaciones con ca
 
 Los archivos se recuperan desde la ruta persistida en `sea_calificaciones_omr.archivo_escaneado_path`; no dependen del archivo seleccionado en el navegador ni de un trabajo OMR temporal en memoria. Los registros históricos sin ruta y los archivos que ya no están en disco se informan como no disponibles. No se infiere una página individual a partir del orden de estudiantes.
 
+## Visualización del patrón después de calificar
+
+En **Lista de Evaluaciones**, una evaluación en estado **Calificado** muestra la acción **Patrón oficial**. Esta consulta es de solo lectura y presenta las respuestas oficiales de cada variante en una vista compacta, equivalente a la clave utilizada durante la calificación.
+
+El endpoint `GET /api/omr/{rolExamenId}/patron-calificado` solo responde a `ADMINISTRADOR_SISTEMA`, `RESPONSABLE_EVALUACIONES` y `PERSONAL_EVALUACIONES` con acceso al rol. El backend exige el estado `CALIFICADO`, valida el alcance académico —incluido el campus del personal de evaluaciones— y descifra el contenido protegido en el servidor. Nunca devuelve la carga cifrada ni las claves de protección.
+
 `GET /api/omr/{rolExamenId}/calificaciones/{calificacionId}/escaneado` requiere un rol operativo de evaluaciones y acceso al rol de examen. Verifica que la calificación pertenezca a esa evaluación y que el archivo real esté dentro de storage. Solo sirve PDF, PNG o JPEG, con caché desactivada. La consulta no recibe rutas de archivos del navegador.
 
 Verificación: calificar una evaluación con varias páginas, cerrar y recargar la lista, abrir sus notas y consultar cada archivo. Comprobar que las páginas se pueden recorrer y que las notas y el estado no cambian; probar también una calificación sin archivo y un acceso fuera del alcance del usuario.

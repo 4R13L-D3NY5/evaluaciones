@@ -17,6 +17,8 @@ La vista también permite generar el **Reporte diario de seguimiento de evaluaci
 
 El parcial seleccionado informa:
 
+- fecha programada del examen, tomada del rol correspondiente a la gestión,
+  carrera, asignatura y grupo seleccionados;
 - cantidad de preguntas fáciles, medias y difíciles del banco cargado;
 - total de preguntas;
 - modalidad: con cartilla, sin cartilla o virtual;
@@ -55,6 +57,12 @@ curriculares; no se presentan planes fijos o inventados.
 - Si una carrera no tiene roles registrados, sus asignaturas siguen visibles y muestran el grupo/docente entregado por SEA; solo el parcial se muestra como **Sin examen**.
 - El catálogo institucional entrega el nombre del docente en `teacherFullName`; el sistema lo normaliza como nombre del docente para mostrarlo en todas las vistas. Si excepcionalmente no llega el nombre pero sí el CI, se muestra **Nombre no disponible (CI ...)** y no un nombre inventado.
 - La información de cada parcial se construye con el rol y banco que corresponden a esa asignatura; el grupo/docente se conserva desde SEA.
+- Los grupos se consultan usando la gestión seleccionada. Los roles se
+  intersectan con esos grupos por `seaGroupId` para evitar mostrar la fecha de
+  otra gestión; si SEA no devuelve grupos vigentes, no se muestran roles ni
+  fechas sin una asociación confiable con la gestión seleccionada.
+- La fecha se muestra por parcial desde `fechaDisplay`, con respaldo en
+  `fecha`; cuando no existe un examen o fecha, la interfaz muestra `—`.
 
 ## Verificación
 
@@ -63,6 +71,9 @@ curriculares; no se presentan planes fijos o inventados.
 - Validación manual de los endpoints oficiales con la instancia local.
 - Filtro de búsqueda, plan curricular y ocultamiento de asignaturas sin
   asignar conectados a señales reactivas para actualizar la tabla al cambiar.
+- La fecha visible cambia al seleccionar 1er parcial, 2do parcial, examen
+  final o 2da instancia y se reconstruye al recargar la combinación de gestión,
+  sede y carrera.
 
 ## Pendiente
 

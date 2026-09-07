@@ -1116,6 +1116,8 @@ Es esperado si todavía no se registró y confirmó la calificación manual. No 
 
 ## 20. Limitaciones y pendientes
 
+La lista priorizada de pendientes, estados y criterios de cierre se mantiene en [docs/pendientes-sistema.md](docs/pendientes-sistema.md). Allí se separan las funciones pendientes de desarrollo de las que ya existen y requieren validación integral.
+
 - La autenticación local está preparada para evolucionar a Keycloak, pero el SSO institucional requiere configuración y pruebas.
 - Vault está en el mismo servidor en la configuración actual; para ambientes críticos se recomienda KMS/HSM y TLS externo.
 - La sobreimpresión OMR debe probarse físicamente con la impresora y la cartilla institucional.
@@ -1131,6 +1133,7 @@ Es esperado si todavía no se registró y confirmó la calificación manual. No 
 
 | Documento | Contenido |
 | --- | --- |
+| [docs/pendientes-sistema.md](docs/pendientes-sistema.md) | Lista priorizada de pendientes y criterios de cierre |
 | [guia_despliegue.md](guia_despliegue.md) | Instalación, Vault, arranque, actualización, respaldos y contingencia |
 | [alcance.md](alcance.md) | Alcance funcional y hoja de ruta |
 | [docs/validacion-banco-preguntas.md](docs/validacion-banco-preguntas.md) | Formato Excel, tipologías y validaciones |
@@ -1149,4 +1152,3 @@ Es esperado si todavía no se registró y confirmó la calificación manual. No 
 ## Uso institucional
 
 El código, la configuración, los documentos y los datos de estudiantes son de uso institucional. La distribución, copia, publicación, acceso a secretos y tratamiento de información académica deben sujetarse a las políticas de UNITEPC y de seguridad de la información.
-

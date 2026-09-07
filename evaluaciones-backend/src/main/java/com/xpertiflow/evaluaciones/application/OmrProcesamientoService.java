@@ -7,6 +7,7 @@ import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
 import com.xpertiflow.evaluaciones.api.dto.DetalleRespuestaOmrDto;
+import com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ConfiguracionOmr;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -137,6 +139,46 @@ public class OmrProcesamientoService {
         return calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId).stream()
                 .map(this::mapearCalificacion)
                 .toList();
+    }
+
+    /**
+     * Devuelve el patrón exclusivamente después de cerrar la calificación.
+     * Las claves se leen desde el contenido protegido de cada variante para
+     * evitar depender de la columna histórica en texto plano.
+     */
+    @Transactional(readOnly = true)
+    public PatronCalificadoResponseDto consultarPatronCalificado(String rolExamenId) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        if (rol.getEstadoFlujo() == null || !"CALIFICADO".equals(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("El patrón solo puede consultarse después de pasar la evaluación a Calificado.");
+        }
+
+        List<PatronCalificadoResponseDto.VariantePatronDto> variantes = varianteRepository.findByRolExamenId(rolExamenId)
+                .stream()
+                .sorted(Comparator.comparing(ExamenVariante::getLetraVariante))
+                .map(variante -> {
+                    Map<String, String> respuestas = leerPatron(variante);
+                    if (respuestas.isEmpty()) {
+                        throw new IllegalStateException("La variante " + variante.getLetraVariante() + " no tiene un patrón protegido disponible.");
+                    }
+                    PatronCalificadoResponseDto.VariantePatronDto dto = new PatronCalificadoResponseDto.VariantePatronDto();
+                    dto.setLetra(variante.getLetraVariante());
+                    dto.setTotalPreguntas(variante.getTotalPreguntas() == null ? respuestas.size() : variante.getTotalPreguntas());
+                    dto.setRespuestas(respuestas);
+                    return dto;
+                })
+                .toList();
+
+        if (variantes.isEmpty()) {
+            throw new IllegalStateException("No existe un patrón persistido para esta evaluación.");
+        }
+
+        PatronCalificadoResponseDto respuesta = new PatronCalificadoResponseDto();
+        respuesta.setRolExamenId(rolExamenId);
+        respuesta.setEstado(rol.getEstadoFlujo().name());
+        respuesta.setVariantes(variantes);
+        return respuesta;
     }
 
     @Transactional(readOnly = true)
@@ -238,9 +280,9 @@ public class OmrProcesamientoService {
         BigDecimal nota100 = total == 0
                 ? BigDecimal.ZERO
                 : BigDecimal.valueOf(aciertos * 100.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
-        BigDecimal nota30 = total == 0
+        BigDecimal nota60 = total == 0
                 ? BigDecimal.ZERO
-                : BigDecimal.valueOf(aciertos * 30.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
+                : BigDecimal.valueOf(aciertos * 60.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
 
         CalificacionOmr calificacion = calificacionRepository
                 .findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigo)
@@ -254,7 +296,7 @@ public class OmrProcesamientoService {
         calificacion.setFallos(fallos);
         calificacion.setBlancos(blancos);
         calificacion.setDoblesMarcas(dobles);
-        calificacion.setNotaSobre30(nota30);
+        calificacion.setNotaSobre60(nota60);
         calificacion.setNotaSobre100(nota100);
         calificacion.setEstadoCalificacion(nota100.doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
         try {
@@ -326,7 +368,7 @@ public class OmrProcesamientoService {
         dto.setFallos(calificacion.getFallos());
         dto.setBlancos(calificacion.getBlancos());
         dto.setDoblesMarcas(calificacion.getDoblesMarcas());
-        dto.setNotaSobre30(calificacion.getNotaSobre30());
+        dto.setNotaSobre60(calificacion.getNotaSobre60());
         dto.setNotaSobre100(calificacion.getNotaSobre100());
         dto.setEstadoCalificacion(calificacion.getEstadoCalificacion());
         dto.setRespuestasDetectadasJson(calificacion.getRespuestasDetectadasJson());

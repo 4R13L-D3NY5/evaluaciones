@@ -46,8 +46,9 @@ public class CalificacionOmr {
     @Column(name = "dobles_marcas", nullable = false)
     private Integer doblesMarcas;
 
+    // El nombre físico se conserva para no romper instalaciones existentes; su semántica vigente es sobre 60.
     @Column(name = "nota_sobre_30", nullable = false, precision = 5, scale = 2)
-    private BigDecimal notaSobre30;
+    private BigDecimal notaSobre60;
 
     @Column(name = "nota_sobre_100", nullable = false, precision = 5, scale = 2)
     private BigDecimal notaSobre100;

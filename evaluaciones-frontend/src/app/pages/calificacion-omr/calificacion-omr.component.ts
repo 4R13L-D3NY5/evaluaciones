@@ -36,7 +36,7 @@ export interface EstudianteOmrItem {
   blancos: number;
   doblesMarcas: number;
   nota100: number;
-  nota30: number;
+  nota60: number;
   aprobado: boolean;
   estadoCalificacion: string;
   imagenEscaneada: string;
@@ -636,6 +636,7 @@ export interface EstudianteOmrItem {
                         <span class="text-2xl font-black font-mono text-foreground">{{ est.nota100 }}</span>
                         <span class="text-xs text-muted-foreground font-bold">/100</span>
                       </div>
+                      <div class="text-[10px] font-mono font-bold text-muted-foreground">Nota: {{ est.nota60 }}/60</div>
                     </div>
                   </div>
 
@@ -1335,7 +1336,7 @@ export class CalificacionOmrComponent implements OnInit {
       blancos: lectura.blancos || 0,
       doblesMarcas: lectura.doblesMarcas || 0,
       nota100: lectura.notaSobre100 || 0,
-      nota30: lectura.notaSobre30 || 0,
+      nota60: lectura.notaSobre60 || 0,
       aprobado: lectura.estadoCalificacion === 'APROBADO',
       estadoCalificacion: lectura.estado === 'CALIFICADO' ? (lectura.estadoCalificacion || 'CALIFICADO') : 'REVISION_MANUAL',
       imagenEscaneada: imagen,
@@ -1596,6 +1597,7 @@ export class CalificacionOmrComponent implements OnInit {
         let fallos = 0;
         let blancos = 0;
         let dobles = 0;
+        const puntosPorReactivo = 60 / 30;
 
         const bubbleRadius = Math.max(Math.floor(rh * 0.019), 5);
 
@@ -1680,7 +1682,7 @@ export class CalificacionOmrComponent implements OnInit {
             marcada = opciones[maxIdx];
             if (marcada === patron) {
               estado = 'CORRECTA';
-              puntos = 3.333;
+              puntos = puntosPorReactivo;
               aciertos++;
             } else {
               estado = 'INCORRECTA';
@@ -1729,7 +1731,8 @@ export class CalificacionOmrComponent implements OnInit {
           }
         }
 
-        const nota100 = Math.round((aciertos / 30.0) * 1000) / 10;
+        const totalPreguntas = 30;
+        const nota100 = Math.round((aciertos / totalPreguntas) * 1000) / 10;
 
         // Dibujar banner OMR superior
         const bannerH = Math.max(Math.floor(img.height * 0.022), 26);
@@ -1739,7 +1742,8 @@ export class CalificacionOmrComponent implements OnInit {
         ctx.fillStyle = '#FFFFFF';
         ctx.font = `bold ${Math.floor(bannerH * 0.55)}px sans-serif`;
         ctx.textBaseline = 'middle';
-        ctx.fillText(`OMR SCORE: ${nota100}/100 pts (${aciertos}/30 Aciertos) - ${nota100 >= 51 ? 'APROBADO' : 'REPROBADO'}`, rx + 10, ry - bannerH / 2 - 4);
+        const nota60 = Math.round((aciertos / totalPreguntas) * 60 * 100) / 100;
+        ctx.fillText(`OMR SCORE: ${nota100}/100 pts (${nota60}/60 puntos; ${aciertos} aciertos) - ${nota100 >= 51 ? 'APROBADO' : 'REPROBADO'}`, rx + 10, ry - bannerH / 2 - 4);
 
         resolve({
           aciertos,
@@ -1804,7 +1808,7 @@ export class CalificacionOmrComponent implements OnInit {
       data.push([
         codigoMateria,
         est.codigo,
-        est.aciertos
+        est.nota60
       ]);
     });
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
+import com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto;
 import com.xpertiflow.evaluaciones.application.OmrProcesamientoService;
 import com.xpertiflow.evaluaciones.application.OmrEscaneadoService;
 import org.springframework.core.io.FileSystemResource;
@@ -74,6 +75,13 @@ public class OmrProcesamientoController {
     @Operation(summary = "Listar calificaciones OMR persistidas de una evaluación")
     public ResponseEntity<List<CalificacionOmrResponseDto>> listarCalificaciones(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(omrProcesamientoService.listarCalificaciones(rolExamenId));
+    }
+
+    @GetMapping("/{rolExamenId}/patron-calificado")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Consultar el patrón de respuestas después de calificar")
+    public ResponseEntity<PatronCalificadoResponseDto> consultarPatronCalificado(@PathVariable String rolExamenId) {
+        return ResponseEntity.ok(omrProcesamientoService.consultarPatronCalificado(rolExamenId));
     }
 
     @GetMapping("/configuracion")

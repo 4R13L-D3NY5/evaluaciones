@@ -37,7 +37,7 @@ export interface OmrLecturaResponse {
   blancos?: number;
   doblesMarcas?: number;
   notaSobre100?: number;
-  notaSobre30?: number;
+  notaSobre60?: number;
   estadoCalificacion?: string;
 }
 
@@ -60,7 +60,7 @@ export interface CalificacionOmrResponse {
   fallos: number;
   blancos: number;
   doblesMarcas: number;
-  notaSobre30: number;
+  notaSobre60: number;
   notaSobre100: number;
   estadoCalificacion: string;
   respuestasDetectadasJson: string;
@@ -92,6 +92,18 @@ export interface ConfiguracionOmr {
   actualizadoPor?: string;
 }
 
+export interface PatronCalificadoVariante {
+  letra: string;
+  totalPreguntas: number;
+  respuestas: Record<string, string>;
+}
+
+export interface PatronCalificadoResponse {
+  rolExamenId: string;
+  estado: 'CALIFICADO';
+  variantes: PatronCalificadoVariante[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class OmrProcesamientoService {
   private readonly _http = inject(HttpClient);
@@ -116,6 +128,10 @@ export class OmrProcesamientoService {
 
   public listarCalificaciones(rolExamenId: string): Observable<CalificacionOmrResponse[]> {
     return this._http.get<CalificacionOmrResponse[]>(`/api/omr/${rolExamenId}/calificaciones`);
+  }
+
+  public consultarPatronCalificado(rolExamenId: string): Observable<PatronCalificadoResponse> {
+    return this._http.get<PatronCalificadoResponse>(`/api/omr/${encodeURIComponent(rolExamenId)}/patron-calificado`);
   }
 
   public obtenerEscaneado(rolExamenId: string, calificacionId: number): Observable<Blob> {

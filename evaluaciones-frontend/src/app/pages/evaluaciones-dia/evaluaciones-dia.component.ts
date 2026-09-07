@@ -29,6 +29,7 @@ import { ConfiguracionEvaluacionesService } from '../../core/services/configurac
 import { DocumentoSinCartilla, ExamenSinCartillaService, NotaDocente as NotaDocenteSinCartilla } from '../../core/services/examen-sin-cartilla.service';
 import {
   CalificacionOmrResponse,
+  PatronCalificadoResponse,
   AjustarCalificacionOmrRequest,
   OmrJobResponse,
   OmrLecturaResponse,
@@ -465,7 +466,7 @@ interface CampusDisponible extends Campus {
                           <div class="relative group/tooltip">
                             <button 
                               [class]="getPasoBotonClass(item, st.key)"
-                              [disabled]="esConsultaAcademica() || pasoBloqueadoPorCartillas(item, st.key)"
+                              [disabled]="esConsultaAcademica() || pasoBloqueadoPorCartillas(item, st.key) || validacionPorBancoBloqueada(item, st.key)"
                               (click)="clickPasoEstado(item, st.key)"
                               class="h-7 w-7 rounded-lg transition-all flex items-center justify-center cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
                               <i [class]="getPasoIcon(item, st)" class="text-xs"></i>
@@ -588,6 +589,22 @@ interface CampusDisponible extends Campus {
                             </button>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/configuracion:flex flex-col items-center z-50 pointer-events-none">
                               <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Variantes y patrones guardados</span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
+                        @if (puedeMostrarPatronCalificado(item)) {
+                          <div class="relative group/patronCalificado">
+                            <button
+                              (click)="abrirPatronCalificado(item)"
+                              title="Ver patrón oficial después de calificar"
+                              aria-label="Ver patrón oficial después de calificar"
+                              class="h-7 w-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-check-square text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/patronCalificado:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Patrón oficial · solo lectura</span>
                               <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                             </div>
                           </div>
@@ -1812,6 +1829,55 @@ interface CampusDisponible extends Campus {
       }
 
       <!-- MODAL: CONFIGURACIÓN PERSISTIDA DE VARIANTES Y ASIGNACIONES -->
+      @if (dialogPatronCalificado()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-5xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-950 text-white p-5 flex items-start justify-between gap-4 shrink-0">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center"><i class="pi pi-check-square text-lg text-emerald-200"></i></div>
+                <div>
+                  <h3 class="text-sm font-black">Patrón oficial después de calificar</h3>
+                  <p class="text-[11px] text-white/75">{{ evaluacionSeleccionadaPatron()?.codigo }} · {{ evaluacionSeleccionadaPatron()?.materia }} · consulta protegida y solo lectura</p>
+                </div>
+              </div>
+              <button (click)="cerrarPatronCalificado()" aria-label="Cerrar patrón oficial" class="h-8 w-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-5">
+              @if (cargandoPatronCalificado()) {
+                <div class="py-14 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spinner pi-spin text-emerald-700 mr-2"></i>Consultando el patrón protegido...</div>
+              } @else if (errorPatronCalificado()) {
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-bold text-rose-800 flex items-center gap-2"><i class="pi pi-exclamation-triangle"></i><span>{{ errorPatronCalificado() }}</span></div>
+              } @else {
+                @if (patronCalificado()) {
+                  <div class="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs text-emerald-950 flex items-start gap-3">
+                    <i class="pi pi-lock text-emerald-700 mt-0.5"></i>
+                    <div><strong>Patrón confirmado para la calificación.</strong><p class="mt-1 text-emerald-800/80">Las respuestas se muestran desde el contenido protegido de la evaluación. No se pueden editar desde esta vista.</p></div>
+                  </div>
+
+                  @for (variante of (patronCalificado()?.variantes || []); track variante.letra) {
+                    <section class="rounded-xl border border-border overflow-hidden">
+                      <div class="px-4 py-3 bg-muted/50 border-b border-border flex items-center justify-between gap-3">
+                        <div><h4 class="text-xs font-black uppercase tracking-wide text-foreground">Variante {{ variante.letra }}</h4><span class="text-[10px] text-muted-foreground">{{ variante.totalPreguntas }} respuestas oficiales</span></div>
+                        <span class="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 text-[10px] font-black uppercase">Calificado</span>
+                      </div>
+                      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 p-4 bg-white">
+                        @for (pregunta of getNumerosRango(1, variante.totalPreguntas); track pregunta) {
+                          <div class="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs"><span class="font-mono font-black text-muted-foreground">{{ pregunta }}.</span><span class="min-w-7 rounded-md bg-emerald-50 px-2 py-1 text-center font-mono font-black text-emerald-800">{{ variante.respuestas[pregunta] || '—' }}</span></div>
+                        }
+                      </div>
+                    </section>
+                  }
+                }
+              }
+            </div>
+
+            <div class="p-4 border-t border-border flex justify-end shrink-0 bg-muted/20"><button (click)="cerrarPatronCalificado()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: CONFIGURACIÓN PERSISTIDA DE VARIANTES Y ASIGNACIONES -->
       @if (dialogConfiguracionGeneracion()) {
         <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-border rounded-2xl max-w-6xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
@@ -1955,7 +2021,7 @@ interface CampusDisponible extends Campus {
                             <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Estado código</span><strong [class.text-emerald-700]="lectura.codigoValidado" [class.text-amber-700]="!lectura.codigoValidado">{{ lectura.codigoValidado ? 'Detectado / validado' : 'Pendiente de validar' }}</strong></div>
                             <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Variante</span><strong class="text-indigo-700">{{ lectura.letraVariante ? 'TIPO ' + lectura.letraVariante : '—' }}</strong></div>
                             <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">OCR candidato</span><strong class="font-mono text-foreground">{{ (lectura.codigoOcr || []).join(', ') || '—' }}</strong></div>
-                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Aciertos / Nota</span><strong class="text-emerald-700">{{ lectura.aciertos ?? 0 }} · {{ lectura.notaSobre30 ?? 0 }}/30</strong></div>
+                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Aciertos / Nota</span><strong class="text-emerald-700">{{ lectura.aciertos ?? 0 }} · {{ lectura.notaSobre60 ?? 0 }}/60</strong></div>
                           </div>
                           <div class="rounded-lg border border-border bg-card p-2">
                             <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-muted-foreground">Respuesta del estudiante vs patrón oficial</span><span class="text-[10px] text-muted-foreground">— blanco · AB doble</span></div>
@@ -2024,7 +2090,7 @@ interface CampusDisponible extends Campus {
                 </section>
               }
               @if (!cargandoNotasOmr() && notasOmr().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen calificaciones OMR guardadas para esta evaluación.</div> }
-              @else if (!cargandoNotasOmr()) { <div class="border border-border rounded-xl overflow-hidden"><div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Variante</span><span>/30</span><span>/100</span><span>Estado</span></div><div class="divide-y divide-border">@for (nota of notasOmr(); track nota.id) {<div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 px-3 py-2.5 items-center text-xs"><span class="font-mono text-muted-foreground">{{ $index + 1 }}</span><span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span><span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span><strong>{{ nota.notaSobre30 }}</strong><strong>{{ nota.notaSobre100 }}</strong><span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="nota.estadoCalificacion !== 'APROBADO'">{{ nota.estadoCalificacion }}</span></div>}</div></div> }
+              @else if (!cargandoNotasOmr()) { <div class="border border-border rounded-xl overflow-hidden"><div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Variante</span><span>/60</span><span>/100</span><span>Estado</span></div><div class="divide-y divide-border">@for (nota of notasOmr(); track nota.id) {<div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 px-3 py-2.5 items-center text-xs"><span class="font-mono text-muted-foreground">{{ $index + 1 }}</span><span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span><span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span><strong>{{ nota.notaSobre60 }}</strong><strong>{{ nota.notaSobre100 }}</strong><span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="nota.estadoCalificacion !== 'APROBADO'">{{ nota.estadoCalificacion }}</span></div>}</div></div> }
             </div>
             <div class="p-4 border-t border-border flex justify-end shrink-0"><button (click)="cerrarNotasOmr()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
           </div>
@@ -2061,7 +2127,7 @@ interface CampusDisponible extends Campus {
             <div class="p-5 overflow-y-auto space-y-4">
               <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-950">
                 <i class="pi pi-info-circle mr-1.5"></i>
-                {{ evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas' ? 'Registre la nota sobre 30 de cada estudiante de la nómina oficial. Al guardar todas las notas, la evaluación pasará a Calificado.' : 'Las notas se calcularon y guardaron tomando como fuente la nómina oficial de los servicios institucionales.' }}
+                {{ evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas' ? 'Registre la nota sobre 60 de cada estudiante de la nómina oficial. Al guardar todas las notas, la evaluación pasará a Calificado.' : 'Las notas se calcularon y guardaron tomando como fuente la nómina oficial de los servicios institucionales.' }}
               </div>
               @if (cargandoNotasDocente()) {
                 <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-xl text-amber-700"></i><p class="mt-2">Consultando nómina oficial y notas...</p></div>
@@ -2069,13 +2135,13 @@ interface CampusDisponible extends Campus {
                 <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">No se pudo obtener la nómina oficial del grupo.</div>
               } @else {
                 <div class="border border-border rounded-xl overflow-hidden">
-                  <div class="grid grid-cols-[55px_1fr_150px_150px] gap-3 bg-muted/60 px-4 py-3 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Nota /30</span><span>Nota /100</span></div>
+                  <div class="grid grid-cols-[55px_1fr_150px_150px] gap-3 bg-muted/60 px-4 py-3 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Nota /60</span><span>Nota /100</span></div>
                   <div class="divide-y divide-border">
                     @for (nota of notasDocente(); track nota.codigoEstudiante; let idx = $index) {
                       <div class="grid grid-cols-[55px_1fr_150px_150px] gap-3 px-4 py-3 items-center text-xs">
                         <span class="font-mono text-muted-foreground">{{ idx + 1 }}</span>
                         <span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground uppercase">{{ nota.estudianteNombreCompleto }}</span></span>
-                        <input type="number" min="0" max="30" step="0.01" [value]="nota.notaSobre30 ?? ''" (input)="editarNotaDocente(nota.codigoEstudiante, $any($event.target).value)" [disabled]="evaluacionSeleccionadaNotasDocente()?.etapa !== 'Pendiente de notas' || guardandoNotasDocente()" class="rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs font-black text-foreground outline-none focus:border-amber-500 disabled:bg-muted disabled:cursor-not-allowed" placeholder="0–30" />
+                        <input type="number" min="0" max="60" step="0.01" [value]="nota.notaSobre60 ?? ''" (input)="editarNotaDocente(nota.codigoEstudiante, $any($event.target).value)" [disabled]="evaluacionSeleccionadaNotasDocente()?.etapa !== 'Pendiente de notas' || guardandoNotasDocente()" class="rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs font-black text-foreground outline-none focus:border-amber-500 disabled:bg-muted disabled:cursor-not-allowed" placeholder="0–60" />
                         <span class="rounded-lg bg-emerald-50 px-3 py-2 font-mono text-xs font-black text-emerald-800">{{ nota.notaSobre100 ?? '—' }}</span>
                       </div>
                     }
@@ -2086,7 +2152,7 @@ interface CampusDisponible extends Campus {
             <div class="p-4 border-t border-border flex flex-wrap items-center justify-between gap-2 shrink-0">
               <span class="text-[10px] text-muted-foreground">{{ notasDocenteConCarga() }} de {{ notasDocente().length }} notas registradas</span>
               <div class="flex gap-2">
-                <button (click)="imprimirReporteNotasDocente()" [disabled]="!notasDocente().length" class="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-black cursor-pointer disabled:opacity-40"><i class="pi pi-print mr-1"></i> Imprimir reporte</button>
+                <button (click)="imprimirReporteNotasDocente()" [disabled]="!notasDocenteCompletas()" [title]="notasDocenteCompletas() ? 'Imprimir reporte de notas' : 'Complete todas las notas para imprimir'" class="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-black cursor-pointer disabled:opacity-40"><i class="pi pi-print mr-1"></i> Imprimir reporte</button>
                 <button (click)="cerrarNotasDocente()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button>
                 @if (evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas') {
                   <button (click)="guardarNotasDocente()" [disabled]="!notasDocenteCompletas() || guardandoNotasDocente()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="guardandoNotasDocente()" [class.pi-spinner]="guardandoNotasDocente()" [class.pi-check]="!guardandoNotasDocente()"></i> {{ guardandoNotasDocente() ? 'Guardando...' : 'Guardar y calificar' }}</button>
@@ -2141,6 +2207,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   );
   public readonly esResponsableEvaluaciones = computed(
     () => this._auth.usuario()?.rol === 'RESPONSABLE_EVALUACIONES'
+  );
+  public readonly esAdministradorSistema = computed(
+    () => this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
   );
   public readonly esEvaluacionesPorCampus = computed(
     () => this.esPersonalEvaluaciones() || this.esResponsableEvaluaciones()
@@ -2208,6 +2277,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public evaluacionSeleccionadaConfiguracion = signal<EvaluacionItemUI | null>(null);
   public configuracionGeneracion = signal<ConfiguracionGeneracion | null>(null);
   public cargandoConfiguracionGeneracion = signal<boolean>(false);
+  public dialogPatronCalificado = signal<boolean>(false);
+  public evaluacionSeleccionadaPatron = signal<EvaluacionItemUI | null>(null);
+  public patronCalificado = signal<PatronCalificadoResponse | null>(null);
+  public cargandoPatronCalificado = signal<boolean>(false);
+  public errorPatronCalificado = signal<string | null>(null);
   public estadoMarcas = signal<Record<string, string>>({});
   public estadoListas = signal<Record<string, string>>({});
 
@@ -2804,6 +2878,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       : ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa));
   }
 
+  public puedeMostrarPatronCalificado(item: EvaluacionItemUI): boolean {
+    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones())
+      && !this.esConsultaAcademica()
+      && item.modalidad !== 'PRESENCIAL_SIN_CARTILLA'
+      && item.etapa === 'Calificado';
+  }
+
   public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
     return !this.esConsultaAcademica() && item.modalidad === 'PRESENCIAL_CARTILLA' && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
   }
@@ -3086,6 +3167,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const currentIdx = pasos.indexOf(item.etapa);
     const pasoIdx = pasos.indexOf(pasoKey);
 
+    if (this.validacionPorBancoBloqueada(item, pasoKey)) {
+      return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
+    }
+
     if (this.pasoBloqueadoPorCartillas(item, pasoKey)) {
       return 'bg-amber-50 text-amber-700 border border-amber-300 border-dashed cursor-not-allowed';
     }
@@ -3130,6 +3215,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (pasoIdx < currentIdx) return `Completado: ${st.label}`;
     if (pasoIdx === currentIdx) return `Estado actual: ${st.label}`;
     if (pasoIdx === currentIdx + 1) {
+      if (this.validacionPorBancoBloqueada(item, st.key)) {
+        return 'Este estado se asigna automáticamente cuando el docente carga y se valida el banco de preguntas';
+      }
       if (this.pasoBloqueadoPorCartillas(item, st.key)) {
         return 'Confirma primero la impresión de las marcas OMR y de la lista de estudiantes';
       }
@@ -3154,6 +3242,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const currentIdx = pasos.indexOf(item.etapa);
     const pasoIdx = pasos.indexOf(pasoKey);
 
+    if (this.validacionPorBancoBloqueada(item, pasoKey)) {
+      this._mostrarToast('El estado Validado se asigna automáticamente cuando el docente carga y se valida el banco de preguntas.', 'warning');
+      return;
+    }
+
     if (this.pasoBloqueadoPorCartillas(item, pasoKey)) {
       this._mostrarToast('Antes de pasar a Entregado, confirma la impresión de las marcas OMR y de la lista de estudiantes.', 'warning');
       return;
@@ -3163,15 +3256,6 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         && item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
         && item.etapa === 'Validado') {
       this.abrirConfirmacionImpresionSinCartilla(item);
-      return;
-    }
-
-    if (pasoKey === 'Validado' && item.etapa === 'Programado') {
-      if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
-        this._mostrarToast('Para validar un examen sin cartilla, el docente debe cargar primero el archivo .doc desde Banco de preguntas.', 'error');
-        return;
-      }
-      this.evaluacionSeleccionadaParaValidar.set(item);
       return;
     }
 
@@ -3209,6 +3293,34 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         error: err => this._mostrarToast(err?.error?.message || 'No se pudo actualizar el estado oficial del examen.', 'error')
       });
     }
+  }
+
+  public abrirPatronCalificado(item: EvaluacionItemUI): void {
+    if (!this.puedeMostrarPatronCalificado(item)) return;
+    this.evaluacionSeleccionadaPatron.set(item);
+    this.patronCalificado.set(null);
+    this.errorPatronCalificado.set(null);
+    this.cargandoPatronCalificado.set(true);
+    this.dialogPatronCalificado.set(true);
+    this._omrService.consultarPatronCalificado(item.id).subscribe({
+      next: patron => {
+        if (this.evaluacionSeleccionadaPatron()?.id !== item.id) return;
+        this.patronCalificado.set(patron);
+        this.cargandoPatronCalificado.set(false);
+      },
+      error: err => {
+        this.cargandoPatronCalificado.set(false);
+        this.errorPatronCalificado.set(err?.error?.message || 'No se pudo consultar el patrón oficial. Verifique que la evaluación esté Calificada y que su usuario tenga alcance al campus.');
+      }
+    });
+  }
+
+  public cerrarPatronCalificado(): void {
+    this.dialogPatronCalificado.set(false);
+    this.evaluacionSeleccionadaPatron.set(null);
+    this.patronCalificado.set(null);
+    this.errorPatronCalificado.set(null);
+    this.cargandoPatronCalificado.set(false);
   }
 
   public campusKey(campus: CampusDisponible): string {
@@ -3578,7 +3690,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
                   fallos: calificacion.fallos,
                   blancos: calificacion.blancos,
                   doblesMarcas: calificacion.doblesMarcas,
-                  notaSobre30: calificacion.notaSobre30,
+                  notaSobre60: calificacion.notaSobre60,
                   notaSobre100: calificacion.notaSobre100,
                   estadoCalificacion: calificacion.estadoCalificacion,
                   detalles: calificacion.detalles || actual.detalles
@@ -3752,21 +3864,21 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public editarNotaDocente(codigoEstudiante: string, valor: string): void {
     const nota = valor === '' ? null : Number(valor);
     this.notasDocente.update(notas => notas.map(actual => actual.codigoEstudiante === codigoEstudiante
-      ? { ...actual, notaSobre30: Number.isFinite(nota) ? nota : null, notaSobre100: Number.isFinite(nota) ? Number(((nota! * 100) / 30).toFixed(2)) : null }
+      ? { ...actual, notaSobre60: Number.isFinite(nota) ? nota : null, notaSobre100: Number.isFinite(nota) ? Number(((nota! * 100) / 60).toFixed(2)) : null }
       : actual));
   }
 
   public notasDocenteConCarga(): number {
-    return this.notasDocente().filter(nota => nota.notaSobre30 !== null && nota.notaSobre30 !== undefined).length;
+    return this.notasDocente().filter(nota => nota.notaSobre60 !== null && nota.notaSobre60 !== undefined).length;
   }
 
   public notasDocenteCompletas(): boolean {
     const notas = this.notasDocente();
-    return notas.length > 0 && notas.every(nota => nota.notaSobre30 !== null
-      && nota.notaSobre30 !== undefined
-      && Number.isFinite(Number(nota.notaSobre30))
-      && Number(nota.notaSobre30) >= 0
-      && Number(nota.notaSobre30) <= 30);
+    return notas.length > 0 && notas.every(nota => nota.notaSobre60 !== null
+      && nota.notaSobre60 !== undefined
+      && Number.isFinite(Number(nota.notaSobre60))
+      && Number(nota.notaSobre60) >= 0
+      && Number(nota.notaSobre60) <= 60);
   }
 
   public guardarNotasDocente(): void {
@@ -3775,7 +3887,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.guardandoNotasDocente.set(true);
     const notas = this.notasDocente().map(nota => ({
       codigoEstudiante: nota.codigoEstudiante,
-      notaSobre30: Number(nota.notaSobre30)
+      notaSobre60: Number(nota.notaSobre60)
     }));
     this._sinCartillaService.guardarNotas(item.id, notas, 'DOCENTE').subscribe({
       next: guardadas => {
@@ -3796,14 +3908,17 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public imprimirReporteNotasDocente(): void {
     const item = this.evaluacionSeleccionadaNotasDocente();
     const notas = this.notasDocente();
-    if (!item || !notas.length) return;
+    if (!item || !this.notasDocenteCompletas()) {
+      this._mostrarToast('Complete todas las notas antes de imprimir el reporte.', 'error');
+      return;
+    }
     const ventana = window.open('', '_blank', 'width=1000,height=750');
     if (!ventana) {
       this._mostrarToast('El navegador bloqueó la ventana del reporte. Permita las ventanas emergentes.', 'error');
       return;
     }
-    const filas = notas.map((nota, indice) => `<tr><td>${indice + 1}</td><td>${this.escapeHtml(nota.codigoEstudiante)}</td><td>${this.escapeHtml(nota.estudianteNombreCompleto)}</td><td>${nota.notaSobre30 ?? '—'}</td><td>${nota.notaSobre100 ?? '—'}</td></tr>`).join('');
-    ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de notas ${this.escapeHtml(item.codigo)}</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:32px}h1{font-size:20px;margin:0 0 6px}p{color:#53627b;font-size:12px;margin:4px 0 20px}.meta{border:1px solid #d9e1ef;padding:12px;border-radius:8px;margin-bottom:18px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d9e1ef;padding:9px;text-align:left}th{background:#eef3fa;text-transform:uppercase;font-size:10px}td:nth-child(1),td:nth-child(4),td:nth-child(5){text-align:center}@media print{body{padding:0}}</style></head><body><h1>Reporte de notas — examen sin cartilla</h1><p>Sistema de Evaluaciones</p><div class="meta"><strong>${this.escapeHtml(item.codigo)} — ${this.escapeHtml(item.materia)}</strong><br>Grupo: ${this.escapeHtml(item.grupo)} · Parcial: ${this.escapeHtml(item.tipo)} · Docente: ${this.escapeHtml(item.docenteNombre || '—')}<br>Estado: ${this.escapeHtml(item.etapa)}</div><table><thead><tr><th>N°</th><th>Código</th><th>Estudiante</th><th>Nota /30</th><th>Nota /100</th></tr></thead><tbody>${filas}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
+    const filas = notas.map((nota, indice) => `<tr><td>${indice + 1}</td><td>${this.escapeHtml(nota.codigoEstudiante)}</td><td>${this.escapeHtml(nota.estudianteNombreCompleto)}</td><td>${nota.notaSobre60 ?? '—'}</td><td>${nota.notaSobre100 ?? '—'}</td></tr>`).join('');
+    ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de notas ${this.escapeHtml(item.codigo)}</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:32px}h1{font-size:20px;margin:0 0 6px}p{color:#53627b;font-size:12px;margin:4px 0 20px}.meta{border:1px solid #d9e1ef;padding:12px;border-radius:8px;margin-bottom:18px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d9e1ef;padding:9px;text-align:left}th{background:#eef3fa;text-transform:uppercase;font-size:10px}td:nth-child(1),td:nth-child(4),td:nth-child(5){text-align:center}@media print{body{padding:0}}</style></head><body><h1>Reporte de notas — examen sin cartilla</h1><p>Sistema de Evaluaciones</p><div class="meta"><strong>${this.escapeHtml(item.codigo)} — ${this.escapeHtml(item.materia)}</strong><br>Grupo: ${this.escapeHtml(item.grupo)} · Parcial: ${this.escapeHtml(item.tipo)} · Docente: ${this.escapeHtml(item.docenteNombre || '—')}<br>Estado: ${this.escapeHtml(item.etapa)}</div><table><thead><tr><th>N°</th><th>Código</th><th>Estudiante</th><th>Nota /60</th><th>Nota /100</th></tr></thead><tbody>${filas}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
     ventana.document.close();
   }
 
@@ -3861,22 +3976,16 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.evaluacionSeleccionadaParaValidar.set(null);
   }
 
+  public validacionPorBancoBloqueada(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): boolean {
+    return item.etapa === 'Programado' && pasoKey === 'Validado';
+  }
+
   public confirmarValidacionDocente(): void {
     const item = this.evaluacionSeleccionadaParaValidar();
     if (!item) return;
 
-    this._rolService.transicionarEstado(item.id, {
-      nuevoEstado: 'VALIDADO',
-      usuario: 'ADMIN_EVALUACIONES'
-    }).subscribe({
-      next: rolActualizado => {
-        const actualizado = this._mapearRolResponseA_UI(rolActualizado);
-        this.evaluaciones.update(items => items.map(actual => actual.id === item.id ? actualizado : actual));
-        this.evaluacionSeleccionadaParaValidar.set(null);
-        this._mostrarToast(`${item.codigo}: Examen validado y listo para generación.`);
-      },
-      error: err => this._mostrarToast(err?.error?.message || 'No se pudo validar el examen en el backend oficial.', 'error')
-    });
+    this._mostrarToast('El estado Validado se asigna automáticamente cuando el docente carga y se valida el banco de preguntas.', 'warning');
+    this.cerrarModalValidar();
   }
 
   public abrirModalParametrizacion(item: EvaluacionItemUI): void {
