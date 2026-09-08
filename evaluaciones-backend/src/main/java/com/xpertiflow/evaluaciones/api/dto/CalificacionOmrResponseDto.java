@@ -18,7 +18,7 @@ public class CalificacionOmrResponseDto {
     private Integer fallos;
     private Integer blancos;
     private Integer doblesMarcas;
-    private BigDecimal notaSobre30;
+    private BigDecimal notaSobre60;
     private BigDecimal notaSobre100;
     private String estadoCalificacion;
     private String respuestasDetectadasJson;

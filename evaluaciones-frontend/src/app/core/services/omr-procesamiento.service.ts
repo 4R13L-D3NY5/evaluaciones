@@ -37,7 +37,7 @@ export interface OmrLecturaResponse {
   blancos?: number;
   doblesMarcas?: number;
   notaSobre100?: number;
-  notaSobre30?: number;
+  notaSobre60?: number;
   estadoCalificacion?: string;
 }
 
@@ -60,7 +60,7 @@ export interface CalificacionOmrResponse {
   fallos: number;
   blancos: number;
   doblesMarcas: number;
-  notaSobre30: number;
+  notaSobre60: number;
   notaSobre100: number;
   estadoCalificacion: string;
   respuestasDetectadasJson: string;
@@ -78,6 +78,12 @@ export interface CalificacionOmrResponse {
 }
 
 export interface ConfiguracionOmr {
+  id?: number;
+  alcance?: 'GENERAL' | 'CAMPUS' | 'IMPRESORA';
+  campusClave?: string | null;
+  campusNombre?: string | null;
+  impresoraClave?: string | null;
+  activo?: boolean;
   umbralDensidadMarca: number;
   umbralDiferencialDoble: number;
   umbralBinarioGrilla: number;
@@ -92,22 +98,38 @@ export interface ConfiguracionOmr {
   actualizadoPor?: string;
 }
 
+export interface PatronCalificadoVariante {
+  letra: string;
+  totalPreguntas: number;
+  respuestas: Record<string, string>;
+}
+
+export interface PatronCalificadoResponse {
+  rolExamenId: string;
+  estado: 'CALIFICADO';
+  variantes: PatronCalificadoVariante[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class OmrProcesamientoService {
   private readonly _http = inject(HttpClient);
 
-  public procesar(rolExamenId: string, archivo: File): Observable<OmrJobResponse> {
-    return this._enviarArchivo(rolExamenId, archivo, 'procesar');
+  public procesar(rolExamenId: string, archivo: File, impresora = ''): Observable<OmrJobResponse> {
+    return this._enviarArchivo(rolExamenId, archivo, 'procesar', impresora);
   }
 
-  public procesarLecturaConciliacion(rolExamenId: string, archivo: File): Observable<OmrJobResponse> {
-    return this._enviarArchivo(rolExamenId, archivo, 'procesar-lectura');
+  public procesarLecturaConciliacion(rolExamenId: string, archivo: File, impresora = ''): Observable<OmrJobResponse> {
+    return this._enviarArchivo(rolExamenId, archivo, 'procesar-lectura', impresora);
   }
 
-  private _enviarArchivo(rolExamenId: string, archivo: File, operacion: string): Observable<OmrJobResponse> {
+  private _enviarArchivo(rolExamenId: string, archivo: File, operacion: string, impresora = ''): Observable<OmrJobResponse> {
     const datos = new FormData();
     datos.append('file', archivo, archivo.name);
-    return this._http.post<OmrJobResponse>(`/api/omr/${rolExamenId}/${operacion}`, datos);
+    const valorImpresora = impresora.trim();
+    const url = valorImpresora
+      ? `/api/omr/${rolExamenId}/${operacion}?impresora=${encodeURIComponent(valorImpresora)}`
+      : `/api/omr/${rolExamenId}/${operacion}`;
+    return this._http.post<OmrJobResponse>(url, datos);
   }
 
   public consultar(jobId: string): Observable<OmrJobResponse> {
@@ -116,6 +138,16 @@ export class OmrProcesamientoService {
 
   public listarCalificaciones(rolExamenId: string): Observable<CalificacionOmrResponse[]> {
     return this._http.get<CalificacionOmrResponse[]>(`/api/omr/${rolExamenId}/calificaciones`);
+  }
+
+  public consultarPatronCalificado(rolExamenId: string): Observable<PatronCalificadoResponse> {
+    return this._http.get<PatronCalificadoResponse>(`/api/omr/${encodeURIComponent(rolExamenId)}/patron-calificado`);
+  }
+
+  public imprimirPatronCalificado(rolExamenId: string): Observable<Blob> {
+    return this._http.get(`/api/omr/${encodeURIComponent(rolExamenId)}/patron-calificado/pdf`, {
+      responseType: 'blob'
+    });
   }
 
   public obtenerEscaneado(rolExamenId: string, calificacionId: number): Observable<Blob> {
@@ -130,6 +162,18 @@ export class OmrProcesamientoService {
 
   public guardarConfiguracion(configuracion: ConfiguracionOmr): Observable<ConfiguracionOmr> {
     return this._http.put<ConfiguracionOmr>('/api/omr/configuracion', configuracion);
+  }
+
+  public listarConfiguraciones(): Observable<ConfiguracionOmr[]> {
+    return this._http.get<ConfiguracionOmr[]>('/api/omr/configuraciones');
+  }
+
+  public guardarConfiguracionPorAlcance(configuracion: ConfiguracionOmr): Observable<ConfiguracionOmr> {
+    return this._http.put<ConfiguracionOmr>('/api/omr/configuraciones', configuracion);
+  }
+
+  public eliminarConfiguracion(id: number): Observable<void> {
+    return this._http.delete<void>(`/api/omr/configuraciones/${id}`);
   }
 
   public ajustarCalificacion(rolExamenId: string, request: AjustarCalificacionOmrRequest): Observable<CalificacionOmrResponse> {

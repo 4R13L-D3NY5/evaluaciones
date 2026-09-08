@@ -60,10 +60,46 @@ class CartillaOmrPdfServiceTest {
             String texto = new PDFTextStripper().getText(documento);
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("LISTA DE ESTUDIANTES"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("FIRMA DEL ESTUDIANTE"));
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("OBSERVACIONES"));
             org.junit.jupiter.api.Assertions.assertTrue(
                     java.util.stream.StreamSupport.stream(documento.getPage(0).getResources().getXObjectNames().spliterator(), false)
                             .anyMatch(nombre -> documento.getPage(0).getResources().isImageXObject(nombre)),
                     "La lista debe incluir el logo institucional");
+        }
+    }
+
+    @Test
+    void generaPatronOficialImprimiblePorVariante() throws IOException {
+        RolExamen rol = RolExamen.builder()
+                .carreraNombre("LICENCIATURA EN INGENIERIA DE SISTEMAS")
+                .materiaCodigo("SIS-114")
+                .materiaNombre("ALGEBRA")
+                .grupo("TA-01")
+                .tipoParcial(TipoParcial.PRIMER_PARCIAL)
+                .fecha(LocalDate.of(2026, 9, 3))
+                .fechaDisplay("03/09/2026")
+                .build();
+
+        var variante = new com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto.VariantePatronDto();
+        variante.setLetra("A");
+        variante.setTotalPreguntas(60);
+        var respuestas = new java.util.LinkedHashMap<String, String>();
+        for (int pregunta = 1; pregunta <= 60; pregunta++) {
+            respuestas.put(String.valueOf(pregunta), pregunta % 2 == 0 ? "B" : "A");
+        }
+        variante.setRespuestas(respuestas);
+        var patron = new com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto();
+        patron.setRolExamenId("ROL-1");
+        patron.setEstado("CALIFICADO");
+        patron.setVariantes(List.of(variante));
+
+        byte[] pdf = new PatronOmrPdfService().generar(rol, patron);
+        try (PDDocument documento = PDDocument.load(pdf)) {
+            assertEquals(1, documento.getNumberOfPages());
+            String texto = new PDFTextStripper().getText(documento);
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("PATRÓN OFICIAL"));
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("Variante A"));
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("60 preguntas"));
         }
     }
 }

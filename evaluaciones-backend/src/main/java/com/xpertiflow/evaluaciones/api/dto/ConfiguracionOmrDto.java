@@ -11,6 +11,18 @@ import java.time.LocalDateTime;
 
 @Data
 public class ConfiguracionOmrDto {
+    private Short id;
+
+    private String alcance;
+
+    private String campusClave;
+
+    private String campusNombre;
+
+    private String impresoraClave;
+
+    private Boolean activo;
+
     @DecimalMin("40") @DecimalMax("95")
     private BigDecimal umbralDensidadMarca;
 

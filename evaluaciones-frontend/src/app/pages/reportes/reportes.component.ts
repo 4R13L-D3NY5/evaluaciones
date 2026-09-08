@@ -294,6 +294,12 @@ interface FilaRemark {
               </div>
             </div>
 
+            <div class="max-w-sm space-y-1">
+              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Impresora utilizada (opcional)</label>
+              <input type="text" [(ngModel)]="impresoraConciliacion" placeholder="Ej. HP-Laser-01" class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none" />
+              <p class="text-[10px] text-muted-foreground">Permite aplicar el ajuste OMR específico de esa impresora y campus.</p>
+            </div>
+
             <div class="rounded-xl border border-purple-200 bg-purple-50/60 p-3 text-xs text-purple-900 flex flex-wrap items-center gap-x-4 gap-y-2">
               <span><i class="pi pi-info-circle mr-1"></i>Flujo: selecciona la evaluación, procesa el PDF escaneado y luego carga el Excel de Remark.</span>
               <span [class]="omrProcesado() ? 'text-emerald-700 font-black' : 'text-muted-foreground'"><i class="pi" [class.pi-check-circle]="omrProcesado()" [class.pi-clock]="!omrProcesado()"></i> OMR: {{ omrProcesado() ? 'procesado' : 'pendiente' }}</span>
@@ -830,6 +836,7 @@ export class ReporteEvaluacionesComponent implements OnInit {
   private filasRemark: FilaRemark[] = [];
   private lecturasOmr: OmrLecturaResponse[] = [];
   public archivoOmr: File | null = null;
+  public impresoraConciliacion = '';
 
   public rolesConciliacionOrdenados = computed(() => [...this.rolesConciliacion()].sort((a, b) => {
     const fecha = (a.fecha || '').localeCompare(b.fecha || '');
@@ -1027,6 +1034,7 @@ export class ReporteEvaluacionesComponent implements OnInit {
 
   public seleccionarRolConciliacion(rolId: string): void {
     this.rolConciliacionId = rolId;
+    this.impresoraConciliacion = '';
     this.archivoOmr = null;
     this.archivoOmrNombre.set(null);
     this.omrProcesado.set(false);
@@ -1061,7 +1069,7 @@ export class ReporteEvaluacionesComponent implements OnInit {
     this.omrProcesado.set(false);
     this.resultadosConciliacion.set([]);
     this.errorConciliacion.set(null);
-    this._omr.procesarLecturaConciliacion(this.rolConciliacionId, this.archivoOmr).subscribe({
+    this._omr.procesarLecturaConciliacion(this.rolConciliacionId, this.archivoOmr, this.impresoraConciliacion).subscribe({
       next: aceptado => this._esperarResultadoOmr(aceptado.jobId),
       error: error => {
         this.cargandoOmr.set(false);

@@ -17,7 +17,7 @@ export interface NotaDocente {
   id?: number;
   codigoEstudiante: string;
   estudianteNombreCompleto: string;
-  notaSobre30: number | null;
+  notaSobre60: number | null;
   notaSobre100: number | null;
   guardadoEn?: string;
   guardadoPor?: string;
@@ -51,7 +51,7 @@ export class ExamenSinCartillaService {
     return this._http.get<NotaDocente[]>(`${this._baseUrl}/${rolExamenId}/notas`);
   }
 
-  public guardarNotas(rolExamenId: string, notas: { codigoEstudiante: string; notaSobre30: number }[], usuario = 'DOCENTE'): Observable<NotaDocente[]> {
+  public guardarNotas(rolExamenId: string, notas: { codigoEstudiante: string; notaSobre60: number }[], usuario = 'DOCENTE'): Observable<NotaDocente[]> {
     return this._http.post<NotaDocente[]>(`${this._baseUrl}/${rolExamenId}/notas`, { notas, usuario });
   }
 }

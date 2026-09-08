@@ -7,8 +7,10 @@ import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
 import com.xpertiflow.evaluaciones.api.dto.DetalleRespuestaOmrDto;
+import com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.ConfiguracionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
 import com.xpertiflow.evaluaciones.domain.entity.LoteCartillasOmr;
@@ -16,6 +18,7 @@ import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.CalificacionOmrRepository;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ConfiguracionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.LoteCartillasOmrRepository;
@@ -42,6 +45,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -50,23 +54,33 @@ public class OmrProcesamientoService {
     private final ObjectMapper objectMapper;
     private final AppProperties appProperties;
     private final CalificacionOmrRepository calificacionRepository;
+    private final AuditoriaEvaluacionRepository auditoriaRepository;
     private final ConfiguracionOmrRepository configuracionRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final ExamenVarianteRepository varianteRepository;
     private final RolExamenRepository rolExamenRepository;
     private final LoteCartillasOmrRepository loteCartillasRepository;
     private final BancoCifradoService cifradoService;
+    private final PatronOmrPdfService patronOmrPdfService;
     private final Map<String, JsonNode> resultados = new ConcurrentHashMap<>();
 
     public JsonNode solicitar(String rolExamenId, MultipartFile archivo) {
-        return solicitar(rolExamenId, archivo, "CALIFICACION");
+        return solicitar(rolExamenId, archivo, "CALIFICACION", null);
+    }
+
+    public JsonNode solicitar(String rolExamenId, MultipartFile archivo, String impresora) {
+        return solicitar(rolExamenId, archivo, "CALIFICACION", impresora);
     }
 
     public JsonNode solicitarLecturaConciliacion(String rolExamenId, MultipartFile archivo) {
-        return solicitar(rolExamenId, archivo, "LECTURA_CONCILIACION");
+        return solicitar(rolExamenId, archivo, "LECTURA_CONCILIACION", null);
     }
 
-    private JsonNode solicitar(String rolExamenId, MultipartFile archivo, String modo) {
+    public JsonNode solicitarLecturaConciliacion(String rolExamenId, MultipartFile archivo, String impresora) {
+        return solicitar(rolExamenId, archivo, "LECTURA_CONCILIACION", impresora);
+    }
+
+    private JsonNode solicitar(String rolExamenId, MultipartFile archivo, String modo, String impresora) {
         if (archivo == null || archivo.isEmpty()) {
             throw new IllegalArgumentException("Debe seleccionar un PDF o imagen escaneada.");
         }
@@ -78,12 +92,16 @@ public class OmrProcesamientoService {
         try {
             Files.createDirectories(destino.getParent());
             archivo.transferTo(destino);
-            JsonNode solicitud = objectMapper.valueToTree(Map.of(
-                    "jobId", jobId,
-                    "rolExamenId", rolExamenId,
-                    "archivoPath", destino.toString(),
-                    "modo", modo
-            ));
+            RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                    .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("jobId", jobId);
+            payload.put("rolExamenId", rolExamenId);
+            payload.put("archivoPath", destino.toString());
+            payload.put("modo", modo);
+            payload.put("campus", rol.getCampus() == null ? "" : rol.getCampus().trim());
+            payload.put("impresora", impresora == null ? "" : impresora.trim());
+            JsonNode solicitud = objectMapper.valueToTree(payload);
             rabbitTemplate.convertAndSend("evaluaciones.omr.procesar", solicitud.toString());
             JsonNode aceptado = objectMapper.createObjectNode().put("jobId", jobId).put("estado", "EN_COLA");
             resultados.put(jobId, aceptado);
@@ -139,17 +157,131 @@ public class OmrProcesamientoService {
                 .toList();
     }
 
+    /**
+     * Devuelve el patrón exclusivamente después de cerrar la calificación.
+     * Las claves se leen desde el contenido protegido de cada variante para
+     * evitar depender de la columna histórica en texto plano.
+     */
+    @Transactional(readOnly = true)
+    public PatronCalificadoResponseDto consultarPatronCalificado(String rolExamenId) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        if (rol.getEstadoFlujo() == null || !"CALIFICADO".equals(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("El patrón solo puede consultarse después de pasar la evaluación a Calificado.");
+        }
+
+        List<PatronCalificadoResponseDto.VariantePatronDto> variantes = varianteRepository.findByRolExamenId(rolExamenId)
+                .stream()
+                .sorted(Comparator.comparing(ExamenVariante::getLetraVariante))
+                .map(variante -> {
+                    Map<String, String> respuestas = leerPatron(variante);
+                    if (respuestas.isEmpty()) {
+                        throw new IllegalStateException("La variante " + variante.getLetraVariante() + " no tiene un patrón protegido disponible.");
+                    }
+                    PatronCalificadoResponseDto.VariantePatronDto dto = new PatronCalificadoResponseDto.VariantePatronDto();
+                    dto.setLetra(variante.getLetraVariante());
+                    dto.setTotalPreguntas(variante.getTotalPreguntas() == null ? respuestas.size() : variante.getTotalPreguntas());
+                    dto.setRespuestas(respuestas);
+                    return dto;
+                })
+                .toList();
+
+        if (variantes.isEmpty()) {
+            throw new IllegalStateException("No existe un patrón persistido para esta evaluación.");
+        }
+
+        PatronCalificadoResponseDto respuesta = new PatronCalificadoResponseDto();
+        respuesta.setRolExamenId(rolExamenId);
+        respuesta.setEstado(rol.getEstadoFlujo().name());
+        respuesta.setVariantes(variantes);
+        return respuesta;
+    }
+
+    /**
+     * Genera el patrón en memoria para impresión, reutilizando la misma
+     * consulta protegida que alimenta la vista de solo lectura.
+     */
+    @Transactional
+    public byte[] generarPatronCalificadoPdf(String rolExamenId, String usuario) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        try {
+            byte[] pdf = patronOmrPdfService.generar(rol, consultarPatronCalificado(rolExamenId));
+            auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen("CALIFICADO")
+                    .etapaDestino("CALIFICADO")
+                    .accion("IMPRESION_PATRON_CALIFICADO")
+                    .usuario(usuarioValido(usuario))
+                    .detallesJson("{\"variantes\":\"oficiales\"}")
+                    .build());
+            return pdf;
+        } catch (IOException exception) {
+            throw new IllegalStateException("No se pudo generar el PDF del patrón oficial.", exception);
+        }
+    }
+
     @Transactional(readOnly = true)
     public ConfiguracionOmrDto obtenerConfiguracion() {
-        return mapearConfiguracion(configuracionRepository.findById((short) 1)
-                .orElseGet(this::configuracionDefecto));
+        return mapearConfiguracion(configuracionGeneral());
     }
 
     @Transactional
     public ConfiguracionOmrDto guardarConfiguracion(ConfiguracionOmrDto request) {
-        ConfiguracionOmr configuracion = configuracionRepository.findById((short) 1)
-                .orElseGet(this::configuracionDefecto);
-        configuracion.setId((short) 1);
+        request.setAlcance("GENERAL");
+        request.setCampusClave(null);
+        request.setCampusNombre(null);
+        request.setImpresoraClave(null);
+        return guardarConfiguracionPorAlcance(request);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConfiguracionOmrDto> listarConfiguraciones() {
+        return configuracionRepository.findAllByOrderByAlcanceAscCampusNombreAscImpresoraClaveAsc()
+                .stream()
+                .filter(ConfiguracionOmr::isActivo)
+                .map(this::mapearConfiguracion)
+                .toList();
+    }
+
+    @Transactional
+    public ConfiguracionOmrDto guardarConfiguracionPorAlcance(ConfiguracionOmrDto request) {
+        String alcance = normalizarAlcance(request.getAlcance());
+        String campusClave = clave(request.getCampusClave());
+        String campusNombre = texto(request.getCampusNombre());
+        String impresoraClave = clave(request.getImpresoraClave());
+        campusClave = campusClave.isBlank() ? null : campusClave;
+        campusNombre = campusNombre.isBlank() ? null : campusNombre;
+        impresoraClave = impresoraClave.isBlank() ? null : impresoraClave;
+        validarAlcance(alcance, campusClave, impresoraClave);
+        final String campusClaveFiltro = campusClave;
+        final String impresoraClaveFiltro = impresoraClave;
+
+        ConfiguracionOmr configuracion = request.getId() == null ? null : configuracionRepository.findById(request.getId())
+                .filter(ConfiguracionOmr::isActivo)
+                .filter(item -> alcance.equals(item.getAlcance())
+                        && igual(item.getCampusClave(), campusClaveFiltro)
+                        && igual(item.getImpresoraClave(), impresoraClaveFiltro))
+                .orElse(null);
+        if (configuracion == null) {
+            configuracion = configuracionRepository.findAll().stream()
+                .filter(item -> item.isActivo()
+                        && alcance.equals(item.getAlcance())
+                        && igual(item.getCampusClave(), campusClaveFiltro)
+                        && igual(item.getImpresoraClave(), impresoraClaveFiltro))
+                .findFirst()
+                .orElseGet(() -> {
+                    ConfiguracionOmr nueva = configuracionDefecto();
+                    nueva.setId(siguienteId());
+                    return nueva;
+                });
+        }
+
+        configuracion.setAlcance(alcance);
+        configuracion.setCampusClave(campusClave);
+        configuracion.setCampusNombre(campusNombre);
+        configuracion.setImpresoraClave(impresoraClave);
+        configuracion.setActivo("GENERAL".equals(alcance) || request.getActivo() == null || request.getActivo());
         if (request.getUmbralDensidadMarca() != null) configuracion.setUmbralDensidadMarca(request.getUmbralDensidadMarca());
         if (request.getUmbralDiferencialDoble() != null) configuracion.setUmbralDiferencialDoble(request.getUmbralDiferencialDoble());
         if (request.getUmbralBinarioGrilla() != null) configuracion.setUmbralBinarioGrilla(request.getUmbralBinarioGrilla());
@@ -165,9 +297,69 @@ public class OmrProcesamientoService {
         return mapearConfiguracion(configuracionRepository.save(configuracion));
     }
 
+    @Transactional
+    public void eliminarConfiguracion(Short id) {
+        ConfiguracionOmr configuracion = configuracionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Configuración OMR no encontrada."));
+        if ("GENERAL".equals(configuracion.getAlcance())) {
+            throw new IllegalArgumentException("La configuración general no se puede eliminar; restaure sus valores predeterminados.");
+        }
+        configuracion.setActivo(false);
+        configuracion.setActualizadoEn(LocalDateTime.now());
+        configuracion.setActualizadoPor("ADMIN_EVALUACIONES");
+        configuracionRepository.save(configuracion);
+    }
+
+    private ConfiguracionOmr configuracionGeneral() {
+        return configuracionRepository.findAll().stream()
+                .filter(item -> item.isActivo() && "GENERAL".equals(item.getAlcance()))
+                .findFirst()
+                .orElseGet(() -> configuracionRepository.findById((short) 1).orElseGet(this::configuracionDefecto));
+    }
+
+    private Short siguienteId() {
+        return configuracionRepository.findAll().stream()
+                .map(ConfiguracionOmr::getId)
+                .filter(java.util.Objects::nonNull)
+                .max(Short::compareTo)
+                .map(maximo -> (short) (maximo + 1))
+                .orElse((short) 1);
+    }
+
+    private void validarAlcance(String alcance, String campusClave, String impresoraClave) {
+        if ("GENERAL".equals(alcance) && (!texto(campusClave).isBlank() || !texto(impresoraClave).isBlank())) {
+            throw new IllegalArgumentException("La configuración general no puede tener campus ni impresora.");
+        }
+        if ("CAMPUS".equals(alcance) && texto(campusClave).isBlank()) {
+            throw new IllegalArgumentException("Debe indicar el campus para una configuración por campus.");
+        }
+        if ("IMPRESORA".equals(alcance) && texto(impresoraClave).isBlank()) {
+            throw new IllegalArgumentException("Debe indicar la impresora para una configuración por impresora.");
+        }
+    }
+
+    private String normalizarAlcance(String alcance) {
+        String valor = texto(alcance).toUpperCase(Locale.ROOT);
+        return List.of("GENERAL", "CAMPUS", "IMPRESORA").contains(valor) ? valor : "GENERAL";
+    }
+
+    private String clave(String valor) {
+        return texto(valor).replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+    }
+
+    private String texto(String valor) {
+        return valor == null ? "" : valor.trim();
+    }
+
+    private boolean igual(String primero, String segundo) {
+        return clave(primero).equals(clave(segundo));
+    }
+
     private ConfiguracionOmr configuracionDefecto() {
         ConfiguracionOmr configuracion = new ConfiguracionOmr();
         configuracion.setId((short) 1);
+        configuracion.setAlcance("GENERAL");
+        configuracion.setActivo(true);
         configuracion.setUmbralDensidadMarca(new BigDecimal("70.00"));
         configuracion.setUmbralDiferencialDoble(new BigDecimal("18.00"));
         configuracion.setUmbralBinarioGrilla((short) 185);
@@ -184,6 +376,12 @@ public class OmrProcesamientoService {
 
     private ConfiguracionOmrDto mapearConfiguracion(ConfiguracionOmr configuracion) {
         ConfiguracionOmrDto dto = new ConfiguracionOmrDto();
+        dto.setId(configuracion.getId());
+        dto.setAlcance(configuracion.getAlcance());
+        dto.setCampusClave(configuracion.getCampusClave());
+        dto.setCampusNombre(configuracion.getCampusNombre());
+        dto.setImpresoraClave(configuracion.getImpresoraClave());
+        dto.setActivo(configuracion.isActivo());
         dto.setUmbralDensidadMarca(configuracion.getUmbralDensidadMarca());
         dto.setUmbralDiferencialDoble(configuracion.getUmbralDiferencialDoble());
         dto.setUmbralBinarioGrilla(configuracion.getUmbralBinarioGrilla());
@@ -238,9 +436,9 @@ public class OmrProcesamientoService {
         BigDecimal nota100 = total == 0
                 ? BigDecimal.ZERO
                 : BigDecimal.valueOf(aciertos * 100.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
-        BigDecimal nota30 = total == 0
+        BigDecimal nota60 = total == 0
                 ? BigDecimal.ZERO
-                : BigDecimal.valueOf(aciertos * 30.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
+                : BigDecimal.valueOf(aciertos * 60.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
 
         CalificacionOmr calificacion = calificacionRepository
                 .findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigo)
@@ -254,7 +452,7 @@ public class OmrProcesamientoService {
         calificacion.setFallos(fallos);
         calificacion.setBlancos(blancos);
         calificacion.setDoblesMarcas(dobles);
-        calificacion.setNotaSobre30(nota30);
+        calificacion.setNotaSobre60(nota60);
         calificacion.setNotaSobre100(nota100);
         calificacion.setEstadoCalificacion(nota100.doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
         try {
@@ -326,7 +524,7 @@ public class OmrProcesamientoService {
         dto.setFallos(calificacion.getFallos());
         dto.setBlancos(calificacion.getBlancos());
         dto.setDoblesMarcas(calificacion.getDoblesMarcas());
-        dto.setNotaSobre30(calificacion.getNotaSobre30());
+        dto.setNotaSobre60(calificacion.getNotaSobre60());
         dto.setNotaSobre100(calificacion.getNotaSobre100());
         dto.setEstadoCalificacion(calificacion.getEstadoCalificacion());
         dto.setRespuestasDetectadasJson(calificacion.getRespuestasDetectadasJson());

@@ -374,9 +374,12 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                             <div [class]="'rounded-lg border px-2.5 py-1.5 ' + (info?.cumple ? 'border-emerald-200 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/50')">
                               <div class="flex items-center justify-between gap-2 min-w-0">
                                 <span class="text-[10px] font-black text-primary truncate">{{ info?.etiqueta }}</span>
-                                <span class="text-[9px] font-bold text-muted-foreground whitespace-nowrap">{{ info?.modalidad }}</span>
+                                <span class="inline-flex items-center gap-1 text-[9px] font-black text-foreground whitespace-nowrap" [title]="'Fecha del examen: ' + (info?.fecha || 'sin fecha')">
+                                  <i class="pi pi-calendar text-primary text-[9px]"></i>{{ info?.fecha || '—' }}
+                                </span>
                               </div>
                               <div class="mt-1 flex items-center justify-between gap-2 min-w-0">
+                                <span class="text-[9px] font-bold text-muted-foreground whitespace-nowrap">{{ info?.modalidad }}</span>
                                 <span class="text-[9px] font-mono text-foreground whitespace-nowrap">
                                   {{ info?.facil }}F · {{ info?.medio }}M · {{ info?.dificil }}D · {{ info?.total }} total
                                 </span>
@@ -677,13 +680,14 @@ export class PlanEstudiosComponent implements OnInit {
         // El listado de roles ya informa si existe banco. Solo se consulta el
         // detalle para los roles que realmente tienen uno, evitando respuestas
         // 400 esperables para evaluaciones aún sin banco cargado.
-        const rolesConBanco = roles.filter(rol => rol.bancoPreguntasCargado === true);
+        const rolesDeLaGestion = this.filtrarRolesDeLaGestion(roles, grupos);
+        const rolesConBanco = rolesDeLaGestion.filter(rol => rol.bancoPreguntasCargado === true);
         const consultasBanco = rolesConBanco.map(rol => this.bancoService.obtenerPorRol(rol.id).pipe(
           catchError(() => of(null))
         ));
 
         if (consultasBanco.length === 0) {
-          this.planSemestres.set(this.construirPlan(cursos, grupos, roles, new Map()));
+          this.planSemestres.set(this.construirPlan(cursos, grupos, rolesDeLaGestion, new Map()));
           this.cargandoPlan.set(false);
           return;
         }
@@ -694,11 +698,11 @@ export class PlanEstudiosComponent implements OnInit {
             bancos.forEach((banco, indice) => {
               if (banco) bancosPorRol.set(rolesConBanco[indice].id, banco);
             });
-            this.planSemestres.set(this.construirPlan(cursos, grupos, roles, bancosPorRol));
+            this.planSemestres.set(this.construirPlan(cursos, grupos, rolesDeLaGestion, bancosPorRol));
             this.cargandoPlan.set(false);
           },
           error: () => {
-            this.planSemestres.set(this.construirPlan(cursos, grupos, roles, new Map()));
+            this.planSemestres.set(this.construirPlan(cursos, grupos, rolesDeLaGestion, new Map()));
             this.cargandoPlan.set(false);
             this.errorCarga.set('Se cargó el plan, pero no fue posible consultar el detalle de los bancos de preguntas.');
           }
@@ -785,15 +789,20 @@ export class PlanEstudiosComponent implements OnInit {
     const gruposMostrar = gruposLabel || [...new Set(roles.map(rol => rol.grupo).filter(Boolean))].join(' · ');
     const examenes = {} as Record<string, PlanExamenResumen>;
     for (const parcial of this.parcialesConfig) {
-      const rol = roles.find(item => this.normalizarParcial(item.tipoParcial) === parcial.clave);
+      const rolesDelParcial = roles.filter(item => this.normalizarParcial(item.tipoParcial) === parcial.clave);
+      const rol = rolesDelParcial[0];
       const banco = rol ? bancosPorRol.get(rol.id) : undefined;
       const facil = banco?.facilesCount || 0;
       const medio = banco?.mediasCount || 0;
       const dificil = banco?.dificilesCount || 0;
       const total = banco?.totalReactivos || 0;
+      const fechas = [...new Set(rolesDelParcial
+        .map(item => this.formatearFechaExamen(item.fechaDisplay, item.fecha))
+        .filter(Boolean))];
       examenes[parcial.clave] = {
         clave: parcial.clave,
         etiqueta: parcial.etiqueta,
+        fecha: fechas.join(' · '),
         rolId: rol?.id,
         modalidadCodigo: rol?.modalidad,
         facil,
@@ -826,9 +835,9 @@ export class PlanEstudiosComponent implements OnInit {
       preguntas2P: this.aResumenDificultad(examenes['2P']),
       preguntasFinal: this.aResumenDificultad(examenes['FINAL']),
       examenes,
-      fecha1P: examenes['1P'].estado === 'Sin examen' ? '—' : (roles.find(rol => this.normalizarParcial(rol.tipoParcial) === '1P')?.fechaDisplay || '—'),
-      fecha2P: examenes['2P'].estado === 'Sin examen' ? '—' : (roles.find(rol => this.normalizarParcial(rol.tipoParcial) === '2P')?.fechaDisplay || '—'),
-      fechaFinal: examenes['FINAL'].estado === 'Sin examen' ? '—' : (roles.find(rol => this.normalizarParcial(rol.tipoParcial) === 'FINAL')?.fechaDisplay || '—'),
+      fecha1P: examenes['1P'].fecha || '—',
+      fecha2P: examenes['2P'].fecha || '—',
+      fechaFinal: examenes['FINAL'].fecha || '—',
       estadoExamen1P: this.mapEstadoLegacy(examenes['1P'].estado),
       estadoExamen2P: this.mapEstadoLegacy(examenes['2P'].estado),
       estadoExamenFinal: this.mapEstadoLegacy(examenes['FINAL'].estado)
@@ -852,6 +861,19 @@ export class PlanEstudiosComponent implements OnInit {
     if (tipo === 'Final' || tipo === 'Examen Final') return 'FINAL';
     if (tipo === '2da Instancia') return '2DA_INSTANCIA';
     return null;
+  }
+
+  private formatearFechaExamen(fechaDisplay?: string | null, fecha?: string | null): string {
+    const display = fechaDisplay?.trim();
+    if (display) return display;
+
+    const valor = fecha?.trim() || '';
+    const coincidencia = valor.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return coincidencia ? `${coincidencia[3]}/${coincidencia[2]}/${coincidencia[1]}` : valor;
+  }
+
+  private normalizarTexto(valor?: string | null): string {
+    return (valor || '').trim().toLowerCase();
   }
 
   private mapEstadoLegacy(estado: string): 'Calificado' | 'Devuelto' | 'Pendiente' | 'Generado' {
@@ -1002,6 +1024,29 @@ export class PlanEstudiosComponent implements OnInit {
         this.cancelarCambio();
         this._mostrarToast(mensaje);
       }
+    });
+  }
+
+  /**
+  * Los roles locales no tienen una columna de gestión; su vínculo oficial es
+  * el grupo SEA. Como los grupos se consultan con la gestión seleccionada,
+   * esta intersección evita reutilizar fechas de otra gestión en la malla.
+  */
+  private filtrarRolesDeLaGestion(roles: RolExamenResponse[], grupos: GroupItem[]): RolExamenResponse[] {
+    // Sin grupos vigentes no existe una asociación confiable con la gestión
+    // seleccionada; se conserva la asignatura, pero no se muestran roles
+    // potencialmente pertenecientes a otra gestión.
+    if (grupos.length === 0) return [];
+
+    const gruposPorId = new Set(grupos.map(grupo => grupo.groupId).filter(Boolean));
+    const gruposPorCursoYCodigo = new Set(
+      grupos.map(grupo => `${grupo.syllabusCourseId}::${this.normalizarTexto(grupo.code)}`)
+    );
+
+    return roles.filter(rol => {
+      if (rol.seaGroupId && gruposPorId.has(rol.seaGroupId)) return true;
+      const clave = `${rol.seaSyllabusCourseId || ''}::${this.normalizarTexto(rol.grupo)}`;
+      return !rol.seaGroupId && gruposPorCursoYCodigo.has(clave);
     });
   }
 
