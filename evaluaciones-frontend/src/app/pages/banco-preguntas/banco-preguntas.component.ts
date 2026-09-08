@@ -8,6 +8,7 @@ import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unite
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
+import { AuthService } from '../../core/services/auth.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { PrevisualizacionTypstRequest } from '../../core/models/generacion-typst.model';
 import { DocumentoSinCartilla, ExamenSinCartillaService } from '../../core/services/examen-sin-cartilla.service';
@@ -316,7 +317,7 @@ export interface DiaCalendario {
             } @else {
               <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                 <i class="pi pi-exclamation-triangle"></i>
-                <span>No existe un rol de examen oficial para esta materia, grupo y parcial. Regístralo antes de cargar el banco.</span>
+                <span>No existe un rol de examen oficial para esta materia, grupo y parcial. Ponte en contacto con tu director de carrera.</span>
               </div>
             }
           </div>
@@ -2387,6 +2388,7 @@ export class BancoPreguntasComponent implements OnInit {
   private readonly _rolService = inject(RolExamenService);
   private readonly _bancoService = inject(BancoPreguntasService);
   private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
+  private readonly _auth = inject(AuthService);
   private readonly _generacionTypst = inject(GeneracionTypstService);
   private readonly _sinCartillaService = inject(ExamenSinCartillaService);
 
@@ -2491,12 +2493,23 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public ngOnInit(): void {
-    this._configuracionService.cargar().subscribe({
+    // La ruta ya está protegida, pero la sesión puede tardar unos milisegundos
+    // en restaurarse después de un nuevo inicio. El catálogo se consulta solo
+    // cuando el contexto autenticado está disponible.
+    this._auth.restaurarSesion().subscribe({
+      next: usuario => {
+        if (!usuario) return;
+        this._configuracionService.cargar().subscribe({
+          error: () => {
+            // Se conservan los valores oficiales predeterminados del servicio.
+          }
+        });
+        this._cargarSedes();
+      },
       error: () => {
-        // Se conservan los valores oficiales predeterminados del servicio.
+        this._cargarSedes();
       }
     });
-    this._cargarSedes();
   }
 
   private _cargarSedes(): void {
@@ -2505,6 +2518,13 @@ export class BancoPreguntasComponent implements OnInit {
       next: data => {
         this.sedes.set(data);
         this.cargandoSedes.set(false);
+        this.carreras.set([]);
+        this.asignaturas.set([]);
+        this.grupos.set([]);
+        this.sedeSeleccionada.set(null);
+        this.carreraSeleccionada.set(null);
+        this.asignaturaSeleccionada.set(null);
+        this.grupoSeleccionado.set('');
         const sedeInicial = this._gateway.resolverSedeInicial(data);
         if (sedeInicial) {
           this.seleccionarSede(sedeInicial);

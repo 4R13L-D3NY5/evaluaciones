@@ -495,7 +495,7 @@ interface CampusDisponible extends Campus {
                           <button
                             (click)="abrirGestionCartillas(item)"
                             [disabled]="!puedeGestionarCartillas(item)"
-                          aria-label="Gestionar marcas OMR y lista de estudiantes"
+                          [attr.aria-label]="item.modalidad === 'PRESENCIAL_SIN_CARTILLA' ? 'Gestionar lista de firmas' : 'Gestionar marcas OMR y lista de estudiantes'"
                           [class]="marcaImpresa(item) ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-teal-700 bg-teal-50 border-teal-200'"
                           class="relative h-8 w-8 p-0 rounded-lg hover:bg-teal-100 border flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35">
                           <i class="pi pi-id-card text-xs"></i>
@@ -508,7 +508,7 @@ interface CampusDisponible extends Campus {
                         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/cartillas:flex flex-col items-center z-50 pointer-events-none">
                           <div class="bg-slate-900 text-white text-[10px] font-bold py-2 px-2.5 rounded-lg shadow-xl whitespace-nowrap">
                             <div class="font-extrabold text-white mb-1">Estado de impresión</div>
-                            <div class="flex items-center justify-between gap-3"><span class="text-slate-300">Marcas OMR</span><span [class.text-emerald-300]="textoEstadoMarcas(item) === 'Impresa'" [class.text-amber-300]="textoEstadoMarcas(item) !== 'Impresa'">{{ textoEstadoMarcas(item) }}</span></div>
+                            @if (item.modalidad === 'PRESENCIAL_CARTILLA') { <div class="flex items-center justify-between gap-3"><span class="text-slate-300">Marcas OMR</span><span [class.text-emerald-300]="textoEstadoMarcas(item) === 'Impresa'" [class.text-amber-300]="textoEstadoMarcas(item) !== 'Impresa'">{{ textoEstadoMarcas(item) }}</span></div> } @else { <div class="flex items-center justify-between gap-3"><span class="text-slate-300">Marcas OMR</span><span class="text-slate-400">No aplica</span></div> }
                             <div class="flex items-center justify-between gap-3"><span class="text-slate-300">Lista de estudiantes</span><span [class.text-emerald-300]="textoEstadoLista(item) === 'Impresa'" [class.text-amber-300]="textoEstadoLista(item) !== 'Impresa'">{{ textoEstadoLista(item) }}</span></div>
                           </div>
                           <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
@@ -1740,8 +1740,8 @@ interface CampusDisponible extends Campus {
               <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center"><i class="pi pi-id-card text-lg"></i></div>
                 <div>
-                  <h3 class="text-sm font-black text-foreground">Marcas OMR y lista de estudiantes</h3>
-                  <p class="text-xs text-muted-foreground">{{ evaluacionCartillas.codigo }} · {{ evaluacionCartillas.grupo }} · dos documentos independientes para imprimir.</p>
+                  <h3 class="text-sm font-black text-foreground">{{ evaluacionCartillas.modalidad === 'PRESENCIAL_SIN_CARTILLA' ? 'Lista de firmas' : 'Marcas OMR y lista de estudiantes' }}</h3>
+                  <p class="text-xs text-muted-foreground">{{ evaluacionCartillas.codigo }} · {{ evaluacionCartillas.grupo }} · {{ evaluacionCartillas.modalidad === 'PRESENCIAL_SIN_CARTILLA' ? 'el examen sin cartilla no requiere impresión de marcas OMR.' : 'documentos independientes para imprimir.' }}</p>
                 </div>
               </div>
               <button (click)="cerrarGestionCartillas()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
@@ -1755,12 +1755,16 @@ interface CampusDisponible extends Campus {
                     <i class="pi pi-info-circle text-indigo-600 text-base mt-0.5"></i>
                     <span>La lista se consulta directamente del SEA. Puedes volver a generar cualquiera de los dos PDF para obtener la información actualizada. Cada documento tiene su propia confirmación de impresión.</span>
                   </div>
-                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Estudiantes</span><strong class="text-lg text-foreground">{{ preparacion.totalCartillas }}</strong></div>
-                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Marcas OMR</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresion === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresion === 'PENDIENTE'">{{ preparacion.estadoImpresion }}</strong></div>
-                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Lista</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresionLista === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresionLista === 'PENDIENTE'">{{ preparacion.estadoImpresionLista }}</strong></div>
-                    <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">PDF separados</strong></div>
-                  </div>
+                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                     <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Estudiantes</span><strong class="text-lg text-foreground">{{ preparacion.totalCartillas }}</strong></div>
+                     @if (evaluacionCartillas.modalidad === 'PRESENCIAL_CARTILLA') {
+                       <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Marcas OMR</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresion === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresion === 'PENDIENTE'">{{ preparacion.estadoImpresion }}</strong></div>
+                     } @else {
+                       <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Marcas OMR</span><strong class="text-sm text-slate-500">No aplica</strong></div>
+                     }
+                     <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Lista</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresionLista === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresionLista === 'PENDIENTE'">{{ preparacion.estadoImpresionLista }}</strong></div>
+                     <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">PDF de firmas</strong></div>
+                   </div>
                   <div class="rounded-2xl border border-border overflow-hidden">
                     <div class="px-4 py-3 bg-muted/40 border-b border-border flex items-center justify-between gap-3">
                       <div>
@@ -1770,20 +1774,22 @@ interface CampusDisponible extends Campus {
                       <span class="px-2.5 py-1 rounded-full bg-background border border-border text-[10px] font-black text-muted-foreground">{{ preparacion.totalCartillas }} registros</span>
                     </div>
                     <div class="max-h-48 overflow-y-auto divide-y divide-border text-xs">
-                      <div class="grid grid-cols-[36px_110px_1fr] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
-                        <span>N°</span><span>Código</span><span>Estudiante</span>
+                      <div class="grid grid-cols-[36px_110px_1fr_130px] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
+                        <span>N°</span><span>Código</span><span>Estudiante</span><span>Observaciones</span>
                       </div>
                     @for (estudiante of preparacion.estudiantes; track estudiante.codigoEstudiante) {
-                      <div class="grid grid-cols-[36px_110px_1fr] gap-2 px-3 py-2.5 items-center">
+                      <div class="grid grid-cols-[36px_110px_1fr_130px] gap-2 px-3 py-2.5 items-center">
                         <span class="font-mono text-muted-foreground">{{ estudiante.numeroOrden }}</span>
                         <span class="font-mono font-bold">{{ estudiante.codigoEstudiante }}</span>
                         <span class="truncate font-medium">{{ estudiante.nombreCompleto }}</span>
+                        <span class="text-[10px] text-muted-foreground">—</span>
                       </div>
                     }
                     </div>
                   </div>
-                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <section class="rounded-2xl border border-teal-200 bg-teal-50/30 p-4">
+                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                     @if (evaluacionCartillas.modalidad === 'PRESENCIAL_CARTILLA') {
+                     <section class="rounded-2xl border border-teal-200 bg-teal-50/30 p-4">
                       <div class="flex items-start justify-between gap-3 mb-3">
                         <div class="flex items-center gap-2.5">
                           <div class="h-9 w-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center"><i class="pi pi-id-card"></i></div>
@@ -1799,8 +1805,9 @@ interface CampusDisponible extends Campus {
                           <div class="h-10 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-black flex items-center justify-center"><i class="pi pi-check-circle mr-1.5"></i>Impresión confirmada</div>
                         }
                       </div>
-                    </section>
-                    <section class="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4">
+                     </section>
+                     }
+                     <section class="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4">
                       <div class="flex items-start justify-between gap-3 mb-3">
                         <div class="flex items-center gap-2.5">
                           <div class="h-9 w-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center"><i class="pi pi-list"></i></div>
@@ -1872,7 +1879,12 @@ interface CampusDisponible extends Campus {
               }
             </div>
 
-            <div class="p-4 border-t border-border flex justify-end shrink-0 bg-muted/20"><button (click)="cerrarPatronCalificado()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
+            <div class="p-4 border-t border-border flex items-center justify-end gap-2 shrink-0 bg-muted/20">
+              <button (click)="imprimirPatronCalificado()" [disabled]="imprimiendoPatronCalificado() || !patronCalificado()" class="px-4 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50">
+                <i class="pi mr-1.5" [class.pi-spinner]="imprimiendoPatronCalificado()" [class.pi-spin]="imprimiendoPatronCalificado()" [class.pi-print]="!imprimiendoPatronCalificado()"></i>{{ imprimiendoPatronCalificado() ? 'Preparando PDF…' : 'Imprimir patrón' }}
+              </button>
+              <button (click)="cerrarPatronCalificado()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button>
+            </div>
           </div>
         </div>
       }
@@ -1969,6 +1981,10 @@ interface CampusDisponible extends Campus {
                 <div class="text-xs text-indigo-950">
                   <div class="font-black">Escaneado de cartillas</div>
                   <div class="text-[11px] mt-1">Se revisará cada página: código del estudiante, grilla y respuestas. Los códigos se cotejan exclusivamente con la nómina y su patrón de variante.</div>
+                  <label class="block mt-3 max-w-xs">
+                    <span class="block text-[10px] uppercase tracking-wide font-black text-indigo-900">Impresora utilizada (opcional)</span>
+                    <input type="text" [ngModel]="impresoraCalificacionOmr()" (ngModelChange)="impresoraCalificacionOmr.set($event)" placeholder="Ej. HP-Laser-01" class="mt-1 w-full bg-white border border-indigo-200 rounded-lg px-3 py-2 text-xs font-bold text-indigo-950" />
+                  </label>
                   @if (archivoOmrSeleccionado()) {
                     <div class="font-mono font-bold text-indigo-700 mt-2"><i class="pi pi-file mr-1"></i>{{ archivoOmrSeleccionado()?.name }}</div>
                   }
@@ -2282,6 +2298,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public patronCalificado = signal<PatronCalificadoResponse | null>(null);
   public cargandoPatronCalificado = signal<boolean>(false);
   public errorPatronCalificado = signal<string | null>(null);
+  public imprimiendoPatronCalificado = signal<boolean>(false);
   public estadoMarcas = signal<Record<string, string>>({});
   public estadoListas = signal<Record<string, string>>({});
 
@@ -2360,6 +2377,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public dialogCalificacionOmr = signal<boolean>(false);
   public evaluacionSeleccionadaOmr = signal<EvaluacionItemUI | null>(null);
   public archivoOmrSeleccionado = signal<File | null>(null);
+  public impresoraCalificacionOmr = signal<string>('');
   public procesandoCalificacionOmr = signal<boolean>(false);
   public guardandoCalificacionOmr = signal<boolean>(false);
   public resultadoCalificacionOmr = signal<OmrJobResponse | null>(null);
@@ -3008,7 +3026,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public imprimirCartillas(): void {
     const item = this.evaluacionSeleccionadaCartillas();
-    if (!item || this.generandoCartillas()) return;
+    if (!item || item.modalidad !== 'PRESENCIAL_CARTILLA' || this.generandoCartillas()) return;
     this.generandoCartillas.set(true);
     const ventana = window.open('', '_blank');
     this._cartillasOmr.imprimir(item.id).subscribe({
@@ -3323,6 +3341,35 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.cargandoPatronCalificado.set(false);
   }
 
+  public imprimirPatronCalificado(): void {
+    const item = this.evaluacionSeleccionadaPatron();
+    if (!item || !this.patronCalificado() || this.imprimiendoPatronCalificado()) return;
+
+    this.imprimiendoPatronCalificado.set(true);
+    const ventana = window.open('', '_blank');
+    this._omrService.imprimirPatronCalificado(item.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        if (ventana) {
+          ventana.location.href = url;
+        } else {
+          window.open(url, '_blank');
+        }
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        this.imprimiendoPatronCalificado.set(false);
+        this._mostrarToast('Patrón oficial generado. Puedes imprimirlo desde la ventana del PDF.');
+      },
+      error: err => {
+        ventana?.close();
+        this.imprimiendoPatronCalificado.set(false);
+        this._mostrarToast(
+          err?.error?.message || err?.error?.error || err?.message || 'No se pudo generar el PDF del patrón oficial.',
+          'error'
+        );
+      }
+    });
+  }
+
   public campusKey(campus: CampusDisponible): string {
     return campus.campusId || campus.code || `${campus.branchOfficeCode}-${campus.name}`;
   }
@@ -3453,6 +3500,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (item.etapa !== 'Devuelto' && item.etapa !== 'Pendiente de notas') return;
     this.evaluacionSeleccionadaOmr.set(item);
     this.archivoOmrSeleccionado.set(null);
+    this.impresoraCalificacionOmr.set('');
     this.resultadoCalificacionOmr.set(null);
     this.edicionesOmr.set({});
     this.previewPaginasOmr.set([]);
@@ -3471,6 +3519,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.dialogCalificacionOmr.set(false);
     this.evaluacionSeleccionadaOmr.set(null);
     this.archivoOmrSeleccionado.set(null);
+    this.impresoraCalificacionOmr.set('');
     this.resultadoCalificacionOmr.set(null);
     this.edicionesOmr.set({});
     this.previewPaginasOmr.set([]);
@@ -3553,7 +3602,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.resultadoCalificacionOmr.set(null);
     this.errorCalificacionOmr.set(false);
     this.mensajeCalificacionOmr.set('Enviando escaneado al motor OMR...');
-    this._omrService.procesar(item.id, archivo).subscribe({
+    this._omrService.procesar(item.id, archivo, this.impresoraCalificacionOmr()).subscribe({
       next: aceptado => this._esperarResultadoCalificacionOmr(aceptado.jobId),
       error: err => {
         this.procesandoCalificacionOmr.set(false);
@@ -3982,7 +4031,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public confirmarValidacionDocente(): void {
     const item = this.evaluacionSeleccionadaParaValidar();
-    if (!item) return;
+    if (!item || item.modalidad !== 'PRESENCIAL_CARTILLA') return;
 
     this._mostrarToast('El estado Validado se asigna automáticamente cuando el docente carga y se valida el banco de preguntas.', 'warning');
     this.cerrarModalValidar();

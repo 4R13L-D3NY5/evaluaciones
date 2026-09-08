@@ -55,8 +55,8 @@ PARAMETROS_OMR_DEFECTO: dict[str, float] = {
 }
 
 
-def _cargar_parametros_omr() -> dict[str, float]:
-    """Lee la configuración oficial vigente; usa defaults si la BD no responde."""
+def _cargar_parametros_omr(campus: str = "", impresora: str = "") -> dict[str, float]:
+    """Resuelve impresora, campus y configuración general en ese orden."""
     columnas = tuple(PARAMETROS_OMR_DEFECTO.keys())
     conexion = None
     try:
@@ -66,15 +66,34 @@ def _cargar_parametros_omr() -> dict[str, float]:
         )
         with conexion.cursor() as cursor:
             cursor.execute(
-                "SELECT " + ", ".join(columnas) +
-                " FROM sea_configuracion_omr WHERE id = 1"
+                """SELECT alcance, campus_clave, impresora_clave, """ + ", ".join(columnas) +
+                """ FROM sea_configuracion_omr
+                    WHERE activo = TRUE
+                      AND (
+                        (alcance = 'IMPRESORA'
+                         AND UPPER(TRIM(impresora_clave)) = UPPER(TRIM(%s))
+                         AND (campus_clave IS NULL OR UPPER(TRIM(campus_clave)) = UPPER(TRIM(%s))))
+                        OR (alcance = 'CAMPUS'
+                            AND UPPER(TRIM(campus_clave)) = UPPER(TRIM(%s)))
+                        OR alcance = 'GENERAL'
+                      )
+                    ORDER BY CASE
+                        WHEN alcance = 'IMPRESORA' AND campus_clave IS NOT NULL THEN 1
+                        WHEN alcance = 'IMPRESORA' THEN 2
+                        WHEN alcance = 'CAMPUS' THEN 3
+                        ELSE 4
+                    END,
+                    id
+                    LIMIT 1""",
+                (impresora or "", campus or "", campus or ""),
             )
             fila = cursor.fetchone()
         if not fila:
             return PARAMETROS_OMR_DEFECTO.copy()
+        valores = fila[3:]
         return {
             columna: float(valor) if valor is not None else PARAMETROS_OMR_DEFECTO[columna]
-            for columna, valor in zip(columnas, fila)
+            for columna, valor in zip(columnas, valores)
         }
     except Exception as exc:
         logger.warning("No se pudo cargar configuración OMR; se usarán defaults: %s", exc)
@@ -501,7 +520,7 @@ def _persistir_calificacion(
                      procesado_por)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (rol_examen_id, lectura["codigoEstudiante"], mapeo["nombre"], mapeo["variante"],
-                 total, aciertos, fallos, blancos, dobles, round(aciertos * 30 / total, 2) if total else 0,
+                 total, aciertos, fallos, blancos, dobles, round(aciertos * 60 / total, 2) if total else 0,
                  nota100, "APROBADO" if nota100 >= 51 else "REPROBADO", json.dumps(respuestas),
                  archivo_escaneado_path, "OMR_VISION_ENGINE_V1"),
             )
@@ -546,14 +565,14 @@ def _resumen_calificacion(lectura: dict[str, Any], mapeo: dict[str, Any]) -> dic
         "blancos": blancos,
         "doblesMarcas": dobles,
         "notaSobre100": nota100,
-        "notaSobre30": round(aciertos * 30 / total, 2) if total else 0,
+        "notaSobre60": round(aciertos * 60 / total, 2) if total else 0,
         "estadoCalificacion": "APROBADO" if nota100 >= 51 else "REPROBADO",
         "detalles": detalles,
     }
 
 
-def procesar_archivo(archivo: str, rol_examen_id: str) -> dict[str, Any]:
-    parametros = _cargar_parametros_omr()
+def procesar_archivo(archivo: str, rol_examen_id: str, campus: str = "", impresora: str = "") -> dict[str, Any]:
+    parametros = _cargar_parametros_omr(campus, impresora)
     mapeos = _cargar_mapeos(rol_examen_id)
     if not mapeos:
         raise ValueError("El rol no tiene un mapeo oficial de estudiantes-variante.")
@@ -598,9 +617,9 @@ def procesar_archivo(archivo: str, rol_examen_id: str) -> dict[str, Any]:
     return {"totalPaginas": len(paginas), "resultados": lecturas}
 
 
-def procesar_archivo_lectura(archivo: str) -> dict[str, Any]:
+def procesar_archivo_lectura(archivo: str, campus: str = "", impresora: str = "") -> dict[str, Any]:
     """Lee código y respuestas sin exigir nómina, variante ni clave de respuestas."""
-    parametros = _cargar_parametros_omr()
+    parametros = _cargar_parametros_omr(campus, impresora)
     paginas = _abrir_paginas(archivo)
     lecturas = []
     for numero_pagina, imagen in enumerate(paginas, start=1):

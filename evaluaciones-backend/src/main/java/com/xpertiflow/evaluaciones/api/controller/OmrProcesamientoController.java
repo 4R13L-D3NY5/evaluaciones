@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -52,15 +53,19 @@ public class OmrProcesamientoController {
     @PostMapping("/{rolExamenId}/procesar")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Enviar un escaneo de cartillas al motor OMR")
-    public ResponseEntity<JsonNode> procesar(@PathVariable String rolExamenId, @RequestParam("file") MultipartFile archivo) {
-        return ResponseEntity.accepted().body(omrProcesamientoService.solicitar(rolExamenId, archivo));
+    public ResponseEntity<JsonNode> procesar(@PathVariable String rolExamenId,
+                                             @RequestParam("file") MultipartFile archivo,
+                                             @RequestParam(required = false) String impresora) {
+        return ResponseEntity.accepted().body(omrProcesamientoService.solicitar(rolExamenId, archivo, impresora));
     }
 
     @PostMapping("/{rolExamenId}/procesar-lectura")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Leer código y respuestas de un escaneo para conciliación")
-    public ResponseEntity<JsonNode> procesarLectura(@PathVariable String rolExamenId, @RequestParam("file") MultipartFile archivo) {
-        return ResponseEntity.accepted().body(omrProcesamientoService.solicitarLecturaConciliacion(rolExamenId, archivo));
+    public ResponseEntity<JsonNode> procesarLectura(@PathVariable String rolExamenId,
+                                                    @RequestParam("file") MultipartFile archivo,
+                                                    @RequestParam(required = false) String impresora) {
+        return ResponseEntity.accepted().body(omrProcesamientoService.solicitarLecturaConciliacion(rolExamenId, archivo, impresora));
     }
 
     @GetMapping("/jobs/{jobId}")
@@ -84,6 +89,21 @@ public class OmrProcesamientoController {
         return ResponseEntity.ok(omrProcesamientoService.consultarPatronCalificado(rolExamenId));
     }
 
+    @GetMapping(value = "/{rolExamenId}/patron-calificado/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Generar el PDF del patrón de respuestas después de calificar")
+    public ResponseEntity<byte[]> imprimirPatronCalificado(@PathVariable String rolExamenId,
+                                                            Authentication authentication) {
+        byte[] pdf = omrProcesamientoService.generarPatronCalificadoPdf(rolExamenId,
+                authentication == null ? null : authentication.getName());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=patron-oficial-" + rolExamenId + ".pdf")
+                .cacheControl(CacheControl.noStore())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
     @GetMapping("/configuracion")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Consultar parámetros de lectura OMR")
@@ -97,6 +117,29 @@ public class OmrProcesamientoController {
     public ResponseEntity<ConfiguracionOmrDto> guardarConfiguracion(
             @Valid @RequestBody ConfiguracionOmrDto request) {
         return ResponseEntity.ok(omrProcesamientoService.guardarConfiguracion(request));
+    }
+
+    @GetMapping("/configuraciones")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @Operation(summary = "Listar configuraciones OMR general, por campus y por impresora")
+    public ResponseEntity<List<ConfiguracionOmrDto>> listarConfiguraciones() {
+        return ResponseEntity.ok(omrProcesamientoService.listarConfiguraciones());
+    }
+
+    @PutMapping("/configuraciones")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Guardar una configuración OMR por alcance")
+    public ResponseEntity<ConfiguracionOmrDto> guardarConfiguracionPorAlcance(
+            @Valid @RequestBody ConfiguracionOmrDto request) {
+        return ResponseEntity.ok(omrProcesamientoService.guardarConfiguracionPorAlcance(request));
+    }
+
+    @DeleteMapping("/configuraciones/{id}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Desactivar una configuración OMR específica")
+    public ResponseEntity<Void> eliminarConfiguracion(@PathVariable Short id) {
+        omrProcesamientoService.eliminarConfiguracion(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{rolExamenId}/calificaciones/ajustar")

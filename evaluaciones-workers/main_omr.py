@@ -18,7 +18,9 @@ def _procesar_job_omr(payload: dict) -> dict:
     job_id = payload.get("jobId", "unknown")
     rol_examen_id = payload.get("rolExamenId", "unknown")
     logger.info("Job OMR %s recibido para rol %s", job_id, rol_examen_id)
-    resultado = procesar_archivo_lectura(payload["archivoPath"]) if payload.get("modo") == "LECTURA_CONCILIACION" else procesar_archivo(payload["archivoPath"], rol_examen_id)
+    campus = payload.get("campus", "")
+    impresora = payload.get("impresora", "")
+    resultado = procesar_archivo_lectura(payload["archivoPath"], campus, impresora) if payload.get("modo") == "LECTURA_CONCILIACION" else procesar_archivo(payload["archivoPath"], rol_examen_id, campus, impresora)
     return {
         "jobId": job_id,
         "rolExamenId": rol_examen_id,

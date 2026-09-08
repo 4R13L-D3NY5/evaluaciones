@@ -17,6 +17,21 @@ public class ConfiguracionOmr {
     @Id
     private Short id;
 
+    @Column(name = "alcance", nullable = false, length = 20)
+    private String alcance = "GENERAL";
+
+    @Column(name = "campus_clave", length = 220)
+    private String campusClave;
+
+    @Column(name = "campus_nombre", length = 180)
+    private String campusNombre;
+
+    @Column(name = "impresora_clave", length = 180)
+    private String impresoraClave;
+
+    @Column(name = "activo", nullable = false)
+    private boolean activo = true;
+
     @Column(name = "umbral_densidad_marca", nullable = false, precision = 5, scale = 2)
     private BigDecimal umbralDensidadMarca;
 

@@ -4,6 +4,8 @@
 
 En **Lista de Evaluaciones → Notas y escaneados OMR**, las evaluaciones con cartilla en estado pendiente de notas o calificado permiten consultar sus archivos originales mediante **Ver escaneado**. Se muestra un botón por archivo asociado a las calificaciones, aunque varias personas provengan del mismo PDF. El visor abre el PDF completo con navegación por páginas, o la imagen original, en modo de consulta sin recalcular ni modificar notas.
 
+La lista oficial de firmas incluye una columna **Observaciones** por estudiante para completar manualmente durante la entrega o recepción. La misma lista se puede utilizar en evaluaciones presenciales sin cartilla; en esa modalidad no se generan ni se exigen marcas OMR.
+
 Los archivos se recuperan desde la ruta persistida en `sea_calificaciones_omr.archivo_escaneado_path`; no dependen del archivo seleccionado en el navegador ni de un trabajo OMR temporal en memoria. Los registros históricos sin ruta y los archivos que ya no están en disco se informan como no disponibles. No se infiere una página individual a partir del orden de estudiantes.
 
 ## Visualización del patrón después de calificar
@@ -11,6 +13,8 @@ Los archivos se recuperan desde la ruta persistida en `sea_calificaciones_omr.ar
 En **Lista de Evaluaciones**, una evaluación en estado **Calificado** muestra la acción **Patrón oficial**. Esta consulta es de solo lectura y presenta las respuestas oficiales de cada variante en una vista compacta, equivalente a la clave utilizada durante la calificación.
 
 El endpoint `GET /api/omr/{rolExamenId}/patron-calificado` solo responde a `ADMINISTRADOR_SISTEMA`, `RESPONSABLE_EVALUACIONES` y `PERSONAL_EVALUACIONES` con acceso al rol. El backend exige el estado `CALIFICADO`, valida el alcance académico —incluido el campus del personal de evaluaciones— y descifra el contenido protegido en el servidor. Nunca devuelve la carga cifrada ni las claves de protección.
+
+El endpoint `GET /api/omr/{rolExamenId}/patron-calificado/pdf` genera temporalmente un PDF imprimible, con una página por variante y las respuestas oficiales numeradas. Reutiliza las mismas condiciones de estado, rol y alcance; no guarda una copia adicional del patrón.
 
 `GET /api/omr/{rolExamenId}/calificaciones/{calificacionId}/escaneado` requiere un rol operativo de evaluaciones y acceso al rol de examen. Verifica que la calificación pertenezca a esa evaluación y que el archivo real esté dentro de storage. Solo sirve PDF, PNG o JPEG, con caché desactivada. La consulta no recibe rutas de archivos del navegador.
 
@@ -82,12 +86,13 @@ La confirmación genera un registro en `sea_auditoria_evaluaciones` con la canti
 ## Verificación operativa
 
 1. Generar el examen de un rol y confirmar que existen estudiantes mapeados.
-2. Abrir **Lista de Evaluaciones** y seleccionar el icono de cartillas.
+2. Abrir **Lista de Evaluaciones** y seleccionar el icono de cartillas o lista de firmas.
 3. Verificar que la lista oficial aparezca sin generar un lote y que **Imprimir marcas** devuelva un PDF con un estudiante por página A4, sin cartilla dibujada ni letras A-E de variante.
 4. Confirmar que cada fila contiene N°, código de materia, grupo, código y nombre completo.
 5. Imprimir desde la ventana del PDF y validar los datos contra la lista oficial.
 6. Marcar impreso únicamente después de imprimirlo; revisar que solo quede la auditoría y que no se genere un archivo en `storage/generados`.
 7. En la etapa de OMR, validar que el código leído identifica la clave interna y mostrar la variante confirmada únicamente en la inspección de resultados.
+8. En un rol **Sin Cartilla**, verificar que la lista de firmas se pueda imprimir con la columna **Observaciones** y que no exista ningún paso obligatorio de impresión de marcas OMR.
 
 ## Procesamiento OMR con escaneo real
 
@@ -146,6 +151,20 @@ La guía de alineación visual toma la matriz detectada en cada página y deriva
 
 El módulo **Calificación Óptica OMR** incluye el apartado **Parámetros OMR** para consultar y ajustar la calibración sin editar código. La configuración se guarda en `sea_configuracion_omr` y el worker la consulta al iniciar cada procesamiento; por tanto, los cambios aplican a nuevos escaneos y no recalculan automáticamente resultados ya guardados.
 
+### Configuración general, por campus y por impresora
+
+Los parámetros de lectura se pueden guardar con tres alcances independientes:
+
+- **General:** valor base para cualquier escaneo que no tenga una coincidencia específica.
+- **Campus:** ajuste para todos los escaneos de un campus.
+- **Impresora:** ajuste para una impresora concreta. Puede ser exclusivo de una combinación impresora-campus o aplicarse a esa impresora en todos los campus.
+
+Al procesar un escaneo, el backend envía al worker el campus del rol de examen y, cuando el operador lo indica, el identificador de la impresora utilizada. El worker resuelve la configuración con esta prioridad: `impresora + campus` → `impresora` → `campus` → `general`. Si no se informa la impresora, se aplican campus y general. El identificador de la impresora debe mantenerse estable y escribirse siempre con el mismo nombre operativo (por ejemplo, `HP-LASER-01`).
+
+Cada alcance conserva los mismos parámetros de marca, grilla, tinta, código y OCR. Guardar una configuración no modifica calificaciones existentes: únicamente afecta nuevos procesos OMR. Las configuraciones específicas pueden desactivarse sin borrar el registro histórico; la configuración general permanece disponible como respaldo obligatorio.
+
+La migración `V35__configuracion_omr_por_campus_impresora.sql` agrega el alcance, las claves de campus/impresora y el estado activo. Las rutas administrativas son `GET /api/omr/configuraciones`, `PUT /api/omr/configuraciones` y `DELETE /api/omr/configuraciones/{id}`. La modificación y desactivación requieren `ADMINISTRADOR_SISTEMA` o `RESPONSABLE_EVALUACIONES`; el personal de evaluaciones puede consultar los valores para verificar qué configuración se aplicará.
+
 | Parámetro | Default | Rango | Efecto |
 | --- | ---: | ---: | --- |
 | Densidad mínima de marca | 60 | 40–95 | Decide cuándo una burbuja tiene tinta suficiente; se complementa con una separación mínima frente a las demás opciones. |
@@ -164,6 +183,9 @@ API administrativa de la configuración:
 | --- | --- | --- |
 | GET | `/api/omr/configuracion` | Consulta los parámetros oficiales vigentes. |
 | PUT | `/api/omr/configuracion` | Guarda cambios validados y registra fecha/usuario de actualización. |
+| GET | `/api/omr/configuraciones` | Lista la configuración general y las específicas por campus/impresora. |
+| PUT | `/api/omr/configuraciones` | Crea o actualiza una configuración según su alcance. |
+| DELETE | `/api/omr/configuraciones/{id}` | Desactiva una configuración específica sin eliminar el registro. |
 
 Los rangos se validan en el backend para evitar una configuración que inutilice la lectura. La pantalla permite restaurar los defaults en el formulario, pero estos solo se aplican después de presionar **Guardar configuración**.
 

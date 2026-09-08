@@ -29,6 +29,7 @@ El flujo utiliza una única fuente académica oficial: los servicios institucion
 4. Si SEA no devuelve un docente o un grupo válido, el sistema detiene la operación y muestra el motivo.
 5. Si el grupo teórico `TA-##` no trae modalidad en el rol, se asigna **Con Cartilla**.
 6. Los roles inician en versión `V1`; una nueva importación del mismo grupo, parcial y fecha genera `V2`, `V3`, etc., sin sobrescribir la versión anterior.
+7. En el Banco de preguntas, la sesión se restaura antes de consultar sedes, carreras, asignaturas y grupos. Las sedes y carreras incluidas en las asignaciones académicas del docente se exponen también en la sesión para que el selector inicial se mantenga al volver a ingresar.
 
 ## 4. Flujo común de registro y preparación
 

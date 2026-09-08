@@ -29,7 +29,7 @@ Además, el backend protege el acceso al rol de examen y al banco de preguntas: 
 2. En una cuenta nueva, la contraseña temporal es igual al CI y `debe_cambiar_contrasena` queda activo.
 3. El primer ingreso dirige al usuario a cambiar la contraseña. La nueva contraseña debe tener al menos ocho caracteres, no puede ser igual al CI y se guarda únicamente como hash BCrypt.
 4. Restablecer una contraseña vuelve a establecer el CI como clave temporal y activa nuevamente el cambio obligatorio.
-5. Una importación actualiza los datos y asignaciones de una cuenta existente por CI; no reemplaza la contraseña que ya fue cambiada por el usuario.
+5. Una importación actualiza los datos y asignaciones de una cuenta existente por CI; no reemplaza la contraseña que ya fue cambiada por el usuario. Si la fila solo contiene `CI`, `NOMBRE_COMPLETO` y `ROL`, se interpreta como una corrección de cuenta y conserva los alcances ya registrados.
 6. Las cuentas nuevas creadas por lote muestran sus credenciales temporales solamente en el resultado inmediato de la importación.
 7. Una persona puede tener varias asignaciones académicas. Para directores se guarda cada relación sede-carrera; para docentes se guarda cada relación sede-carrera-asignatura. El Excel anterior se mantiene compatible.
 8. Los errores de importación se informan por fila sin detener las filas válidas.
@@ -53,6 +53,18 @@ La hoja `USUARIOS` debe contener como mínimo:
 Las columnas de sede y carrera se generan como columnas de selección. Se admite `X`, `SI`, `1`, `TRUE` o una marca de verificación. Se pueden seleccionar varias sedes y carreras en la misma fila. Los códigos entre corchetes deben ser los códigos oficiales que entrega SEA.
 
 También se admiten, para integraciones o archivos ya existentes, las columnas `SEDES` y `CARRERAS` con códigos separados por coma, punto y coma o barra vertical.
+
+### Corrección masiva de roles
+
+Para corregir usuarios ya registrados sin acceder directamente a PostgreSQL, se puede utilizar **Usuarios y accesos → Importar lote** con una hoja que contenga únicamente:
+
+| CI | NOMBRE_COMPLETO | ROL |
+|---|---|---|
+| `2245450` | `NOMBRE COMPLETO` | `DIRECTOR_CARRERA` |
+
+El sistema busca cada cuenta por CI y actualiza su rol. Al no incluir valores en sedes, carreras o campus, conserva los alcances existentes y registra cada cambio en la auditoría. Después de la corrección, se debe abrir cada director y revisar sus relaciones sede-carrera; las cuentas que solo tenían campus por haber sido creadas como `PERSONAL_EVALUACIONES` deberán recibir manualmente las carreras que les correspondan.
+
+Las cuentas creadas con versiones anteriores, que solo tenían sedes y carreras separadas, se muestran con relaciones sede-carrera reconstruidas para facilitar la recuperación. Al guardar el usuario, esas relaciones quedan persistidas en la estructura nueva.
 
 ## Modelo de datos
 

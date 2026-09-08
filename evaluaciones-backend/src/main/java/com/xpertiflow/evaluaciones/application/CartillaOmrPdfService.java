@@ -210,8 +210,9 @@ public class CartillaOmrPdfService {
         float altoTabla = (filas + 1) * ALTO_FILA_NOMINA;
         float yInferior = PAGE_HEIGHT - tablaTop - altoTabla;
         float codigoX = x + 38f;
-        float estudianteX = x + 132f;
-        float firmaX = x + 400f;
+        float estudianteX = x + 122f;
+        float firmaX = x + 340f;
+        float observacionesX = x + 455f;
 
         contenido.setNonStrokingColor(new Color(41, 48, 92));
         contenido.addRect(x, yInferior + altoTabla - ALTO_FILA_NOMINA, anchoTotal, ALTO_FILA_NOMINA);
@@ -229,7 +230,7 @@ public class CartillaOmrPdfService {
         contenido.setStrokingColor(COLOR_BORDE);
         contenido.addRect(x, yInferior, anchoTotal, altoTabla);
         contenido.stroke();
-        for (float lineaX : new float[]{codigoX, estudianteX, firmaX}) {
+        for (float lineaX : new float[]{codigoX, estudianteX, firmaX, observacionesX}) {
             contenido.moveTo(lineaX, yInferior);
             contenido.lineTo(lineaX, yInferior + altoTabla);
         }
@@ -248,6 +249,8 @@ public class CartillaOmrPdfService {
                 PDType1Font.HELVETICA_BOLD, 7.5f);
         textoDesdeArribaBlanco(contenido, "FIRMA DEL ESTUDIANTE", firmaX + 8f, tablaTop + 16f,
                 PDType1Font.HELVETICA_BOLD, 7.5f);
+        textoDesdeArribaBlanco(contenido, "OBSERVACIONES", observacionesX + 6f, tablaTop + 16f,
+                PDType1Font.HELVETICA_BOLD, 7.5f);
 
         for (int indice = 0; indice < cartillas.size(); indice++) {
             CartillaOmr cartilla = cartillas.get(indice);
@@ -256,8 +259,10 @@ public class CartillaOmrPdfService {
                     PDType1Font.HELVETICA, 7.5f);
             textoDesdeArriba(contenido, limitar(normalizar(cartilla.getCodigoEstudiante()), 12), codigoX + 8f, y,
                     PDType1Font.HELVETICA_BOLD, 7.5f);
-            textoDesdeArriba(contenido, limitar(normalizar(cartilla.getNombreCompleto()), 44), estudianteX + 8f, y,
+            textoDesdeArriba(contenido, limitar(normalizar(cartilla.getNombreCompleto()), 32), estudianteX + 8f, y,
                     PDType1Font.HELVETICA, 7.5f);
+            textoDesdeArriba(contenido, "________________", observacionesX + 6f, y,
+                    PDType1Font.HELVETICA, 6.5f);
         }
     }
 

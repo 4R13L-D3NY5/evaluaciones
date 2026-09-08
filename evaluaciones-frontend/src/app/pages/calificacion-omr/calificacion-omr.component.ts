@@ -89,6 +89,11 @@ export interface EstudianteOmrItem {
               noResultsText="No se encontraron roles de examen oficiales." />
           </div>
 
+          <label class="w-full sm:w-[210px] space-y-1">
+            <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Impresora utilizada (opcional)</span>
+            <input type="text" [ngModel]="impresoraOmr()" (ngModelChange)="impresoraOmr.set($event)" placeholder="Ej. HP-Laser-01" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+          </label>
+
           <!-- Input oculto para subir PDF o imágenes -->
           <input 
             type="file" 
@@ -791,6 +796,35 @@ export interface EstudianteOmrItem {
                 Los cambios se guardan en la base oficial y se aplican al siguiente procesamiento. No alteran calificaciones ya guardadas ni sustituyen la revisión manual.
               </div>
 
+              <div class="rounded-xl border border-purple-200 bg-purple-50/60 p-4 space-y-3">
+                <div>
+                  <h4 class="text-xs font-black text-purple-950 uppercase tracking-wide">Alcance de la configuración</h4>
+                  <p class="text-[10px] text-purple-900 mt-1">Prioridad de aplicación: impresora y campus, impresora general, campus y configuración general.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <label class="space-y-1.5">
+                    <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Guardar para</span>
+                    <select [ngModel]="configuracionOmr().alcance || 'GENERAL'" (ngModelChange)="cambiarAlcanceConfiguracionOmr($event)" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground">
+                      <option value="GENERAL">Configuración general</option>
+                      <option value="CAMPUS">Un campus</option>
+                      <option value="IMPRESORA">Una impresora</option>
+                    </select>
+                  </label>
+                  @if ((configuracionOmr().alcance || 'GENERAL') !== 'GENERAL') {
+                    <label class="space-y-1.5">
+                      <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Campus{{ configuracionOmr().alcance === 'IMPRESORA' ? ' (opcional)' : '' }}</span>
+                      <input type="text" [ngModel]="configuracionOmr().campusNombre || configuracionOmr().campusClave || ''" (ngModelChange)="actualizarTextoConfiguracionOmr('campus', $event)" placeholder="Ej. JUAN PABLO II" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+                    </label>
+                  }
+                  @if ((configuracionOmr().alcance || 'GENERAL') === 'IMPRESORA') {
+                    <label class="space-y-1.5">
+                      <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Impresora</span>
+                      <input type="text" [ngModel]="configuracionOmr().impresoraClave || ''" (ngModelChange)="actualizarTextoConfiguracionOmr('impresora', $event)" placeholder="Ej. HP-Laser-01" class="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs font-bold text-foreground" />
+                    </label>
+                  }
+                </div>
+              </div>
+
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label class="space-y-1.5">
                   <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Densidad mínima de marca (%)</span>
@@ -838,6 +872,31 @@ export interface EstudianteOmrItem {
               @if (configuracionOmr().actualizadoEn) {
                 <p class="text-[10px] text-muted-foreground">Última actualización: {{ configuracionOmr().actualizadoEn }} · {{ configuracionOmr().actualizadoPor || 'ADMIN_EVALUACIONES' }}</p>
               }
+
+              <div class="border border-border rounded-xl overflow-hidden">
+                <div class="px-4 py-3 bg-muted/50 flex items-center justify-between gap-2">
+                  <h4 class="text-xs font-black text-foreground uppercase tracking-wide">Configuraciones guardadas</h4>
+                  <span class="text-[10px] font-bold text-muted-foreground">{{ configuracionesOmr().length }} activa(s)</span>
+                </div>
+                <div class="divide-y divide-border max-h-48 overflow-y-auto">
+                  @for (configuracion of configuracionesOmr(); track configuracion.id || $index) {
+                    <div class="px-4 py-2.5 flex items-center justify-between gap-3 text-xs">
+                      <div class="min-w-0">
+                        <div class="font-black text-foreground">{{ etiquetaAlcanceConfiguracionOmr(configuracion) }}</div>
+                        <div class="text-[10px] text-muted-foreground truncate">{{ detalleAlcanceConfiguracionOmr(configuracion) }}</div>
+                      </div>
+                      <div class="flex items-center gap-1.5 shrink-0">
+                        <button (click)="editarConfiguracionOmr(configuracion)" class="px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted font-bold cursor-pointer">Editar</button>
+                        @if (configuracion.alcance !== 'GENERAL' && configuracion.id) {
+                          <button (click)="eliminarConfiguracionOmr(configuracion)" class="px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold cursor-pointer">Desactivar</button>
+                        }
+                      </div>
+                    </div>
+                  } @empty {
+                    <div class="px-4 py-4 text-[11px] text-muted-foreground">No hay configuraciones específicas guardadas.</div>
+                  }
+                </div>
+              </div>
             </div>
 
             <div class="flex flex-wrap justify-end gap-2 p-6 border-t border-border">
@@ -954,6 +1013,8 @@ export class CalificacionOmrComponent implements OnInit {
   public mensajeConfiguracionOmr = signal<string>('');
   public errorConfiguracionOmr = signal<boolean>(false);
   public configuracionOmr = signal<ConfiguracionOmr>(this.configuracionOmrDefecto());
+  public configuracionesOmr = signal<ConfiguracionOmr[]>([]);
+  public impresoraOmr = signal<string>('');
 
   public totalPaginas = computed(() => {
     return this.paginasRenderizadas().length;
@@ -1023,15 +1084,22 @@ export class CalificacionOmrComponent implements OnInit {
       zonaCodigoAncho: 0.27,
       zonaCodigoAlto: 0.06,
       escalaOcr: 3,
-      radioBusquedaPixeles: 2
+      radioBusquedaPixeles: 2,
+      alcance: 'GENERAL',
+      campusClave: '',
+      campusNombre: '',
+      impresoraClave: '',
+      activo: true
     };
   }
 
   private _cargarConfiguracionOmr(): void {
     this.cargandoConfiguracionOmr.set(true);
-    this.omrProcesamientoService.obtenerConfiguracion().subscribe({
-      next: configuracion => {
-        this.configuracionOmr.set(configuracion);
+    this.omrProcesamientoService.listarConfiguraciones().subscribe({
+      next: configuraciones => {
+        this.configuracionesOmr.set(configuraciones);
+        const configuracionGeneral = configuraciones.find(item => item.alcance === 'GENERAL') || configuraciones[0];
+        this.configuracionOmr.set({ ...this.configuracionOmrDefecto(), ...(configuracionGeneral || {}) });
         this.errorConfiguracionOmr.set(false);
       },
       error: error => {
@@ -1046,6 +1114,7 @@ export class CalificacionOmrComponent implements OnInit {
   public abrirConfiguracionOmr(): void {
     this.mensajeConfiguracionOmr.set('');
     this.errorConfiguracionOmr.set(false);
+    this._cargarConfiguracionOmr();
     this.dialogConfiguracionOmr.set(true);
   }
 
@@ -1062,8 +1131,73 @@ export class CalificacionOmrComponent implements OnInit {
     this.mensajeConfiguracionOmr.set('');
   }
 
+  public cambiarAlcanceConfiguracionOmr(valor: string): void {
+    const alcance = valor === 'CAMPUS' || valor === 'IMPRESORA' ? valor : 'GENERAL';
+    this.configuracionOmr.update(actual => ({
+      ...actual,
+      alcance,
+      campusClave: alcance === 'GENERAL' ? '' : (actual.campusClave || actual.campusNombre || ''),
+      campusNombre: alcance === 'GENERAL' ? '' : (actual.campusNombre || actual.campusClave || ''),
+      impresoraClave: alcance === 'IMPRESORA' ? (actual.impresoraClave || '') : ''
+    }));
+    this.mensajeConfiguracionOmr.set('');
+  }
+
+  public actualizarTextoConfiguracionOmr(campo: 'campus' | 'impresora', valor: string): void {
+    const texto = valor || '';
+    if (campo === 'campus') {
+      this.configuracionOmr.update(actual => ({ ...actual, campusNombre: texto, campusClave: texto.trim().toUpperCase() }));
+    } else {
+      this.configuracionOmr.update(actual => ({ ...actual, impresoraClave: texto.trim().toUpperCase() }));
+    }
+    this.mensajeConfiguracionOmr.set('');
+  }
+
+  public editarConfiguracionOmr(configuracion: ConfiguracionOmr): void {
+    this.configuracionOmr.set({ ...this.configuracionOmrDefecto(), ...configuracion });
+    this.mensajeConfiguracionOmr.set('Configuración cargada en el formulario. Puede ajustar los parámetros y guardarla.');
+    this.errorConfiguracionOmr.set(false);
+  }
+
+  public etiquetaAlcanceConfiguracionOmr(configuracion: ConfiguracionOmr): string {
+    if (configuracion.alcance === 'IMPRESORA') return 'Impresora';
+    if (configuracion.alcance === 'CAMPUS') return 'Campus';
+    return 'General';
+  }
+
+  public detalleAlcanceConfiguracionOmr(configuracion: ConfiguracionOmr): string {
+    if (configuracion.alcance === 'IMPRESORA') {
+      return `${configuracion.impresoraClave || 'Sin impresora'}${configuracion.campusNombre ? ` · ${configuracion.campusNombre}` : ''}`;
+    }
+    return configuracion.alcance === 'CAMPUS' ? (configuracion.campusNombre || configuracion.campusClave || 'Sin campus') : 'Aplicación predeterminada';
+  }
+
+  public eliminarConfiguracionOmr(configuracion: ConfiguracionOmr): void {
+    if (!configuracion.id || configuracion.alcance === 'GENERAL' || this.guardandoConfiguracionOmr()) return;
+    this.guardandoConfiguracionOmr.set(true);
+    this.omrProcesamientoService.eliminarConfiguracion(configuracion.id).subscribe({
+      next: () => {
+        this.mensajeConfiguracionOmr.set('Configuración específica desactivada.');
+        this._cargarConfiguracionOmr();
+      },
+      error: error => {
+        console.error('No se pudo desactivar la configuración OMR:', error);
+        this.errorConfiguracionOmr.set(true);
+        this.mensajeConfiguracionOmr.set('No se pudo desactivar la configuración seleccionada.');
+      },
+      complete: () => this.guardandoConfiguracionOmr.set(false)
+    });
+  }
+
   public restaurarConfiguracionOmr(): void {
-    this.configuracionOmr.set(this.configuracionOmrDefecto());
+    const actual = this.configuracionOmr();
+    this.configuracionOmr.set({
+      ...this.configuracionOmrDefecto(),
+      alcance: actual.alcance || 'GENERAL',
+      campusClave: actual.campusClave || '',
+      campusNombre: actual.campusNombre || '',
+      impresoraClave: actual.impresoraClave || ''
+    });
     this.mensajeConfiguracionOmr.set('Valores predeterminados restaurados en el formulario. Presione Guardar configuración para aplicarlos.');
     this.errorConfiguracionOmr.set(false);
   }
@@ -1072,9 +1206,10 @@ export class CalificacionOmrComponent implements OnInit {
     this.guardandoConfiguracionOmr.set(true);
     this.mensajeConfiguracionOmr.set('');
     this.errorConfiguracionOmr.set(false);
-    this.omrProcesamientoService.guardarConfiguracion(this.configuracionOmr()).subscribe({
+    this.omrProcesamientoService.guardarConfiguracionPorAlcance(this.configuracionOmr()).subscribe({
       next: configuracion => {
         this.configuracionOmr.set(configuracion);
+        this._cargarConfiguracionOmr();
         this.mensajeConfiguracionOmr.set('Configuración guardada. Se aplicará al siguiente procesamiento OMR.');
       },
       error: error => {
@@ -1263,7 +1398,7 @@ export class CalificacionOmrComponent implements OnInit {
     this.procesandoOmr.set(true);
     this.calificacionEjecutada.set(false);
     this.paginaProgreso.set(1);
-    this.omrProcesamientoService.procesar(rolId, archivo).subscribe({
+    this.omrProcesamientoService.procesar(rolId, archivo, this.impresoraOmr()).subscribe({
       next: aceptado => this._esperarResultadoOmr(aceptado.jobId, archivo),
       error: error => {
         console.error('Error enviando escaneo OMR al backend:', error);

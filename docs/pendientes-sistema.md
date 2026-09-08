@@ -1,6 +1,7 @@
 # Pendientes del Sistema de Evaluaciones
 
 Fecha de registro: 2026-09-06  
+Última actualización: 2026-09-07
 Repositorio: `sisa-evaluacion`  
 Alcance: seguimiento funcional, técnico y de pruebas del sistema.
 
@@ -15,6 +16,8 @@ Una funcionalidad no se considerará terminada únicamente porque aparezca en pa
 - **Pendiente de implementación:** todavía falta construir la funcionalidad o una parte esencial de ella.
 - **Parcialmente implementado:** existe una parte funcional, pero falta completar reglas, permisos, integración o experiencia de usuario.
 - **Pendiente de validación:** la funcionalidad existe en el sistema, pero requiere pruebas formales antes de darla por concluida.
+- **Incidencia reportada; pendiente de diagnóstico:** se informó un fallo que debe reproducirse y corregirse antes de validar el flujo.
+- **Pendiente de aclaración:** falta precisar el alcance funcional antes de implementar.
 
 ## Lista priorizada
 
@@ -29,6 +32,17 @@ Una funcionalidad no se considerará terminada únicamente porque aparezca en pa
 | 7 | Optimización del módulo de Auditoría | Pendiente de análisis y optimización | Media | Permitir consultar eventos por módulo, acción, usuario, fecha, resultado y entidad afectada; mostrar el detalle sin exponer secretos; mantener paginación y filtros consistentes; restringir el acceso según rol; revisar índices y tiempos de respuesta; y confirmar que las acciones sensibles quedan registradas. |
 | 8 | Permiso configurable para importación de bancos por Directores de Carrera | Pendiente de implementación | Alta | En Administración de Evaluaciones, un administrador o responsable puede habilitar o deshabilitar esta capacidad. El valor predeterminado debe ser **deshabilitado**. Cuando esté habilitada, el Director de Carrera podrá importar bancos únicamente dentro de su sede/carrera y el sistema debe registrar el cambio y cada importación en auditoría. |
 | 9 | Configuración de períodos de examen activos y período predeterminado | Pendiente de implementación | Alta | En la configuración administrativa se pueden activar o desactivar **1.er parcial, 2.º parcial, final y las instancias** disponibles. Debe existir un único período predeterminado, inicialmente **1.er parcial**; los selectores y formularios deben mostrar solo períodos activos y conservar la configuración por gestión. |
+| 10 | Permitir restablecer un rol de examen a Validado desde la Lista de Evaluaciones | Pendiente de implementación y validación | Alta | Habilitar la acción **Restablecer a Validado** para todos los perfiles que gestionan roles de examen, siempre dentro de su alcance autorizado de sede, campus, carrera y exámenes propios cuando corresponda. Se refiere al rol de examen, no al rol de acceso del usuario ni a su contraseña. Antes de ejecutar, mostrar una confirmación con los efectos sobre estados, documentos, patrones y calificaciones; definir y comprobar qué datos se conservan o invalidan. Validar permisos en el servidor y registrar el usuario autenticado, fecha, examen y estados anterior y posterior en la bitácora. Probar exámenes con y sin cartilla y evitar afectar otros roles de examen. |
+| 11 | Corregir el funcionamiento del examen sin cartilla | Incidencia reportada; pendiente de diagnóstico | Alta | Reproducir el fallo reportado «no está dando el examen sin cartilla», identificar la etapa afectada y corregirla. Validar el flujo completo: generación y acceso al examen, carga de notas por el docente sobre 60, previsualización sobre 100 e impresión del reporte. Comprobar permisos, persistencia y cambio de estado; coordinar el cierre con los pendientes 2 y 3. |
+| 12 | Impresión de patrones de respuestas | Implementado; pendiente de validación | Alta | Los perfiles autorizados pueden imprimir el patrón correspondiente al examen y a su variante, también después de calificar. El documento identifica examen, materia, grupo, período y variante, mantiene la correspondencia entre número de pregunta y respuesta, y se genera temporalmente desde el contenido protegido. Respetar las restricciones de acceso y liberación del patrón; registrar la operación en auditoría en la validación integral. Complementa el pendiente 1; visualizar no equivale a imprimir. |
+| 13 | Agregar observaciones a la lista de firmas de estudiantes | Implementado; pendiente de validación | Alta | La lista de firmas impresa incluye una columna de observaciones por estudiante, con espacio para anotaciones y sin recortar los datos ni el espacio de firma. Verificar la legibilidad y la paginación con nóminas extensas, tanto con cartilla como sin cartilla. |
+| 14 | No exigir impresión de marcas en exámenes sin cartilla | Implementado; pendiente de validación | Alta | El flujo sin cartilla puede abrir e imprimir la lista de firmas sin imprimir marcas OMR. El backend rechaza la solicitud directa de marcas para esta modalidad y la interfaz no muestra la operación como requisito. Mantener la impresión de marcas y sus controles exclusivamente para exámenes con cartilla; comprobar que ambos flujos conservan sus documentos y estados correctos. |
+| 15 | Corregir la identificación del usuario autenticado en la bitácora | Incidencia reportada; pendiente de diagnóstico | Alta | Reproducir los eventos que no registran al usuario logueado y revisar las acciones auditables de los módulos. Obtener la identidad desde la sesión autenticada en el servidor, sin confiar en un nombre enviado por el cliente. Verificar con usuarios y roles distintos que cada acción registra al actor correcto; distinguir las tareas automáticas de las acciones humanas. Complementa el pendiente 7 y debe atenderse antes de la optimización general. |
+| 16 | Revisar OMR en la calificación de notas del examen | Pendiente de diagnóstico y validación integral | Alta | Contrastar cartillas de prueba con respuestas conocidas: lectura de marcas, identificación del estudiante y variante, correspondencia con el patrón y tratamiento de marcas vacías, múltiples o ambiguas. Comprobar el cálculo de la nota sobre 60 y su previsualización sobre 100, persistencia, reporte y ausencia de duplicación de resultados al repetir el procesamiento. Documentar y corregir las diferencias encontradas. |
+
+### Incidencias de prioridad alta registradas el 7 de septiembre de 2026
+
+Los puntos 10 a 16 se incorporan por solicitud del usuario. Son pendientes de trabajo, no funcionalidades verificadas ni correcciones ya realizadas. El fallo reportado en el examen sin cartilla obliga a volver a comprobar los puntos 2 y 3 antes de cerrarlos, aunque existan componentes implementados. El usuario aclaró que el punto 10 corresponde a **restablecer un rol de examen a Validado**, mediante la acción mostrada en la Lista de Evaluaciones; no se trata de restablecer contraseñas ni perfiles de acceso.
 
 ## Avance inicial
 
@@ -48,14 +62,17 @@ Este bloque permanece en **Pendiente de validación** hasta probarlo con un doce
 
 ## Orden sugerido de atención
 
-1. Cerrar los flujos de notas sin cartilla, incluyendo carga por docente, impresión y permisos.
-2. Cerrar la visualización de patrones después de calificar.
-3. Implementar el permiso configurable de importación de bancos para Directores de Carrera.
-4. Implementar los períodos activos y el período predeterminado por gestión.
-5. Validar la fecha del examen en Plan de Estudios con datos de varias gestiones y grupos.
+1. Corregir el examen sin cartilla y cerrar carga de notas, impresión y permisos; eliminar la exigencia de imprimir marcas en esta modalidad (2, 3, 11 y 14).
+2. Revisar y validar la calificación OMR y sus escalas de notas (16).
+3. Corregir la identificación del usuario autenticado en la bitácora (15).
+4. Cerrar la visualización e impresión de patrones después de calificar (1 y 12).
+5. Agregar observaciones a la lista de firmas y habilitar el restablecimiento del rol de examen a Validado para los perfiles que lo gestionan, respetando su alcance autorizado (13 y 10).
 6. Probar respaldos y restauración en un entorno aislado, por el riesgo operativo que implica.
-7. Optimizar Reportes tomando SIDOPA como referencia principal.
-8. Optimizar Auditoría y verificar que todas las acciones nuevas queden registradas.
+7. Implementar el permiso configurable de importación de bancos para Directores de Carrera (8).
+8. Implementar los períodos activos y el período predeterminado por gestión (9).
+9. Validar la fecha del examen en Plan de Estudios con datos de varias gestiones y grupos (4).
+10. Optimizar Reportes tomando SIDOPA como referencia principal (5).
+11. Optimizar Auditoría y verificar que todas las acciones nuevas queden registradas (7), sin postergar la corrección prioritaria del usuario autenticado del punto 15.
 
 ## Checklist de cierre para cada pendiente
 

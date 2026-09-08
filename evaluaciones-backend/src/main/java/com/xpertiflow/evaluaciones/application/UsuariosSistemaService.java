@@ -443,15 +443,12 @@ public class UsuariosSistemaService {
                     request.setCampuses(resolverCampuses(row, campusesLista, formatter));
 
                     UsuarioSistema existente = usuarioRepository.findByCi(normalizarCi(ci)).orElse(null);
-                    // El Excel histórico todavía no contiene columnas de campus. Al actualizar
-                    // una cuenta de personal se conserva su configuración de campus para evitar
-                    // que una importación administrativa la borre accidentalmente.
-                    if (existente != null && "PERSONAL_EVALUACIONES".equals(rol)
-                            && (request.getCampuses() == null || request.getCampuses().isEmpty())) {
-                        request.setCampuses(existente.getCampuses().stream()
-                                .map(item -> new AlcanceCampusDto(item.getSedeCodigo(), item.getSedeNombre(),
-                                        item.getCampusId(), item.getCampusCodigo(), item.getCampusNombre(), item.isHabilitado()))
-                                .toList());
+                    // Un archivo usado solo para corregir roles no debe borrar los alcances
+                    // ya registrados. Los alcances se reemplazan únicamente cuando la fila
+                    // contiene valores explícitos en alguna columna de sede, carrera o campus.
+                    if (existente != null && !filaTieneAlcance(row, sedes, carreras,
+                            sedesLista, carrerasLista, campusesLista, formatter)) {
+                        conservarAlcances(existente, request);
                     }
                     UsuarioSistema guardado;
                     if (existente == null) {
@@ -602,6 +599,15 @@ public class UsuariosSistemaService {
                         item.getCarreraCodigo(), item.getCarreraNombre(),
                         item.getAsignaturaCodigo(), item.getAsignaturaNombre()))
                 .toList();
+        if (asignaciones.isEmpty() && !sedes.isEmpty() && !carreras.isEmpty()) {
+            // Compatibilidad con cuentas creadas antes de V30: en ese momento se
+            // persistían sedes y carreras por separado, sin la relación concreta.
+            asignaciones = sedes.stream()
+                    .flatMap(sede -> carreras.stream()
+                            .map(carrera -> new AsignacionAcademicaDto(
+                                    sede.codigo(), sede.nombre(), carrera.codigo(), carrera.nombre(), "", "")))
+                    .toList();
+        }
         return new UsuarioSistemaResponseDto(usuario.getId(), usuario.getCi(), usuario.getUsuario(), usuario.getNombreCompleto(),
                 usuario.getRolCodigo(), rol == null ? usuario.getRolCodigo() : rol.getNombre(), usuario.isActivo(),
                 usuario.isDebeCambiarContrasena(), usuario.getProveedorIdentidad(), sedes, carreras, campuses, asignaciones,
@@ -610,6 +616,35 @@ public class UsuariosSistemaService {
 
     private String nombre(String valor) {
         return valor == null ? "" : valor.trim();
+    }
+
+    private void conservarAlcances(UsuarioSistema usuario, UsuarioSistemaRequestDto request) {
+        request.setSedes(usuario.getSedes().stream()
+                .map(item -> new AlcanceAcademicoDto(item.getCodigo(), item.getNombre()))
+                .toList());
+        request.setCarreras(usuario.getCarreras().stream()
+                .map(item -> new AlcanceAcademicoDto(item.getCodigo(), item.getNombre()))
+                .toList());
+        request.setCampuses(usuario.getCampuses().stream()
+                .map(item -> new AlcanceCampusDto(item.getSedeCodigo(), item.getSedeNombre(),
+                        item.getCampusId(), item.getCampusCodigo(), item.getCampusNombre(), item.isHabilitado()))
+                .toList());
+        request.setAsignaciones(usuario.getAsignaciones().stream()
+                .map(item -> new AsignacionAcademicaDto(item.getSedeCodigo(), item.getSedeNombre(),
+                        item.getCarreraCodigo(), item.getCarreraNombre(), item.getAsignaturaCodigo(),
+                        item.getAsignaturaNombre()))
+                .toList());
+    }
+
+    private boolean filaTieneAlcance(Row row, List<ColumnaAlcance> sedes,
+                                     List<ColumnaAlcance> carreras, Integer sedesLista,
+                                     Integer carrerasLista, Integer campusesLista,
+                                     DataFormatter formatter) {
+        return sedes.stream().anyMatch(columna -> !valor(row, columna.indice(), formatter).trim().isBlank())
+                || carreras.stream().anyMatch(columna -> !valor(row, columna.indice(), formatter).trim().isBlank())
+                || (sedesLista != null && !valor(row, sedesLista, formatter).trim().isBlank())
+                || (carrerasLista != null && !valor(row, carrerasLista, formatter).trim().isBlank())
+                || (campusesLista != null && !valor(row, campusesLista, formatter).trim().isBlank());
     }
 
     private void validarRolAsignable(String codigo, String rolActor) {

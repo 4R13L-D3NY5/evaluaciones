@@ -65,7 +65,7 @@ public class CartillaOmrService {
     public PreparacionCartillasOmrResponseDto obtenerPreparacion(String rolExamenId) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
-        validarEstadoParaMarcas(rol);
+        validarEstadoParaLista(rol);
         List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
         Optional<AuditoriaEvaluacion> impresion = auditoriaRepository
                 .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, ACCION_IMPRESION_MARCAS);
@@ -104,7 +104,7 @@ public class CartillaOmrService {
     public byte[] generarListaPdfTemporal(String rolExamenId) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
-        validarEstadoParaMarcas(rol);
+        validarEstadoParaLista(rol);
         List<CartillaOmr> cartillas = construirCartillas(rolExamenId, rol);
         try {
             return pdfService.generarListaBytes(rol, cartillas);
@@ -127,7 +127,7 @@ public class CartillaOmrService {
     public PreparacionCartillasOmrResponseDto marcarListaImpresion(String rolExamenId, String usuario) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
-        validarEstadoParaMarcas(rol);
+        validarEstadoParaLista(rol);
         List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
         registrarAuditoria(rol, ACCION_IMPRESION_LISTA, usuario, estudiantes.size(), null);
         return obtenerPreparacion(rolExamenId);
@@ -314,8 +314,21 @@ public class CartillaOmrService {
     }
 
     private void validarEstadoParaMarcas(RolExamen rol) {
+        if (rol.getModalidad() != com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen.PRESENCIAL_CARTILLA) {
+            throw new IllegalStateException("Los exámenes sin cartilla no requieren impresión de marcas OMR.");
+        }
         if (!ESTADOS_PERMITIDOS_MARCAS.contains(rol.getEstadoFlujo())) {
             throw new IllegalStateException("Las marcas OMR solo pueden generarse antes de entregar el examen. "
+                    + "Estado actual: " + rol.getEstadoFlujo().getValor());
+        }
+    }
+
+    private void validarEstadoParaLista(RolExamen rol) {
+        if (rol.getModalidad() == com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen.VIRTUAL) {
+            throw new IllegalStateException("La lista de firmas solo corresponde a evaluaciones presenciales.");
+        }
+        if (!ESTADOS_PERMITIDOS_MARCAS.contains(rol.getEstadoFlujo())) {
+            throw new IllegalStateException("La lista de firmas solo puede generarse antes de entregar el examen. "
                     + "Estado actual: " + rol.getEstadoFlujo().getValor());
         }
     }

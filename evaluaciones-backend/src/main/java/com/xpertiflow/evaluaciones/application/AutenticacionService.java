@@ -12,7 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -66,15 +68,29 @@ public class AutenticacionService {
         dto.setRol(usuario.getRolCodigo());
         dto.setRolNombre(nombreRol(usuario.getRolCodigo()));
         dto.setDebeCambiarContrasena(usuario.isDebeCambiarContrasena());
-        dto.setSedesAsignadas(Arrays.stream(usuario.getSedesAsignadas().split(","))
+        Set<String> sedes = new LinkedHashSet<>(Arrays.stream(usuario.getSedesAsignadas().split(","))
                 .map(String::trim)
                 .filter(sede -> !sede.isBlank())
                 .toList());
-        dto.setCarrerasAsignadas(usuario.getCarreras().stream()
+        usuario.getSedes().stream()
+                .map(sede -> sede.getCodigo().trim())
+                .filter(sede -> !sede.isBlank())
+                .forEach(sedes::add);
+        usuario.getAsignaciones().stream()
+                .map(asignacion -> asignacion.getSedeCodigo().trim())
+                .filter(sede -> !sede.isBlank())
+                .forEach(sedes::add);
+        dto.setSedesAsignadas(List.copyOf(sedes));
+
+        Set<String> carreras = new LinkedHashSet<>(usuario.getCarreras().stream()
                 .map(carrera -> carrera.getCodigo().trim())
                 .filter(carrera -> !carrera.isBlank())
-                .sorted(Comparator.naturalOrder())
                 .toList());
+        usuario.getAsignaciones().stream()
+                .map(asignacion -> asignacion.getCarreraCodigo().trim())
+                .filter(carrera -> !carrera.isBlank())
+                .forEach(carreras::add);
+        dto.setCarrerasAsignadas(carreras.stream().sorted(Comparator.naturalOrder()).toList());
         return dto;
     }
 
