@@ -770,23 +770,33 @@ interface InstanciaImportacionItem {
               </div>
 
               <!-- Selector de Grupos disponibles de la materia en SEA -->
-              @if (gruposDeMateria().length > 1) {
+              @if (formMateriaObj()) {
                 <div>
                   <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                     <i class="pi pi-users text-primary text-[10px]"></i> Grupo / Paralelo Oficial
                   </label>
-                  <div class="flex flex-wrap gap-2">
-                    @for (grp of gruposDeMateria(); track grp.groupId) {
-                      <button 
-                        type="button"
-                        (click)="seleccionarGrupoSEA(grp)"
-                        [class]="formGrupoObj()?.groupId === grp.groupId ? 'bg-primary text-white font-black' : 'bg-muted text-foreground border border-border font-bold'"
-                        class="px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5">
-                        <i class="pi pi-check-circle text-[10px]" *ngIf="formGrupoObj()?.groupId === grp.groupId"></i>
-                        <span>{{ grp.code || 'Grupo' }} ({{ grp.classType || 'TA' }})</span>
-                      </button>
-                    }
-                  </div>
+                  @if (gruposDeMateria().length > 0) {
+                    <div class="flex flex-wrap gap-2">
+                      @for (grp of gruposDeMateria(); track grp.groupId) {
+                        <button
+                          type="button"
+                          (click)="seleccionarGrupoSEA(grp)"
+                          [class]="formGrupoObj()?.groupId === grp.groupId ? 'bg-primary text-white font-black' : 'bg-muted text-foreground border border-border font-bold'"
+                          class="px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5">
+                          <i class="pi pi-check-circle text-[10px]" *ngIf="formGrupoObj()?.groupId === grp.groupId"></i>
+                          <span>{{ grp.code || 'Grupo' }} ({{ grp.classType || 'TA' }})</span>
+                        </button>
+                      }
+                    </div>
+                  } @else if (cargandoGrupoFormulario()) {
+                    <div class="rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      <i class="pi pi-spin pi-spinner mr-1"></i> Consultando el grupo oficial en SEA...
+                    </div>
+                  } @else {
+                    <div class="rounded-lg border border-dashed border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      No se encontró un grupo oficial disponible para esta asignatura.
+                    </div>
+                  }
                 </div>
               }
 
@@ -796,7 +806,7 @@ interface InstanciaImportacionItem {
                   <span class="flex items-center gap-1 text-primary">
                     <i class="pi pi-verified"></i> Datos sincronizados
                   </span>
-                  <span class="font-mono text-muted-foreground">Grupo: {{ formGrupoObj()?.code || 'TA-01' }}</span>
+                  <span class="font-mono text-muted-foreground">Grupo: {{ formGrupoObj()?.code || (cargandoGrupoFormulario() ? 'Cargando...' : '—') }}</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 text-xs">
@@ -913,6 +923,7 @@ export class RolExamenesComponent implements OnInit {
   public cargando = signal<boolean>(false);
   public cargandoCarreras = signal<boolean>(false);
   public cargandoRoles = signal<boolean>(false);
+  public cargandoGrupoFormulario = signal<boolean>(false);
 
   // Filtros Reactivos con Signals
   public filtroSemestre = signal<string | number>('Todos');
@@ -1056,18 +1067,85 @@ export class RolExamenesComponent implements OnInit {
   public onMateriaFormChange(syllabusCourseId: string): void {
     const mat = this.materias().find(m => m.syllabusCourseId === syllabusCourseId);
     if (mat) {
+      this.cargandoGrupoFormulario.set(false);
       this.formMateriaObj.set(mat);
       const grps = this.grupos().filter(g => g.syllabusCourseId === mat.syllabusCourseId);
       if (grps.length > 0) {
         this.formGrupoObj.set(grps[0]);
       } else {
         this.formGrupoObj.set(null);
+        this._cargarGrupoParaFormulario(mat);
       }
     }
   }
 
   public seleccionarGrupoSEA(grp: GroupItem): void {
     this.formGrupoObj.set(grp);
+  }
+
+  /**
+   * Resuelve el grupo oficial del examen sin mezclar grupos de otras materias.
+   * El identificador persistido es la referencia principal; los demás datos
+   * solo se usan como respaldo para roles antiguos que no lo tengan.
+   */
+  private _resolverGrupoFormulario(mat: Course | null, item?: RolExamenItem): GroupItem | null {
+    if (!mat) return null;
+
+    const gruposMateria = this.grupos().filter(g => g.syllabusCourseId === mat.syllabusCourseId);
+    if (gruposMateria.length === 0) return null;
+    if (!item) return gruposMateria[0];
+
+    const porId = gruposMateria.find(g => g.groupId === item.seaGroupId);
+    if (porId) return porId;
+
+    const codigo = this._normalizar(item.grupo);
+    const tipoClase = this._normalizar(item.tipoClase);
+    const porCodigoYTipo = gruposMateria.find(g =>
+      this._normalizar(g.code) === codigo &&
+      (!tipoClase || this._normalizar(g.classType) === tipoClase)
+    );
+    if (porCodigoYTipo) return porCodigoYTipo;
+
+    // Solo usar el código sin tipo cuando no hay ambigüedad dentro de la materia.
+    const porCodigo = gruposMateria.filter(g => this._normalizar(g.code) === codigo);
+    return porCodigo.length === 1 ? porCodigo[0] : null;
+  }
+
+  /**
+   * Recupera el grupo puntual desde SEA cuando la carga global aún no terminó.
+   * Se fusiona únicamente la materia consultada para no perder otros grupos.
+   */
+  private _cargarGrupoParaFormulario(mat: Course, item?: RolExamenItem): void {
+    const sede = this.sedeSeleccionada();
+    const carrera = this.carreraSeleccionada();
+    if (!sede || !carrera) return;
+
+    const syllabusCourseId = mat.syllabusCourseId;
+    this.cargandoGrupoFormulario.set(true);
+    this._gateway.getGroups(
+      '2-2026',
+      sede.branchOfficeId,
+      carrera.careerId,
+      syllabusCourseId,
+      sede.code,
+      carrera.careerCode
+    ).subscribe({
+      next: grupos => {
+        this.grupos.update(actuales => [
+          ...actuales.filter(grupo => grupo.syllabusCourseId !== syllabusCourseId),
+          ...grupos
+        ]);
+
+        // Evita que una respuesta tardía reemplace la selección de otra materia.
+        if (this.formMateriaObj()?.syllabusCourseId === syllabusCourseId) {
+          this.formGrupoObj.set(this._resolverGrupoFormulario(mat, item));
+        }
+        this.cargandoGrupoFormulario.set(false);
+      },
+      error: () => {
+        this.cargandoGrupoFormulario.set(false);
+      }
+    });
   }
 
   public getHorarioSEAString(): string {
@@ -1829,9 +1907,12 @@ export class RolExamenesComponent implements OnInit {
       return;
     }
     this.itemEditando.set(item);
-    const mat = this.materias().find(m => m.courseCode === item.codigo) || null;
+    this.cargandoGrupoFormulario.set(false);
+    const mat = this.materias().find(m => m.syllabusCourseId === item.seaSyllabusCourseId)
+      || this.materias().find(m => m.courseCode === item.codigo)
+      || null;
     this.formMateriaObj.set(mat);
-    const grp = this.grupos().find(g => g.groupId === item.seaGroupId || g.code === item.grupo) || null;
+    const grp = this._resolverGrupoFormulario(mat, item);
     this.formGrupoObj.set(grp);
     this.formTipo = item.tipo;
     this.formFecha = item.fecha;
@@ -1841,6 +1922,13 @@ export class RolExamenesComponent implements OnInit {
         ? 'PRESENCIAL_CARTILLA'
         : 'PRESENCIAL_SIN_CARTILLA';
     this.dialogFormulario.set(true);
+
+    // La tabla puede cargarse antes que el catálogo de grupos. En ese caso,
+    // completa el grupo por asignatura y vuelve a enlazar el docente oficial
+    // sin obligar al usuario a pulsar manualmente el grupo.
+    if (mat && !grp) {
+      this._cargarGrupoParaFormulario(mat, item);
+    }
   }
 
   public cerrarModalFormulario(): void {
@@ -1861,7 +1949,7 @@ export class RolExamenesComponent implements OnInit {
       this._mostrarToast('Selecciona una sede y una carrera oficiales.');
       return;
     }
-    if (!grp) {
+    if (!grp || grp.syllabusCourseId !== mat.syllabusCourseId) {
       this._mostrarToast('Selecciona un grupo oficial para la materia.');
       return;
     }

@@ -29,6 +29,7 @@ import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -399,6 +400,13 @@ public class OmrProcesamientoService {
 
     @Transactional
     public CalificacionOmrResponseDto ajustarCalificacion(String rolExamenId, AjustarCalificacionOmrRequestDto request) {
+        return ajustarCalificacion(rolExamenId, request, null);
+    }
+
+    @Transactional
+    public CalificacionOmrResponseDto ajustarCalificacion(String rolExamenId,
+                                                         AjustarCalificacionOmrRequestDto request,
+                                                         Authentication authentication) {
         String codigo = request.getCodigoEstudiante() == null ? "" : request.getCodigoEstudiante().trim();
         if (codigo.isBlank()) {
             throw new IllegalArgumentException("El código del estudiante es obligatorio.");
@@ -460,7 +468,8 @@ public class OmrProcesamientoService {
         } catch (IOException exception) {
             throw new IllegalStateException("No se pudieron serializar las respuestas ajustadas.", exception);
         }
-        calificacion.setProcesadoPor(usuarioValido(request.getUsuario()) + "_AJUSTE_OMR");
+        String usuario = authentication != null ? authentication.getName() : request.getUsuario();
+        calificacion.setProcesadoPor(usuarioValido(usuario) + "_AJUSTE_OMR");
         return mapearCalificacion(calificacionRepository.save(calificacion));
     }
 
@@ -509,7 +518,7 @@ public class OmrProcesamientoService {
     }
 
     private String usuarioValido(String usuario) {
-        return usuario == null || usuario.isBlank() ? "ADMIN_EVALUACIONES" : usuario.trim();
+        return usuario == null || usuario.isBlank() ? "SISTEMA" : usuario.trim();
     }
 
     private CalificacionOmrResponseDto mapearCalificacion(CalificacionOmr calificacion) {

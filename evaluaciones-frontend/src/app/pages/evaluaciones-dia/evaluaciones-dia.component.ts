@@ -3292,8 +3292,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (pasoIdx === currentIdx + 1) {
       const nuevoEstado = this.estadoBackendParaEtapa(pasoKey);
       this._rolService.transicionarEstado(item.id, {
-        nuevoEstado,
-        usuario: 'ADMIN_EVALUACIONES'
+        nuevoEstado
       }).subscribe({
         next: rolActualizado => {
           const actualizado = this._mapearRolResponseA_UI(rolActualizado);
@@ -3445,8 +3444,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
     this.confirmandoImpresionSinCartilla.set(true);
     this._rolService.transicionarEstado(item.id, {
-      nuevoEstado: 'IMPRESO',
-      usuario: 'ADMIN_EVALUACIONES'
+      nuevoEstado: 'IMPRESO'
     }).subscribe({
       next: rolActualizado => {
         const actualizado = this._mapearRolResponseA_UI(rolActualizado);
@@ -3710,8 +3708,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       pagina: lectura.pagina,
       codigoAnterior: lectura.codigoEstudiante || null,
       codigoEstudiante: codigo,
-      respuestas: this.respuestasOmrParaGuardar(lectura),
-      usuario: 'ADMIN_EVALUACIONES'
+      respuestas: this.respuestasOmrParaGuardar(lectura)
     }).subscribe({
       next: calificacion => {
         this.resultadoCalificacionOmr.update(resultado => {
@@ -3775,8 +3772,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       pagina: pagina.pagina,
       codigoAnterior: pagina.codigoEstudiante || null,
       codigoEstudiante: this.codigoOmr(pagina),
-      respuestas: this.respuestasOmrParaGuardar(pagina),
-      usuario: 'ADMIN_EVALUACIONES'
+      respuestas: this.respuestasOmrParaGuardar(pagina)
     }));
     this.guardandoCalificacionOmr.set(true);
     forkJoin(ajustes.map(ajuste => this._omrService.ajustarCalificacion(item.id, ajuste))).subscribe({
@@ -3791,8 +3787,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   private _transicionarACalificado(item: EvaluacionItemUI): void {
     this._rolService.transicionarEstado(item.id, {
-      nuevoEstado: 'CALIFICADO',
-      usuario: 'ADMIN_EVALUACIONES'
+      nuevoEstado: 'CALIFICADO'
     }).subscribe({
       next: rolActualizado => {
         const actualizado = this._mapearRolResponseA_UI(rolActualizado);
@@ -3930,7 +3925,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       codigoEstudiante: nota.codigoEstudiante,
       notaSobre60: Number(nota.notaSobre60)
     }));
-    this._sinCartillaService.guardarNotas(item.id, notas, 'DOCENTE').subscribe({
+    this._sinCartillaService.guardarNotas(item.id, notas).subscribe({
       next: guardadas => {
         this.notasDocente.set(guardadas);
         this.guardandoNotasDocente.set(false);
@@ -4839,9 +4834,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
     this.restableciendo.set(true);
     this._rolService.restablecerAValidado(item.id, {
-      motivo,
-      usuario: 'Sistema',
-      ipOrigen: '127.0.0.1'
+      motivo
     }).subscribe({
       next: rol => {
         const actualizado = this._mapearRolResponseA_UI(rol);

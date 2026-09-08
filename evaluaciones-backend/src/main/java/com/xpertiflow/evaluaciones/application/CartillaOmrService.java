@@ -310,7 +310,7 @@ public class CartillaOmrService {
     }
 
     private String usuarioValido(String usuario) {
-        return usuario == null || usuario.isBlank() ? "ADMIN_EVALUACIONES" : usuario.trim();
+        return usuario == null || usuario.isBlank() ? "SISTEMA" : usuario.trim();
     }
 
     private void validarEstadoParaMarcas(RolExamen rol) {

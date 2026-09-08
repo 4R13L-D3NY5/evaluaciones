@@ -60,14 +60,14 @@ export class CartillasOmrService {
   public marcarImpresoTemporal(rolExamenId: string): Observable<PreparacionCartillasOmr> {
     return this._http.post<PreparacionCartillasOmr>(
       `/api/roles-examen/${rolExamenId}/cartillas/marcar-impreso`,
-      { usuario: 'ADMIN_EVALUACIONES' }
+      {}
     );
   }
 
   public marcarListaImpresaTemporal(rolExamenId: string): Observable<PreparacionCartillasOmr> {
     return this._http.post<PreparacionCartillasOmr>(
       `/api/roles-examen/${rolExamenId}/cartillas/marcar-lista-impresa`,
-      { usuario: 'ADMIN_EVALUACIONES' }
+      {}
     );
   }
 
@@ -76,15 +76,13 @@ export class CartillasOmrService {
   }
 
   public generar(rolExamenId: string): Observable<LoteCartillasOmr> {
-    return this._http.post<LoteCartillasOmr>(`/api/roles-examen/${rolExamenId}/cartillas/generar`, {
-      usuario: 'ADMIN_EVALUACIONES'
-    });
+    return this._http.post<LoteCartillasOmr>(`/api/roles-examen/${rolExamenId}/cartillas/generar`, {});
   }
 
   public marcarImpreso(rolExamenId: string, loteId: string): Observable<LoteCartillasOmr> {
     return this._http.post<LoteCartillasOmr>(
       `/api/roles-examen/${rolExamenId}/cartillas/lotes/${loteId}/marcar-impreso`,
-      { usuario: 'ADMIN_EVALUACIONES' }
+      {}
     );
   }
 }

@@ -3518,7 +3518,7 @@ export class BancoPreguntasComponent implements OnInit {
     if (!rol || !file || !this.esSinCartillaActivo() || !this.rolPuedeCargarBanco() || this.cargandoDocumentoSinCartilla()) return;
 
     this.cargandoDocumentoSinCartilla.set(true);
-    this._sinCartillaService.cargarDocumento(rol.id, file, 'DOCENTE').subscribe({
+    this._sinCartillaService.cargarDocumento(rol.id, file).subscribe({
       next: documento => {
         this.documentoSinCartilla.set(documento);
         this.archivoSinCartillaSeleccionado.set(null);

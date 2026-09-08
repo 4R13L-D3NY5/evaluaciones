@@ -147,7 +147,8 @@ public class OmrProcesamientoController {
     @Operation(summary = "Guardar una corrección manual de código y respuestas OMR")
     public ResponseEntity<CalificacionOmrResponseDto> ajustarCalificacion(
             @PathVariable String rolExamenId,
-            @Valid @RequestBody AjustarCalificacionOmrRequestDto request) {
-        return ResponseEntity.ok(omrProcesamientoService.ajustarCalificacion(rolExamenId, request));
+            @Valid @RequestBody AjustarCalificacionOmrRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(omrProcesamientoService.ajustarCalificacion(rolExamenId, request, authentication));
     }
 }
