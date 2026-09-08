@@ -558,7 +558,12 @@ export class UsuariosSistemaComponent implements OnInit {
     this.asignaturasAsignacion = [];
     if (!this.esDocenteSeleccionado() || !this.sedeAsignacionCodigo || !this.carreraAsignacionCodigo) return;
     this.cargandoAsignaturas = true;
-    this.gateway.getCourses(this.sedeAsignacionCodigo, this.carreraAsignacionCodigo).pipe(catchError(() => of([] as Course[]))).subscribe(asignaturas => {
+    const carrera = this.carrerasAsignacion.find(item => item.careerCode === this.carreraAsignacionCodigo);
+    if (!carrera) {
+      this.cargandoAsignaturas = false;
+      return;
+    }
+    this.gateway.getCourses(this.sedeAsignacionCodigo, carrera.careerId).pipe(catchError(() => of([] as Course[]))).subscribe(asignaturas => {
       this.asignaturasAsignacion = [...asignaturas].sort((a, b) => a.courseCode.localeCompare(b.courseCode));
       this.cargandoAsignaturas = false;
     });

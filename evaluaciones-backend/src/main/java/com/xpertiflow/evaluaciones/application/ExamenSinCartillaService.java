@@ -69,6 +69,7 @@ public class ExamenSinCartillaService {
     @Transactional
     public DocumentoSinCartillaResponseDto cargarDocumento(String rolExamenId, MultipartFile file, Authentication authentication) {
         RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
+        validarEstadoCarga(rol);
         String usuario = usuarioAutenticado(authentication);
         validarArchivo(file);
         Path archivo = null;
@@ -252,6 +253,20 @@ public class ExamenSinCartillaService {
                 .orElseThrow(() -> new RuntimeException("El examen sin cartilla todavía no tiene un documento cargado."));
     }
 
+    @Transactional
+    public void eliminarDocumento(String rolExamenId, Authentication authentication) {
+        RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
+        validarEstadoCarga(rol);
+        DocumentoExamenSinCartilla documento = documentoRepository.findByRolExamenId(rolExamenId)
+                .orElseThrow(() -> new RuntimeException("El examen sin cartilla todavía no tiene un documento cargado."));
+
+        Path archivo = Path.of(documento.getArchivoPath());
+        documentoRepository.delete(documento);
+        rolExamenService.revertirPorEliminacionDocumentoSinCartilla(
+                rolExamenId, usuarioAutenticado(authentication));
+        eliminarArchivoSilenciosamente(archivo);
+    }
+
     private RolExamen obtenerRolSinCartilla(String rolExamenId, Authentication authentication) {
         RolExamen rol = rolRepository.findById(rolExamenId)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
@@ -259,6 +274,15 @@ public class ExamenSinCartillaService {
             throw new IllegalStateException("Esta operación solo corresponde a exámenes presenciales sin cartilla.");
         }
         return rol;
+    }
+
+    private void validarEstadoCarga(RolExamen rol) {
+        if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO
+                && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
+            throw new IllegalStateException(
+                    "El examen sin cartilla solo se puede cargar, reemplazar o eliminar antes de GENERADO; estado actual: "
+                            + rol.getEstadoFlujo().getValor());
+        }
     }
 
     private String usuarioAutenticado(Authentication authentication) {

@@ -179,6 +179,44 @@ class RolExamenServiceTest {
     }
 
     @Test
+    void eliminarDocumentoSinCartillaRegresaElRolValidadoAProgramado() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-TEST-SIN-CARTILLA-ELIMINAR")
+                .estadoFlujo(EstadoFlujo.VALIDADO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(rolExamenRepository.save(rol)).thenReturn(rol);
+
+        RolExamen resultado = service.revertirPorEliminacionDocumentoSinCartilla(
+                rol.getId(), "DOCENTE-TEST");
+
+        assertThat(resultado.getEstadoFlujo()).isEqualTo(EstadoFlujo.PROGRAMADO);
+        assertThat(resultado.getHashEncriptacion()).isNull();
+        assertThat(resultado.getFechaValidacion()).isNull();
+        ArgumentCaptor<AuditoriaEvaluacion> auditoria = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
+        verify(auditoriaRepository).save(auditoria.capture());
+        assertThat(auditoria.getValue().getAccion()).isEqualTo("ELIMINACION_EXAMEN_SIN_CARTILLA");
+        assertThat(auditoria.getValue().getUsuario()).isEqualTo("DOCENTE-TEST");
+    }
+
+    @Test
+    void eliminarDocumentoSinCartillaRechazaUnRolGenerado() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-TEST-SIN-CARTILLA-GENERADO")
+                .estadoFlujo(EstadoFlujo.GENERADO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        assertThatThrownBy(() -> service.revertirPorEliminacionDocumentoSinCartilla(
+                rol.getId(), "DOCENTE-TEST"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("antes de GENERADO");
+
+        verify(rolExamenRepository, never()).save(rol);
+        verify(auditoriaRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void alDevolverUnaCartillaPasaAutomaticamenteAPendienteDeCalificacion() {
         RolExamen rol = RolExamen.builder()
                 .id("ROL-TEST-CARTILLA-001")

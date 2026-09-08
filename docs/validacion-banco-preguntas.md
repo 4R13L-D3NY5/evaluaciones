@@ -34,7 +34,7 @@ Documento vivo del módulo **Gestión y Validación de Evaluaciones**. Estas reg
 
 ## 4. Tipología, opciones y respuesta correcta
 
-La respuesta correcta siempre es un único inciso `A`, `B`, `C`, `D` o `E`. En V/F simple también se aceptan `VERDADERO` y `FALSO`, que se normalizan a `A` y `B`. Valores como `AB`, `A/B`, `A: ...`, `Apple` o respuestas vacías son inválidos.
+La respuesta correcta se persiste como un único inciso `A`, `B`, `C`, `D` o `E`. En V/F simple también se aceptan `VERDADERO` y `FALSO`, que se normalizan a `A` y `B`. En V/F complejas se acepta además el valor descriptivo que genera la lista oficial del Excel, por ejemplo `B: 1 y 3 son verdaderas`; el validador extrae y persiste únicamente la letra `B`. Valores como `AB`, `A/B`, `Apple` o respuestas vacías son inválidos.
 
 | Tipología | Opciones requeridas | Respuesta | Grupo |
 | --- | --- | --- | --- |
@@ -92,7 +92,7 @@ Para los exámenes virtuales, la lista ofrece la acción de sala virtual/restabl
 - Grupo de emparejamiento sin un solo enunciado principal, con menos de 2 o más de 10 filas relacionadas, o con filas separadas.
 - Grupo de caso o problema sin un solo enunciado principal, con menos de 2 o más de 10 subítems, o con filas separadas.
 - Opción de emparejamiento o subítem sin grupo o sin enunciado principal correspondiente.
-- Respuestas `AB`, `A/B`, `A: texto`, `VERDADERO`, `FALSO` y vacía.
+- Respuestas `AB`, `A/B`, `Apple`, respuestas descriptivas oficiales como `B: 1 y 3 son verdaderas`, `VERDADERO`, `FALSO` y vacía.
 - Dificultades `1`, `2`, `3`, vacía, decimal y texto inválido.
 - Pesos positivos, cero, negativos, texto y más de dos decimales.
 - Enunciados duplicados, fórmulas con error y `$` sin cerrar.

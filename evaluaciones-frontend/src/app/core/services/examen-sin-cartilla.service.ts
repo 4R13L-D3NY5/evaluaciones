@@ -39,6 +39,10 @@ export class ExamenSinCartillaService {
     return this._http.post<DocumentoSinCartilla>(`${this._baseUrl}/${rolExamenId}/documento`, formData);
   }
 
+  public eliminarDocumento(rolExamenId: string): Observable<void> {
+    return this._http.delete<void>(`${this._baseUrl}/${rolExamenId}/documento`);
+  }
+
   public urlDocumento(rolExamenId: string): string {
     return `${this._baseUrl}/${rolExamenId}/documento/archivo`;
   }

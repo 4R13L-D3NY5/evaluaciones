@@ -40,7 +40,7 @@ Cuando todavía no existe el examen se muestra **Sin examen**. Si existe el exam
 
 - `GET /api/catalogo-academico/sedes`
 - `GET /api/catalogo-academico/carreras?branchOfficeCode={codigo}`
-- `GET /api/catalogo-academico/asignaturas?branchOfficeCode={codigo}&careerCode={codigo}`
+- `GET /api/catalogo-academico/asignaturas?branchOfficeCode={codigo}&careerId={uuid}` (el UUID se envía a SEA; el código se usa únicamente para autorización interna)
 - `GET /api/catalogo-academico/grupos?term={gestion}&branchOfficeId={uuid}&careerId={uuid}`
 - `GET /api/roles-examen?sedeCodigo={codigo}&carreraCodigo={codigo}`
 - `GET /api/bancos-preguntas/{rolExamenId}`

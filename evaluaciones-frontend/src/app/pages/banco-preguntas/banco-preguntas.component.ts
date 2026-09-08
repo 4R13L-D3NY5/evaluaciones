@@ -337,13 +337,18 @@ export interface DiaCalendario {
               </div>
 
               @if (documentoSinCartilla(); as documento) {
-                <div class="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-950">
-                  <div class="flex items-start gap-2">
-                    <i class="pi pi-check-circle text-emerald-700 mt-0.5"></i>
-                    <div><strong class="block">Documento registrado y validado</strong><span class="text-[10px]">{{ documento.nombreArchivo }} · {{ formatearTamanoDocumento(documento.tamanoBytes) }} · {{ documento.cargadoPor }}</span></div>
+                  <div class="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-950">
+                    <div class="flex items-start gap-2">
+                      <i class="pi pi-check-circle text-emerald-700 mt-0.5"></i>
+                      <div><strong class="block">Documento registrado y validado</strong><span class="text-[10px]">{{ documento.nombreArchivo }} · {{ formatearTamanoDocumento(documento.tamanoBytes) }} · {{ documento.cargadoPor }}</span></div>
+                    </div>
+                  <div class="flex flex-wrap gap-2">
+                    <button (click)="abrirDocumentoSinCartilla()" class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-[10px] font-black text-emerald-800 hover:bg-emerald-100 cursor-pointer"><i class="pi pi-download mr-1"></i> Descargar examen</button>
+                    @if (rolPuedeCargarBanco()) {
+                      <button (click)="eliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-[10px] font-black text-rose-700 hover:bg-rose-50 cursor-pointer disabled:opacity-50"><i class="pi pi-trash mr-1"></i> Eliminar examen</button>
+                    }
                   </div>
-                  <button (click)="abrirDocumentoSinCartilla()" class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-[10px] font-black text-emerald-800 hover:bg-emerald-100 cursor-pointer"><i class="pi pi-download mr-1"></i> Descargar examen</button>
-                </div>
+                  </div>
               }
 
               <div (click)="triggerFileInput()" (dragover)="onDragOver($event)" (drop)="onDropFile($event)" [class]="rolPuedeCargarBanco() ? 'border-2 border-dashed border-emerald-300 hover:border-emerald-600 rounded-2xl p-8 text-center space-y-3 bg-emerald-50/40 hover:bg-emerald-50 transition-all cursor-pointer' : 'border-2 border-dashed border-amber-300 rounded-2xl p-8 text-center space-y-3 bg-amber-50/60 opacity-80 cursor-not-allowed'">
@@ -657,7 +662,7 @@ export interface DiaCalendario {
                   <strong>¿Dónde corregir la opción?</strong> La aplicación no mueve incisos automáticamente. Corrige la fila en el Excel original,
                   usando las columnas oficiales <code>respuesta_correcta</code> y <code>opcion_a</code> a <code>opcion_e</code>.
                   En <strong>Selección de la mejor respuesta</strong> y <strong>Subítem de caso o problema</strong>, si la respuesta es <code>E</code>, <code>opcion_e</code> debe contener el texto de esa alternativa.
-                  En <strong>Verdadero o Falso Complejas</strong>, <code>opcion_e</code> debe quedar vacía: la letra <code>E</code> sí puede registrarse en <code>respuesta_correcta</code> porque identifica una combinación de las cuatro proposiciones.
+                  En <strong>Verdadero o Falso Complejas</strong>, <code>opcion_e</code> debe quedar vacía. La respuesta puede ser la letra o el valor completo de la lista oficial, por ejemplo <code>B: 1 y 3 son verdaderas</code>; ambos formatos se interpretan como la clave <code>B</code>.
                   Luego vuelve a cargar el archivo para ejecutar nuevamente todas las validaciones.
                 </div>
                 <ul class="list-disc pl-5 space-y-1 text-rose-800 text-[11px]">
@@ -2615,7 +2620,13 @@ export class BancoPreguntasComponent implements OnInit {
 
   private _cargarMateriasDeCarrera(branchCode: string, careerCode: string): void {
     this.cargandoAsignaturas.set(true);
-    this._gateway.getCourses(branchCode, careerCode).subscribe({
+    const carrera = this.carreras().find(item => item.careerCode === careerCode);
+    if (!carrera) {
+      this.asignaturas.set([]);
+      this.cargandoAsignaturas.set(false);
+      return;
+    }
+    this._gateway.getCourses(branchCode, carrera.careerId).subscribe({
       next: data => {
         const asignaturasOrdenadas = data.slice().sort((a, b) => this.compararCodigos(a.courseCode, b.courseCode));
         this.asignaturas.set(asignaturasOrdenadas);
@@ -3041,7 +3052,7 @@ export class BancoPreguntasComponent implements OnInit {
       return { regla: 'Proposiciones 1–4', problema: 'Falta una o más proposiciones en las columnas opcion_a a opcion_d.', correccion: 'Completa exactamente las cuatro proposiciones y no uses opcion_e para esta tipología.' };
     }
     if (error.includes('Respuesta en V/F complejas')) {
-      return { regla: 'Clave de respuesta', problema: 'La respuesta no corresponde a una clave A–E de Verdadero o Falso Complejas.', correccion: 'Registra la letra de la combinación correcta según la guía: A, B, C, D o E.' };
+      return { regla: 'Clave de respuesta', problema: 'La respuesta no corresponde a una clave A–E de Verdadero o Falso Complejas.', correccion: 'Selecciona una clave de la lista oficial, por ejemplo B: 1 y 3 son verdaderas.' };
     }
     if (error.includes('Requiere 5 opciones completas')) {
       const faltantes = opciones.filter(opcion => !opcion.valor?.trim()).map(opcion => opcion.campo);
@@ -3530,6 +3541,32 @@ export class BancoPreguntasComponent implements OnInit {
     window.open(this._sinCartillaService.urlDocumento(rol.id), '_blank');
   }
 
+  public eliminarDocumentoSinCartilla(): void {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.documentoSinCartilla() || !this.rolPuedeCargarBanco()) {
+      this._mostrarToast('El examen sin cartilla solo se puede eliminar antes de GENERADO.', 'error');
+      return;
+    }
+    if (!window.confirm('Se eliminará el examen sin cartilla y el rol volverá a PROGRAMADO. ¿Deseas continuar?')) return;
+
+    this.cargandoDocumentoSinCartilla.set(true);
+    this._sinCartillaService.eliminarDocumento(rol.id).subscribe({
+      next: () => {
+        this.documentoSinCartilla.set(null);
+        this.archivoSinCartillaSeleccionado.set(null);
+        this.cargandoDocumentoSinCartilla.set(false);
+        this._mostrarToast('Examen sin cartilla eliminado. Puedes cargar un nuevo documento.');
+        const sede = this.sedeSeleccionada();
+        const carrera = this.carreraSeleccionada();
+        if (sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
+      },
+      error: err => {
+        this.cargandoDocumentoSinCartilla.set(false);
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo eliminar el examen sin cartilla.', 'error');
+      }
+    });
+  }
+
   public formatearTamanoDocumento(bytes: number): string {
     if (!bytes) return '0 KB';
     if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -3646,9 +3683,8 @@ export class BancoPreguntasComponent implements OnInit {
         }
 
         // Normalizar Respuesta Correcta (extraer letra principal A-E)
-        let respNorm = '';
-        if (/^[A-E]$/.test(respRaw)) respNorm = respRaw;
-        else if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'VERDADERO') respNorm = 'A';
+        let respNorm = this.normalizarRespuestaCorrectaExcel(respRaw, tipoNorm);
+        if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'VERDADERO') respNorm = 'A';
         else if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'FALSO') respNorm = 'B';
 
         // Normalizar Dificultad (1, 2, 3)
@@ -3825,6 +3861,14 @@ export class BancoPreguntasComponent implements OnInit {
   private normalizarEncabezadoExcel(valor: string): string {
     return (valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  }
+
+  private normalizarRespuestaCorrectaExcel(valor: string, tipo: string): string {
+    const respuesta = (valor || '').trim().toUpperCase();
+    if (/^[A-E]$/.test(respuesta)) return respuesta;
+    if (tipo !== 'VERDADERO_O_FALSO_COMPLEJAS') return '';
+    const respuestaConDescripcion = respuesta.match(/^([A-E])\s*[:.)-]\s*.+$/);
+    return respuestaConDescripcion?.[1] || '';
   }
 
   private aliasColumnaExcel(valor: string): string | null {

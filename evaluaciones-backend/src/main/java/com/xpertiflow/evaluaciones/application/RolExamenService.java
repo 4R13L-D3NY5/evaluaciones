@@ -367,7 +367,9 @@ public class RolExamenService {
             return null;
         }
         try {
-            List<CourseDto> cursos = unitepcGatewayClient.getCourses(rol.getSedeCodigo(), rol.getCarreraCodigo());
+            String careerId = unitepcGatewayClient.resolveCareerId(rol.getSedeCodigo(), rol.getCarreraCodigo());
+            if (careerId == null) return null;
+            List<CourseDto> cursos = unitepcGatewayClient.getCourses(rol.getSedeCodigo(), careerId);
             return cursos == null ? null : cursos.stream()
                     .filter(curso -> mismoTexto(curso.getCourseCode(), rol.getMateriaCodigo()))
                     .map(CourseDto::getSyllabusCourseId)
@@ -523,6 +525,30 @@ public class RolExamenService {
         RolExamen guardado = rolExamenRepository.save(rol);
         registrarAuditoria(guardado, origen, EstadoFlujo.PROGRAMADO,
                 "ELIMINACION_BANCO_PREGUNTAS",
+                usuario != null && !usuario.isBlank() ? usuario : "Sistema",
+                "127.0.0.1");
+        return guardado;
+    }
+
+    @Transactional
+    public RolExamen revertirPorEliminacionDocumentoSinCartilla(String id, String usuario) {
+        RolExamen rol = rolExamenRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
+        EstadoFlujo origen = rol.getEstadoFlujo();
+        if (origen != EstadoFlujo.PROGRAMADO && origen != EstadoFlujo.VALIDADO) {
+            throw new IllegalStateException(
+                    "El documento sin cartilla solo se puede eliminar antes de GENERADO; estado actual: "
+                            + origen.getValor());
+        }
+
+        if (origen == EstadoFlujo.VALIDADO) {
+            rol.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
+            rol.setHashEncriptacion(null);
+            rol.setFechaValidacion(null);
+        }
+        RolExamen guardado = rolExamenRepository.save(rol);
+        registrarAuditoria(guardado, origen, EstadoFlujo.PROGRAMADO,
+                "ELIMINACION_EXAMEN_SIN_CARTILLA",
                 usuario != null && !usuario.isBlank() ? usuario : "Sistema",
                 "127.0.0.1");
         return guardado;

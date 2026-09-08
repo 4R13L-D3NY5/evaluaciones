@@ -44,12 +44,23 @@ public class CatalogoAcademicoController {
     @Operation(summary = "Listar asignaturas por sede y carrera")
     public ResponseEntity<List<CourseDto>> asignaturas(
             @RequestParam String branchOfficeCode,
-            @RequestParam String careerCode,
+            @RequestParam String careerId,
             Authentication authentication) {
+        // El servicio institucional de SEA recibe el UUID de la carrera. El
+        // código solo se resuelve internamente para aplicar las restricciones
+        // de alcance del usuario, que históricamente se guardan por código.
+        CareerDto carrera = unitepcGatewayClient.getCareers(branchOfficeCode).stream()
+                .filter(item -> careerId.equals(item.getCareerId()))
+                .findFirst()
+                .orElse(null);
+        if (carrera == null || !accesoAcademicoService.puedeConsultarCarrera(
+                branchOfficeCode, carrera.getCareerCode(), authentication)) {
+            return ResponseEntity.ok(List.of());
+        }
         return ResponseEntity.ok(accesoAcademicoService.filtrarAsignaturasParaUsuario(
-                unitepcGatewayClient.getCourses(branchOfficeCode, careerCode),
+                unitepcGatewayClient.getCourses(branchOfficeCode, careerId),
                 branchOfficeCode,
-                careerCode,
+                carrera.getCareerCode(),
                 authentication));
     }
 

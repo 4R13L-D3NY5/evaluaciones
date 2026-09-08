@@ -44,7 +44,7 @@ flowchart TD
 | **Autenticación** | `POST /auth/token` | Form: `client_id`, `client_secret`, `grant_type=client_credentials` | Obtiene el token JWT temporal (expira en 300 segundos). |
 | **Sedes** | `GET /api/v1/university/externals/research/branchOffices` | Ninguno | Lista de sedes (Cochabamba, La Paz, El Alto, Santa Cruz, etc.). |
 | **Carreras** | `GET /api/v1/university/externals/research/careers` | `branchOfficeCode=CBA` | Carreras habilitadas por sede. |
-| **Asignaturas (Pensum)** | `GET /api/v1/university/externals/research/courses` | `branchOfficeCode=CBA&careerCode=SIS-PLAN2023` | Materias, códigos, créditos y semestres de la carrera. |
+| **Asignaturas (Pensum)** | `GET /api/v1/university/externals/research/courses` | `branchOfficeCode=CBA&careerId={uuid}` | Materias, códigos, créditos y semestres de la carrera. |
 | **Grupos y Docentes** | `GET /api/v1/student/externals/research/groups` | `term=2-2026&branchOfficeId=...&careerId=...&syllabusCourseId=...` | Grupos teóricos/prácticos (`TA-01`, `TB-01`), docente titular, aula, horario y campus. |
 | **Estudiantes por Grupo** | `GET /api/v1/student/externals/research/students/byGroup` | `groupId=<id_grupo>` | Nómina oficial de alumnos inscritos (código, nombres, apellidos). |
 | **Campus** | `GET /api/v1/student/externals/research/campuses` | `branchOfficeId=...` | Sedes físicas / campus (Campus Colonial, Campus Juan Pablo II, etc.). |
@@ -205,12 +205,12 @@ public class UnitepcGatewayClient {
                 .body(new ParameterizedTypeReference<>() {});
     }
 
-    public List<CourseDto> getCourses(String branchOfficeCode, String careerCode) {
+    public List<CourseDto> getCourses(String branchOfficeCode, String careerId) {
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/university/externals/research/courses")
                         .queryParam("branchOfficeCode", branchOfficeCode)
-                        .queryParam("careerCode", careerCode)
+                        .queryParam("careerId", careerId)
                         .build())
                 .headers(h -> {
                     h.setBearerAuth(getToken());
@@ -297,9 +297,9 @@ public class CatalogoAcademicoController {
     @GetMapping("/courses")
     public ResponseEntity<List<CourseDto>> getCourses(
             @RequestParam String branchOfficeCode, 
-            @RequestParam String careerCode
+            @RequestParam String careerId
     ) {
-        return ResponseEntity.ok(gatewayClient.getCourses(branchOfficeCode, careerCode));
+        return ResponseEntity.ok(gatewayClient.getCourses(branchOfficeCode, careerId));
     }
 
     @GetMapping("/students/byGroup")
@@ -386,8 +386,8 @@ export class UnitepcGatewayService {
     return this.http.get<any[]>(`${this.baseUrl}/careers`, { params: { branchOfficeCode } });
   }
 
-  getCourses(branchOfficeCode: string, careerCode: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/courses`, { params: { branchOfficeCode, careerCode } });
+  getCourses(branchOfficeCode: string, careerId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/courses`, { params: { branchOfficeCode, careerId } });
   }
 
   getStudentsByGroup(groupId: string): Observable<any[]> {

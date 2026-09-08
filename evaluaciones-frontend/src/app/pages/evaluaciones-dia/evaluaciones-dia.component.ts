@@ -15,7 +15,7 @@ import {
   EstudiantesGatewayService, 
   EstudianteInscrito 
 } from '../../core/services/estudiantes-gateway.service';
-import { BranchOffice, Campus, Career } from '../../core/models/unitepc-gateway.models';
+import { BranchOffice, Campus, Career, Course } from '../../core/models/unitepc-gateway.models';
 import { VarianteCompilada } from '../../core/services/examen-macro-generator.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { BancoPreguntasService, BancoPreguntasResponse } from '../../core/services/banco-preguntas.service';
@@ -4089,9 +4089,23 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   private _resolverGrupoSEA(item: EvaluacionItemUI): Observable<string | undefined> {
+    const carrera = this.carreras().find(c =>
+      c.careerCode?.trim().toLowerCase() === item.careerCode?.trim().toLowerCase()
+    );
+    const carrera$ = carrera
+      ? of(carrera)
+      : this._gateway.getCareers(item.sedeCode || '').pipe(
+          map(carreras => carreras.find(c =>
+            c.careerCode?.trim().toLowerCase() === item.careerCode?.trim().toLowerCase()
+          )),
+          catchError(() => of(undefined))
+        );
     const syllabusCourseId$ = item.seaSyllabusCourseId
       ? of(item.seaSyllabusCourseId)
-      : this._gateway.getCourses(item.sedeCode || '', item.careerCode || '').pipe(
+      : carrera$.pipe(
+          switchMap(carreraEncontrada => carreraEncontrada
+            ? this._gateway.getCourses(item.sedeCode || '', carreraEncontrada.careerId)
+            : of([] as Course[])),
           map(cursos => cursos.find(curso =>
             curso.courseCode?.trim().toLowerCase() === item.codigo?.trim().toLowerCase()
           )?.syllabusCourseId)
