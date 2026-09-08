@@ -150,15 +150,15 @@ export class UnitepcGatewayService {
 
   /**
    * Lista las Materias de una Carrera en una Sede específica
-   * GET /api/catalogo-academico/asignaturas?branchOfficeCode={branchOfficeCode}&careerCode={careerCode}
+   * GET /api/catalogo-academico/asignaturas?branchOfficeCode={branchOfficeCode}&careerId={careerId}
    */
-  public getCourses(branchOfficeCode: string, careerCode: string): Observable<Course[]> {
+  public getCourses(branchOfficeCode: string, careerId: string): Observable<Course[]> {
     const params = new HttpParams()
       .set('branchOfficeCode', branchOfficeCode)
-      .set('careerCode', careerCode);
+      .set('careerId', careerId);
     return this._http.get<Course[]>(`${this._baseUrl}/asignaturas`, { params }).pipe(
       catchError(err => {
-        console.error(`[UnitepcGatewayService] Error al obtener Materias (${branchOfficeCode} - ${careerCode}):`, err);
+        console.error(`[UnitepcGatewayService] Error al obtener Materias (${branchOfficeCode} - ${careerId}):`, err);
         return throwError(() => err);
       })
     );

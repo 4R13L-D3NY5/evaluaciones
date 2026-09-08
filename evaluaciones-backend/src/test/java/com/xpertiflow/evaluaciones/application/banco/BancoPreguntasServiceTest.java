@@ -154,6 +154,24 @@ class BancoPreguntasServiceTest {
     }
 
     @Test
+    void rechazaCargaOReemplazoCuandoElRolYaFueGeneradoAntesDeProcesarElArchivo() throws Exception {
+        rol.setEstadoFlujo(EstadoFlujo.GENERADO);
+        MockMultipartFile archivo = crearExcel(60);
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(
+                rol.getId(), archivo, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isFalse();
+        assertThat(respuesta.getErroresValidacion())
+                .anyMatch(error -> error.contains("antes de GENERADO"));
+        verify(bancoRepository, never()).save(any());
+        verify(bancoRepository, never()).deleteAll(any());
+        verify(reactivoRepository, never()).save(any());
+        verify(rolExamenService, never()).validarPorBanco(anyString(), anyString(), anyString());
+    }
+
+    @Test
     void aceptaLasEtiquetasOficialesDelExcelSinErroresDeTipo() throws Exception {
         String[] tiposOficiales = {
                 "Selección de la mejor respuesta",
@@ -162,6 +180,34 @@ class BancoPreguntasServiceTest {
                 "Verdadero o Falso Complejas"
         };
         MockMultipartFile archivo = crearExcel(60, tiposOficiales);
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(
+                rol.getId(), archivo, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isTrue();
+        assertThat(respuesta.getErroresValidacion()).isEmpty();
+        verify(reactivoRepository, times(60)).save(any(Reactivo.class));
+    }
+
+    @Test
+    void aceptaLaDescripcionCompletaDeLaClaveGeneradaPorLaListaOficial() throws Exception {
+        MockMultipartFile archivo = crearExcel(60, new String[]{"Verdadero o Falso Complejas"});
+        try (XSSFWorkbook workbook = new XSSFWorkbook(archivo.getInputStream());
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Row row = workbook.getSheet("Banco").getRow(1);
+            row.getCell(3).setCellValue("1. La energía no se crea ni se destruye, solo se transforma.");
+            row.getCell(4).setCellValue("2. Los virus informáticos son organismos vivos.");
+            row.getCell(5).setCellValue("3. El sonido puede propagarse en el vacío.");
+            row.getCell(6).setCellValue("4. La contraseña 123456 es altamente segura.");
+            row.getCell(7).setCellValue("");
+            row.getCell(8).setCellValue("B: 1 y 3 son verdaderas");
+            workbook.write(output);
+            archivo = new MockMultipartFile(
+                    "file", "vf-complejas-clave-descriptiva.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    output.toByteArray());
+        }
         when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
 
         CargaBancoResponseDto respuesta = service.cargarDesdeExcel(

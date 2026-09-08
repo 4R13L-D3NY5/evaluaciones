@@ -1184,7 +1184,7 @@ export class RolExamenesComponent implements OnInit {
 
     this._cargarRolesOficiales();
 
-    this._gateway.getCourses(sede.code, carrera.careerCode).subscribe({
+    this._gateway.getCourses(sede.code, carrera.careerId).subscribe({
       next: materias => {
         this.materias.set([...materias].sort((a, b) =>
           a.courseCode.localeCompare(b.courseCode, 'es', { numeric: true, sensitivity: 'base' })
@@ -1600,15 +1600,31 @@ export class RolExamenesComponent implements OnInit {
         }
 
         // La plantilla oficial tiene cinco hojas y la hoja de roles empieza en la fila 12.
-        // La hoja conserva una columna A vacía; por ello sheet_to_json mantiene
-        // esa posición y los datos comienzan en el índice 1 (columna B).
-        // Índices reales: B materia, C código, D semestre, E grupo, F docente,
-        // G:L contienen los exámenes que se importan desde este modal.
+        // Se usan letras absolutas de Excel y se convierten al índice entregado por
+        // sheet_to_json, porque algunas versiones conservan la columna A vacía y
+        // otras comienzan el rango directamente en B.
+        // Columnas oficiales: B materia, C código, D semestre, E grupo, F docente,
+        // G:L contienen las fechas y horas de 1er Parcial, 2do Parcial y Final.
+        const rangoHoja = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        const indiceColumnaExcel = (letra: string): number => XLSX.utils.decode_col(letra) - rangoHoja.s.c;
+        const columnasRol = {
+          materia: indiceColumnaExcel('B'),
+          codigo: indiceColumnaExcel('C'),
+          semestre: indiceColumnaExcel('D'),
+          grupo: indiceColumnaExcel('E'),
+          docente: indiceColumnaExcel('F'),
+          primerParcialFecha: indiceColumnaExcel('G'),
+          primerParcialHora: indiceColumnaExcel('H'),
+          segundoParcialFecha: indiceColumnaExcel('I'),
+          segundoParcialHora: indiceColumnaExcel('J'),
+          finalFecha: indiceColumnaExcel('K'),
+          finalHora: indiceColumnaExcel('L')
+        };
         // La 2da Instancia se carga exclusivamente mediante su plantilla.
         const examenesDeFila = (fila: any[]) => [
-          { tipo: '1er Parcial' as RolExamenItem['tipo'], columnaFecha: 6, columnaHora: 7 },
-          { tipo: '2do Parcial' as RolExamenItem['tipo'], columnaFecha: 8, columnaHora: 9 },
-          { tipo: 'Final' as RolExamenItem['tipo'], columnaFecha: 10, columnaHora: 11 }
+          { tipo: '1er Parcial' as RolExamenItem['tipo'], columnaFecha: columnasRol.primerParcialFecha, columnaHora: columnasRol.primerParcialHora },
+          { tipo: '2do Parcial' as RolExamenItem['tipo'], columnaFecha: columnasRol.segundoParcialFecha, columnaHora: columnasRol.segundoParcialHora },
+          { tipo: 'Final' as RolExamenItem['tipo'], columnaFecha: columnasRol.finalFecha, columnaHora: columnasRol.finalHora }
         ].map(examen => ({
           ...examen,
           fecha: this._leerFechaExcel(fila[examen.columnaFecha]),
@@ -1618,9 +1634,9 @@ export class RolExamenesComponent implements OnInit {
 
         filas.slice(11).forEach((row, idx) => {
           const filaExcel = idx + 12;
-          const materiaNombreArchivo = this._textoCelda(row[1]);
-          const codigo = this._textoCelda(row[2]);
-          const grupoCodigo = this._textoCelda(row[4]);
+          const materiaNombreArchivo = this._textoCelda(row[columnasRol.materia]);
+          const codigo = this._textoCelda(row[columnasRol.codigo]);
+          const grupoCodigo = this._textoCelda(row[columnasRol.grupo]);
 
           // Las filas completamente vacías al final de la plantilla no son errores.
           if (!materiaNombreArchivo && !codigo && !grupoCodigo) return;
@@ -1645,7 +1661,14 @@ export class RolExamenesComponent implements OnInit {
 
           const schedule = grupo.schedules?.[0];
           let rolesGeneradosEnFila = 0;
-          const tieneDatosDeExamenGeneral = [6, 8, 10].some(columna => {
+          const tieneDatosDeExamenGeneral = [
+            columnasRol.primerParcialFecha,
+            columnasRol.primerParcialHora,
+            columnasRol.segundoParcialFecha,
+            columnasRol.segundoParcialHora,
+            columnasRol.finalFecha,
+            columnasRol.finalHora
+          ].some(columna => {
             const valor = row[columna];
             return valor !== null && valor !== undefined && this._textoCelda(valor) !== '';
           });

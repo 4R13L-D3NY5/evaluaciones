@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -62,6 +63,14 @@ public class ExamenSinCartillaController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.attachment().filename(documento.getNombreArchivo()).build().toString())
                 .body(resource);
+    }
+
+    @DeleteMapping("/{rolExamenId}/documento")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    public ResponseEntity<Void> eliminarDocumento(@PathVariable String rolExamenId,
+                                                    Authentication authentication) {
+        service.eliminarDocumento(rolExamenId, authentication);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{rolExamenId}/notas")

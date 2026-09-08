@@ -95,8 +95,9 @@ public class BancoPreguntasService {
             String materiaCodigo, String grupo, String tipoParcialValor, MultipartFile file, String docenteAprobador) {
         TipoParcial tipoParcial = TipoParcial.fromValor(tipoParcialValor);
 
-        // Primero buscar un rol PROGRAMADO; si no existe, buscar el más reciente en cualquier estado
-        // para permitir re-subir un banco sobre un rol ya validado/generado.
+        // Primero buscar un rol PROGRAMADO; si no existe, buscar el más reciente en cualquier estado.
+        // La validación final de estado se realiza antes de procesar el archivo
+        // y solo permite PROGRAMADO o VALIDADO.
         Optional<RolExamen> rolOpt = rolRepository.findFirstByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujo(
                         materiaCodigo, grupo, tipoParcial, EstadoFlujo.PROGRAMADO);
 
@@ -118,6 +119,16 @@ public class BancoPreguntasService {
 
         List<String> errores = new ArrayList<>();
         List<Reactivo> reactivos = new ArrayList<>();
+
+        // La carga o sustitución solo es válida antes de que se generen los
+        // cuadernillos. Esta comprobación debe ejecutarse antes de procesar o
+        // persistir contenido para impedir cargas parciales en estados finales.
+        if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO
+                && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
+            return respuestaFallida(rol, List.of(
+                    "El banco solo se puede cargar o reemplazar antes de GENERADO; estado actual: "
+                            + rol.getEstadoFlujo().getValor()));
+        }
 
         validarArchivo(file, errores);
         if (!errores.isEmpty()) return respuestaFallida(rol, errores);
@@ -200,6 +211,14 @@ public class BancoPreguntasService {
             String docenteOficial = rolExamenService.resolverNombreDocenteOficial(rol);
             if (docenteOficial == null || docenteOficial.isBlank()) {
                 throw new RuntimeException("No se encontró un docente oficial en los servicios institucionales para este rol de examen");
+            }
+
+            // Una carga posterior a VALIDADO reemplaza el banco vigente para
+            // que no queden dos bancos activos asociados al mismo rol.
+            List<BancoPreguntas> bancosAnteriores = bancoRepository
+                    .findByRolExamenIdOrderByFechaAprobacionDesc(rol.getId());
+            if (!bancosAnteriores.isEmpty()) {
+                bancoRepository.deleteAll(bancosAnteriores);
             }
 
             // Guardar banco. El paquete contiene todo el contenido sensible y
@@ -382,8 +401,11 @@ public class BancoPreguntasService {
         } else if (respuesta.isBlank()) {
             errores.add("Fila " + (rowNum + 1) + ": respuesta correcta debe ser un único inciso A-E");
         }
+        boolean respuestaDescriptivaVfCompleja = "VERDADERO_O_FALSO_COMPLEJAS".equals(tipoNormalizado)
+                && respuestaOriginal.trim().matches("(?i)[A-E]\\s*[:.)-]\\s*.+");
         if (!sinRespuestaDirecta && !respuestaOriginal.isBlank()
-                && !respuestaOriginal.trim().matches("(?i)[A-E]|VERDADERO|FALSO")) {
+                && !respuestaOriginal.trim().matches("(?i)[A-E]|VERDADERO|FALSO")
+                && !respuestaDescriptivaVfCompleja) {
             errores.add("Fila " + (rowNum + 1) + ": respuesta correcta inválida; debe ser un único inciso A-E");
         }
         boolean respuestaDebeApuntarAOpcion = !sinRespuestaDirecta && !"OPCION_EMPAREJAMIENTO".equals(tipoNormalizado);
@@ -729,6 +751,10 @@ public class BancoPreguntasService {
         if ("VERDADERO_O_FALSO_SIMPLE".equals(tipo)) {
             if ("VERDADERO".equals(valor)) return "A";
             if ("FALSO".equals(valor)) return "B";
+        }
+        if ("VERDADERO_O_FALSO_COMPLEJAS".equals(tipo)
+                && valor.matches("[A-E]\\s*[:.)-]\\s*.+")) {
+            return valor.substring(0, 1);
         }
         return valor.matches("[A-E]") ? valor : "";
     }

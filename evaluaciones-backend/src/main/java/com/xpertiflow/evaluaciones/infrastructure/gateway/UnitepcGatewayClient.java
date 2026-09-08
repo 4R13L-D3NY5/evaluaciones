@@ -89,12 +89,24 @@ public class UnitepcGatewayClient {
                 .body(new ParameterizedTypeReference<>() {});
     }
 
-    public List<CourseDto> getCourses(String branchOfficeCode, String careerCode) {
+    public String resolveCareerId(String branchOfficeCode, String careerCode) {
+        if (careerCode == null || careerCode.isBlank()) {
+            return null;
+        }
+        return getCareers(branchOfficeCode).stream()
+                .filter(career -> careerCode.equalsIgnoreCase(career.getCareerCode()))
+                .map(CareerDto::getCareerId)
+                .filter(id -> id != null && !id.isBlank())
+                .findFirst()
+                .orElse(null);
+    }
+
+    public List<CourseDto> getCourses(String branchOfficeCode, String careerId) {
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/university/externals/research/courses")
                         .queryParam("branchOfficeCode", branchOfficeCode)
-                        .queryParam("careerCode", careerCode)
+                        .queryParam("careerId", careerId)
                         .build())
                 .headers(h -> {
                     h.setBearerAuth(getToken());

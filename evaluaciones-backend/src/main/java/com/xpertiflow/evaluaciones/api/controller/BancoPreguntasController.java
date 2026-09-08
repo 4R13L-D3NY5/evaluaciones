@@ -50,7 +50,7 @@ public class BancoPreguntasController {
     }
 
     @DeleteMapping("/{rolExamenId}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     @Operation(summary = "Eliminar el banco de preguntas cargado para un rol de examen")
     public ResponseEntity<Void> eliminarPorRol(
             @PathVariable String rolExamenId,

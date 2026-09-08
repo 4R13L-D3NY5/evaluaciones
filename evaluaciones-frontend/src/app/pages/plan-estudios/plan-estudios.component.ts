@@ -672,7 +672,9 @@ export class PlanEstudiosComponent implements OnInit {
       : of([] as GroupItem[]);
 
     forkJoin({
-      cursos: this.gateway.getCourses(codigoSede, codigoCarrera),
+      cursos: carrera
+        ? this.gateway.getCourses(codigoSede, carrera.careerId)
+        : of([] as Course[]),
       grupos: gruposSea$,
       roles: this.rolService.listar(codigoSede, codigoCarrera)
     }).subscribe({

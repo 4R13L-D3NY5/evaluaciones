@@ -923,7 +923,7 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
     this.materiaSeleccionada.set(null);
     const sede = this.sedeSeleccionada();
     if (sede) {
-      this._cargarMateriasDeCarrera(sede.code, carrera.careerCode);
+      this._cargarMateriasDeCarrera(sede.code, carrera.careerId);
       this._cargarGrupos();
     }
   }
@@ -975,9 +975,9 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
     });
   }
 
-  private _cargarMateriasDeCarrera(branchCode: string, careerCode: string): void {
+  private _cargarMateriasDeCarrera(branchCode: string, careerId: string): void {
     this.cargandoMaterias.set(true);
-    this._gateway.getCourses(branchCode, careerCode).subscribe({
+    this._gateway.getCourses(branchCode, careerId).subscribe({
       next: data => {
         this.materias.set(data.slice().sort((a, b) => this.compararCodigos(a.courseCode, b.courseCode)));
         this.cargandoMaterias.set(false);
@@ -1126,7 +1126,7 @@ export class CatalogoUnitepcComponent implements OnInit, OnDestroy {
     if (pares.size === 0) return;
 
     forkJoin([...pares.entries()].map(([clave, contexto]) => this._gateway
-      .getCourses(contexto.sede.code, contexto.carrera.careerCode)
+      .getCourses(contexto.sede.code, contexto.carrera.careerId)
       .pipe(
         catchError(() => of([] as Course[])),
         map(asignaturas => ({ clave, asignaturas }))
