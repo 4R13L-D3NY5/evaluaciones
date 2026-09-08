@@ -19,12 +19,15 @@ El sistema utiliza autenticación interna con sesión HTTP y autorización por r
 
 - `POST /api/auth/login`: crea la sesión interna.
 - `GET /api/auth/session`: devuelve el usuario autenticado.
+- `POST /api/auth/renew`: renueva la ventana de inactividad de la sesión autenticada.
 - `POST /api/auth/logout`: invalida la sesión.
 - `POST /api/auth/cambiar-contrasena`: completa el cambio obligatorio de la contraseña temporal.
 
 La administración de usuarios se encuentra documentada en [módulo de usuarios, roles y alcance académico](modulo-usuarios-accesos.md). Las cuentas nuevas usan el CI como usuario y contraseña temporal; el primer ingreso exige definir una contraseña personal. Los alcances por sede y carrera se almacenan en relaciones separadas y se importan mediante columnas marcables del Excel.
 
 Las rutas del frontend tienen guards por rol y los endpoints operativos del backend aplican `@PreAuthorize`. Para docentes, el acceso ya se filtra por el CI oficial del docente recibido desde SEA en grupos, materias y banco de preguntas; el resto de consultas de evaluaciones, OMR, virtuales y reportes debe completar el mismo control antes de pasar a producción.
+
+La sesión HTTP tiene una ventana de inactividad configurable mediante `SESSION_TIMEOUT` (por defecto, 30 minutos). El frontend muestra un aviso durante los últimos cinco minutos con contador regresivo y permite renovarla; si llega a cero o el backend responde que ya expiró, se muestra la opción para volver a iniciar sesión.
 
 ## Usuario inicial de desarrollo
 

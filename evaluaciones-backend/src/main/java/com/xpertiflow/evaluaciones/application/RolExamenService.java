@@ -150,6 +150,7 @@ public class RolExamenService {
         entity.setSeaGroupId(previsualizacion.getSeaGroupId());
         aplicarDocenteOficial(entity, grupoOficial);
         entity.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
+        entity.setDia(nombreDiaSemana(dto.getFecha()));
         entity.setFechaDisplay(formatearFecha(dto.getFecha()));
         RolExamen guardado = rolExamenRepository.save(entity);
         registrarAuditoria(guardado, null, EstadoFlujo.PROGRAMADO, "CREACION_ROL_EXAMEN", "Sistema", "127.0.0.1");
@@ -176,6 +177,7 @@ public class RolExamenService {
         mapper.updateEntity(dto, rol);
         rol.setSeaGroupId(previsualizacion.getSeaGroupId());
         aplicarDocenteOficial(rol, grupoOficial);
+        rol.setDia(nombreDiaSemana(dto.getFecha()));
         rol.setFechaDisplay(formatearFecha(dto.getFecha()));
         RolExamen guardado = rolExamenRepository.save(rol);
         registrarAuditoria(guardado, rol.getEstadoFlujo(), rol.getEstadoFlujo(),
@@ -787,5 +789,18 @@ public class RolExamenService {
 
     private String formatearFecha(java.time.LocalDate fecha) {
         return String.format("%02d/%02d/%d", fecha.getDayOfMonth(), fecha.getMonthValue(), fecha.getYear());
+    }
+
+    private String nombreDiaSemana(java.time.LocalDate fecha) {
+        if (fecha == null) return null;
+        return switch (fecha.getDayOfWeek()) {
+            case MONDAY -> "Lunes";
+            case TUESDAY -> "Martes";
+            case WEDNESDAY -> "Miércoles";
+            case THURSDAY -> "Jueves";
+            case FRIDAY -> "Viernes";
+            case SATURDAY -> "Sábado";
+            case SUNDAY -> "Domingo";
+        };
     }
 }

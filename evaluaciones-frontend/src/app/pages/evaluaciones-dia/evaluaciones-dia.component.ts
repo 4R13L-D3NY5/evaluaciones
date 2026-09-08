@@ -1753,14 +1753,12 @@ interface CampusDisponible extends Campus {
                 @if (loteCartillasActual(); as preparacion) {
                   <div class="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs text-indigo-950 leading-relaxed flex gap-3 items-start">
                     <i class="pi pi-info-circle text-indigo-600 text-base mt-0.5"></i>
-                    <span>La lista se consulta directamente del SEA. Puedes volver a generar cualquiera de los dos PDF para obtener la información actualizada. Cada documento tiene su propia confirmación de impresión.</span>
+                    <span>La lista se consulta directamente del SEA. Puedes volver a generar {{ evaluacionCartillas.modalidad === 'PRESENCIAL_SIN_CARTILLA' ? 'el PDF de la lista' : 'cualquiera de los dos PDF' }} para obtener la información actualizada. Cada documento tiene su propia confirmación de impresión.</span>
                   </div>
                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                      <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Estudiantes</span><strong class="text-lg text-foreground">{{ preparacion.totalCartillas }}</strong></div>
                      @if (evaluacionCartillas.modalidad === 'PRESENCIAL_CARTILLA') {
                        <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Marcas OMR</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresion === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresion === 'PENDIENTE'">{{ preparacion.estadoImpresion }}</strong></div>
-                     } @else {
-                       <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Marcas OMR</span><strong class="text-sm text-slate-500">No aplica</strong></div>
                      }
                      <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Lista</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresionLista === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresionLista === 'PENDIENTE'">{{ preparacion.estadoImpresionLista }}</strong></div>
                      <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">PDF de firmas</strong></div>
@@ -2704,15 +2702,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     carrerasAsignadas: CarreraCampusAsignada[]
   ): Career[] {
     const carrerasCatalogo = new Map(catalogo.map(carrera => [carrera.careerCode.toUpperCase(), carrera]));
-    const identidadCampus = {
-      sedeCodigo: campus.branchOfficeCode,
-      campusId: campus.campusId,
-      campusCodigo: campus.code,
-      campusNombre: campus.name
-    };
-    const carrerasConfiguradas = carrerasAsignadas.length
-      ? carrerasAsignadas
-      : this._campusCarreras.listar(identidadCampus);
+    // La configuración oficial vive en el servidor. El almacenamiento local
+    // solo conserva caché y no debe volver a habilitar asignaciones obsoletas.
+    const carrerasConfiguradas = carrerasAsignadas;
     if (carrerasConfiguradas.length) {
       return carrerasConfiguradas
         .map(carrera => carrerasCatalogo.get(carrera.codigo.toUpperCase()))

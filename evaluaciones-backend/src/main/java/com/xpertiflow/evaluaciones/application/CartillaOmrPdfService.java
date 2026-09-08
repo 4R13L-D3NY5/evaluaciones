@@ -261,7 +261,7 @@ public class CartillaOmrPdfService {
                     PDType1Font.HELVETICA_BOLD, 7.5f);
             textoDesdeArriba(contenido, limitar(normalizar(cartilla.getNombreCompleto()), 32), estudianteX + 8f, y,
                     PDType1Font.HELVETICA, 7.5f);
-            textoDesdeArriba(contenido, "________________", observacionesX + 6f, y,
+            textoDesdeArriba(contenido, "________________", firmaX + 8f, y,
                     PDType1Font.HELVETICA, 6.5f);
         }
     }

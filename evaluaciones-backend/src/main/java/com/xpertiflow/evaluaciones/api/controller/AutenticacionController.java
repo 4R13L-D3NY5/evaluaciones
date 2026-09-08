@@ -46,19 +46,33 @@ public class AutenticacionController {
             context.setAuthentication(authentication);
             SecurityContextHolder.setContext(context);
             securityContextRepository.saveContext(context, httpRequest, httpResponse);
-            return ResponseEntity.ok(service.registrarIngreso(authentication));
+            return ResponseEntity.ok(conEstadoSesion(service.registrarIngreso(authentication), httpRequest));
         } catch (BadCredentialsException exception) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
     }
 
     @GetMapping("/session")
-    public ResponseEntity<SesionUsuarioDto> session(Authentication authentication) {
+    public ResponseEntity<SesionUsuarioDto> session(Authentication authentication, HttpServletRequest request) {
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication.getPrincipal().equals("anonymousUser")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(service.obtenerSesion(authentication));
+        return ResponseEntity.ok(conEstadoSesion(service.obtenerSesion(authentication), request));
+    }
+
+    @PostMapping("/renew")
+    public ResponseEntity<SesionUsuarioDto> renovarSesion(
+            Authentication authentication,
+            HttpServletRequest request) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication.getPrincipal().equals("anonymousUser")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        // Acceder a la sesión durante una petición autenticada renueva su
+        // ventana de inactividad sin crear una sesión para usuarios anónimos.
+        request.getSession(false);
+        return ResponseEntity.ok(conEstadoSesion(service.obtenerSesion(authentication), request));
     }
 
     @PostMapping("/logout")
@@ -74,8 +88,20 @@ public class AutenticacionController {
     @PostMapping("/cambiar-contrasena")
     public ResponseEntity<SesionUsuarioDto> cambiarContrasena(
             @Valid @RequestBody CambiarContrasenaRequestDto request,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
         service.cambiarContrasena(authentication, request.getContrasenaActual(), request.getContrasenaNueva());
-        return ResponseEntity.ok(service.obtenerSesion(authentication));
+        return ResponseEntity.ok(conEstadoSesion(service.obtenerSesion(authentication), httpRequest));
+    }
+
+    private SesionUsuarioDto conEstadoSesion(SesionUsuarioDto sesion, HttpServletRequest request) {
+        HttpSession httpSession = request.getSession(false);
+        if (httpSession == null || httpSession.getMaxInactiveInterval() <= 0) {
+            return sesion;
+        }
+        int duracionSegundos = httpSession.getMaxInactiveInterval();
+        sesion.setSesionDuracionSegundos(duracionSegundos);
+        sesion.setSesionExpiraEn(System.currentTimeMillis() + duracionSegundos * 1000L);
+        return sesion;
     }
 }

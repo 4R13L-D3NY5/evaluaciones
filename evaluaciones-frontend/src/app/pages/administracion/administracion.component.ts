@@ -932,7 +932,13 @@ export interface ParcialConfig {
 
             <div class="flex justify-end gap-2 pt-2">
               <button (click)="cerrarModalAsignarCarrera()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground">Cancelar</button>
-              <button (click)="guardarAsignacionCarreraModal()" [disabled]="cargandoCarrerasParaCampus() || !campusSeleccionadoParaCarrera()" class="px-5 py-2 rounded-xl bg-purple-700 text-white text-xs font-black disabled:opacity-50">Guardar asignaciones</button>
+              <button (click)="guardarAsignacionCarreraModal()" [disabled]="cargandoCarrerasParaCampus() || guardandoAsignacionCarrera() || !campusSeleccionadoParaCarrera()" class="px-5 py-2 rounded-xl bg-purple-700 text-white text-xs font-black disabled:opacity-50">
+                @if (guardandoAsignacionCarrera()) {
+                  <i class="pi pi-spin pi-spinner mr-1"></i> Guardando...
+                } @else {
+                  Guardar asignaciones
+                }
+              </button>
             </div>
           </div>
         </div>
@@ -993,6 +999,7 @@ export class AdministracionEvaluacionesComponent {
 
   public ratioEstudiantesPorVariante: number = 5;
   public guardandoConfiguracion = signal<boolean>(false);
+  public guardandoAsignacionCarrera = signal<boolean>(false);
 
   public tabActual = signal<'campus' | 'carreras' | 'usuarios' | 'configuracion' | 'tiempos'>('campus');
   public toastMessage = signal<string | null>(null);
@@ -1308,29 +1315,14 @@ export class AdministracionEvaluacionesComponent {
           sede: item.sede,
           sedeCodigo: item.sedeCodigo,
           campusCodigo: item.campusCodigo,
-          carreras: this._campusCarreras.listar({
-            sedeCodigo: item.sedeCodigo,
-            campusId: item.campusId,
-            campusCodigo: item.campusCodigo,
-            campusNombre: item.nombre
-          }).map((carrera, indice) => ({ id: indice + 1, nombre: `${carrera.codigo} · ${this.nombreCarreraVisible(carrera.codigo, carrera.nombre)}` }))
+          carreras: []
         }));
         const consultasCarreras = campusItems.map(item => this._campusCarreras.listarRemoto({
           sedeCodigo: item.sedeCodigo,
           campusId: item.campusId,
           campusCodigo: item.campusCodigo,
           campusNombre: item.nombre
-        }).pipe(map(carreras => carreras.length ? carreras : this._campusCarreras.listar({
-          sedeCodigo: item.sedeCodigo,
-          campusId: item.campusId,
-          campusCodigo: item.campusCodigo,
-          campusNombre: item.nombre
-        })), catchError(() => of(this._campusCarreras.listar({
-          sedeCodigo: item.sedeCodigo,
-          campusId: item.campusId,
-          campusCodigo: item.campusCodigo,
-          campusNombre: item.nombre
-        })))));
+        }).pipe(catchError(() => of([]))));
         forkJoin(consultasCarreras).subscribe(asignaciones => {
           this.listaCarrerasCampus = campusItems.map((item, indice) => ({
             id: item.id,
@@ -1595,37 +1587,43 @@ export class AdministracionEvaluacionesComponent {
   }
 
   public guardarAsignacionCarreraModal(): void {
+    if (this.guardandoAsignacionCarrera()) return;
     const campusSeleccionado = this.campusSeleccionadoParaCarrera();
     const campusTarget = this.listaCarrerasCampus.find(c => this.mismoCampus(c, campusSeleccionado));
     const carrerasAsignadas = this.carrerasDisponiblesParaCampus().filter(carrera => this.carrerasSeleccionadasCampus.has(carrera.id));
-    if (campusTarget && campusSeleccionado) {
-      campusTarget.carreras = carrerasAsignadas.map(carrera => ({ ...carrera }));
-      const campus = this.listaCampus.find(item => item.nombre === campusTarget.campus);
-      if (campus) {
-        campus.carrerasCount = campusTarget.carreras.length;
-        const identidadCampus = {
-          sedeCodigo: campus.sedeCodigo,
-          campusId: campus.campusId,
-          campusCodigo: campus.campusCodigo,
-          campusNombre: campus.nombre
-        };
-        this._campusCarreras.guardar(identidadCampus, campusTarget.carreras);
-        this._campusCarreras.guardarRemoto(identidadCampus, campusTarget.carreras).subscribe({
-          next: carreras => {
-            campusTarget.carreras = carreras.map((carrera, indice) => ({
-              id: indice + 1,
-              nombre: `${carrera.codigo} · ${carrera.nombre}`
-            }));
-            campus.carrerasCount = carreras.length;
-            this.catalogoVersion.update(value => value + 1);
-          },
-          error: () => this._mostrarToast('La asignación quedó guardada localmente, pero no pudo sincronizarse con el servidor.')
-        });
-      }
-      this.catalogoVersion.update(value => value + 1);
-      this._mostrarToast(`${carrerasAsignadas.length} carrera(s) asignada(s) a '${campusTarget.campus}'.`);
+    const campus = campusTarget ? this.listaCampus.find(item => this.mismoCampus(campusTarget, item)) : null;
+    if (!campusTarget || !campusSeleccionado || !campus) {
+      this._mostrarToast('Selecciona un campus válido para guardar las asignaciones.');
+      return;
     }
-    this.cerrarModalAsignarCarrera();
+
+    const identidadCampus = {
+      sedeCodigo: campus.sedeCodigo,
+      campusId: campus.campusId,
+      campusCodigo: campus.campusCodigo,
+      campusNombre: campus.nombre
+    };
+    this.guardandoAsignacionCarrera.set(true);
+    this._campusCarreras.guardarRemoto(identidadCampus, carrerasAsignadas).subscribe({
+      next: carreras => {
+        campusTarget.carreras = carreras.map((carrera, indice) => ({
+          id: indice + 1,
+          nombre: `${carrera.codigo} · ${this.nombreCarreraVisible(carrera.codigo, carrera.nombre)}`
+        }));
+        campus.carrerasCount = carreras.length;
+        this.catalogoVersion.update(value => value + 1);
+        this.guardandoAsignacionCarrera.set(false);
+        this.cerrarModalAsignarCarrera();
+        this._mostrarToast(`${carreras.length} carrera(s) guardada(s) en el servidor para '${campusTarget.campus}'.`);
+      },
+      error: error => {
+        this.guardandoAsignacionCarrera.set(false);
+        const mensaje = error?.status === 403
+          ? 'No tienes permisos para guardar asignaciones de campus.'
+          : 'No se pudo guardar la asignación en el servidor. Verifica la conexión e inténtalo nuevamente.';
+        this._mostrarToast(mensaje);
+      }
+    });
   }
 
   public editarCarreraCampus(row: CarreraCampusItem, carr: { id: number; nombre: string }): void {

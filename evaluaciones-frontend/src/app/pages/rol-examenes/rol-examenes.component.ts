@@ -1728,7 +1728,7 @@ export class RolExamenesComponent implements OnInit {
               modalidad: 'PRESENCIAL_CARTILLA',
               conCartilla: true,
               semana: 1,
-              dia: schedule ? this._obtenerNombreDia(schedule.day) : 'Por definir',
+              dia: this._nombreDiaDeFecha(examen.fecha.iso),
               fecha: examen.fecha.iso,
               fechaDisplay: examen.fecha.display,
               horario,
@@ -1900,7 +1900,9 @@ export class RolExamenesComponent implements OnInit {
       modalidad: this.formModalidad,
       conCartilla,
       semana: edit?.semana || 1,
-      dia: sch ? this._obtenerNombreDia(sch.day) : edit?.dia || 'Lunes',
+      // El día mostrado debe corresponder a la fecha del examen. El horario
+      // y el aula siguen proviniendo del grupo oficial de SEA.
+      dia: this._nombreDiaDeFecha(this.formFecha),
       fecha: this.formFecha,
       fechaDisplay: fechaDisp,
       horario: sch ? `${sch.startTime} - ${sch.endTime}` : edit?.horario || '08:15 - 09:45',
@@ -2250,6 +2252,11 @@ export class RolExamenesComponent implements OnInit {
 
   private _nombreDiaSemana(dia: number): string {
     return ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][dia] || 'día no identificado';
+  }
+
+  private _nombreDiaDeFecha(fechaIso: string): string {
+    const dia = this._diaSemanaDeFecha(fechaIso);
+    return ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dia] || 'Por definir';
   }
 
   private _formatearFechaCorta(fechaIso: string): string {

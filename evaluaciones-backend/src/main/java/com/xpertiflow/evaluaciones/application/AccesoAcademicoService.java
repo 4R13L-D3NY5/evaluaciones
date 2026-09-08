@@ -177,16 +177,24 @@ public class AccesoAcademicoService {
                                 || coincide(item.getAsignaturaCodigo(), rol.getMateriaCodigo())));
         }
         if ("DIRECTOR_CARRERA".equals(rolUsuario)) {
-            if (!usuario.getAsignaciones().isEmpty()) {
-                return usuario.getAsignaciones().stream().anyMatch(item ->
+            boolean asignacionAcademicaValida = usuario.getAsignaciones().stream().anyMatch(item ->
                         coincide(item.getSedeCodigo(), rol.getSedeCodigo())
                                 && coincide(item.getCarreraCodigo(), rol.getCarreraCodigo()));
-            }
+            if (asignacionAcademicaValida) return true;
+
             boolean sedeValida = !usuario.getSedes().isEmpty() && usuario.getSedes().stream()
                     .anyMatch(item -> coincide(item.getCodigo(), rol.getSedeCodigo()));
             boolean carreraValida = !usuario.getCarreras().isEmpty() && usuario.getCarreras().stream()
                     .anyMatch(item -> coincide(item.getCodigo(), rol.getCarreraCodigo()));
-            return sedeValida && carreraValida;
+            if (sedeValida && carreraValida) return true;
+
+            // Algunas cuentas de dirección se cargaron con el alcance nuevo de
+            // campus. En ese caso el campus habilitado es el límite operativo;
+            // no se concede acceso global ni se ignoran los campus deshabilitados.
+            return usuario.getCampuses().stream().anyMatch(item ->
+                    item.isHabilitado()
+                            && coincide(item.getSedeCodigo(), rol.getSedeCodigo())
+                            && coincideCampus(item, rol.getCampus()));
         }
         if ("PERSONAL_EVALUACIONES".equals(rolUsuario)) {
             return usuario.getCampuses().stream().anyMatch(item ->
