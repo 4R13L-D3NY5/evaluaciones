@@ -14,7 +14,7 @@ import {
   RolExamenService
 } from '../../core/services/rol-examen.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
-import { catchError, forkJoin, from, map, mergeMap, of, switchMap, toArray } from 'rxjs';
+import { catchError, firstValueFrom, forkJoin, from, map, mergeMap, of, switchMap, toArray } from 'rxjs';
 
 export type RolExamenItem = RolExamenPersistedItem;
 
@@ -1647,7 +1647,7 @@ export class RolExamenesComponent implements OnInit {
 
     this.excelCargadoNombre.set(file.name);
     const reader = new FileReader();
-    reader.onload = (e: any) => {
+    reader.onload = async (e: any) => {
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
@@ -1710,6 +1710,63 @@ export class RolExamenesComponent implements OnInit {
           valorHora: fila[examen.columnaHora]
         }));
 
+        // La consulta global de grupos puede devolver una relación incompleta
+        // entre la asignatura y su syllabusCourseId. Antes de validar el Excel,
+        // se consultan en SEA, por asignatura, únicamente los grupos que aún no
+        // están disponibles localmente. Así TA-01/TA-02 se resuelven contra la
+        // relación oficial y no contra un texto aislado del archivo.
+        const codigosArchivo = [...new Set(
+          filas.slice(11)
+            .map(row => this._textoCelda(row[columnasRol.codigo]))
+            .filter(Boolean)
+            .map(codigo => this._normalizar(codigo))
+        )];
+        const gruposRequeridosPorMateria = new Map<string, Set<string>>();
+        for (const row of filas.slice(11)) {
+          const codigo = this._normalizar(this._textoCelda(row[columnasRol.codigo]));
+          const grupo = this._normalizar(this._textoCelda(row[columnasRol.grupo]));
+          if (!codigo || !grupo) continue;
+          const gruposRequeridos = gruposRequeridosPorMateria.get(codigo) || new Set<string>();
+          gruposRequeridos.add(grupo);
+          gruposRequeridosPorMateria.set(codigo, gruposRequeridos);
+        }
+        const materiasQueRequierenConsulta = codigosArchivo
+          .map(codigo => this.materias().find(item => this._normalizar(item.courseCode) === codigo))
+          .filter((materia): materia is Course => !!materia)
+          .filter(materia => {
+            const gruposMateria = this.grupos().filter(grupo =>
+              this._normalizar(grupo.syllabusCourseId) === this._normalizar(materia.syllabusCourseId)
+            );
+            const gruposRequeridos = gruposRequeridosPorMateria.get(this._normalizar(materia.courseCode)) || new Set<string>();
+            return ![...gruposRequeridos].every(codigoGrupo =>
+              gruposMateria.some(grupo => this._normalizar(grupo.code) === codigoGrupo)
+            );
+          });
+
+        if (materiasQueRequierenConsulta.length > 0 && sede && carrera) {
+          this.cargando.set(true);
+          const consultas = await firstValueFrom(from(materiasQueRequierenConsulta).pipe(
+            mergeMap(materia => this._gateway.getGroups(
+              '2-2026',
+              sede.branchOfficeId,
+              carrera.careerId,
+              materia.syllabusCourseId,
+              sede.code,
+              carrera.careerCode
+            ).pipe(catchError(() => of([] as GroupItem[]))), 6),
+            toArray()
+          ));
+          const gruposConsultados = consultas.flat();
+          if (gruposConsultados.length > 0) {
+            const gruposPorId = new Map<string, GroupItem>();
+            for (const grupo of [...this.grupos(), ...gruposConsultados]) {
+              if (grupo.groupId) gruposPorId.set(grupo.groupId, grupo);
+            }
+            this.grupos.set([...gruposPorId.values()]);
+          }
+          this.cargando.set(false);
+        }
+
         filas.slice(11).forEach((row, idx) => {
           const filaExcel = idx + 12;
           const materiaNombreArchivo = this._textoCelda(row[columnasRol.materia]);
@@ -1725,7 +1782,9 @@ export class RolExamenesComponent implements OnInit {
 
           const materia = this.materias().find(item => this._normalizar(item.courseCode) === this._normalizar(codigo));
           const grupo = materia
-            ? this.grupos().find(item => item.syllabusCourseId === materia.syllabusCourseId && this._normalizar(item.code) === this._normalizar(grupoCodigo))
+            ? this.grupos().find(item =>
+              this._normalizar(item.syllabusCourseId) === this._normalizar(materia.syllabusCourseId)
+                && this._normalizar(item.code) === this._normalizar(grupoCodigo))
             : undefined;
 
           if (!materia) {
