@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
@@ -62,18 +63,18 @@ public class CartillaOmrController {
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Registrar la confirmación de impresión de marcas OMR")
     public ResponseEntity<PreparacionCartillasOmrResponseDto> marcarImpreso(@PathVariable String rolExamenId,
-                                                                              @RequestBody(required = false) GenerarCartillasOmrRequestDto request) {
-        String usuario = request == null ? null : request.usuario();
-        return ResponseEntity.ok(cartillaOmrService.marcarImpresion(rolExamenId, usuario));
+                                                                              @RequestBody(required = false) GenerarCartillasOmrRequestDto request,
+                                                                              Authentication authentication) {
+        return ResponseEntity.ok(cartillaOmrService.marcarImpresion(rolExamenId, authentication.getName()));
     }
 
     @PostMapping("/marcar-lista-impresa")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
     @Operation(summary = "Registrar la confirmación de impresión de la lista de estudiantes")
     public ResponseEntity<PreparacionCartillasOmrResponseDto> marcarListaImpresa(@PathVariable String rolExamenId,
-                                                                                   @RequestBody(required = false) GenerarCartillasOmrRequestDto request) {
-        String usuario = request == null ? null : request.usuario();
-        return ResponseEntity.ok(cartillaOmrService.marcarListaImpresion(rolExamenId, usuario));
+                                                                                   @RequestBody(required = false) GenerarCartillasOmrRequestDto request,
+                                                                                   Authentication authentication) {
+        return ResponseEntity.ok(cartillaOmrService.marcarListaImpresion(rolExamenId, authentication.getName()));
     }
 
     @PostMapping("/generar")
@@ -81,9 +82,10 @@ public class CartillaOmrController {
     @Operation(summary = "Generar un lote de cartillas OMR preimpresas")
     public ResponseEntity<LoteCartillasOmrResponseDto> generar(
             @PathVariable String rolExamenId,
-            @RequestBody(required = false) GenerarCartillasOmrRequestDto request) {
-        String usuario = request == null ? null : request.usuario();
-        return ResponseEntity.status(HttpStatus.CREATED).body(cartillaOmrService.generar(rolExamenId, usuario));
+            @RequestBody(required = false) GenerarCartillasOmrRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                cartillaOmrService.generar(rolExamenId, authentication.getName()));
     }
 
     @PostMapping("/lotes/{loteId}/marcar-impreso")
@@ -92,8 +94,8 @@ public class CartillaOmrController {
     public ResponseEntity<LoteCartillasOmrResponseDto> marcarImpreso(
             @PathVariable String rolExamenId,
             @PathVariable String loteId,
-            @RequestBody(required = false) GenerarCartillasOmrRequestDto request) {
-        String usuario = request == null ? null : request.usuario();
-        return ResponseEntity.ok(cartillaOmrService.marcarImpreso(rolExamenId, loteId, usuario));
+            @RequestBody(required = false) GenerarCartillasOmrRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(cartillaOmrService.marcarImpreso(rolExamenId, loteId, authentication.getName()));
     }
 }

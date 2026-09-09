@@ -32,10 +32,9 @@ export class ExamenSinCartillaService {
     return this._http.get<DocumentoSinCartilla>(`${this._baseUrl}/${rolExamenId}/documento`);
   }
 
-  public cargarDocumento(rolExamenId: string, file: File, usuario = 'DOCENTE'): Observable<DocumentoSinCartilla> {
+  public cargarDocumento(rolExamenId: string, file: File): Observable<DocumentoSinCartilla> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('usuario', usuario);
     return this._http.post<DocumentoSinCartilla>(`${this._baseUrl}/${rolExamenId}/documento`, formData);
   }
 
@@ -55,7 +54,7 @@ export class ExamenSinCartillaService {
     return this._http.get<NotaDocente[]>(`${this._baseUrl}/${rolExamenId}/notas`);
   }
 
-  public guardarNotas(rolExamenId: string, notas: { codigoEstudiante: string; notaSobre60: number }[], usuario = 'DOCENTE'): Observable<NotaDocente[]> {
-    return this._http.post<NotaDocente[]>(`${this._baseUrl}/${rolExamenId}/notas`, { notas, usuario });
+  public guardarNotas(rolExamenId: string, notas: { codigoEstudiante: string; notaSobre60: number }[]): Observable<NotaDocente[]> {
+    return this._http.post<NotaDocente[]>(`${this._baseUrl}/${rolExamenId}/notas`, { notas });
   }
 }

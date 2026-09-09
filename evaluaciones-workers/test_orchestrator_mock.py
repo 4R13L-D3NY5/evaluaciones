@@ -116,7 +116,7 @@ def main() -> None:
         "bancoPreguntasId": "BANCO-MOCK-001",
         "variantes": ["A", "B", "C"],
         "ratioEstudiantesPorVariante": 5,
-        "estudiantes": ESTUDIANTES_EJEMPLO,
+        "estudiantes": list(reversed(ESTUDIANTES_EJEMPLO)),
         "outputBasePath": output_base,
     }
 
@@ -124,9 +124,12 @@ def main() -> None:
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
     assert result["estado"] == "COMPLETADO"
-    assert len(result["variantes"]) == 3
+    assert len(result["variantes"]) == 2
     assert len(result["mapeos"]) == 12
-    assert Counter(m["letraVariante"] for m in result["mapeos"]) == {"A": 5, "B": 5, "C": 2}
+    assert Counter(m["letraVariante"] for m in result["mapeos"]) == {"A": 6, "B": 6}
+    assert [m["codigoEstudiante"] for m in result["mapeos"]] == sorted(
+        m["codigoEstudiante"] for m in result["mapeos"]
+    )
     for v in result["variantes"]:
         assert os.path.exists(v["archivoPdfPath"])
         assert os.path.exists(v["archivoTypstPath"])
@@ -142,6 +145,8 @@ def main() -> None:
     assert 'size: 15pt' in documento_typst
     assert '*A)*' not in documento_typst
     assert 'VARIANTE' not in documento_typst
+    assert documento_typst.index("1111111") < documento_typst.index("1111112")
+    assert documento_typst.index("1111112") < documento_typst.index("1111113")
 
     print("\nPrueba de orquestador completada con éxito.")
 

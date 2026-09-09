@@ -186,7 +186,9 @@ public class CartillaOmrService {
      */
     private List<DatosEstudiante> obtenerEstudiantesParaMarcas(String rolExamenId, RolExamen rol) {
         List<DatosEstudiante> mapeados = mapeoRepository.findByRolExamenId(rolExamenId).stream()
-                .sorted(Comparator.comparing(MapeoEstudianteVariante::getCodigoEstudiante))
+                .sorted(Comparator.comparing(
+                        MapeoEstudianteVariante::getCodigoEstudiante,
+                        OrdenEstudiantes.comparadorCodigo()))
                 .map(mapeo -> new DatosEstudiante(mapeo.getCodigoEstudiante(), nombreCompleto(mapeo)))
                 .toList();
         if (!mapeados.isEmpty()) {
@@ -214,7 +216,9 @@ public class CartillaOmrService {
                 throw new IllegalStateException("La nómina oficial contiene un estudiante sin código o nombre completo.");
             }
             return new DatosEstudiante(estudiante.getStudentCode().trim(), estudiante.getFullName().trim());
-        }).sorted(Comparator.comparing(DatosEstudiante::codigo)).toList();
+        }).sorted(Comparator.comparing(
+                DatosEstudiante::codigo,
+                OrdenEstudiantes.comparadorCodigo())).toList();
     }
 
     private List<CartillaOmr> construirCartillas(String rolExamenId, RolExamen rol) {
@@ -310,7 +314,7 @@ public class CartillaOmrService {
     }
 
     private String usuarioValido(String usuario) {
-        return usuario == null || usuario.isBlank() ? "ADMIN_EVALUACIONES" : usuario.trim();
+        return usuario == null || usuario.isBlank() ? "SISTEMA" : usuario.trim();
     }
 
     private void validarEstadoParaMarcas(RolExamen rol) {

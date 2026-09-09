@@ -46,8 +46,9 @@ public class RolExamenController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA') and @accesoAcademicoService.puedeConsultarCarrera(#dto.sedeCodigo, #dto.carreraCodigo, authentication)")
     @Operation(summary = "Crear un nuevo rol de examen")
-    public ResponseEntity<RolExamenResponseDto> crear(@Valid @RequestBody RolExamenRequestDto dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(rolExamenService.crear(dto));
+    public ResponseEntity<RolExamenResponseDto> crear(@Valid @RequestBody RolExamenRequestDto dto,
+                                                       Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(rolExamenService.crear(dto, authentication));
     }
 
     @PutMapping("/{id}")
@@ -55,8 +56,9 @@ public class RolExamenController {
     @Operation(summary = "Actualizar un rol de examen programado o validado")
     public ResponseEntity<RolExamenResponseDto> actualizar(
             @PathVariable String id,
-            @Valid @RequestBody RolExamenRequestDto dto) {
-        return ResponseEntity.ok(rolExamenService.actualizar(id, dto));
+            @Valid @RequestBody RolExamenRequestDto dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.actualizar(id, dto, authentication));
     }
 
     @PutMapping("/{id}/modalidad")
@@ -72,8 +74,8 @@ public class RolExamenController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
     @Operation(summary = "Eliminar un rol de examen programado o validado")
-    public ResponseEntity<Void> eliminar(@PathVariable String id) {
-        rolExamenService.eliminar(id);
+    public ResponseEntity<Void> eliminar(@PathVariable String id, Authentication authentication) {
+        rolExamenService.eliminar(id, authentication);
         return ResponseEntity.noContent().build();
     }
 
@@ -92,8 +94,9 @@ public class RolExamenController {
     @Operation(summary = "Restablecer un rol de examen posterior a VALIDADO a VALIDADO")
     public ResponseEntity<RolExamenResponseDto> restablecerAValidado(
             @PathVariable String id,
-            @Valid @RequestBody RestablecerRolRequestDto dto) {
-        return ResponseEntity.ok(rolExamenService.restablecerAValidado(id, dto));
+            @Valid @RequestBody RestablecerRolRequestDto dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.restablecerAValidado(id, dto, authentication));
     }
 
     @GetMapping("/{id}/auditoria")

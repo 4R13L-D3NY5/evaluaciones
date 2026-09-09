@@ -521,6 +521,7 @@ interface CampusDisponible extends Campus {
 
                     <!-- Documento oficial -->
                     <td class="p-3.5 text-center">
+                      <div class="inline-flex items-center gap-1.5">
                         @if (puedeMostrarDocumento(item)) {
                         <div class="relative inline-flex group/documento">
                           <button
@@ -537,9 +538,39 @@ interface CampusDisponible extends Campus {
                             <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                           </div>
                         </div>
-                      } @else {
-                        <span class="text-muted-foreground/50">—</span>
-                      }
+                        }
+                        @if (puedeMostrarPatronCalificado(item)) {
+                          <div class="relative inline-flex group/patronDocumento">
+                            <button
+                              (click)="imprimirPatronCalificadoDirecto(item)"
+                              title="Imprimir patrones de variantes para firma y sello"
+                              aria-label="Imprimir patrones de variantes para firma y sello"
+                              class="h-7 w-7 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 flex items-center justify-center transition-colors cursor-pointer">
+                              <i class="pi pi-print text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/patronDocumento:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Patrones · firma y sello</span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                          <div class="relative inline-flex group/auditoriaPatron">
+                            <button
+                              (click)="abrirPatronCalificado(item)"
+                              title="Previsualizar auditoría de variantes"
+                              aria-label="Previsualizar auditoría de variantes"
+                              class="h-7 w-7 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 flex items-center justify-center transition-colors cursor-pointer">
+                              <i class="pi pi-eye text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/auditoriaPatron:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Auditoría · previsualizar origen</span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+                        @if (!puedeMostrarDocumento(item) && !puedeMostrarPatronCalificado(item)) {
+                          <span class="text-muted-foreground/50">—</span>
+                        }
+                      </div>
                     </td>
 
                     <!-- Acciones -->
@@ -589,22 +620,6 @@ interface CampusDisponible extends Campus {
                             </button>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/configuracion:flex flex-col items-center z-50 pointer-events-none">
                               <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Variantes y patrones guardados</span>
-                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
-                            </div>
-                          </div>
-                        }
-
-                        @if (puedeMostrarPatronCalificado(item)) {
-                          <div class="relative group/patronCalificado">
-                            <button
-                              (click)="abrirPatronCalificado(item)"
-                              title="Ver patrón oficial después de calificar"
-                              aria-label="Ver patrón oficial después de calificar"
-                              class="h-7 w-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center cursor-pointer transition-colors">
-                              <i class="pi pi-check-square text-xs"></i>
-                            </button>
-                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/patronCalificado:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Patrón oficial · solo lectura</span>
                               <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                             </div>
                           </div>
@@ -1753,14 +1768,12 @@ interface CampusDisponible extends Campus {
                 @if (loteCartillasActual(); as preparacion) {
                   <div class="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs text-indigo-950 leading-relaxed flex gap-3 items-start">
                     <i class="pi pi-info-circle text-indigo-600 text-base mt-0.5"></i>
-                    <span>La lista se consulta directamente del SEA. Puedes volver a generar cualquiera de los dos PDF para obtener la información actualizada. Cada documento tiene su propia confirmación de impresión.</span>
+                    <span>La lista se consulta directamente del SEA. Puedes volver a generar {{ evaluacionCartillas.modalidad === 'PRESENCIAL_SIN_CARTILLA' ? 'el PDF de la lista' : 'cualquiera de los dos PDF' }} para obtener la información actualizada. Cada documento tiene su propia confirmación de impresión.</span>
                   </div>
                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                      <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Estudiantes</span><strong class="text-lg text-foreground">{{ preparacion.totalCartillas }}</strong></div>
                      @if (evaluacionCartillas.modalidad === 'PRESENCIAL_CARTILLA') {
                        <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Marcas OMR</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresion === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresion === 'PENDIENTE'">{{ preparacion.estadoImpresion }}</strong></div>
-                     } @else {
-                       <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Marcas OMR</span><strong class="text-sm text-slate-500">No aplica</strong></div>
                      }
                      <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Lista</span><strong class="text-sm" [class.text-emerald-700]="preparacion.estadoImpresionLista === 'IMPRESO'" [class.text-amber-700]="preparacion.estadoImpresionLista === 'PENDIENTE'">{{ preparacion.estadoImpresionLista }}</strong></div>
                      <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">PDF de firmas</strong></div>
@@ -1841,10 +1854,10 @@ interface CampusDisponible extends Campus {
           <div class="bg-card border border-border rounded-2xl max-w-5xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
             <div class="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-950 text-white p-5 flex items-start justify-between gap-4 shrink-0">
               <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center"><i class="pi pi-check-square text-lg text-emerald-200"></i></div>
+                <div class="h-10 w-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center"><i class="pi pi-eye text-lg text-emerald-200"></i></div>
                 <div>
-                  <h3 class="text-sm font-black">Patrón oficial después de calificar</h3>
-                  <p class="text-[11px] text-white/75">{{ evaluacionSeleccionadaPatron()?.codigo }} · {{ evaluacionSeleccionadaPatron()?.materia }} · consulta protegida y solo lectura</p>
+                  <h3 class="text-sm font-black">Auditoría de variantes y origen</h3>
+                  <p class="text-[11px] text-white/75">{{ evaluacionSeleccionadaPatron()?.codigo }} · {{ evaluacionSeleccionadaPatron()?.materia }} · documento independiente de la planilla para firma</p>
                 </div>
               </div>
               <button (click)="cerrarPatronCalificado()" aria-label="Cerrar patrón oficial" class="h-8 w-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer"><i class="pi pi-times"></i></button>
@@ -1865,14 +1878,26 @@ interface CampusDisponible extends Campus {
                   @for (variante of (patronCalificado()?.variantes || []); track variante.letra) {
                     <section class="rounded-xl border border-border overflow-hidden">
                       <div class="px-4 py-3 bg-muted/50 border-b border-border flex items-center justify-between gap-3">
-                        <div><h4 class="text-xs font-black uppercase tracking-wide text-foreground">Variante {{ variante.letra }}</h4><span class="text-[10px] text-muted-foreground">{{ variante.totalPreguntas }} respuestas oficiales</span></div>
-                        <span class="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 text-[10px] font-black uppercase">Calificado</span>
+                        <div><h4 class="text-xs font-black uppercase tracking-wide text-foreground">Variante {{ variante.letra }}</h4><span class="text-[10px] text-muted-foreground">Relación entre la pregunta presentada y su origen en el banco</span></div>
+                        <span class="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 text-[10px] font-black uppercase">{{ evaluacionSeleccionadaPatron()?.etapa }}</span>
                       </div>
-                      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 p-4 bg-white">
-                        @for (pregunta of getNumerosRango(1, variante.totalPreguntas); track pregunta) {
-                          <div class="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs"><span class="font-mono font-black text-muted-foreground">{{ pregunta }}.</span><span class="min-w-7 rounded-md bg-emerald-50 px-2 py-1 text-center font-mono font-black text-emerald-800">{{ variante.respuestas[pregunta] || '—' }}</span></div>
-                        }
-                      </div>
+                      @if (variante.trazabilidad?.length) {
+                        <details class="border-t border-border bg-slate-50/70">
+                          <summary class="cursor-pointer px-4 py-3 text-[11px] font-black text-indigo-800">Ver trazabilidad de preguntas</summary>
+                          <div class="overflow-x-auto px-4 pb-4">
+                            <table class="w-full min-w-[620px] text-[10px]">
+                              <thead><tr class="border-b border-indigo-100 text-left uppercase tracking-wide text-slate-500"><th class="px-2 py-2">N.º presentado</th><th class="px-2 py-2">N.º en banco</th><th class="px-2 py-2">Clave banco</th><th class="px-2 py-2">Clave variante</th><th class="px-2 py-2">Reactivo</th></tr></thead>
+                              <tbody>
+                                @for (traza of variante.trazabilidad; track traza.numeroPresentado) {
+                                  <tr class="border-b border-slate-100 text-slate-700"><td class="px-2 py-1.5 font-mono font-black">{{ traza.numeroPresentado }}</td><td class="px-2 py-1.5 font-mono">{{ traza.numeroBanco || '—' }}</td><td class="px-2 py-1.5 font-mono font-black">{{ traza.respuestaCorrectaBanco || '—' }}</td><td class="px-2 py-1.5 font-mono font-black text-emerald-800">{{ traza.respuestaCorrectaVariante || '—' }}</td><td class="px-2 py-1.5 font-mono">{{ traza.reactivoId || '—' }}</td></tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        </details>
+                      } @else {
+                        <div class="border-t border-amber-200 bg-amber-50 px-4 py-3 text-[10px] font-bold text-amber-800">Esta generación es histórica y no guardó la relación de origen. Las nuevas generaciones conservarán la trazabilidad automáticamente.</div>
+                      }
                     </section>
                   }
                 }
@@ -1880,9 +1905,6 @@ interface CampusDisponible extends Campus {
             </div>
 
             <div class="p-4 border-t border-border flex items-center justify-end gap-2 shrink-0 bg-muted/20">
-              <button (click)="imprimirPatronCalificado()" [disabled]="imprimiendoPatronCalificado() || !patronCalificado()" class="px-4 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50">
-                <i class="pi mr-1.5" [class.pi-spinner]="imprimiendoPatronCalificado()" [class.pi-spin]="imprimiendoPatronCalificado()" [class.pi-print]="!imprimiendoPatronCalificado()"></i>{{ imprimiendoPatronCalificado() ? 'Preparando PDF…' : 'Imprimir patrón' }}
-              </button>
               <button (click)="cerrarPatronCalificado()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button>
             </div>
           </div>
@@ -2704,15 +2726,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     carrerasAsignadas: CarreraCampusAsignada[]
   ): Career[] {
     const carrerasCatalogo = new Map(catalogo.map(carrera => [carrera.careerCode.toUpperCase(), carrera]));
-    const identidadCampus = {
-      sedeCodigo: campus.branchOfficeCode,
-      campusId: campus.campusId,
-      campusCodigo: campus.code,
-      campusNombre: campus.name
-    };
-    const carrerasConfiguradas = carrerasAsignadas.length
-      ? carrerasAsignadas
-      : this._campusCarreras.listar(identidadCampus);
+    // La configuración oficial vive en el servidor. El almacenamiento local
+    // solo conserva caché y no debe volver a habilitar asignaciones obsoletas.
+    const carrerasConfiguradas = carrerasAsignadas;
     if (carrerasConfiguradas.length) {
       return carrerasConfiguradas
         .map(carrera => carrerasCatalogo.get(carrera.codigo.toUpperCase()))
@@ -2900,7 +2916,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     return (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones())
       && !this.esConsultaAcademica()
       && item.modalidad !== 'PRESENCIAL_SIN_CARTILLA'
-      && item.etapa === 'Calificado';
+      && ['Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa);
   }
 
   public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
@@ -3300,8 +3316,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (pasoIdx === currentIdx + 1) {
       const nuevoEstado = this.estadoBackendParaEtapa(pasoKey);
       this._rolService.transicionarEstado(item.id, {
-        nuevoEstado,
-        usuario: 'ADMIN_EVALUACIONES'
+        nuevoEstado
       }).subscribe({
         next: rolActualizado => {
           const actualizado = this._mapearRolResponseA_UI(rolActualizado);
@@ -3328,7 +3343,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       },
       error: err => {
         this.cargandoPatronCalificado.set(false);
-        this.errorPatronCalificado.set(err?.error?.message || 'No se pudo consultar el patrón oficial. Verifique que la evaluación esté Calificada y que su usuario tenga alcance al campus.');
+        this.errorPatronCalificado.set(err?.error?.message || 'No se pudo consultar el patrón oficial. Verifique que la evaluación ya fue devuelta y que su usuario tenga alcance al campus.');
       }
     });
   }
@@ -3341,9 +3356,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.cargandoPatronCalificado.set(false);
   }
 
-  public imprimirPatronCalificado(): void {
-    const item = this.evaluacionSeleccionadaPatron();
-    if (!item || !this.patronCalificado() || this.imprimiendoPatronCalificado()) return;
+  public imprimirPatronCalificadoDirecto(item: EvaluacionItemUI): void {
+    if (!this.puedeMostrarPatronCalificado(item) || this.imprimiendoPatronCalificado()) return;
 
     this.imprimiendoPatronCalificado.set(true);
     const ventana = window.open('', '_blank');
@@ -3363,7 +3377,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         ventana?.close();
         this.imprimiendoPatronCalificado.set(false);
         this._mostrarToast(
-          err?.error?.message || err?.error?.error || err?.message || 'No se pudo generar el PDF del patrón oficial.',
+          err?.error?.message || err?.error?.error || err?.message || 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido devuelto.',
           'error'
         );
       }
@@ -3453,8 +3467,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
     this.confirmandoImpresionSinCartilla.set(true);
     this._rolService.transicionarEstado(item.id, {
-      nuevoEstado: 'IMPRESO',
-      usuario: 'ADMIN_EVALUACIONES'
+      nuevoEstado: 'IMPRESO'
     }).subscribe({
       next: rolActualizado => {
         const actualizado = this._mapearRolResponseA_UI(rolActualizado);
@@ -3718,8 +3731,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       pagina: lectura.pagina,
       codigoAnterior: lectura.codigoEstudiante || null,
       codigoEstudiante: codigo,
-      respuestas: this.respuestasOmrParaGuardar(lectura),
-      usuario: 'ADMIN_EVALUACIONES'
+      respuestas: this.respuestasOmrParaGuardar(lectura)
     }).subscribe({
       next: calificacion => {
         this.resultadoCalificacionOmr.update(resultado => {
@@ -3783,8 +3795,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       pagina: pagina.pagina,
       codigoAnterior: pagina.codigoEstudiante || null,
       codigoEstudiante: this.codigoOmr(pagina),
-      respuestas: this.respuestasOmrParaGuardar(pagina),
-      usuario: 'ADMIN_EVALUACIONES'
+      respuestas: this.respuestasOmrParaGuardar(pagina)
     }));
     this.guardandoCalificacionOmr.set(true);
     forkJoin(ajustes.map(ajuste => this._omrService.ajustarCalificacion(item.id, ajuste))).subscribe({
@@ -3799,8 +3810,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   private _transicionarACalificado(item: EvaluacionItemUI): void {
     this._rolService.transicionarEstado(item.id, {
-      nuevoEstado: 'CALIFICADO',
-      usuario: 'ADMIN_EVALUACIONES'
+      nuevoEstado: 'CALIFICADO'
     }).subscribe({
       next: rolActualizado => {
         const actualizado = this._mapearRolResponseA_UI(rolActualizado);
@@ -3938,7 +3948,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       codigoEstudiante: nota.codigoEstudiante,
       notaSobre60: Number(nota.notaSobre60)
     }));
-    this._sinCartillaService.guardarNotas(item.id, notas, 'DOCENTE').subscribe({
+    this._sinCartillaService.guardarNotas(item.id, notas).subscribe({
       next: guardadas => {
         this.notasDocente.set(guardadas);
         this.guardandoNotasDocente.set(false);
@@ -4847,9 +4857,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
     this.restableciendo.set(true);
     this._rolService.restablecerAValidado(item.id, {
-      motivo,
-      usuario: 'Sistema',
-      ipOrigen: '127.0.0.1'
+      motivo
     }).subscribe({
       next: rol => {
         const actualizado = this._mapearRolResponseA_UI(rol);

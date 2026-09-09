@@ -133,6 +133,11 @@ public class RolExamenService {
 
     @Transactional
     public RolExamenResponseDto crear(RolExamenRequestDto dto) {
+        return crear(dto, null);
+    }
+
+    @Transactional
+    public RolExamenResponseDto crear(RolExamenRequestDto dto, Authentication authentication) {
         normalizarModalidadVigente(dto);
         RolExamen previsualizacion = mapper.toEntity(dto);
         GroupItemDto grupoOficial = resolverGrupoOficialDesdeSea(previsualizacion);
@@ -150,14 +155,22 @@ public class RolExamenService {
         entity.setSeaGroupId(previsualizacion.getSeaGroupId());
         aplicarDocenteOficial(entity, grupoOficial);
         entity.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
+        entity.setDia(nombreDiaSemana(dto.getFecha()));
         entity.setFechaDisplay(formatearFecha(dto.getFecha()));
         RolExamen guardado = rolExamenRepository.save(entity);
-        registrarAuditoria(guardado, null, EstadoFlujo.PROGRAMADO, "CREACION_ROL_EXAMEN", "Sistema", "127.0.0.1");
+        registrarAuditoria(guardado, null, EstadoFlujo.PROGRAMADO, "CREACION_ROL_EXAMEN",
+                actor(authentication, null), "127.0.0.1");
         return mapper.toResponseDto(guardado);
     }
 
     @Transactional
     public RolExamenResponseDto actualizar(String id, RolExamenRequestDto dto) {
+        return actualizar(id, dto, null);
+    }
+
+    @Transactional
+    public RolExamenResponseDto actualizar(String id, RolExamenRequestDto dto,
+                                           Authentication authentication) {
         if (!id.equals(dto.getId())) {
             throw new RuntimeException("El id del rol de examen no coincide con el id de la solicitud");
         }
@@ -176,10 +189,11 @@ public class RolExamenService {
         mapper.updateEntity(dto, rol);
         rol.setSeaGroupId(previsualizacion.getSeaGroupId());
         aplicarDocenteOficial(rol, grupoOficial);
+        rol.setDia(nombreDiaSemana(dto.getFecha()));
         rol.setFechaDisplay(formatearFecha(dto.getFecha()));
         RolExamen guardado = rolExamenRepository.save(rol);
         registrarAuditoria(guardado, rol.getEstadoFlujo(), rol.getEstadoFlujo(),
-                "ACTUALIZACION_ROL_EXAMEN", "Sistema", "127.0.0.1");
+                "ACTUALIZACION_ROL_EXAMEN", actor(authentication, null), "127.0.0.1");
         return mapper.toResponseDto(guardado);
     }
 
@@ -452,6 +466,11 @@ public class RolExamenService {
 
     @Transactional
     public void eliminar(String id) {
+        eliminar(id, null);
+    }
+
+    @Transactional
+    public void eliminar(String id, Authentication authentication) {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
 
@@ -482,7 +501,7 @@ public class RolExamenService {
                 origen == EstadoFlujo.PROGRAMADO
                         ? "VALIDACION_BANCO_PREGUNTAS"
                         : "REVALIDACION_BANCO_PREGUNTAS",
-                usuario != null && !usuario.isBlank() ? usuario : "Sistema",
+                usuarioValido(usuario),
                 "127.0.0.1");
         return guardado;
     }
@@ -525,7 +544,7 @@ public class RolExamenService {
         RolExamen guardado = rolExamenRepository.save(rol);
         registrarAuditoria(guardado, origen, EstadoFlujo.PROGRAMADO,
                 "ELIMINACION_BANCO_PREGUNTAS",
-                usuario != null && !usuario.isBlank() ? usuario : "Sistema",
+                usuarioValido(usuario),
                 "127.0.0.1");
         return guardado;
     }
@@ -549,7 +568,7 @@ public class RolExamenService {
         RolExamen guardado = rolExamenRepository.save(rol);
         registrarAuditoria(guardado, origen, EstadoFlujo.PROGRAMADO,
                 "ELIMINACION_EXAMEN_SIN_CARTILLA",
-                usuario != null && !usuario.isBlank() ? usuario : "Sistema",
+                usuarioValido(usuario),
                 "127.0.0.1");
         return guardado;
     }
@@ -608,9 +627,11 @@ public class RolExamenService {
                 ? "SUSPENSION_ROL_EXAMEN: " + dto.getMotivo()
                 : "TRANSICION_ESTADO";
 
+        String usuarioAuditoria = actor(authentication, dto.getUsuario());
+        String ipAuditoria = dto.getIpOrigen() != null ? dto.getIpOrigen() : "127.0.0.1";
+
         registrarAuditoria(guardado, origen, destino, accion,
-                dto.getUsuario() != null ? dto.getUsuario() : "Sistema",
-                dto.getIpOrigen() != null ? dto.getIpOrigen() : "127.0.0.1");
+                usuarioAuditoria, ipAuditoria);
 
         // En un examen con cartilla, la devolución entrega las cartillas al
         // personal de Evaluaciones para su lectura OMR. La devolución se
@@ -623,8 +644,8 @@ public class RolExamenService {
             guardado = rolExamenRepository.save(rol);
             registrarAuditoria(guardado, EstadoFlujo.DEVUELTO, EstadoFlujo.PENDIENTE_NOTAS,
                     "INICIO_CALIFICACION_OMR",
-                    dto.getUsuario() != null ? dto.getUsuario() : "Sistema",
-                    dto.getIpOrigen() != null ? dto.getIpOrigen() : "127.0.0.1");
+                    usuarioAuditoria,
+                    ipAuditoria);
         }
 
         return mapper.toResponseDto(guardado);
@@ -702,6 +723,12 @@ public class RolExamenService {
 
     @Transactional
     public RolExamenResponseDto restablecerAValidado(String id, RestablecerRolRequestDto dto) {
+        return restablecerAValidado(id, dto, null);
+    }
+
+    @Transactional
+    public RolExamenResponseDto restablecerAValidado(String id, RestablecerRolRequestDto dto,
+                                                     Authentication authentication) {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
 
@@ -719,7 +746,7 @@ public class RolExamenService {
         RolExamen guardado = rolExamenRepository.save(rol);
         registrarAuditoria(guardado, origen, EstadoFlujo.VALIDADO,
                 "RESTABLECIMIENTO_A_VALIDADO",
-                dto.getUsuario() != null && !dto.getUsuario().isBlank() ? dto.getUsuario() : "Sistema",
+                actor(authentication, dto.getUsuario()),
                 dto.getIpOrigen() != null && !dto.getIpOrigen().isBlank() ? dto.getIpOrigen() : "127.0.0.1",
                 dto.getMotivo());
 
@@ -781,11 +808,30 @@ public class RolExamenService {
         return usuario == null || usuario.isBlank() ? "SISTEMA" : usuario.trim();
     }
 
+    private String actor(Authentication authentication, String fallback) {
+        return authentication != null
+                ? usuarioValido(authentication.getName())
+                : usuarioValido(fallback);
+    }
+
     private String formatearFecha(LocalDateTime fecha) {
         return String.format("%02d/%02d/%d", fecha.getDayOfMonth(), fecha.getMonthValue(), fecha.getYear());
     }
 
     private String formatearFecha(java.time.LocalDate fecha) {
         return String.format("%02d/%02d/%d", fecha.getDayOfMonth(), fecha.getMonthValue(), fecha.getYear());
+    }
+
+    private String nombreDiaSemana(java.time.LocalDate fecha) {
+        if (fecha == null) return null;
+        return switch (fecha.getDayOfWeek()) {
+            case MONDAY -> "Lunes";
+            case TUESDAY -> "Martes";
+            case WEDNESDAY -> "Miércoles";
+            case THURSDAY -> "Jueves";
+            case FRIDAY -> "Viernes";
+            case SATURDAY -> "Sábado";
+            case SUNDAY -> "Domingo";
+        };
     }
 }

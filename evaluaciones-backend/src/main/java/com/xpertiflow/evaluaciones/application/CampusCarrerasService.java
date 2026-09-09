@@ -48,6 +48,13 @@ public class CampusCarrerasService {
         exigirSede(request, authentication);
         String claveCampus = claveCampus(request);
         repository.deleteBySedeCodigoAndCampusClave(request.getSedeCodigo(), claveCampus);
+        // Elimina también registros creados con el nombre del campus antes de
+        // que se utilizara el identificador institucional. De lo contrario,
+        // una asignación antigua podía reaparecer al consultar el catálogo.
+        String claveLegada = normalizar(request.getCampusNombre());
+        if (!claveLegada.equals(claveCampus)) {
+            repository.deleteBySedeCodigoAndCampusClave(request.getSedeCodigo(), claveLegada);
+        }
         List<CampusCarreraItemDto> carreras = request.getCarreras() == null ? List.of() : request.getCarreras();
         carreras.stream()
                 .filter(item -> item != null && item.getCodigo() != null && !item.getCodigo().isBlank()

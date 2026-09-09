@@ -47,6 +47,10 @@ export interface UsuarioSistema {
   asignaciones: AsignacionAcademica[];
   ultimoIngreso?: string;
   creadoEn?: string;
+  sedesSea?: AlcanceAcademico[];
+  carrerasSea?: AlcanceAcademico[];
+  gruposSea?: number;
+  alcanceDesdeSea?: boolean;
 }
 
 export interface UsuarioSistemaRequest {

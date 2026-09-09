@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,8 +33,10 @@ public class BancoPreguntasController {
     public ResponseEntity<CargaBancoResponseDto> uploadPorRol(
             @PathVariable String rolExamenId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "docenteAprobador", required = false) String docenteAprobador) {
-        return ResponseEntity.ok(bancoPreguntasService.cargarDesdeExcel(rolExamenId, file, docenteAprobador));
+            @RequestParam(value = "docenteAprobador", required = false) String docenteAprobador,
+            Authentication authentication) {
+        return ResponseEntity.ok(bancoPreguntasService.cargarDesdeExcel(
+                rolExamenId, file, docenteAprobador, authentication.getName()));
     }
 
     @PostMapping("/upload")
@@ -44,9 +47,10 @@ public class BancoPreguntasController {
             @RequestParam("materiaCodigo") String materiaCodigo,
             @RequestParam("grupo") String grupo,
             @RequestParam("tipoParcial") String tipoParcial,
-            @RequestParam(value = "docenteAprobador", required = false) String docenteAprobador) {
+            @RequestParam(value = "docenteAprobador", required = false) String docenteAprobador,
+            Authentication authentication) {
         return ResponseEntity.ok(bancoPreguntasService.cargarDesdeExcelPorParametros(
-                materiaCodigo, grupo, tipoParcial, file, docenteAprobador));
+                materiaCodigo, grupo, tipoParcial, file, docenteAprobador, authentication.getName()));
     }
 
     @DeleteMapping("/{rolExamenId}")
@@ -55,8 +59,9 @@ public class BancoPreguntasController {
     public ResponseEntity<Void> eliminarPorRol(
             @PathVariable String rolExamenId,
             @RequestParam("confirmacion") String confirmacion,
-            @RequestParam(value = "usuario", required = false) String usuario) {
-        bancoPreguntasService.eliminarPorRolExamenId(rolExamenId, confirmacion, usuario);
+            @RequestParam(value = "usuario", required = false) String usuario,
+            Authentication authentication) {
+        bancoPreguntasService.eliminarPorRolExamenId(rolExamenId, confirmacion, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 }

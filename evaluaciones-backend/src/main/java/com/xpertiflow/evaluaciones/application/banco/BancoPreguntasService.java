@@ -85,14 +85,27 @@ public class BancoPreguntasService {
 
     @Transactional
     public CargaBancoResponseDto cargarDesdeExcel(String rolExamenId, MultipartFile file, String docenteAprobador) {
+        return cargarDesdeExcel(rolExamenId, file, docenteAprobador, null);
+    }
+
+    @Transactional
+    public CargaBancoResponseDto cargarDesdeExcel(String rolExamenId, MultipartFile file,
+                                                  String docenteAprobador, String usuarioAuditoria) {
         RolExamen rol = rolRepository.findById(rolExamenId)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
-        return cargarDesdeExcelConRol(rol, file, docenteAprobador);
+        return cargarDesdeExcelConRol(rol, file, docenteAprobador, usuarioAuditoria);
     }
 
     @Transactional
     public CargaBancoResponseDto cargarDesdeExcelPorParametros(
             String materiaCodigo, String grupo, String tipoParcialValor, MultipartFile file, String docenteAprobador) {
+        return cargarDesdeExcelPorParametros(materiaCodigo, grupo, tipoParcialValor, file, docenteAprobador, null);
+    }
+
+    @Transactional
+    public CargaBancoResponseDto cargarDesdeExcelPorParametros(
+            String materiaCodigo, String grupo, String tipoParcialValor, MultipartFile file,
+            String docenteAprobador, String usuarioAuditoria) {
         TipoParcial tipoParcial = TipoParcial.fromValor(tipoParcialValor);
 
         // Primero buscar un rol PROGRAMADO; si no existe, buscar el más reciente en cualquier estado.
@@ -111,11 +124,17 @@ public class BancoPreguntasService {
                         + ", grupo=" + grupo + ", parcial=" + tipoParcialValor
                         + ". Debe crearse el rol de examen antes de cargar el banco de preguntas."));
 
-        return cargarDesdeExcelConRol(rol, file, docenteAprobador);
+        return cargarDesdeExcelConRol(rol, file, docenteAprobador, usuarioAuditoria);
     }
 
     @Transactional
     public CargaBancoResponseDto cargarDesdeExcelConRol(RolExamen rol, MultipartFile file, String docenteAprobador) {
+        return cargarDesdeExcelConRol(rol, file, docenteAprobador, null);
+    }
+
+    @Transactional
+    public CargaBancoResponseDto cargarDesdeExcelConRol(RolExamen rol, MultipartFile file,
+                                                        String docenteAprobador, String usuarioAuditoria) {
 
         List<String> errores = new ArrayList<>();
         List<Reactivo> reactivos = new ArrayList<>();
@@ -263,7 +282,7 @@ public class BancoPreguntasService {
                 reactivoRepository.save(r);
             }
 
-            rolExamenService.validarPorBanco(rol.getId(), hash, docenteOficial.trim());
+            rolExamenService.validarPorBanco(rol.getId(), hash, usuarioAuditoria);
 
             return CargaBancoResponseDto.builder()
                     .exito(true)

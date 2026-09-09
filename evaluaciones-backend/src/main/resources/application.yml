@@ -22,6 +22,8 @@ spring:
     baseline-on-migrate: true
 
   servlet:
+    session:
+      timeout: ${SESSION_TIMEOUT:30m}
     multipart:
       max-file-size: 50MB
       max-request-size: 100MB

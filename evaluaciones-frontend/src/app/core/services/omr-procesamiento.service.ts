@@ -102,11 +102,18 @@ export interface PatronCalificadoVariante {
   letra: string;
   totalPreguntas: number;
   respuestas: Record<string, string>;
+  trazabilidad?: Array<{
+    numeroPresentado: number;
+    numeroBanco?: number;
+    reactivoId?: string;
+    respuestaCorrectaBanco?: string;
+    respuestaCorrectaVariante?: string;
+  }>;
 }
 
 export interface PatronCalificadoResponse {
   rolExamenId: string;
-  estado: 'CALIFICADO';
+  estado: 'DEVUELTO' | 'PENDIENTE_NOTAS' | 'CALIFICADO';
   variantes: PatronCalificadoVariante[];
 }
 

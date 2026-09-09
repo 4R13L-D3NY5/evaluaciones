@@ -385,7 +385,7 @@ export interface DiaCalendario {
                 title="Descargar la plantilla oficial en blanco con 4 hojas, listas desplegables y fórmulas automáticas"
                 class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
                 <i class="pi pi-download text-xs"></i>
-                <span>Plantilla Oficial (4 Hojas)</span>
+                <span>Plantilla Oficial</span>
               </button>
 
               <button 
@@ -3518,7 +3518,7 @@ export class BancoPreguntasComponent implements OnInit {
     if (!rol || !file || !this.esSinCartillaActivo() || !this.rolPuedeCargarBanco() || this.cargandoDocumentoSinCartilla()) return;
 
     this.cargandoDocumentoSinCartilla.set(true);
-    this._sinCartillaService.cargarDocumento(rol.id, file, 'DOCENTE').subscribe({
+    this._sinCartillaService.cargarDocumento(rol.id, file).subscribe({
       next: documento => {
         this.documentoSinCartilla.set(documento);
         this.archivoSinCartillaSeleccionado.set(null);

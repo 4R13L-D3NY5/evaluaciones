@@ -7,7 +7,11 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.orchestrator import _asignar_variantes_aleatorias, _catalogo_variantes
+from src.orchestrator import (
+    _asignar_variantes_aleatorias,
+    _catalogo_variantes,
+    ordenar_estudiantes,
+)
 
 
 class DistribucionVariantesTest(unittest.TestCase):
@@ -31,6 +35,27 @@ class DistribucionVariantesTest(unittest.TestCase):
 
     def test_catalogo_continua_con_etiquetas_tipo_excel(self):
         self.assertEqual(_catalogo_variantes(28)[-3:], ["Z", "AA", "AB"])
+
+    def test_orden_estudiantes_es_numerico_y_no_lexicografico(self):
+        estudiantes = [
+            {"codigo_estudiante": "100", "nombres": "Cien"},
+            {"codigo_estudiante": "9", "nombres": "Nueve"},
+            {"codigo_estudiante": "25", "nombres": "Veinticinco"},
+        ]
+        ordenados = ordenar_estudiantes(estudiantes)
+        self.assertEqual(
+            [item["codigo_estudiante"] for item in ordenados],
+            ["9", "25", "100"],
+        )
+
+    def test_orden_estudiantes_conserva_referencia_de_cada_registro(self):
+        estudiantes = [
+            {"codigo_estudiante": "25", "nombres": "Veinticinco"},
+            {"codigo_estudiante": "9", "nombres": "Nueve"},
+        ]
+        ordenados = ordenar_estudiantes(estudiantes)
+        self.assertIs(ordenados[0], estudiantes[1])
+        self.assertIs(ordenados[1], estudiantes[0])
 
 
 if __name__ == "__main__":
