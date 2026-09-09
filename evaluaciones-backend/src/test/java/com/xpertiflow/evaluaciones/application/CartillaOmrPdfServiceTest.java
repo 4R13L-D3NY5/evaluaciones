@@ -80,28 +80,33 @@ class CartillaOmrPdfServiceTest {
                 .fechaDisplay("03/09/2026")
                 .build();
 
-        var variante = new com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto.VariantePatronDto();
-        variante.setLetra("A");
-        variante.setTotalPreguntas(60);
         var respuestas = new java.util.LinkedHashMap<String, String>();
         for (int pregunta = 1; pregunta <= 60; pregunta++) {
             respuestas.put(String.valueOf(pregunta), pregunta % 2 == 0 ? "B" : "A");
         }
-        variante.setRespuestas(respuestas);
+        var variantes = new ArrayList<com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto.VariantePatronDto>();
+        for (char letra = 'A'; letra <= 'D'; letra++) {
+            var variante = new com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto.VariantePatronDto();
+            variante.setLetra(String.valueOf(letra));
+            variante.setTotalPreguntas(60);
+            variante.setRespuestas(new java.util.LinkedHashMap<>(respuestas));
+            variantes.add(variante);
+        }
         var patron = new com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto();
         patron.setRolExamenId("ROL-1");
         patron.setEstado("CALIFICADO");
-        patron.setVariantes(List.of(variante));
+        patron.setVariantes(variantes);
 
         byte[] pdf = new PatronOmrPdfService().generar(rol, patron);
         if (Boolean.getBoolean("pdf.qa")) Files.write(Path.of("target/qa-patron.pdf"), pdf);
         try (PDDocument documento = PDDocument.load(pdf)) {
             assertEquals(1, documento.getNumberOfPages());
-            assertEquals(936f, documento.getPage(0).getMediaBox().getWidth());
-            assertEquals(612f, documento.getPage(0).getMediaBox().getHeight());
+            assertEquals(612f, documento.getPage(0).getMediaBox().getWidth());
+            assertEquals(936f, documento.getPage(0).getMediaBox().getHeight());
             String texto = new PDFTextStripper().getText(documento);
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("PATRÓN OFICIAL"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("VARIANTE A"));
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("VARIANTE D"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("60 preguntas"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("FIRMA DEL DOCENTE"));
             org.junit.jupiter.api.Assertions.assertFalse(texto.contains("RECEPCIÓN DE EVALUACIONES"));

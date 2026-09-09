@@ -19,6 +19,7 @@ import com.xpertiflow.evaluaciones.api.dto.gateway.TimeFrameDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
+import com.xpertiflow.evaluaciones.application.OrdenEstudiantes;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
@@ -237,6 +238,9 @@ public class GeneracionTypstService {
                     "apellido_materno", ""
             ));
         }
+        resultado.sort(Comparator.comparing(
+                item -> item.get("codigo_estudiante"),
+                OrdenEstudiantes.comparadorCodigo()));
         return resultado;
     }
 
@@ -322,7 +326,9 @@ public class GeneracionTypstService {
                 .toList();
 
         List<MapeoResultadoDto> mapeos = mapeoRepository.findByRolExamenId(rolExamenId).stream()
-                .sorted(Comparator.comparing(MapeoEstudianteVariante::getCodigoEstudiante))
+                .sorted(Comparator.comparing(
+                        MapeoEstudianteVariante::getCodigoEstudiante,
+                        OrdenEstudiantes.comparadorCodigo()))
                 .map(mapeo -> {
                     MapeoResultadoDto dto = new MapeoResultadoDto();
                     dto.setCodigoEstudiante(mapeo.getCodigoEstudiante());

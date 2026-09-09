@@ -51,6 +51,22 @@ def _normalizar_estudiante(estudiante: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _clave_orden_codigo(codigo: Any) -> tuple[int, Any, int, str]:
+    """Ordena códigos numéricos naturalmente y deja respaldo alfanumérico."""
+    texto = str(codigo or "").strip()
+    if texto.isdigit():
+        return (0, int(texto), len(texto), texto.casefold())
+    return (1, texto.casefold(), 0, texto.casefold())
+
+
+def ordenar_estudiantes(estudiantes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Devuelve una copia estable de la nómina ordenada por código."""
+    return sorted(
+        estudiantes,
+        key=lambda estudiante: _clave_orden_codigo(estudiante.get("codigo_estudiante")),
+    )
+
+
 def _normalizar_reactivo_previsualizacion(item: dict[str, Any], indice: int) -> dict[str, Any]:
     """Adapta un reactivo aún no persistido al contrato del generador Typst."""
     tipo = item.get("tipo_reactivo") or item.get("tipo") or "SELECCION_MEJOR_RESPUESTA"
@@ -202,6 +218,11 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
         )
     if any(not item.get("codigo_estudiante") or not item.get("nombres") for item in estudiantes):
         raise ValueError("La nómina oficial contiene estudiantes sin código o nombre completo")
+
+    # El PDF unificado, la asignación de variantes y los mapeos deben usar
+    # exactamente la misma secuencia para facilitar la impresión y reparto.
+    # La aleatoriedad se conserva dentro de _asignar_variantes_aleatorias.
+    estudiantes = ordenar_estudiantes(estudiantes)
 
     # El ratio orienta cuántas variantes se preparan. Cuando la división no es
     # exacta se redondea al número de variantes más razonable y luego se

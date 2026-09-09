@@ -29,12 +29,12 @@ import java.util.Set;
 @Service
 public class PatronOmrPdfService {
 
-    // Oficio horizontal: 13 x 8.5 pulgadas.
-    private static final float PAGE_WIDTH = 936f;
-    private static final float PAGE_HEIGHT = 612f;
+    // Oficio vertical: 8.5 x 13 pulgadas.
+    private static final float PAGE_WIDTH = 612f;
+    private static final float PAGE_HEIGHT = 936f;
     private static final float MARGIN = 32f;
     private static final float CONTENT_WIDTH = PAGE_WIDTH - (MARGIN * 2f);
-    private static final float ALTO_BLOQUE_VARIANTE = 119f;
+    private static final float ALTO_BLOQUE_VARIANTE = 109f;
     private static final float ALTO_FIRMA = 72f;
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
@@ -172,7 +172,7 @@ public class PatronOmrPdfService {
         int columnas = 15;
         int filas = Math.max(1, (int) Math.ceil(total / (double) columnas));
         float cellWidth = CONTENT_WIDTH / columnas;
-        float rowHeight = 28f;
+        float rowHeight = 20f;
         float yBottom = PAGE_HEIGHT - top - (filas * rowHeight);
 
         contenido.setNonStrokingColor(new java.awt.Color(247, 248, 253));

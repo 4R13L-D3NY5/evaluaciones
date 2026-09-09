@@ -143,7 +143,9 @@ public class ExamenSinCartillaService {
                             .guardadoPor(nota == null ? null : nota.getGuardadoPor())
                             .build();
                 })
-                .sorted(Comparator.comparing(NotaDocenteResponseDto::getCodigoEstudiante))
+                .sorted(Comparator.comparing(
+                        NotaDocenteResponseDto::getCodigoEstudiante,
+                        OrdenEstudiantes.comparadorCodigo()))
                 .toList();
     }
 
@@ -307,6 +309,9 @@ public class ExamenSinCartillaService {
                     estudiante.setFullName(estudiante.getFullName().trim());
                     return estudiante;
                 })
+                .sorted(Comparator.comparing(
+                        StudentItemDto::getStudentCode,
+                        OrdenEstudiantes.comparadorCodigo()))
                 .toList();
     }
 
