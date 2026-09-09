@@ -872,6 +872,9 @@ def generar_variante(
 
     # Las opciones también deben conservar el orden del banco durante la
     # revisión. Solo se barajan para la generación oficial de variantes.
+    # Conservamos una referencia a la selección original para dejar una
+    # trazabilidad inmutable entre el número visible y la fila del banco.
+    preguntas_sin_barajar = list(preguntas)
     if not modo_previsualizacion:
         preguntas = [_barajar_opciones_pregunta(p, seed + idx) for idx, p in enumerate(preguntas)]
 
@@ -933,8 +936,9 @@ def generar_variante(
 
     patron = {}
     orden_ids = []
+    trazabilidad = []
     numero_pregunta = 0
-    for p in preguntas:
+    for indice_pregunta, p in enumerate(preguntas):
         if _es_macro(p):
             continue
         numero_pregunta += 1
@@ -942,11 +946,27 @@ def generar_variante(
         patron[str(numero_pregunta)] = _extraer_respuesta_correcta(opciones)
         orden_ids.append(p["id"])
 
+        # La posición se conserva porque el barajado de opciones no cambia
+        # el orden de las preguntas. Así la auditoría puede responder qué
+        # pregunta del banco originó cada número de la variante y cuál era
+        # su clave antes y después del barajado.
+        original = preguntas_sin_barajar[indice_pregunta]
+        trazabilidad.append({
+            "numeroPresentado": numero_pregunta,
+            "numeroBanco": original.get("numero_orden"),
+            "reactivoId": original.get("id"),
+            "respuestaCorrectaBanco": _extraer_respuesta_correcta(
+                parsear_opciones(original.get("opciones_json", "[]"))
+            ),
+            "respuestaCorrectaVariante": patron[str(numero_pregunta)],
+        })
+
     return {
         "letra": letra,
         "semilla": seed,
         "patronClavesJson": json.dumps(patron, ensure_ascii=False),
         "ordenReactivosIdsJson": json.dumps(orden_ids, ensure_ascii=False),
+        "trazabilidadPreguntasJson": json.dumps(trazabilidad, ensure_ascii=False),
         "contenidoVirtualJson": json.dumps(contenido_virtual, ensure_ascii=False),
         "archivoPdfPath": pdf_path,
         "archivoTypstPath": typ_path,

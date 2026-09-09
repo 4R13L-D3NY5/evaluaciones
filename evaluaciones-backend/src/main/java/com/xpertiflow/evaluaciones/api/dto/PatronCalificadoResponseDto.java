@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * Patrón de respuestas expuesto únicamente para la revisión posterior a la
- * calificación. El contenido se descifra en el backend y nunca se devuelve
+ * devolución del examen. El contenido se descifra en el backend y nunca se devuelve
  * la carga cifrada ni las claves de protección.
  */
 @Data
@@ -22,5 +22,15 @@ public class PatronCalificadoResponseDto {
         private String letra;
         private Integer totalPreguntas;
         private Map<String, String> respuestas;
+        private List<TrazabilidadPreguntaDto> trazabilidad;
+    }
+
+    @Data
+    public static class TrazabilidadPreguntaDto {
+        private Integer numeroPresentado;
+        private Integer numeroBanco;
+        private String reactivoId;
+        private String respuestaCorrectaBanco;
+        private String respuestaCorrectaVariante;
     }
 }

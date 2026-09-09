@@ -43,6 +43,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDateTime;
@@ -159,23 +160,26 @@ public class OmrProcesamientoService {
     }
 
     /**
-     * Devuelve el patrón exclusivamente después de cerrar la calificación.
-     * Las claves se leen desde el contenido protegido de cada variante para
-     * evitar depender de la columna histórica en texto plano.
+     * Devuelve el patrón cuando el examen ya fue devuelto y pasó a la etapa
+     * de notas, o cuando ya quedó calificado. Las claves se leen desde el
+     * contenido protegido de cada variante para evitar depender de la columna
+     * histórica en texto plano.
      */
     @Transactional(readOnly = true)
     public PatronCalificadoResponseDto consultarPatronCalificado(String rolExamenId) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
-        if (rol.getEstadoFlujo() == null || !"CALIFICADO".equals(rol.getEstadoFlujo().name())) {
-            throw new IllegalStateException("El patrón solo puede consultarse después de pasar la evaluación a Calificado.");
+        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO")
+                .contains(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("El patrón solo puede consultarse después de devolver el examen y habilitar la revisión de notas.");
         }
 
         List<PatronCalificadoResponseDto.VariantePatronDto> variantes = varianteRepository.findByRolExamenId(rolExamenId)
                 .stream()
                 .sorted(Comparator.comparing(ExamenVariante::getLetraVariante))
                 .map(variante -> {
-                    Map<String, String> respuestas = leerPatron(variante);
+                    JsonNode contenido = leerContenidoVariante(variante);
+                    Map<String, String> respuestas = leerPatron(contenido);
                     if (respuestas.isEmpty()) {
                         throw new IllegalStateException("La variante " + variante.getLetraVariante() + " no tiene un patrón protegido disponible.");
                     }
@@ -183,6 +187,7 @@ public class OmrProcesamientoService {
                     dto.setLetra(variante.getLetraVariante());
                     dto.setTotalPreguntas(variante.getTotalPreguntas() == null ? respuestas.size() : variante.getTotalPreguntas());
                     dto.setRespuestas(respuestas);
+                    dto.setTrazabilidad(leerTrazabilidad(contenido));
                     return dto;
                 })
                 .toList();
@@ -203,17 +208,18 @@ public class OmrProcesamientoService {
      * consulta protegida que alimenta la vista de solo lectura.
      */
     @Transactional
-    public byte[] generarPatronCalificadoPdf(String rolExamenId, String usuario) {
+    public byte[] generarPatronCalificadoPdf(String rolExamenId, String usuario, String ipOrigen) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
         try {
             byte[] pdf = patronOmrPdfService.generar(rol, consultarPatronCalificado(rolExamenId));
             auditoriaRepository.save(AuditoriaEvaluacion.builder()
                     .rolExamen(rol)
-                    .etapaOrigen("CALIFICADO")
-                    .etapaDestino("CALIFICADO")
+                    .etapaOrigen(rol.getEstadoFlujo().getValor())
+                    .etapaDestino(rol.getEstadoFlujo().getValor())
                     .accion("IMPRESION_PATRON_CALIFICADO")
                     .usuario(usuarioValido(usuario))
+                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
                     .detallesJson("{\"variantes\":\"oficiales\"}")
                     .build());
             return pdf;
@@ -474,14 +480,35 @@ public class OmrProcesamientoService {
     }
 
     private Map<String, String> leerPatron(ExamenVariante variante) {
+        return leerPatron(leerContenidoVariante(variante));
+    }
+
+    private Map<String, String> leerPatron(JsonNode contenido) {
         try {
-            String contenidoSeguro = descifrarContenidoVariante(variante);
-            JsonNode contenido = objectMapper.readTree(contenidoSeguro);
             String patronJson = contenido.path("patronClavesJson").asText("");
             if (patronJson.isBlank()) return Map.of();
             return objectMapper.readValue(patronJson, new TypeReference<LinkedHashMap<String, String>>() {});
         } catch (IOException exception) {
             throw new IllegalStateException("No se pudo leer el patrón cifrado de la variante.", exception);
+        }
+    }
+
+    private List<PatronCalificadoResponseDto.TrazabilidadPreguntaDto> leerTrazabilidad(JsonNode contenido) {
+        String trazabilidadJson = contenido.path("trazabilidadPreguntasJson").asText("");
+        if (trazabilidadJson.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(trazabilidadJson,
+                    new TypeReference<List<PatronCalificadoResponseDto.TrazabilidadPreguntaDto>>() {});
+        } catch (IOException exception) {
+            throw new IllegalStateException("No se pudo leer la trazabilidad protegida de la variante.", exception);
+        }
+    }
+
+    private JsonNode leerContenidoVariante(ExamenVariante variante) {
+        try {
+            return objectMapper.readTree(descifrarContenidoVariante(variante));
+        } catch (IOException exception) {
+            throw new IllegalStateException("No se pudo leer el contenido protegido de la variante.", exception);
         }
     }
 

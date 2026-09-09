@@ -243,6 +243,7 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
             {
                 "patronClavesJson": variante["patronClavesJson"],
                 "ordenReactivosIdsJson": variante["ordenReactivosIdsJson"],
+                "trazabilidadPreguntasJson": variante["trazabilidadPreguntasJson"],
                 "contenidoVirtualJson": variante["contenidoVirtualJson"],
             },
             f"variante:VAR-{rol_examen_id}-{letra}:rol:{rol_examen_id}",

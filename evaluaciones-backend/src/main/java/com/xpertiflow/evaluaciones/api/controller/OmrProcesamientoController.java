@@ -23,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 
@@ -84,18 +85,20 @@ public class OmrProcesamientoController {
 
     @GetMapping("/{rolExamenId}/patron-calificado")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
-    @Operation(summary = "Consultar el patrón de respuestas después de calificar")
+    @Operation(summary = "Consultar el patrón de respuestas después de devolver el examen")
     public ResponseEntity<PatronCalificadoResponseDto> consultarPatronCalificado(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(omrProcesamientoService.consultarPatronCalificado(rolExamenId));
     }
 
     @GetMapping(value = "/{rolExamenId}/patron-calificado/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
-    @Operation(summary = "Generar el PDF del patrón de respuestas después de calificar")
+    @Operation(summary = "Generar el PDF del patrón de respuestas después de devolver el examen")
     public ResponseEntity<byte[]> imprimirPatronCalificado(@PathVariable String rolExamenId,
-                                                            Authentication authentication) {
+                                                            Authentication authentication,
+                                                            HttpServletRequest request) {
         byte[] pdf = omrProcesamientoService.generarPatronCalificadoPdf(rolExamenId,
-                authentication == null ? null : authentication.getName());
+                authentication == null ? null : authentication.getName(),
+                request == null ? null : request.getRemoteAddr());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename=patron-oficial-" + rolExamenId + ".pdf")

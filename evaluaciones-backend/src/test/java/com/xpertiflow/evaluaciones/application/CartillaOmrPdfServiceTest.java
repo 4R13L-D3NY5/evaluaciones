@@ -96,10 +96,18 @@ class CartillaOmrPdfServiceTest {
         byte[] pdf = new PatronOmrPdfService().generar(rol, patron);
         try (PDDocument documento = PDDocument.load(pdf)) {
             assertEquals(1, documento.getNumberOfPages());
+            assertEquals(936f, documento.getPage(0).getMediaBox().getWidth());
+            assertEquals(612f, documento.getPage(0).getMediaBox().getHeight());
             String texto = new PDFTextStripper().getText(documento);
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("PATRÓN OFICIAL"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("Variante A"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("60 preguntas"));
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("FIRMA DEL DOCENTE"));
+            org.junit.jupiter.api.Assertions.assertFalse(texto.contains("RECEPCIÓN DE EVALUACIONES"));
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    java.util.stream.StreamSupport.stream(documento.getPage(0).getResources().getXObjectNames().spliterator(), false)
+                            .anyMatch(nombre -> documento.getPage(0).getResources().isImageXObject(nombre)),
+                    "La planilla debe incluir el logo institucional");
         }
     }
 }
