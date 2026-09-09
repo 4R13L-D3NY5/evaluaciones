@@ -38,17 +38,17 @@ public class CartillaOmrPdfService {
     private static final float PAGE_HEIGHT = 841f;
     // Campo oficial "Carrera:" de la cartilla preimpresa. Se ubica en la
     // franja superior, junto a la etiqueta, no en la casilla de identificación.
-    private static final float CARRERA_X = 190f;
-    private static final float CARRERA_Y = 22f;
-    private static final float DATOS_X = 250f;
+    private static final float CARRERA_X = 200f;
+    private static final float CARRERA_Y = 27f;
+    private static final float DATOS_X = 260f;
     // Ajuste de la segunda iteración: el código debe iniciar 10 puntos más
     // a la izquierda dentro de su casilla superior derecha.
-    private static final float CODIGO_X = 315f;
-    private static final float NOMBRE_X = 250f;
+    private static final float CODIGO_X = 325f;
+    private static final float NOMBRE_X = 260f;
     // Desplazamiento vertical solicitado para todos los datos preimpresos:
     // cinco puntos hacia arriba respecto de la primera iteración.
     private static final float DATOS_Y = 88f;
-    private static final float NOMBRE_Y = 120f;
+    private static final float NOMBRE_Y = 115f;
     private static final float NOMBRE_TAMANO = 7.5f;
     private static final float CARRERA_TAMANO = 7.5f;
     private static final float MARGEN_NOMINA = 28f;
