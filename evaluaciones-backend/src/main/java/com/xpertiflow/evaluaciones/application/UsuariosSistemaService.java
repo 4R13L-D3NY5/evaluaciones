@@ -14,6 +14,8 @@ import com.xpertiflow.evaluaciones.api.dto.auth.SincronizacionDocentesSeaRespons
 import com.xpertiflow.evaluaciones.api.dto.auth.UsuarioSistemaRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.UsuarioSistemaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.BranchOfficeDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.CareerDto;
 import com.xpertiflow.evaluaciones.domain.entity.AlcanceCarrera;
 import com.xpertiflow.evaluaciones.domain.entity.AlcanceCampus;
 import com.xpertiflow.evaluaciones.domain.entity.AlcanceSede;
@@ -78,9 +80,11 @@ public class UsuariosSistemaService {
         Set<String> rolesVisibles = "EVALUACIONES".equalsIgnoreCase(contexto)
                 ? Set.of("RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES")
                 : Set.of("ADMINISTRADOR_SISTEMA", "DIRECTOR_CARRERA", "DOCENTE", "VICERRECTOR");
+        Map<String, AlcanceSea> alcancesSea = "EVALUACIONES".equalsIgnoreCase(contexto)
+                ? Map.of() : construirAlcancesSea();
         return usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
                 .filter(usuario -> rolesVisibles.contains(usuario.getRolCodigo()))
-                .map(this::mapearUsuario)
+                .map(usuario -> mapearUsuario(usuario, alcancesSea.get(ciParaComparacion(usuario))))
                 .toList();
     }
 
@@ -291,7 +295,15 @@ public class UsuariosSistemaService {
     }
 
     private String ciComparacion(String valor) {
+        return valor == null ? "" : valor.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+    }
+
+    private String normalizar(String valor) {
         return valor == null ? "" : valor.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private boolean coincide(String izquierdo, String derecho) {
+        return izquierdo != null && derecho != null && normalizar(izquierdo).equals(normalizar(derecho));
     }
 
     private static final class DocenteSeaAcumulado {
@@ -579,6 +591,10 @@ public class UsuariosSistemaService {
     }
 
     private UsuarioSistemaResponseDto mapearUsuario(UsuarioSistema usuario) {
+        return mapearUsuario(usuario, null);
+    }
+
+    private UsuarioSistemaResponseDto mapearUsuario(UsuarioSistema usuario, AlcanceSea alcanceSea) {
         RolSistema rol = rolRepository.findById(usuario.getRolCodigo()).orElse(null);
         List<AlcanceAcademicoDto> sedes = usuario.getSedes().stream().sorted(Comparator.comparing(AlcanceSede::getCodigo))
                 .map(item -> new AlcanceAcademicoDto(item.getCodigo(), item.getNombre())).toList();
@@ -608,10 +624,94 @@ public class UsuariosSistemaService {
                                     sede.codigo(), sede.nombre(), carrera.codigo(), carrera.nombre(), "", "")))
                     .toList();
         }
+        boolean puedeMostrarAlcanceSea = alcanceSea != null
+                && "DOCENTE".equalsIgnoreCase(usuario.getRolCodigo())
+                && usuario.getSedes().isEmpty()
+                && usuario.getCarreras().isEmpty()
+                && usuario.getAsignaciones().isEmpty();
+        AlcanceSea alcanceVisible = puedeMostrarAlcanceSea ? alcanceSea : null;
         return new UsuarioSistemaResponseDto(usuario.getId(), usuario.getCi(), usuario.getUsuario(), usuario.getNombreCompleto(),
                 usuario.getRolCodigo(), rol == null ? usuario.getRolCodigo() : rol.getNombre(), usuario.isActivo(),
                 usuario.isDebeCambiarContrasena(), usuario.getProveedorIdentidad(), sedes, carreras, campuses, asignaciones,
-                usuario.getUltimoIngreso(), usuario.getCreadoEn());
+                usuario.getUltimoIngreso(), usuario.getCreadoEn(),
+                alcanceVisible == null ? List.of() : alcanceVisible.sedes(),
+                alcanceVisible == null ? List.of() : alcanceVisible.carreras(),
+                alcanceVisible == null ? 0 : alcanceVisible.grupos(),
+                alcanceVisible != null);
+    }
+
+    private Map<String, AlcanceSea> construirAlcancesSea() {
+        Map<String, AlcanceSeaAcumulado> acumulados = new LinkedHashMap<>();
+        List<GroupItemDto> grupos;
+        try {
+            grupos = unitepcGatewayClient.getGroups("2-2026", null, null, null);
+        } catch (RuntimeException exception) {
+            return Map.of();
+        }
+        if (grupos == null || grupos.isEmpty()) return Map.of();
+
+        List<BranchOfficeDto> sedesSea;
+        try {
+            sedesSea = unitepcGatewayClient.getBranchOffices();
+        } catch (RuntimeException exception) {
+            sedesSea = List.of();
+        }
+        Map<String, List<CareerDto>> carrerasPorSede = new LinkedHashMap<>();
+
+        for (GroupItemDto grupo : grupos) {
+            String ci = ciComparacion(grupo.getTeacherIdentityNumber());
+            if (ci.isBlank()) continue;
+            AlcanceSeaAcumulado acumulado = acumulados.computeIfAbsent(ci, clave -> new AlcanceSeaAcumulado());
+            acumulado.grupos++;
+
+            BranchOfficeDto sede = resolverSedeSea(grupo.getBranchOfficeId(), sedesSea);
+            String sedeCodigo = sede == null ? valorSeguro(grupo.getBranchOfficeId()) : valorSeguro(sede.getCode());
+            String sedeNombre = sede == null ? sedeCodigo : valorSeguro(sede.getName());
+            if (!sedeCodigo.isBlank()) {
+                acumulado.sedes.putIfAbsent(normalizar(sedeCodigo), new AlcanceAcademicoDto(sedeCodigo, sedeNombre));
+            }
+
+            if (grupo.getCareerId() == null || grupo.getCareerId().isBlank() || sedeCodigo.isBlank()) continue;
+            List<CareerDto> carreras = carrerasPorSede.computeIfAbsent(normalizar(sedeCodigo), clave -> {
+                try {
+                    List<CareerDto> resultado = unitepcGatewayClient.getCareers(sedeCodigo);
+                    return resultado == null ? List.of() : resultado;
+                } catch (RuntimeException exception) {
+                    return List.of();
+                }
+            });
+            carreras.stream()
+                    .filter(carrera -> coincide(carrera.getCareerId(), grupo.getCareerId()))
+                    .findFirst()
+                    .ifPresent(carrera -> {
+                        String codigo = valorSeguro(carrera.getCareerCode());
+                        String nombre = valorSeguro(carrera.getCareerName());
+                        String clave = codigo.isBlank() ? valorSeguro(carrera.getCareerId()) : codigo;
+                        if (!clave.isBlank()) {
+                            acumulado.carreras.putIfAbsent(normalizar(clave), new AlcanceAcademicoDto(clave, nombre));
+                        }
+                    });
+        }
+
+        Map<String, AlcanceSea> resultado = new LinkedHashMap<>();
+        acumulados.forEach((ci, acumulado) -> resultado.put(ci, new AlcanceSea(
+                List.copyOf(acumulado.sedes.values()),
+                List.copyOf(acumulado.carreras.values()),
+                acumulado.grupos)));
+        return resultado;
+    }
+
+    private BranchOfficeDto resolverSedeSea(String branchOfficeId, List<BranchOfficeDto> sedesSea) {
+        if (branchOfficeId == null || branchOfficeId.isBlank()) return null;
+        return sedesSea.stream()
+                .filter(sede -> coincide(branchOfficeId, sede.getBranchOfficeId())
+                        || coincide(branchOfficeId, sede.getCode()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String valorSeguro(String valor) {
+        return valor == null ? "" : valor.trim();
     }
 
     private String nombre(String valor) {
@@ -786,4 +886,12 @@ public class UsuariosSistemaService {
     }
 
     private record ColumnaAlcance(int indice, String codigo, String nombre) {}
+
+    private record AlcanceSea(List<AlcanceAcademicoDto> sedes, List<AlcanceAcademicoDto> carreras, int grupos) {}
+
+    private static final class AlcanceSeaAcumulado {
+        private final Map<String, AlcanceAcademicoDto> sedes = new LinkedHashMap<>();
+        private final Map<String, AlcanceAcademicoDto> carreras = new LinkedHashMap<>();
+        private int grupos;
+    }
 }

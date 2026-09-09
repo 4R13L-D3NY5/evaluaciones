@@ -11,6 +11,7 @@ import com.xpertiflow.evaluaciones.domain.entity.AsignacionAcademica;
 import com.xpertiflow.evaluaciones.domain.entity.UsuarioSistema;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.UsuarioSistemaRepository;
+import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -29,6 +30,14 @@ public class AccesoAcademicoService {
 
     private final UsuarioSistemaRepository usuarioRepository;
     private final RolExamenRepository rolExamenRepository;
+    private final UnitepcGatewayClient unitepcGatewayClient;
+
+    private static final String GESTION_ACTIVA = "2-2026";
+    private static final long CACHE_SEA_MILLIS = 60_000L;
+    private volatile List<GroupItemDto> gruposSeaCache = List.of();
+    private volatile long gruposSeaCacheAt;
+    private volatile List<BranchOfficeDto> sedesSeaCache = List.of();
+    private volatile long sedesSeaCacheAt;
 
     public List<RolExamen> filtrarRolesParaUsuario(List<RolExamen> roles, Authentication authentication) {
         return roles.stream().filter(rol -> puedeAcceder(rol, authentication)).toList();
@@ -37,7 +46,8 @@ public class AccesoAcademicoService {
     public List<GroupItemDto> filtrarGruposParaUsuario(List<GroupItemDto> grupos, Authentication authentication) {
         if (!esDocente(authentication)) return grupos;
         String ci = ciAutenticado(authentication);
-        return grupos.stream().filter(grupo -> coincide(grupo.getTeacherIdentityNumber(), ci)).toList();
+        if (ci.isBlank()) return List.of();
+        return grupos.stream().filter(grupo -> coincideIdentidad(grupo.getTeacherIdentityNumber(), ci)).toList();
     }
 
     /**
@@ -47,6 +57,14 @@ public class AccesoAcademicoService {
      */
     public List<BranchOfficeDto> filtrarSedesParaUsuario(List<BranchOfficeDto> sedes,
                                                           Authentication authentication) {
+        if (usaAlcanceSeaDelDocente(authentication)) {
+            List<GroupItemDto> gruposDocente = gruposSeaDelDocente(authentication);
+            if (!gruposDocente.isEmpty()) {
+                return sedes.stream()
+                        .filter(sede -> gruposDocente.stream().anyMatch(grupo -> perteneceASede(grupo, sede)))
+                        .toList();
+            }
+        }
         Set<String> sedesPermitidas = codigosSedesPermitidas(authentication);
         if (sedesPermitidas == null) return sedes;
         return sedes.stream()
@@ -75,6 +93,16 @@ public class AccesoAcademicoService {
                                                        Authentication authentication) {
         if (!puedeConsultarSede(sedeCodigo, authentication)) return List.of();
         UsuarioSistema usuario = usuarioAutenticado(authentication);
+        if (usaAlcanceSeaDelDocente(authentication)) {
+            List<GroupItemDto> gruposDocente = gruposSeaDelDocente(authentication);
+            if (!gruposDocente.isEmpty()) {
+                return carreras.stream()
+                        .filter(carrera -> gruposDocente.stream().anyMatch(grupo ->
+                                perteneceASede(grupo, sedeCodigo)
+                                        && coincide(grupo.getCareerId(), carrera.getCareerId())))
+                        .toList();
+            }
+        }
         if (usuario != null && !usuario.getAsignaciones().isEmpty()
                 && ("DOCENTE".equals(usuario.getRolCodigo()) || "DIRECTOR_CARRERA".equals(usuario.getRolCodigo()))) {
             return carreras.stream()
@@ -101,6 +129,22 @@ public class AccesoAcademicoService {
         if (!esDocente(authentication)) return asignaturas;
 
         UsuarioSistema usuario = usuarioAutenticado(authentication);
+        if (usaAlcanceSeaDelDocente(authentication)) {
+            List<GroupItemDto> gruposDocente = gruposSeaDelDocente(authentication);
+            String careerId = resolverCareerId(sedeCodigo, carreraCodigo);
+            if (!gruposDocente.isEmpty() && careerId != null) {
+                Set<String> materiasPermitidas = gruposDocente.stream()
+                        .filter(grupo -> perteneceASede(grupo, sedeCodigo))
+                        .filter(grupo -> coincide(grupo.getCareerId(), careerId))
+                        .map(GroupItemDto::getSyllabusCourseId)
+                        .map(this::normalizar)
+                        .filter(codigo -> !codigo.isBlank())
+                        .collect(Collectors.toSet());
+                return asignaturas.stream()
+                        .filter(asignatura -> materiasPermitidas.contains(normalizar(asignatura.getSyllabusCourseId())))
+                        .toList();
+            }
+        }
         Set<String> materiasPermitidas;
         if (usuario != null && !usuario.getAsignaciones().isEmpty()) {
             materiasPermitidas = usuario.getAsignaciones().stream()
@@ -126,6 +170,12 @@ public class AccesoAcademicoService {
 
     public boolean puedeConsultarSede(String sedeCodigo, Authentication authentication) {
         if (!estaAutenticado(authentication) || sedeCodigo == null || sedeCodigo.isBlank()) return false;
+        if (usaAlcanceSeaDelDocente(authentication)) {
+            List<GroupItemDto> gruposDocente = gruposSeaDelDocente(authentication);
+            if (!gruposDocente.isEmpty()) {
+                return gruposDocente.stream().anyMatch(grupo -> perteneceASede(grupo, sedeCodigo));
+            }
+        }
         Set<String> sedesPermitidas = codigosSedesPermitidas(authentication);
         return sedesPermitidas == null || sedesPermitidas.contains(normalizar(sedeCodigo));
     }
@@ -136,6 +186,14 @@ public class AccesoAcademicoService {
         if (!puedeConsultarSede(sedeCodigo, authentication)
                 || carreraCodigo == null || carreraCodigo.isBlank()) return false;
         UsuarioSistema usuario = usuarioAutenticado(authentication);
+        if (usaAlcanceSeaDelDocente(authentication)) {
+            List<GroupItemDto> gruposDocente = gruposSeaDelDocente(authentication);
+            String careerId = resolverCareerId(sedeCodigo, carreraCodigo);
+            if (!gruposDocente.isEmpty() && careerId != null) {
+                return gruposDocente.stream().anyMatch(grupo ->
+                        perteneceASede(grupo, sedeCodigo) && coincide(grupo.getCareerId(), careerId));
+            }
+        }
         if (usuario != null && !usuario.getAsignaciones().isEmpty()
                 && ("DOCENTE".equals(usuario.getRolCodigo()) || "DIRECTOR_CARRERA".equals(usuario.getRolCodigo()))) {
             return usuario.getAsignaciones().stream().anyMatch(item ->
@@ -169,7 +227,7 @@ public class AccesoAcademicoService {
         if (usuario == null || !usuario.isActivo()) return false;
         String rolUsuario = usuario.getRolCodigo();
         if ("DOCENTE".equals(rolUsuario)) {
-            if (!coincide(rol.getDocenteCi(), ciAutenticado(authentication, usuario))) return false;
+            if (!coincideIdentidad(rol.getDocenteCi(), ciAutenticado(authentication, usuario))) return false;
             return usuario.getAsignaciones().isEmpty() || usuario.getAsignaciones().stream()
                     .anyMatch(item -> coincide(item.getSedeCodigo(), rol.getSedeCodigo())
                             && coincide(item.getCarreraCodigo(), rol.getCarreraCodigo())
@@ -284,7 +342,7 @@ public class AccesoAcademicoService {
     private List<RolExamen> rolesVisiblesDelDocente(Authentication authentication) {
         String ci = ciAutenticado(authentication);
         return rolExamenRepository.findAll().stream()
-                .filter(rol -> coincide(rol.getDocenteCi(), ci))
+                .filter(rol -> coincideIdentidad(rol.getDocenteCi(), ci))
                 .toList();
     }
 
@@ -316,6 +374,12 @@ public class AccesoAcademicoService {
         return izquierdo != null && derecho != null && normalizar(izquierdo).equals(normalizar(derecho));
     }
 
+    private boolean coincideIdentidad(String izquierdo, String derecho) {
+        String ciIzquierdo = normalizarIdentidad(izquierdo);
+        String ciDerecho = normalizarIdentidad(derecho);
+        return !ciIzquierdo.isBlank() && ciIzquierdo.equals(ciDerecho);
+    }
+
     private boolean coincideCampus(AlcanceCampus asignacion, CampusDto campus) {
         return coincideNoVacio(asignacion.getCampusId(), campus.getCampusId())
                 || coincideNoVacio(asignacion.getCampusCodigo(), campus.getCode())
@@ -337,5 +401,82 @@ public class AccesoAcademicoService {
 
     private String normalizar(String valor) {
         return valor == null ? "" : valor.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizarIdentidad(String valor) {
+        return normalizar(valor).replaceAll("[^A-Z0-9]", "");
+    }
+
+    private boolean usaAlcanceSeaDelDocente(Authentication authentication) {
+        UsuarioSistema usuario = usuarioAutenticado(authentication);
+        return esDocente(authentication) && usuario != null && usuario.isActivo()
+                && usuario.getAsignaciones().isEmpty();
+    }
+
+    private List<GroupItemDto> gruposSeaDelDocente(Authentication authentication) {
+        String ci = ciAutenticado(authentication);
+        if (ci.isBlank()) return List.of();
+        return obtenerGruposSea().stream()
+                .filter(grupo -> coincideIdentidad(grupo.getTeacherIdentityNumber(), ci))
+                .toList();
+    }
+
+    private List<GroupItemDto> obtenerGruposSea() {
+        long ahora = System.currentTimeMillis();
+        if (ahora - gruposSeaCacheAt < CACHE_SEA_MILLIS) return gruposSeaCache;
+        synchronized (this) {
+            ahora = System.currentTimeMillis();
+            if (ahora - gruposSeaCacheAt < CACHE_SEA_MILLIS) return gruposSeaCache;
+            try {
+                List<GroupItemDto> grupos = unitepcGatewayClient.getGroups(GESTION_ACTIVA, null, null, null);
+                gruposSeaCache = grupos == null ? List.of() : List.copyOf(grupos);
+            } catch (RuntimeException ignored) {
+                gruposSeaCache = List.of();
+            }
+            gruposSeaCacheAt = ahora;
+            return gruposSeaCache;
+        }
+    }
+
+    private boolean perteneceASede(GroupItemDto grupo, String sedeCodigo) {
+        if (coincide(grupo.getBranchOfficeId(), sedeCodigo)) return true;
+        return obtenerSedesSea().stream()
+                .filter(sede -> coincide(sede.getCode(), sedeCodigo))
+                .anyMatch(sede -> perteneceASede(grupo, sede));
+    }
+
+    private boolean perteneceASede(GroupItemDto grupo, BranchOfficeDto sede) {
+        return coincide(grupo.getBranchOfficeId(), sede.getBranchOfficeId())
+                || coincide(grupo.getBranchOfficeId(), sede.getCode());
+    }
+
+    private List<BranchOfficeDto> obtenerSedesSea() {
+        long ahora = System.currentTimeMillis();
+        if (ahora - sedesSeaCacheAt < CACHE_SEA_MILLIS) return sedesSeaCache;
+        synchronized (this) {
+            ahora = System.currentTimeMillis();
+            if (ahora - sedesSeaCacheAt < CACHE_SEA_MILLIS) return sedesSeaCache;
+            try {
+                List<BranchOfficeDto> sedes = unitepcGatewayClient.getBranchOffices();
+                sedesSeaCache = sedes == null ? List.of() : List.copyOf(sedes);
+            } catch (RuntimeException ignored) {
+                sedesSeaCache = List.of();
+            }
+            sedesSeaCacheAt = ahora;
+            return sedesSeaCache;
+        }
+    }
+
+    private String resolverCareerId(String sedeCodigo, String carreraCodigo) {
+        try {
+            return unitepcGatewayClient.getCareers(sedeCodigo).stream()
+                    .filter(carrera -> coincide(carrera.getCareerCode(), carreraCodigo))
+                    .map(CareerDto::getCareerId)
+                    .filter(id -> id != null && !id.isBlank())
+                    .findFirst()
+                    .orElse(null);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 }

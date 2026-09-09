@@ -18,6 +18,10 @@ public record UsuarioSistemaResponseDto(
         List<AlcanceCampusDto> campuses,
         List<AsignacionAcademicaDto> asignaciones,
         LocalDateTime ultimoIngreso,
-        LocalDateTime creadoEn
+        LocalDateTime creadoEn,
+        List<AlcanceAcademicoDto> sedesSea,
+        List<AlcanceAcademicoDto> carrerasSea,
+        int gruposSea,
+        boolean alcanceDesdeSea
 ) {
 }
