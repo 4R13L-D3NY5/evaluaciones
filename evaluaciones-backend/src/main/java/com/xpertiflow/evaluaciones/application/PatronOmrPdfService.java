@@ -119,7 +119,6 @@ public class PatronOmrPdfService {
                 MARGIN, top + 12, PDType1Font.HELVETICA_BOLD, 8, new java.awt.Color(55, 43, 125));
         dibujarTabla(contenido, variante, top + 22);
     }
-    }
 
     private void dibujarFirmas(PDPageContentStream contenido, RolExamen rol, float top) throws IOException {
         float ancho = CONTENT_WIDTH;
@@ -145,7 +144,7 @@ public class PatronOmrPdfService {
                 PDImageXObject logo = PDImageXObject.createFromFileByContent(ruta.toFile(), documento);
                 float ancho = 126f;
                 float alto = ancho * logo.getHeight() / logo.getWidth();
-                contenido.drawImage(logo, PAGE_WIDTH - MARGIN - ancho, 13f, ancho, alto);
+                contenido.drawImage(logo, PAGE_WIDTH - MARGIN - ancho, PAGE_HEIGHT - 13f - alto, ancho, alto);
                 return;
             } catch (IOException ignored) {
                 // El logo es decorativo; no debe impedir la impresión de la planilla.

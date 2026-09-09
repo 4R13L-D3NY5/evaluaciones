@@ -94,13 +94,14 @@ class CartillaOmrPdfServiceTest {
         patron.setVariantes(List.of(variante));
 
         byte[] pdf = new PatronOmrPdfService().generar(rol, patron);
+        if (Boolean.getBoolean("pdf.qa")) Files.write(Path.of("target/qa-patron.pdf"), pdf);
         try (PDDocument documento = PDDocument.load(pdf)) {
             assertEquals(1, documento.getNumberOfPages());
             assertEquals(936f, documento.getPage(0).getMediaBox().getWidth());
             assertEquals(612f, documento.getPage(0).getMediaBox().getHeight());
             String texto = new PDFTextStripper().getText(documento);
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("PATRÓN OFICIAL"));
-            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("Variante A"));
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("VARIANTE A"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("60 preguntas"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("FIRMA DEL DOCENTE"));
             org.junit.jupiter.api.Assertions.assertFalse(texto.contains("RECEPCIÓN DE EVALUACIONES"));
