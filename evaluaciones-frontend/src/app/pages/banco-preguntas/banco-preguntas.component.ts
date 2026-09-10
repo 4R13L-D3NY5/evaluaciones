@@ -426,60 +426,62 @@ export interface DiaCalendario {
                     }
                   </button>
 
-                  <!-- BOTÓN 2: PREVISUALIZAR ENCRIPTADO (.PKG) (DESBLOQUEADO TRAS VER PDF) -->
-                  @if (pdfPrevisualizadoYConforme()) {
-                    <button 
-                      (click)="abrirModalPrevisualizacionPkg()"
-                      title="Inspeccionar el contenido cifrado y payload de seguridad del paquete .pkg"
-                      class="bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-purple-900 dark:text-purple-200 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-purple-300 dark:border-purple-700 transition-all hover:scale-105 cursor-pointer">
-                      <i class="pi pi-eye text-xs text-purple-600"></i>
-                      <span>Previsualizar Encriptado</span>
-                    </button>
-                  } @else {
-                    <button 
-                      disabled
-                      title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
-                      class="bg-muted text-muted-foreground/60 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border/60 cursor-not-allowed opacity-60">
-                      <i class="pi pi-lock text-xs"></i>
-                      <span>Previsualizar Encriptado</span>
-                    </button>
-                  }
+                  @if (esAdministradorSistema()) {
+                    <!-- BOTÓN 2: PREVISUALIZAR ENCRIPTADO (.PKG) (SOLO ADMINISTRADOR) -->
+                    @if (pdfPrevisualizadoYConforme()) {
+                      <button 
+                        (click)="abrirModalPrevisualizacionPkg()"
+                        title="Inspeccionar el contenido cifrado y payload de seguridad del paquete .pkg"
+                        class="bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-purple-900 dark:text-purple-200 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-purple-300 dark:border-purple-700 transition-all hover:scale-105 cursor-pointer">
+                        <i class="pi pi-eye text-xs text-purple-600"></i>
+                        <span>Previsualizar Encriptado</span>
+                      </button>
+                    } @else {
+                      <button 
+                        disabled
+                        title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
+                        class="bg-muted text-muted-foreground/60 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border/60 cursor-not-allowed opacity-60">
+                        <i class="pi pi-lock text-xs"></i>
+                        <span>Previsualizar Encriptado</span>
+                      </button>
+                    }
 
-                  <!-- BOTÓN 3: DESCARGAR COPIA .PKG (DESBLOQUEADO TRAS VER PDF) -->
-                  @if (pdfPrevisualizadoYConforme()) {
-                    <button 
-                      (click)="generarYDescargarPaqueteEncriptado()"
-                      title="Descargar una copia de respaldo cifrada en formato .pkg"
-                      class="bg-muted hover:bg-border text-foreground font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border transition-all hover:scale-105 cursor-pointer">
-                      <i class="pi pi-shield text-xs text-purple-700"></i>
-                      <span>Descargar .pkg</span>
-                    </button>
-                  } @else {
-                    <button 
-                      disabled
-                      title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
-                      class="bg-muted text-muted-foreground/60 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border/60 cursor-not-allowed opacity-60">
-                      <i class="pi pi-lock text-xs"></i>
-                      <span>Descargar .pkg</span>
-                    </button>
-                  }
+                    <!-- BOTÓN 3: DESCARGAR COPIA .PKG (SOLO ADMINISTRADOR) -->
+                    @if (pdfPrevisualizadoYConforme()) {
+                      <button 
+                        (click)="generarYDescargarPaqueteEncriptado()"
+                        title="Descargar una copia de respaldo cifrada en formato .pkg"
+                        class="bg-muted hover:bg-border text-foreground font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border transition-all hover:scale-105 cursor-pointer">
+                        <i class="pi pi-shield text-xs text-purple-700"></i>
+                        <span>Descargar .pkg</span>
+                      </button>
+                    } @else {
+                      <button 
+                        disabled
+                        title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
+                        class="bg-muted text-muted-foreground/60 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border/60 cursor-not-allowed opacity-60">
+                        <i class="pi pi-lock text-xs"></i>
+                        <span>Descargar .pkg</span>
+                      </button>
+                    }
 
-                  <!-- BOTÓN 4: ENVIAR A OFICINA DE EVALUACIONES (DESBLOQUEADO TRAS VER PDF) -->
-                  @if (pdfPrevisualizadoYConforme()) {
-                    <button 
-                      (click)="abrirModalEnvioEvaluaciones()"
-                      class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-black text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/20 transition-all hover:scale-105 cursor-pointer">
-                      <i class="pi pi-send text-sm"></i>
-                      <span>Enviar a Oficina de Evaluaciones</span>
-                    </button>
-                  } @else {
-                    <button 
-                      disabled
-                      title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
-                      class="bg-muted text-muted-foreground/60 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 border border-border/60 cursor-not-allowed opacity-60">
-                      <i class="pi pi-lock text-xs"></i>
-                      <span>Enviar a Evaluaciones</span>
-                    </button>
+                    <!-- BOTÓN 4: ENVIAR A OFICINA DE EVALUACIONES (SOLO ADMINISTRADOR) -->
+                    @if (pdfPrevisualizadoYConforme()) {
+                      <button 
+                        (click)="abrirModalEnvioEvaluaciones()"
+                        class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-black text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/20 transition-all hover:scale-105 cursor-pointer">
+                        <i class="pi pi-send text-sm"></i>
+                        <span>Enviar a Oficina de Evaluaciones</span>
+                      </button>
+                    } @else {
+                      <button 
+                        disabled
+                        title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
+                        class="bg-muted text-muted-foreground/60 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 border border-border/60 cursor-not-allowed opacity-60">
+                        <i class="pi pi-lock text-xs"></i>
+                        <span>Enviar a Evaluaciones</span>
+                      </button>
+                    }
                   }
 
                 </div>
@@ -522,7 +524,10 @@ export interface DiaCalendario {
                       </span>
                     </div>
                     <p class="text-xs text-emerald-900/90 dark:text-emerald-300/90 font-medium leading-relaxed">
-                      Has verificado la diagramación oficial del examen en PDF. Las opciones para <strong>previsualizar el paquete encriptado</strong>, <strong>descargar la copia de respaldo .pkg</strong> y <strong>enviar la evaluación a la oficina de evaluaciones</strong> han sido desbloqueadas exitosamente.
+                      Has verificado la diagramación oficial del examen en PDF. La revisión quedó registrada correctamente.
+                      @if (esAdministradorSistema()) {
+                        Las opciones para <strong>previsualizar el paquete encriptado</strong>, <strong>descargar la copia de respaldo .pkg</strong> y <strong>enviar la evaluación a la oficina de evaluaciones</strong> están disponibles para el administrador.
+                      }
                     </p>
                   </div>
                 </div>
@@ -1064,7 +1069,7 @@ export interface DiaCalendario {
       <!-- ================================================================= -->
       <!-- MODAL: DESPACHO OFICIAL DE EXAMEN POR CORREO A EVALUACIONES       -->
       <!-- ================================================================= -->
-      @if (dialogEnvioEvaluaciones()) {
+      @if (dialogEnvioEvaluaciones() && esAdministradorSistema()) {
         <div class="fixed inset-0 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
           <div class="bg-card border border-border rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden animate-scale-in my-6">
             
@@ -1721,7 +1726,7 @@ export interface DiaCalendario {
       <!-- ================================================================= -->
       <!-- MODAL: PREVISUALIZACIÓN DE PAQUETE ENCRIPTADO (.PKG)              -->
       <!-- ================================================================= -->
-      @if (dialogPrevisualizacionPkg()) {
+      @if (dialogPrevisualizacionPkg() && esAdministradorSistema()) {
         <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
           <div class="bg-card border border-border rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto">
             
@@ -2487,6 +2492,10 @@ export class BancoPreguntasComponent implements OnInit {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     return estado === 'PROGRAMADO' || estado === 'VALIDADO';
   });
+
+  public esAdministradorSistema = computed(() =>
+    this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
+  );
 
   public esSinCartillaActivo(): boolean {
     return this.rolExamenActivo()?.modalidad === 'PRESENCIAL_SIN_CARTILLA';
@@ -3987,6 +3996,7 @@ export class BancoPreguntasComponent implements OnInit {
   // FLUJO DE REMISIÓN POR CORREO DIRECTO A EVALUACIONES
   // ============================================================
   public abrirModalEnvioEvaluaciones(): void {
+    if (!this.esAdministradorSistema()) return;
     this.comprobanteGenerado.set(null);
     this.dialogEnvioEvaluaciones.set(true);
   }
@@ -3996,6 +4006,7 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public ejecutarEnvioCorreoEvaluaciones(): void {
+    if (!this.esAdministradorSistema()) return;
     this.enviandoCorreo.set(true);
 
     const campus = this.campusActivo();
@@ -4081,6 +4092,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   }
 
   public abrirClienteCorreo(c: ComprobanteEnvio): void {
+    if (!this.esAdministradorSistema()) return;
     const subject = encodeURIComponent(`[2026] Remisión de examen: [${c.codigoMateria}] ${c.materia} (${c.parcial}) - ${c.grupo}`);
     const body = encodeURIComponent(this.generarTextoCuerpoCorreo(c));
     const to = encodeURIComponent(c.correoDestino);
@@ -4091,6 +4103,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   }
 
   public copiarTextoCorreo(c: ComprobanteEnvio): void {
+    if (!this.esAdministradorSistema()) return;
     const texto = this.generarTextoCuerpoCorreo(c);
     navigator.clipboard.writeText(texto).then(() => {
       this._mostrarToast('Texto oficial del correo copiado al portapapeles.');
@@ -4098,6 +4111,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   }
 
   public imprimirComprobanteEnvio(): void {
+    if (!this.esAdministradorSistema()) return;
     window.print();
   }
 
@@ -4105,6 +4119,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   // GENERAR PAQUETE ENCRIPTADO EXCLUSIVO (.PKG)
   // ============================================================
   public async generarYDescargarPaqueteEncriptado(): Promise<void> {
+    if (!this.esAdministradorSistema()) return;
     const parcialCode = this.parcialActivo().toUpperCase().replace(' ', '_');
     const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
 
@@ -4880,6 +4895,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
   // Previsualización Paquete Encriptado (.pkg)
   public abrirModalPrevisualizacionPkg(): void {
+    if (!this.esAdministradorSistema()) return;
     const parcialCode = this.parcialActivo().toUpperCase().replace(' ', '_');
     const preguntasValidas = this.preguntasCargadas().filter(p => p.valido);
 
