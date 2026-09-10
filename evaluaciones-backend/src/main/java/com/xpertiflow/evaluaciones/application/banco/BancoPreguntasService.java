@@ -427,7 +427,9 @@ public class BancoPreguntasService {
                 && !respuestaDescriptivaVfCompleja) {
             errores.add("Fila " + (rowNum + 1) + ": respuesta correcta inválida; debe ser un único inciso A-E");
         }
-        boolean respuestaDebeApuntarAOpcion = !sinRespuestaDirecta && !"OPCION_EMPAREJAMIENTO".equals(tipoNormalizado);
+        boolean respuestaDebeApuntarAOpcion = !sinRespuestaDirecta
+                && !"OPCION_EMPAREJAMIENTO".equals(tipoNormalizado)
+                && !"VERDADERO_O_FALSO_COMPLEJAS".equals(tipoNormalizado);
         if (respuestaDebeApuntarAOpcion && !respuesta.isBlank()
                 && !textosOpciones.getOrDefault(respuesta, "").isBlank()) {
             // La respuesta apunta a una opción activa.

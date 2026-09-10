@@ -62,6 +62,8 @@ export interface RolExamenCreateRequest {
   horario: string;
   aula: string;
   campus: string;
+  /** Solo se activa para la importación masiva desde Excel. */
+  importacion?: boolean;
 }
 
 export interface RolExamenEstadoRequest {

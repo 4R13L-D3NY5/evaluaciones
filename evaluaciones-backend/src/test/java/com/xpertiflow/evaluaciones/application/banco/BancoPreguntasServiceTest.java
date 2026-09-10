@@ -219,6 +219,29 @@ class BancoPreguntasServiceTest {
     }
 
     @Test
+    void aceptaLaClaveEDeVerdaderoOFalsoComplejasAunqueOpcionEEsteVacia() throws Exception {
+        MockMultipartFile archivo = crearExcel(60, new String[]{"Verdadero o Falso Complejas"});
+        try (XSSFWorkbook workbook = new XSSFWorkbook(archivo.getInputStream());
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Row row = workbook.getSheet("Banco").getRow(1);
+            row.getCell(8).setCellValue("E");
+            workbook.write(output);
+            archivo = new MockMultipartFile(
+                    "file", "vf-complejas-clave-e.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    output.toByteArray());
+        }
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(
+                rol.getId(), archivo, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isTrue();
+        assertThat(respuesta.getErroresValidacion()).isEmpty();
+        verify(reactivoRepository, times(60)).save(any(Reactivo.class));
+    }
+
+    @Test
     void aceptaUnBloqueDeEmparejamientoConUnPrincipalYDosOpciones() throws Exception {
         MockMultipartFile archivo = crearExcelConBloqueEmparejamientoValido();
         when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));

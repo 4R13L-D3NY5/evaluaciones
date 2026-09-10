@@ -37,7 +37,7 @@ class SeleccionBloquesAgrupadosTest(unittest.TestCase):
     def test_caso_clinico_seleccionado_incluye_todos_los_subitems_en_orden(self):
         config.CUOTA_FACILES = 0
         config.CUOTA_MEDIAS = 0
-        config.CUOTA_DIFICILES = 1
+        config.CUOTA_DIFICILES = 3
         reactivos = [
             self.pregunta("caso", 10, "CASO_CLINICO_TRONCO", "CASO-01"),
             self.pregunta("caso-1", 11, "SUBITEM_CASO", "CASO-01"),
@@ -49,10 +49,10 @@ class SeleccionBloquesAgrupadosTest(unittest.TestCase):
 
         self.assertEqual([p["id"] for p in resultado], ["caso", "caso-1", "caso-2", "caso-3"])
 
-    def test_emparejamiento_seleccionado_baraja_subitems_sin_perder_el_bloque(self):
+    def test_emparejamiento_seleccionado_conserva_el_orden_de_los_subitems(self):
         config.CUOTA_FACILES = 0
         config.CUOTA_MEDIAS = 0
-        config.CUOTA_DIFICILES = 1
+        config.CUOTA_DIFICILES = 3
         reactivos = [
             self.pregunta("emp", 20, "EMPAREJAMIENTO_TRONCO", "EMP-01"),
             self.pregunta("emp-1", 21, "OPCION_EMPAREJAMIENTO", "EMP-01"),
@@ -66,13 +66,30 @@ class SeleccionBloquesAgrupadosTest(unittest.TestCase):
         ids = [p["id"] for p in resultado]
         ids_repetidos = [p["id"] for p in resultado_repetido]
         self.assertEqual(ids[0], "emp")
-        self.assertCountEqual(ids[1:], ["emp-1", "emp-2", "emp-3"])
+        self.assertEqual(ids[1:], ["emp-1", "emp-2", "emp-3"])
         self.assertEqual(ids, ids_repetidos)
-        ordenes = {
-            tuple(p["id"] for p in generator.seleccionar_preguntas(reactivos, seed=semilla)[1:])
-            for semilla in range(1, 10)
-        }
-        self.assertGreater(len(ordenes), 1)
+
+    def test_barajado_de_emparejamiento_reordena_maestro_y_remapea_hijos(self):
+        macro = self.pregunta("emp", 20, "EMPAREJAMIENTO_TRONCO", "EMP-01")
+        macro["opciones_json"] = json.dumps([
+            {"letra": "A", "texto": "Concepto A", "correcta": False},
+            {"letra": "B", "texto": "Concepto B", "correcta": False},
+            {"letra": "C", "texto": "Concepto C", "correcta": False},
+            {"letra": "D", "texto": "Concepto D", "correcta": False},
+            {"letra": "E", "texto": "Concepto E", "correcta": False},
+        ])
+        hijos = [
+            {**self.pregunta("emp-1", 21, "OPCION_EMPAREJAMIENTO", "EMP-01"), "respuesta_correcta": "A"},
+            {**self.pregunta("emp-2", 22, "OPCION_EMPAREJAMIENTO", "EMP-01"), "respuesta_correcta": "D"},
+        ]
+
+        resultado = generator._barajar_bloque_emparejamiento(macro, hijos, semilla=7)
+        opciones = json.loads(resultado[0]["opciones_json"])
+        letra_por_concepto = {opcion["texto"]: opcion["letra"] for opcion in opciones}
+
+        self.assertEqual([p["id"] for p in resultado[1:]], ["emp-1", "emp-2"])
+        self.assertEqual(resultado[1]["respuesta_correcta"], letra_por_concepto["Concepto A"])
+        self.assertEqual(resultado[2]["respuesta_correcta"], letra_por_concepto["Concepto D"])
 
     def test_seleccion_no_descarta_preguntas_sin_id_de_postgres(self):
         config.CUOTA_FACILES = 1

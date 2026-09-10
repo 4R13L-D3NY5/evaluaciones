@@ -54,6 +54,9 @@ public class RolExamenRequestDto {
     /** Opcional en la solicitud: el servidor asigna la siguiente versión disponible. */
     private Integer version;
 
+    /** Marca la carga masiva desde Excel; no aplica a la creación manual. */
+    private boolean importacion;
+
     @NotNull
     private ModalidadExamen modalidad;
 
