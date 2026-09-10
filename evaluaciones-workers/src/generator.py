@@ -118,18 +118,44 @@ def _slugify(texto: str) -> str:
     return re.sub(r"[^A-Z0-9_-]", "", t)
 
 
-def _extraer_respuesta_correcta(opciones: list[tuple[str, str, bool]]) -> str:
+TIPOS_SIN_BARAJAR = {
+    "VERDADERO_O_FALSO_SIMPLE",
+    "VERDADERO_O_FALSO_COMPLEJAS",
+    "RESPUESTA_PREMISAS_ABCD",
+}
+
+TIPOS_CON_OPCIONES_BARAJABLES = {
+    "SELECCION_MEJOR_RESPUESTA",
+    "SUBITEM_CASO",
+}
+
+
+def _extraer_respuesta_correcta(
+    opciones: list[tuple[str, str, bool]], respuesta_directa: Any = None
+) -> str:
+    """Obtiene la clave sin confundir premisas con alternativas.
+
+    V/F complejas guarda sus cuatro premisas en A-D y puede tener una clave E,
+    aunque ninguna de esas cuatro entradas tenga ``correcta=true``. Las filas
+    hijas de emparejamiento tampoco tienen opciones propias; en ambos casos la
+    respuesta normalizada de la fila es la fuente de respaldo.
+    """
     for letra, _, correcta in opciones:
         if correcta:
-            return letra
-    return "A"
+            return str(letra).strip().upper()
+    respuesta = str(respuesta_directa or "").strip().upper()
+    coincidencia = re.match(r"^([A-E])(?:\s|[:.)\-]|$)", respuesta)
+    return coincidencia.group(1) if coincidencia else "A"
 
 
 def _barajar_opciones_pregunta(pregunta: dict[str, Any], semilla: int) -> dict[str, Any]:
-    """Devuelve una copia de la pregunta con las opciones barajadas y reasignadas A-E."""
+    """Baraja únicamente alternativas que pueden cambiar de posición."""
+    tipo = pregunta.get("tipo_reactivo")
+    if tipo in TIPOS_SIN_BARAJAR or tipo not in TIPOS_CON_OPCIONES_BARAJABLES:
+        return pregunta.copy()
     opciones = parsear_opciones(pregunta.get("opciones_json", "[]"))
     if not opciones:
-        return pregunta
+        return pregunta.copy()
 
     barajadas = barajar_opciones(opciones, semilla)
     p = pregunta.copy()
@@ -138,6 +164,79 @@ def _barajar_opciones_pregunta(pregunta: dict[str, Any], semilla: int) -> dict[s
         ensure_ascii=False,
     )
     return p
+
+
+def _barajar_bloque_emparejamiento(
+    macro: dict[str, Any], hijos: list[dict[str, Any]], semilla: int
+) -> list[dict[str, Any]]:
+    """Baraja las opciones maestras y remapea las claves de sus hijos.
+
+    Las preguntas hijas conservan su orden. Solo cambia la posición de las
+    definiciones A-E del encabezado; por eso cada respuesta de los hijos debe
+    trasladarse a la nueva letra que representa la misma definición.
+    """
+    opciones = parsear_opciones(macro.get("opciones_json", "[]"))
+    if len(opciones) < 2:
+        return [macro.copy(), *(hijo.copy() for hijo in hijos)]
+
+    mezcladas = opciones[:]
+    random.Random(semilla).shuffle(mezcladas)
+    letras = [chr(ord("A") + indice) for indice in range(len(mezcladas))]
+    remapeo = {
+        str(letra_original).strip().upper(): letras[indice]
+        for indice, (letra_original, _, _) in enumerate(mezcladas)
+    }
+
+    macro_nuevo = macro.copy()
+    macro_nuevo["opciones_json"] = json.dumps(
+        [
+            {"letra": letras[indice], "texto": texto, "correcta": correcta}
+            for indice, (_, texto, correcta) in enumerate(mezcladas)
+        ],
+        ensure_ascii=False,
+    )
+
+    hijos_nuevos = []
+    for hijo in hijos:
+        hijo_nuevo = hijo.copy()
+        clave = _extraer_respuesta_correcta(
+            parsear_opciones(hijo.get("opciones_json", "[]")),
+            hijo.get("respuesta_correcta"),
+        )
+        if clave in remapeo:
+            hijo_nuevo["respuesta_correcta"] = remapeo[clave]
+        hijos_nuevos.append(hijo_nuevo)
+    return [macro_nuevo, *hijos_nuevos]
+
+
+def _barajar_preguntas_para_variante(
+    preguntas: list[dict[str, Any]], semilla: int
+) -> list[dict[str, Any]]:
+    """Aplica el barajado oficial respetando la semántica de cada tipología."""
+    resultado: list[dict[str, Any]] = []
+    indice = 0
+    while indice < len(preguntas):
+        pregunta = preguntas[indice]
+        if pregunta.get("tipo_reactivo") == "EMPAREJAMIENTO_TRONCO":
+            grupo = pregunta.get("grupo_contexto")
+            hijos: list[dict[str, Any]] = []
+            siguiente = indice + 1
+            while siguiente < len(preguntas):
+                candidato = preguntas[siguiente]
+                if (
+                    candidato.get("tipo_reactivo") != "OPCION_EMPAREJAMIENTO"
+                    or candidato.get("grupo_contexto") != grupo
+                ):
+                    break
+                hijos.append(candidato)
+                siguiente += 1
+            resultado.extend(_barajar_bloque_emparejamiento(pregunta, hijos, semilla + indice))
+            indice = siguiente
+            continue
+
+        resultado.append(_barajar_opciones_pregunta(pregunta, semilla + indice))
+        indice += 1
+    return resultado
 
 
 def _sanitize_math(math_text: str) -> str:
@@ -485,8 +584,6 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int, generation
                 if macro is not None:
                     bloque_tipo.append(macro)
                 hijos_ordenados = sorted(hijos, key=_numero_orden)
-                if clave[0] == "EMPAREJAMIENTO":
-                    rng.shuffle(hijos_ordenados)
                 bloque_tipo.extend(hijos_ordenados)
             # Algunos bancos antiguos no traen grupo_contexto en los hijos;
             # siguen siendo preguntas válidas y no deben desaparecer.
@@ -510,10 +607,10 @@ def seleccionar_preguntas(reactivos: list[dict[str, Any]], seed: int, generation
             tipos_nuevos.setdefault(tipo_nuevo, []).append(pregunta)
     bloques.extend(sorted(tipos_nuevos.values(), key=lambda bloque: min(_numero_orden(p) for p in bloque)))
 
-    # El orden de las secciones cambia por variante. Los casos clínicos
-    # conservan sus subítems en orden; en emparejamiento, en cambio, los
-    # enunciados hijos se barajan. La tarjeta de opciones de referencia
-    # permanece sin cambios.
+    # El orden de las secciones cambia por variante. Los casos clínicos y los
+    # emparejamientos conservan sus subítems en orden; el barajado permitido
+    # de alternativas y de la tarjeta maestra se aplica después, al construir
+    # la variante oficial.
     rng.shuffle(bloques)
     return [pregunta for bloque in bloques for pregunta in bloque]
 
@@ -715,9 +812,15 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
             typ_code += '  ]\n]\n'
             continue
 
-        # Las filas hijas de emparejamiento no llevan incisos propios: la
-        # respuesta es la clave A-E de relación y se registra internamente.
-        opciones = [] if tipo in {"VERDADERO_O_FALSO_SIMPLE", "OPCION_EMPAREJAMIENTO"} else parsear_opciones(
+        # V/F simple no imprime alternativas y las premisas A/B/Ambas/Ninguna
+        # se explican solo en las instrucciones de la sección. Las filas hijas
+        # de emparejamiento tampoco llevan incisos propios: usan la tarjeta
+        # maestra A-E.
+        opciones = [] if tipo in {
+            "VERDADERO_O_FALSO_SIMPLE",
+            "RESPUESTA_PREMISAS_ABCD",
+            "OPCION_EMPAREJAMIENTO",
+        } else parsear_opciones(
             p.get("opciones_json", "[]")
         )
         typ_code += f'''
@@ -876,7 +979,7 @@ def generar_variante(
     # trazabilidad inmutable entre el número visible y la fila del banco.
     preguntas_sin_barajar = list(preguntas)
     if not modo_previsualizacion:
-        preguntas = [_barajar_opciones_pregunta(p, seed + idx) for idx, p in enumerate(preguntas)]
+        preguntas = _barajar_preguntas_para_variante(preguntas, seed)
 
     # Contrato seguro para el examen web: conserva exactamente el orden y los
     # incisos que se imprimen, pero elimina cualquier marca de respuesta correcta.
@@ -943,7 +1046,9 @@ def generar_variante(
             continue
         numero_pregunta += 1
         opciones = parsear_opciones(p.get("opciones_json", "[]"))
-        patron[str(numero_pregunta)] = _extraer_respuesta_correcta(opciones)
+        patron[str(numero_pregunta)] = _extraer_respuesta_correcta(
+            opciones, p.get("respuesta_correcta")
+        )
         orden_ids.append(p["id"])
 
         # La posición se conserva porque el barajado de opciones no cambia
@@ -956,7 +1061,8 @@ def generar_variante(
             "numeroBanco": original.get("numero_orden"),
             "reactivoId": original.get("id"),
             "respuestaCorrectaBanco": _extraer_respuesta_correcta(
-                parsear_opciones(original.get("opciones_json", "[]"))
+                parsear_opciones(original.get("opciones_json", "[]")),
+                original.get("respuesta_correcta"),
             ),
             "respuestaCorrectaVariante": patron[str(numero_pregunta)],
         })

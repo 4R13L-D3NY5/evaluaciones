@@ -14,7 +14,7 @@ import {
   RolExamenService
 } from '../../core/services/rol-examen.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
-import { catchError, firstValueFrom, forkJoin, from, map, mergeMap, of, switchMap, toArray } from 'rxjs';
+import { catchError, firstValueFrom, forkJoin, from, map, mergeMap, of, toArray } from 'rxjs';
 
 export type RolExamenItem = RolExamenPersistedItem;
 
@@ -22,6 +22,14 @@ type SeveridadAdvertenciaHorario = 'AMARILLA' | 'ROJA';
 
 interface AdvertenciaHorarioImportacion {
   severidad: SeveridadAdvertenciaHorario;
+  fila: number;
+  materia: string;
+  grupo: string;
+  tipo: string;
+  mensaje: string;
+}
+
+interface AdvertenciaProgramacionImportacion {
   fila: number;
   materia: string;
   grupo: string;
@@ -514,6 +522,29 @@ interface InstanciaImportacionItem {
               </div>
             }
 
+            @if (excelAdvertenciasProgramacion().length > 0) {
+              <div class="rounded-xl border border-orange-200 bg-orange-50 p-3 text-[11px] text-orange-950 space-y-2">
+                <div class="flex items-center gap-2 font-black text-orange-900">
+                  <i class="pi pi-calendar-times"></i>
+                  <span>Programaciones omitidas</span>
+                  <span class="ml-auto rounded-full bg-white/70 px-2 py-0.5 font-mono text-[10px]">
+                    {{ excelAdvertenciasProgramacion().length }}
+                  </span>
+                </div>
+                <p class="text-[10px] leading-relaxed text-orange-900/80">
+                  Estos grupos ya tienen una programación registrada. No se subirán nuevas versiones desde este Excel; cualquier cambio debe registrarse manualmente.
+                </p>
+                <div class="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                  @for (advertencia of excelAdvertenciasProgramacion(); track advertencia.fila + '-' + advertencia.tipo + '-' + advertencia.grupo) {
+                    <div class="rounded-lg border border-orange-300 bg-white/70 px-2.5 py-2 leading-relaxed">
+                      <strong>Fila {{ advertencia.fila }} · {{ advertencia.materia }} · {{ advertencia.grupo }} · {{ advertencia.tipo }}:</strong>
+                      {{ advertencia.mensaje }}
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
             @if (excelAdvertenciasHorario().length > 0) {
               <div class="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-950 space-y-2">
                 <div class="flex items-center gap-2 font-black text-amber-900">
@@ -552,53 +583,6 @@ interface InstanciaImportacionItem {
               </div>
             }
 
-            @if (excelCargadoNombre()) {
-              <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900 space-y-2">
-                <label class="flex items-start gap-2 font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    [disabled]="excelItemsImportados().length === 0 || cargando()"
-                    [ngModel]="reemplazarRolesPermitidos()"
-                    (ngModelChange)="reemplazarRolesPermitidos.set($event)"
-                    class="mt-0.5 accent-amber-600 disabled:cursor-not-allowed">
-                  <span [class.opacity-60]="excelItemsImportados().length === 0">
-                    Eliminar y subir nuevamente los roles de examen coincidentes
-                  </span>
-                </label>
-                <p class="pl-5 text-[10px] leading-relaxed">
-                  @if (excelItemsImportados().length > 0) {
-                    Solo se eliminarán roles de examen en <strong>PROGRAMADO</strong> o <strong>VALIDADO</strong>.
-                    Los que estén en <strong>GENERADO</strong> o en una etapa posterior no se tocarán.
-                  } @else {
-                    No está disponible porque el archivo no tiene registros válidos para importar.
-                    Verifica que la sede, carrera y grupos seleccionados correspondan al Excel.
-                  }
-                </p>
-                @if (rolesImportacionReemplazables().length > 0 || rolesImportacionProtegidos().length > 0) {
-                  <p class="pl-5 text-[10px] font-mono">
-                    Reemplazables: {{ rolesImportacionReemplazables().length }} · Protegidos: {{ rolesImportacionProtegidos().length }}
-                  </p>
-                }
-              </div>
-            }
-
-            @if (confirmarReemplazoImportacion()) {
-              <div class="rounded-xl border border-rose-300 bg-rose-50 p-3 text-[11px] text-rose-900 space-y-2">
-                <div class="flex items-start gap-2 font-black">
-                  <i class="pi pi-exclamation-triangle mt-0.5 text-rose-600"></i>
-                  <span>Confirma el reemplazo de los roles coincidentes</span>
-                </div>
-                <p>
-                  Se eliminarán {{ rolesImportacionReemplazables().length }} roles en estado PROGRAMADO o VALIDADO y luego se cargarán los registros del Excel.
-                  Los {{ rolesImportacionProtegidos().length }} roles avanzados permanecerán sin cambios.
-                </p>
-                <div class="flex justify-end gap-2 pt-1">
-                  <button (click)="confirmarReemplazoImportacion.set(false)" class="px-3 py-1.5 rounded-lg border border-border bg-white text-xs font-bold cursor-pointer">Cancelar</button>
-                  <button (click)="procesarImportacionExcel(true)" [disabled]="cargando()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-black disabled:opacity-50 cursor-pointer">Confirmar y subir</button>
-                </div>
-              </div>
-            }
-
             @if (cargando()) {
               <div class="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs font-bold text-primary flex items-center gap-2">
                 <i class="pi pi-spin pi-spinner"></i>
@@ -609,7 +593,7 @@ interface InstanciaImportacionItem {
             <div class="sticky bottom-0 flex justify-end gap-2 bg-card pt-3 border-t border-border">
               <button (click)="cerrarModalSubirExcel()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
               <button 
-                [disabled]="excelItemsImportados().length === 0 || cargando() || confirmarReemplazoImportacion()"
+                [disabled]="excelItemsImportados().length === 0 || cargando()"
                 (click)="procesarImportacionExcel()"
                 class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
                 @if (cargando()) { <i class="pi pi-spin pi-spinner mr-1"></i> Procesando... } @else { Importar al Rol de Examen }
@@ -941,8 +925,7 @@ export class RolExamenesComponent implements OnInit {
   public excelItemsImportados = signal<RolExamenItem[]>([]);
   public excelErroresImportacion = signal<string[]>([]);
   public excelAdvertenciasHorario = signal<AdvertenciaHorarioImportacion[]>([]);
-  public reemplazarRolesPermitidos = signal<boolean>(false);
-  public confirmarReemplazoImportacion = signal<boolean>(false);
+  public excelAdvertenciasProgramacion = signal<AdvertenciaProgramacionImportacion[]>([]);
 
   public dialogSubirInstancias = signal<boolean>(false);
   public instanciasCargadasNombre = signal<string | null>(null);
@@ -1375,14 +1358,12 @@ export class RolExamenesComponent implements OnInit {
     this.excelItemsImportados.set([]);
     this.excelErroresImportacion.set([]);
     this.excelAdvertenciasHorario.set([]);
-    this.reemplazarRolesPermitidos.set(false);
-    this.confirmarReemplazoImportacion.set(false);
+    this.excelAdvertenciasProgramacion.set([]);
     this.dialogSubirExcel.set(true);
   }
 
   public cerrarModalSubirExcel(): void {
     this.dialogSubirExcel.set(false);
-    this.confirmarReemplazoImportacion.set(false);
   }
 
   public abrirModalSubirInstancias(): void {
@@ -1656,6 +1637,7 @@ export class RolExamenesComponent implements OnInit {
           this.excelItemsImportados.set([]);
           this.excelErroresImportacion.set(['No se encontró la hoja “Rol de Examenes”. Verifica que estés usando el archivo oficial de roles de examen.']);
           this.excelAdvertenciasHorario.set([]);
+          this.excelAdvertenciasProgramacion.set([]);
           this._mostrarToast('El archivo no contiene la hoja oficial “Rol de Examenes”.');
           return;
         }
@@ -1670,11 +1652,14 @@ export class RolExamenesComponent implements OnInit {
         const items: RolExamenItem[] = [];
         const errores: string[] = [];
         const advertenciasHorario: AdvertenciaHorarioImportacion[] = [];
+        const advertenciasProgramacion: AdvertenciaProgramacionImportacion[] = [];
         const clavesExactasDelArchivo = new Set<string>();
-        const siguienteVersionPorClave = new Map<string, number>();
+        const programacionesExistentesPorClave = new Map<string, RolExamenItem>();
         for (const existente of this.examenes()) {
           const clave = this._claveVersion(existente.seaGroupId, existente.tipo);
-          siguienteVersionPorClave.set(clave, Math.max(siguienteVersionPorClave.get(clave) || 0, existente.version || 1));
+          if (!programacionesExistentesPorClave.has(clave)) {
+            programacionesExistentesPorClave.set(clave, existente);
+          }
         }
 
         // La plantilla oficial tiene cinco hojas y la hoja de roles empieza en la fila 12.
@@ -1798,6 +1783,7 @@ export class RolExamenesComponent implements OnInit {
 
           const schedule = grupo.schedules?.[0];
           let rolesGeneradosEnFila = 0;
+          let rolesOmitidosPorProgramacion = 0;
           const tieneDatosDeExamenGeneral = [
             columnasRol.primerParcialFecha,
             columnasRol.primerParcialHora,
@@ -1829,7 +1815,21 @@ export class RolExamenesComponent implements OnInit {
               errores.push(`Fila ${filaExcel}: ${examen.tipo} de ${materia.courseCode} y grupo ${grupo.code} está repetido en el archivo.`);
               continue;
             }
-            const version = (siguienteVersionPorClave.get(claveVersion) || 0) + 1;
+            const programacionExistente = programacionesExistentesPorClave.get(claveVersion);
+            if (programacionExistente) {
+              rolesOmitidosPorProgramacion++;
+              const fechaRegistrada = programacionExistente.fechaDisplay || programacionExistente.fecha || 'fecha registrada';
+              advertenciasProgramacion.push({
+                fila: filaExcel,
+                materia: materia.courseName || materia.courseCode,
+                grupo: grupo.code,
+                tipo: examen.tipo,
+                mensaje: `Este grupo ya cuenta con una programación registrada para ${examen.tipo} (${fechaRegistrada}). La fila no se subirá desde el Excel; cualquier cambio debe registrarse manualmente.`
+              });
+              continue;
+            }
+
+            const version = 1;
             const id = this._crearRolId(grupo.groupId, examen.tipo, examen.fecha.iso, version);
 
           const horario = examen.hora || (schedule ? `${schedule.startTime} - ${schedule.endTime}` : 'Por definir');
@@ -1873,57 +1873,43 @@ export class RolExamenesComponent implements OnInit {
               campus: schedule?.campus || 'Por definir'
             });
             clavesExactasDelArchivo.add(claveExacta);
-            siguienteVersionPorClave.set(claveVersion, version);
             rolesGeneradosEnFila++;
           }
 
-          if (rolesGeneradosEnFila === 0 && tieneDatosDeExamenGeneral) {
-            errores.push(`Fila ${filaExcel}: no se pudo generar ningún examen porque faltan fechas o ya existen registros.`);
+          if (rolesGeneradosEnFila === 0 && rolesOmitidosPorProgramacion === 0 && tieneDatosDeExamenGeneral) {
+            errores.push(`Fila ${filaExcel}: no se pudo generar ningún examen porque faltan fechas válidas.`);
           }
         });
 
         this.excelItemsImportados.set(items);
         this.excelErroresImportacion.set(errores);
         this.excelAdvertenciasHorario.set(advertenciasHorario);
-        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} registros oficiales listos, ${errores.length} observaciones y ${advertenciasHorario.length} advertencias de horario.`);
+        this.excelAdvertenciasProgramacion.set(advertenciasProgramacion);
+        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} registros listos, ${advertenciasProgramacion.length} programaciones omitidas y ${errores.length} observaciones.`);
       } catch (err) {
         console.error('Error al procesar archivo Excel:', err);
         this.excelAdvertenciasHorario.set([]);
+        this.excelAdvertenciasProgramacion.set([]);
         this._mostrarToast('Error al leer el archivo Excel.');
       }
     };
     reader.readAsArrayBuffer(file);
   }
 
-  public procesarImportacionExcel(confirmado = false): void {
+  public procesarImportacionExcel(): void {
     const importados = this.excelItemsImportados();
     if (importados.length === 0) return;
 
-    const reemplazables = this.rolesImportacionReemplazables();
-    if (this.reemplazarRolesPermitidos() && reemplazables.length > 0 && !confirmado) {
-      this.confirmarReemplazoImportacion.set(true);
-      return;
-    }
-    this.confirmarReemplazoImportacion.set(false);
-
     this.cargando.set(true);
-    const eliminar$ = this.reemplazarRolesPermitidos() && reemplazables.length > 0
-      ? from(reemplazables).pipe(
-        mergeMap(item => this._rolService.eliminar(item.id), 6),
-        toArray()
-      )
-      : of([]);
     const crear$ = from(importados).pipe(
-      mergeMap(item => this._rolService.crear(this._toRequest(item)).pipe(
+      mergeMap(item => this._rolService.crear(this._toRequest(item, true)).pipe(
         map(rol => ({ rol, error: null as unknown })),
         catchError(error => of({ rol: null as RolExamenResponse | null, error }))
       ), 6),
       toArray()
     );
 
-    eliminar$.pipe(
-      switchMap(() => crear$)
-    ).subscribe({
+    crear$.subscribe({
       next: resultados => {
         const creados = resultados.filter(resultado => resultado.rol).map(resultado => resultado.rol!);
         const fallidos = resultados.filter(resultado => resultado.error);
@@ -1933,13 +1919,12 @@ export class RolExamenesComponent implements OnInit {
         if (fallidos.length > 0) {
           this._mostrarToast(`${creados.length} exámenes registrados y ${fallidos.length} rechazados por el servidor.`);
         } else {
-          const eliminados = this.reemplazarRolesPermitidos() ? ` Se reemplazaron ${reemplazables.length} roles de examen permitidos.` : '';
-          this._mostrarToast(`${creados.length} exámenes registrados correctamente en PostgreSQL.${eliminados}`);
+          this._mostrarToast(`${creados.length} exámenes registrados correctamente en PostgreSQL.`);
         }
       },
       error: err => {
         this.cargando.set(false);
-        this._mostrarToast(this._mensajeError(err, 'No se pudieron eliminar los roles de examen permitidos; no se realizó la nueva carga.'));
+        this._mostrarToast(this._mensajeError(err, 'No se pudieron registrar los roles de examen.'));
         this._cargarRolesOficiales();
       }
     });
@@ -2108,22 +2093,7 @@ export class RolExamenesComponent implements OnInit {
       && (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO');
   }
 
-  public rolesImportacionReemplazables(): RolExamenItem[] {
-    return this.rolesCoincidentesConImportacion()
-      .filter(item => item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO');
-  }
-
-  public rolesImportacionProtegidos(): RolExamenItem[] {
-    return this.rolesCoincidentesConImportacion()
-      .filter(item => item.estado !== 'PROGRAMADO' && item.estado !== 'VALIDADO');
-  }
-
-  private rolesCoincidentesConImportacion(): RolExamenItem[] {
-    const claves = new Set(this.excelItemsImportados().map(item => this._claveVersion(item.seaGroupId, item.tipo)));
-    return this.examenes().filter(item => claves.has(this._claveVersion(item.seaGroupId, item.tipo)));
-  }
-
-  private _toRequest(item: RolExamenItem): RolExamenCreateRequest {
+  private _toRequest(item: RolExamenItem, importacion = false): RolExamenCreateRequest {
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
     if (!sede || !carrera) {
@@ -2152,7 +2122,8 @@ export class RolExamenesComponent implements OnInit {
       fechaDisplay: item.fechaDisplay,
       horario: item.horario,
       aula: item.aula,
-      campus: item.campus
+      campus: item.campus,
+      importacion
     };
   }
 

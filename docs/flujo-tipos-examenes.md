@@ -79,9 +79,11 @@ flowchart TB
 | Virtual | `En curso → Calificado` | No requiere una transición manual del rol: al vencer la duración o cerrar la sala, el sistema guarda/califica los intentos y pasa el examen a **Calificado**. |
 
 En los bloques de **emparejamiento ampliado**, cada variante conserva completa la
-tarjeta de opciones y todos sus subítems, pero presenta los subítems en un orden
-barajado determinístico. En los bloques de caso clínico o problema, los subítems
-mantienen el orden definido en el banco.
+tarjeta de opciones y todos sus subítems. Las opciones maestras de la tarjeta se
+barajan de forma determinística y las claves de los subítems se remapean para
+seguir apuntando a la misma definición; los subítems mantienen el orden definido
+en el banco. En los bloques de caso clínico o problema, los subítems también
+mantienen ese orden, pero sus alternativas sí pueden barajarse.
 
 ## Configuración administrativa que afecta el flujo
 

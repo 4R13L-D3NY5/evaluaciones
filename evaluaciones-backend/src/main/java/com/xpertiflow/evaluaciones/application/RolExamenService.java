@@ -143,6 +143,10 @@ public class RolExamenService {
         GroupItemDto grupoOficial = resolverGrupoOficialDesdeSea(previsualizacion);
         aplicarDocenteOficial(previsualizacion, grupoOficial);
         dto.setSeaGroupId(previsualizacion.getSeaGroupId());
+        if (dto.isImportacion() && existeProgramacionParaImportacion(dto)) {
+            throw new IllegalArgumentException("El grupo " + dto.getGrupo() + " ya cuenta con una programación para "
+                    + dto.getTipoParcial() + ". Los cambios deben registrarse manualmente.");
+        }
         int version = siguienteVersion(dto);
         dto.setVersion(version);
         dto.setId(construirId(dto, version));
@@ -449,6 +453,21 @@ public class RolExamenService {
                     dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial());
         }
         return ultimo.map(rol -> rol.getVersion() == null ? 1 : rol.getVersion() + 1).orElse(1);
+    }
+
+    /**
+     * La importación masiva no crea versiones alternativas de un grupo/parcial
+     * ya programado. La creación manual conserva el comportamiento anterior y
+     * sigue permitiendo registrar una nueva versión cuando corresponda.
+     */
+    private boolean existeProgramacionParaImportacion(RolExamenRequestDto dto) {
+        if (dto.getSeaGroupId() != null && !dto.getSeaGroupId().isBlank()
+                && rolExamenRepository.findTopBySeaGroupIdAndTipoParcialOrderByVersionDesc(
+                dto.getSeaGroupId(), dto.getTipoParcial()).isPresent()) {
+            return true;
+        }
+        return rolExamenRepository.findTopByMateriaCodigoAndGrupoAndTipoParcialOrderByVersionDesc(
+                dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial()).isPresent();
     }
 
     private String construirId(RolExamenRequestDto dto, int version) {

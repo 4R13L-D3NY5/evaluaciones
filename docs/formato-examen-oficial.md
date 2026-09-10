@@ -71,18 +71,22 @@ La cartilla OMR es un documento separado del examen. El cuadernillo no incluye c
 - Los incisos y su texto no llevan negrita.
 - No se debe forzar un salto de línea después de `___`; el salto se aplica únicamente cuando el texto alcanza el margen derecho.
 - El primer inciso, cuando exista, se presenta debajo del enunciado y no en la línea del número ni de los guiones.
-- Esta regla aplica a selección, premisas, casos prácticos y a las preguntas dependientes de un emparejamiento.
+- Esta regla aplica a selección y a las preguntas de caso que realmente tengan alternativas de respuesta.
 - Cada nueva sección debe destacarse con una línea superior gruesa, título en negrita y mayúsculas, una instrucción descriptiva y una línea inferior fina.
 - En las instrucciones solo la palabra `INSTRUCCIONES:` se escribe en mayúsculas; el texto descriptivo conserva mayúsculas y minúsculas normales. Las claves de premisas, V/F complejas y emparejamiento preservan sus saltos de línea semánticos.
 - Los bloques de sección deben conservar separación vertical suficiente para que el estudiante identifique con facilidad el cambio de tipo de reactivo.
 - Los casos clínicos o problemas y los emparejamientos deben conservar sus bloques tipo tarjeta con borde; las preguntas internas respetan la numeración y los incisos del formato general.
 - Si durante la selección de preguntas se incorpora un caso clínico, problema o emparejamiento, se debe incluir el bloque completo con todos sus subítems u opciones relacionadas; nunca se permite seleccionar solo una parte del grupo.
-- El orden de los subítems u opciones relacionadas debe ser exactamente el orden original del banco validado, aunque las variantes cambien el orden de otros reactivos o de sus opciones.
+- El orden de los subítems de casos y emparejamientos debe ser exactamente el orden original del banco validado.
+- En `Verdadero o Falso Simple`, `Verdadero o Falso Complejas` y `Respuesta A/B/Ambas/Ninguna` no se barajan las columnas de contenido. En V/F complejas, `opcion_a` a `opcion_d` son las premisas 1 a 4 y `opcion_e` permanece vacía; la respuesta A-E es la clave de veracidad.
+- En `Selección de la mejor respuesta` y en los subítems de casos se barajan las alternativas A-E y se conserva su respuesta correcta.
+- En `Emparejamiento Ampliado` se barajan las opciones maestras de la tarjeta A-E y se remapea la clave de cada subítem; los subítems mantienen su orden.
 - Los enunciados mantienen texto normal, sin negrita, salvo el número de pregunta y sus tres guiones `___`. El enunciado principal de un emparejamiento se mantiene dentro de su tarjeta de referencia.
 - Las imágenes de apoyo no reemplazan el texto ni las opciones de respuesta y deben mantenerse dentro del ancho útil de la hoja, sin recortar ni deformar la proporción original.
 - En `Emparejamiento Ampliado`, el enunciado principal y sus opciones de referencia A-E se imprimen dentro de la tarjeta, sin número de pregunta ni `___`. Las opciones relacionadas del grupo se imprimen después como preguntas numeradas y sí conservan `___`.
 - Verdadero o falso simple no muestra incisos ni opciones impresas; el estudiante responde en el espacio `___` y la clave se conserva únicamente de forma interna para calificación.
-- En verdadero o falso complejo, las cuatro afirmaciones de cada pregunta se identifican como `1`, `2`, `3` y `4`; debajo se presenta el grupo de respuestas A-E para que el estudiante marque una sola clave.
+- En verdadero o falso complejo, las cuatro afirmaciones de cada pregunta se identifican como `1`, `2`, `3` y `4`; la clave A-E se presenta una sola vez en las instrucciones de la sección y no se repite como incisos.
+- En `Respuesta A/B/Ambas/Ninguna`, las alternativas A-D se explican únicamente en las instrucciones de la sección; no se repiten como incisos debajo de cada pregunta.
 - En emparejamiento ampliado, después de la tarjeta de referencia se presenta el grupo de respuestas A-E debajo de cada pregunta relacionada.
 
 ## 6. Variantes y asignación
@@ -143,6 +147,7 @@ Debe conservarse en la base de datos:
 
 | Fecha | Cambio |
 |---|---|
+| 2026-09-09 | El barajado se restringe por tipología: no se mezclan V/F simple, V/F complejas ni premisas A/B/Ambas/Ninguna; se mezclan alternativas de selección y casos, y se mezclan las opciones maestras de emparejamiento con remapeo de claves. |
 | 2026-08-29 | Enunciado continuo después de `___`, leading de 0,8 em, separación entre preguntas de 1,2 em, instrucciones en estilo oración y V/F simple sin opciones impresas. |
 | 2026-08-29 | Ficha de cabecera por estudiante con datos oficiales y saltos explícitos en las instrucciones. Las reglas iniciales de salto después de `___` e incisos A/B de V/F simple fueron reemplazadas por la configuración vigente. |
 | 2026-08-29 | Recuperación de cabecera institucional, separadores superior/inferior por sección, instrucciones en mayúsculas, numeración con `___` en negrita y tarjetas para casos/emparejamientos en el PDF oficial y la previsualización. |

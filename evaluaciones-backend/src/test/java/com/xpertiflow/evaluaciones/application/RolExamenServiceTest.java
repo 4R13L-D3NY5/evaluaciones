@@ -1,6 +1,7 @@
 package com.xpertiflow.evaluaciones.application;
 
 import com.xpertiflow.evaluaciones.api.mapper.RolExamenMapper;
+import com.xpertiflow.evaluaciones.api.dto.RolExamenRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.List;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -291,6 +293,53 @@ class RolExamenServiceTest {
         assertThat(rol.getEstadoFlujo()).isEqualTo(EstadoFlujo.ENTREGADO);
         verify(rolExamenRepository).save(rol);
         verify(auditoriaRepository).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void importacionNoCreaUnaNuevaVersionSiElGrupoYaTieneElParcialProgramado() {
+        RolExamenRequestDto solicitud = RolExamenRequestDto.builder()
+                .id("ROL-GROUP-1-1P-2026-09-03")
+                .seaGroupId("GROUP-1")
+                .seaSyllabusCourseId("COURSE-1")
+                .sedeCodigo("CBA")
+                .sedeNombre("COCHABAMBA")
+                .carreraCodigo("SIS")
+                .carreraNombre("SISTEMAS")
+                .materiaCodigo("SIS-413")
+                .materiaNombre("TELECOMUNICACIONES")
+                .semestre(1)
+                .grupo("TA-01")
+                .tipoClase("TA")
+                .tipoParcial(com.xpertiflow.evaluaciones.domain.enums.TipoParcial.PRIMER_PARCIAL)
+                .modalidad(ModalidadExamen.PRESENCIAL_CARTILLA)
+                .fecha(LocalDate.of(2026, 9, 3))
+                .importacion(true)
+                .build();
+        RolExamen previsualizacion = RolExamen.builder()
+                .seaGroupId("GROUP-1")
+                .seaSyllabusCourseId("COURSE-1")
+                .grupo("TA-01")
+                .build();
+        GroupItemDto grupoOficial = new GroupItemDto();
+        grupoOficial.setGroupId("GROUP-1");
+        grupoOficial.setCode("TA-01");
+        grupoOficial.setSyllabusCourseId("COURSE-1");
+        grupoOficial.setTeacherName("DOCENTE OFICIAL");
+
+        when(mapper.toEntity(solicitud)).thenReturn(previsualizacion);
+        when(unitepcGatewayClient.getGroups("2-2026", null, null, null))
+                .thenReturn(List.of(grupoOficial));
+        when(rolExamenRepository.findTopBySeaGroupIdAndTipoParcialOrderByVersionDesc(
+                "GROUP-1", solicitud.getTipoParcial()))
+                .thenReturn(Optional.of(RolExamen.builder().id("ROL-EXISTENTE").version(1).build()));
+
+        assertThatThrownBy(() -> service.crear(solicitud))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ya cuenta con una programación")
+                .hasMessageContaining("cambios deben registrarse manualmente");
+
+        verify(rolExamenRepository, never()).save(org.mockito.ArgumentMatchers.any(RolExamen.class));
+        verify(rolExamenRepository, never()).existsById(org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
