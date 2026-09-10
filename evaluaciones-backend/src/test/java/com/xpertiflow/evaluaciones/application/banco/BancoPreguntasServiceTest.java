@@ -119,7 +119,7 @@ class BancoPreguntasServiceTest {
         });
 
         verify(rolExamenService).validarPorBanco(
-                rol.getId(), respuesta.getHashSha256(), "Docente SEA");
+                rol.getId(), respuesta.getHashSha256(), null);
     }
 
     @Test
@@ -147,7 +147,7 @@ class BancoPreguntasServiceTest {
                 rol.getId(), archivo, "Docente Oficial");
 
         assertThat(respuesta.isExito()).isFalse();
-        assertThat(respuesta.getErroresValidacion()).anyMatch(error -> error.contains("mínimo 60 reactivos"));
+        assertThat(respuesta.getErroresValidacion()).anyMatch(error -> error.contains("mínimo 60 preguntas"));
         verify(bancoRepository, never()).save(any());
         verify(reactivoRepository, never()).save(any());
         verify(rolExamenService, never()).validarPorBanco(anyString(), anyString(), anyString());
@@ -251,7 +251,8 @@ class BancoPreguntasServiceTest {
 
         assertThat(respuesta.isExito()).isTrue();
         assertThat(respuesta.getErroresValidacion()).isEmpty();
-        verify(reactivoRepository, times(60)).save(any(Reactivo.class));
+        assertThat(respuesta.getTotalReactivos()).isEqualTo(60);
+        verify(reactivoRepository, times(61)).save(any(Reactivo.class));
     }
 
     @Test
@@ -345,9 +346,11 @@ class BancoPreguntasServiceTest {
             crearFila(sheet, 3, "Opción de Emparejamiento Ampliado", "EMP-01",
                     "Segunda relación", "", "", "", "", "", "B", "1");
 
-            for (int indice = 4; indice <= 60; indice++) {
+            // Hay 1 fila madre + 2 filas hijas + 58 preguntas independientes.
+            // La fila madre no debe consumir una de las 60 preguntas oficiales.
+            for (int indice = 4; indice <= 61; indice++) {
                 int posicion = indice - 3;
-                String dificultad = posicion <= 13 ? "1" : posicion <= 42 ? "2" : "3";
+                String dificultad = posicion <= 13 ? "1" : posicion <= 43 ? "2" : "3";
                 crearFila(sheet, indice, "SELECCION_SIMPLE", "",
                         "Pregunta oficial " + indice, "Respuesta A", "Respuesta B", "Respuesta C", "Respuesta D", "Respuesta E", "A", dificultad);
             }

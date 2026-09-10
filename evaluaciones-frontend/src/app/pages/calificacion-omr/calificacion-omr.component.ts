@@ -675,7 +675,7 @@ export interface EstudianteOmrItem {
                   <div class="flex items-center justify-between">
                     <h4 class="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <i class="pi pi-list text-purple-700"></i>
-                      <span>Respuestas leídas ({{ est.totalPreguntas }} Reactivos)</span>
+                      <span>Respuestas leídas ({{ est.totalPreguntas }} preguntas)</span>
                     </h4>
                     <span class="text-[10px] text-muted-foreground font-bold">
                       {{ est.aciertos }} correctas según la clave interna

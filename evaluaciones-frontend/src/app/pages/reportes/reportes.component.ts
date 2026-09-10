@@ -525,7 +525,7 @@ interface FilaRemark {
           <div class="p-5 border-b border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 class="text-sm font-black text-foreground uppercase tracking-wide">
-                Auditoría de Bancos de Preguntas y Reactivos Validados
+                Auditoría de Bancos de Preguntas Validadas
               </h3>
               <p class="text-xs text-muted-foreground">Estado de entrega de preguntas por docente y cumplimiento de la norma psicométrica.</p>
             </div>
@@ -562,7 +562,7 @@ interface FilaRemark {
                     <td class="p-3 text-foreground font-medium uppercase">{{ item.docente }}</td>
                     <td class="p-3 text-center font-mono font-bold">{{ item.semestre }}°</td>
                     <td class="p-3 text-center font-mono font-black text-foreground">
-                      {{ item.bancoExcelCargado ? '60 reactivos' : '0 reactivos' }}
+                      {{ item.bancoExcelCargado ? '60 preguntas' : '0 preguntas' }}
                     </td>
                     <td class="p-3 text-center font-mono text-emerald-600 font-bold">
                       {{ item.bancoExcelCargado ? '18' : '0' }}

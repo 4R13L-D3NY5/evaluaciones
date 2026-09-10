@@ -748,7 +748,7 @@ interface CampusDisponible extends Campus {
                   <span class="font-bold text-foreground">BANCO_{{ evaluacionSeleccionadaParaValidar()?.codigo }}_FINAL.xlsx</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-muted-foreground">Total Reactivos:</span>
+                  <span class="text-muted-foreground">Total Preguntas:</span>
                   <span class="font-bold text-emerald-600">30 Preguntas Verificadas con 5 Opciones (OK)</span>
                 </div>
                 <div class="flex justify-between">
@@ -1495,12 +1495,12 @@ interface CampusDisponible extends Campus {
 
                         <div class="text-center space-y-1 pt-2">
                           <h2 class="text-sm font-black uppercase text-slate-950 tracking-wide">
-                            CUESTIONARIO DE PREGUNTAS (30 REACTIVOS)
+                            CUESTIONARIO DE PREGUNTAS (30 PREGUNTAS)
                           </h2>
                           <hr class="border-t-2 border-slate-900 mt-2" />
                         </div>
 
-                        <!-- Cuestionario de 30 Reactivos -->
+                        <!-- Cuestionario de 30 Preguntas -->
                         <div class="space-y-4">
                           <div>
                             <h3 class="font-black text-xs uppercase text-slate-950">SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 30)</h3>

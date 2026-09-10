@@ -290,7 +290,7 @@ interface DashboardTurno {
           <div class="flex items-baseline justify-between">
             <div>
               <span class="text-3xl font-black text-amber-600 dark:text-amber-400 font-mono">{{ porcentajeBancos() }}%</span>
-              <span class="text-[11px] font-bold text-muted-foreground block mt-0.5">{{ totalReactivosBancos() }} reactivos cifrados</span>
+              <span class="text-[11px] font-bold text-muted-foreground block mt-0.5">{{ totalReactivosBancos() }} preguntas cifradas</span>
             </div>
             <span class="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full">
               {{ bancosCargadosVisible() }}/{{ rolesExamenesVisibles().length }} roles de examen con banco

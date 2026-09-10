@@ -134,7 +134,7 @@ export interface DiaCalendario {
                 Banco de preguntas
               </h1>
               <p class="text-xs text-muted-foreground font-medium mt-0.5">
-                Carga, revisión y aprobación de reactivos para cada evaluación.
+                Carga, revisión y aprobación de preguntas para cada evaluación.
               </p>
             </div>
           </div>
@@ -204,7 +204,7 @@ export interface DiaCalendario {
               </div>
             </div>
 
-            <!-- Grilla de 4 Selects Reactivos Conectados al Gateway SEA -->
+            <!-- Grilla de 4 selects de preguntas conectados al Gateway SEA -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <!-- Select 1: Sede -->
               <div class="space-y-1.5">
@@ -293,7 +293,7 @@ export interface DiaCalendario {
                       <i class="pi pi-check-circle mt-0.5 text-emerald-700"></i>
                       <div>
                         <strong class="block uppercase">Banco de preguntas cargado</strong>
-                        <span class="text-[10px]">{{ banco.totalReactivos }} reactivos · {{ banco.nombreArchivoExcel }} · Validado</span>
+                        <span class="text-[10px]">{{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · Validado</span>
                       </div>
                     </div>
                     @if (rolPuedeEliminarBanco()) {
@@ -564,7 +564,7 @@ export interface DiaCalendario {
                   {{ nombreArchivoCargado() || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol de examen debe estar PROGRAMADO o VALIDADO') }}
                 </div>
                 <p class="text-xs text-muted-foreground mt-1">
-                  Validación instantánea de tipos de reactivos, cuotas de dificultad y fórmulas matemáticas/químicas.
+                  Validación instantánea de tipos de preguntas, cuotas de dificultad y fórmulas matemáticas/químicas.
                 </p>
                 <p class="text-xs text-indigo-700 mt-1">
                   Puedes agregar la columna opcional <code>imagen_base64</code> para mostrar una imagen debajo de la pregunta en el examen virtual.
@@ -588,7 +588,7 @@ export interface DiaCalendario {
                 <div class="mt-4 space-y-4 border-t border-indigo-200 pt-4">
                   <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <p class="max-w-3xl text-[11px] leading-relaxed text-indigo-900/75">
-                      Convierte una imagen a Base64 y revisa cómo se verá dentro de una hoja de 8,5 × 13 pulgadas. Esta herramienta solo es necesaria cuando el reactivo incluye una imagen, ecuación u otro apoyo visual.
+                      Convierte una imagen a Base64 y revisa cómo se verá dentro de una hoja de 8,5 × 13 pulgadas. Esta herramienta solo es necesaria cuando la pregunta incluye una imagen, ecuación u otro apoyo visual.
                     </p>
                     @if (imagenBase64Generada()) {
                       <button (click)="limpiarImagenBase64(); $event.stopPropagation()" type="button" class="shrink-0 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer">
@@ -716,12 +716,12 @@ export interface DiaCalendario {
                     <span class="text-emerald-800 font-black text-xs flex items-center justify-center gap-1">
                       <i class="pi pi-shield text-emerald-600"></i> EXAMEN APROBADO
                     </span>
-                    <p class="text-[10px] text-emerald-700">Cuotas mínimas cumplidas y reactivos conformes</p>
+                    <p class="text-[10px] text-emerald-700">Cuotas mínimas cumplidas y preguntas conformes</p>
                   </div>
                 } @else {
                   <div class="bg-amber-50 border border-amber-300 p-3 rounded-xl text-center space-y-0.5">
                     <span class="text-amber-800 font-bold text-xs">Pendiente de Aprobación</span>
-                    <p class="text-[9px] text-amber-700 font-mono">Faltan reactivos o corregir errores</p>
+                    <p class="text-[9px] text-amber-700 font-mono">Faltan preguntas o hay errores por corregir</p>
                   </div>
                 }
               </div>
@@ -819,7 +819,7 @@ export interface DiaCalendario {
               </div>
 
               <p class="text-[10px] text-muted-foreground leading-tight pt-1">
-                Balance referencial de tipos de reactivos.
+                Balance referencial de tipos de preguntas.
               </p>
             </div>
 
@@ -1127,7 +1127,7 @@ export interface DiaCalendario {
                       <strong class="text-foreground">[{{ comprobanteGenerado()?.codigoMateria }}] {{ comprobanteGenerado()?.materia }} ({{ comprobanteGenerado()?.grupo }})</strong>
                     </div>
                     <div>
-                      <span class="text-muted-foreground block text-[10px]">Evaluación / Reactivos:</span>
+                      <span class="text-muted-foreground block text-[10px]">Evaluación / Preguntas:</span>
                       <strong class="text-foreground">{{ comprobanteGenerado()?.parcial }} · {{ comprobanteGenerado()?.totalPreguntas }} preguntas OK</strong>
                     </div>
                     <div>
@@ -1264,7 +1264,7 @@ export interface DiaCalendario {
                   </div>
                   <div>
                     <span class="text-muted-foreground block text-[10px]">Certificación:</span>
-                    <strong class="text-emerald-700 font-bold">✓ {{ totalPreguntasValidas() }} reactivos validados</strong>
+                    <strong class="text-emerald-700 font-bold">✓ {{ totalPreguntasValidas() }} preguntas validadas</strong>
                   </div>
                 </div>
 
@@ -1406,7 +1406,7 @@ export interface DiaCalendario {
                   <div class="flex items-center gap-2">
                     <h3 class="text-base font-black">Previsualización de Cuadernillo de Examen (Formato oficial)</h3>
                     <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
-                      Excel actual · {{ preguntasValidasParaPdf().length }} reactivos
+                      Excel actual · {{ preguntasValidasContablesParaPdf().length }} preguntas
                     </span>
                   </div>
                   <p class="text-xs text-slate-300 font-mono">
@@ -1547,17 +1547,17 @@ export interface DiaCalendario {
                     <span>Instrucciones Generales de la Prueba</span>
                   </div>
                   <ul class="list-disc pl-4 space-y-0.5 text-amber-900/90">
-                    <li>Lea cuidadosamente cada reactivo antes de marcar su respuesta definitiva.</li>
+                    <li>Lea cuidadosamente cada pregunta antes de marcar su respuesta definitiva.</li>
                     <li>Rellene completamente el círculo correspondiente en la <strong>Cartilla de Respuestas Óptica (OMR)</strong> con bolígrafo negro o azul.</li>
                     <li>No se admiten tachaduras, borrones ni marcas dobles. Cada pregunta tiene una única respuesta correcta.</li>
                   </ul>
                 </div>
 
-                <!-- 4. Cuerpo Completo de Preguntas del Banco (100% de los reactivos) -->
+                <!-- 4. Cuerpo Completo de Preguntas del Banco -->
                 <!-- 4. Cuerpo Completo de Preguntas del Banco en formato oficial -->
                 <div class="pt-2 border-t-2 border-slate-900 font-serif">
                   <div class="text-center font-sans font-black text-sm uppercase tracking-widest text-slate-950">
-                    CUESTIONARIO DE PREGUNTAS ({{ preguntasValidasParaPdf().length }} REACTIVOS)
+                    CUESTIONARIO DE PREGUNTAS ({{ preguntasValidasContablesParaPdf().length }} PREGUNTAS)
                   </div>
                   <div class="text-center font-sans font-bold text-[11px] uppercase text-slate-600 mb-3 pb-2">
                     {{ asignaturaNombreCompleto() }} · EVALUACIÓN TEÓRICA {{ parcialActivo() | uppercase }} · VARIANTE A
@@ -1635,7 +1635,7 @@ export interface DiaCalendario {
                         </div>
                       }
 
-                      <!-- Reactivo Individual Formateado Idéntico a Captura 2 -->
+                      <!-- Pregunta individual formateada -->
                       <div class="space-y-1.5 break-inside-avoid">
                         
                         <!-- Enunciado de la Pregunta -->
@@ -1678,7 +1678,7 @@ export interface DiaCalendario {
                     UNIVERSIDAD TÉCNICA PRIVADA COSMOS · DEPARTAMENTO NACIONAL DE EVALUACIONES
                   </div>
                   <div class="font-mono text-[9px]">
-                    Certificación del formato oficial · Total {{ preguntasValidasParaPdf().length }} Reactivos Certificados
+                    Certificación del formato oficial · Total {{ preguntasValidasContablesParaPdf().length }} Preguntas Certificadas
                   </div>
                 </div>
 
@@ -1764,7 +1764,7 @@ export interface DiaCalendario {
                   <strong class="text-foreground">{{ docenteOficialActivo().nombre }}</strong>
                 </div>
                 <div>
-                  <span class="text-muted-foreground text-[10px] block uppercase font-sans font-bold">Total Reactivos:</span>
+                  <span class="text-muted-foreground text-[10px] block uppercase font-sans font-bold">Total de preguntas:</span>
                   <strong class="text-emerald-600 font-black">{{ totalPreguntasValidas() }} Preguntas OK</strong>
                 </div>
                 <div>
@@ -1922,7 +1922,7 @@ export interface DiaCalendario {
                 <span class="inline-flex items-center gap-1.5"><i class="pi pi-th-large text-purple-600"></i> Secciones I a VI</span>
                 <span class="inline-flex items-center gap-1.5"><i class="pi pi-check-square text-purple-600"></i> Opciones A a E</span>
               </div>
-              <p class="mt-2 text-[10px] text-slate-500">Las fórmulas, imágenes y casos se integran dentro de la sección del reactivo; no crean una sección independiente.</p>
+              <p class="mt-2 text-[10px] text-slate-500">Las fórmulas, imágenes y casos se integran dentro de la sección de la pregunta; no crean una sección independiente.</p>
             </div>
 
             <!-- Cuerpo de Ejemplos con Comparador Dual (Excel vs PDF Impreso) -->
@@ -2363,7 +2363,7 @@ export interface DiaCalendario {
             </div>
             <div class="p-5 space-y-4 text-xs">
               <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-900 leading-relaxed">
-                Se eliminarán el banco y sus reactivos asociados. El rol de examen volverá a <strong>PROGRAMADO</strong> para permitir una nueva carga.
+                Se eliminarán el banco y sus preguntas asociadas. El rol de examen volverá a <strong>PROGRAMADO</strong> para permitir una nueva carga.
               </div>
               <label class="block space-y-1.5">
                 <span class="font-black text-foreground">Escribe <code class="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">ELIMINAR</code> para confirmar</span>
@@ -2935,27 +2935,34 @@ export class BancoPreguntasComponent implements OnInit {
 
   public preguntasCargadas = signal<PreguntaValidada[]>([]);
 
-  // Conteos dinámicos calculados directamente sobre las preguntas cargadas
-  public totalPreguntasValidas = computed(() => this.preguntasCargadas().filter(p => p.valido).length);
-  public countFaciles = computed(() => this.preguntasCargadas().filter(p => p.valido && p.dificultad === '1').length);
-  public countMedias = computed(() => this.preguntasCargadas().filter(p => p.valido && p.dificultad === '2').length);
-  public countDificiles = computed(() => this.preguntasCargadas().filter(p => p.valido && p.dificultad === '3').length);
+  // Las filas madre de casos/emparejamientos son contexto y no consumen cupo.
+  private esFilaMadre(pregunta: PreguntaValidada): boolean {
+    return ['CASO_CLINICO_TRONCO', 'PROBLEMA', 'CASO_CLINICO', 'EMPAREJAMIENTO_TRONCO', 'EMPAREJAMIENTO']
+      .includes(pregunta.tipo);
+  }
 
-  public countG1 = computed(() => this.preguntasCargadas().filter(p => p.valido && [
+  private esPreguntaContable(pregunta: PreguntaValidada): boolean {
+    return pregunta.valido && !this.esFilaMadre(pregunta);
+  }
+
+  // Conteos dinámicos calculados únicamente sobre preguntas respondibles.
+  public totalPreguntasValidas = computed(() => this.preguntasCargadas().filter(p => this.esPreguntaContable(p)).length);
+  public countFaciles = computed(() => this.preguntasCargadas().filter(p => this.esPreguntaContable(p) && p.dificultad === '1').length);
+  public countMedias = computed(() => this.preguntasCargadas().filter(p => this.esPreguntaContable(p) && p.dificultad === '2').length);
+  public countDificiles = computed(() => this.preguntasCargadas().filter(p => this.esPreguntaContable(p) && p.dificultad === '3').length);
+
+  public countG1 = computed(() => this.preguntasCargadas().filter(p => this.esPreguntaContable(p) && [
     'VERDADERO_O_FALSO_SIMPLE', 'FALSO_VERDADERO',
     'RESPUESTA_PREMISAS_ABCD', 'RESPUESTA_COMPUESTA',
     'VERDADERO_O_FALSO_COMPLEJAS', 'PREGUNTA_CON_CLAVE'
   ].includes(p.tipo)).length);
 
-  public countG2 = computed(() => this.preguntasCargadas().filter(p => p.valido && [
+  public countG2 = computed(() => this.preguntasCargadas().filter(p => this.esPreguntaContable(p) && [
     'SELECCION_MEJOR_RESPUESTA', 'SELECCION_SIMPLE', 'SELECCION_UNICA'
   ].includes(p.tipo)).length);
 
-  public countG3 = computed(() => this.preguntasCargadas().filter(p => p.valido && [
-    'CASO_CLINICO_TRONCO', 'PROBLEMA', 'CASO_CLINICO',
-    'SUBITEM_CASO', 'SUBPROBLEMA',
-    'EMPAREJAMIENTO_TRONCO', 'EMPAREJAMIENTO',
-    'OPCION_EMPAREJAMIENTO'
+  public countG3 = computed(() => this.preguntasCargadas().filter(p => this.esPreguntaContable(p) && [
+    'SUBITEM_CASO', 'SUBPROBLEMA', 'OPCION_EMPAREJAMIENTO'
   ].includes(p.tipo)).length);
 
   public cuotaDificultadCumplida = computed(() => {
@@ -2977,22 +2984,23 @@ export class BancoPreguntasComponent implements OnInit {
 
     const observaciones: string[] = [];
     const cuotas = this.cuotasDificultad();
-    const validas = this.totalPreguntasValidas();
+    const preguntasContables = preguntas.filter(p => this.esPreguntaContable(p));
+    const validas = preguntasContables.length;
 
-    if (preguntas.length < cuotas.total) {
-      observaciones.push(`Cantidad total insuficiente: se encontraron ${preguntas.length} reactivos y se requieren como mínimo ${cuotas.total}. Corrección: agrega ${cuotas.total - preguntas.length} reactivo(s) válido(s) en el Excel.`);
+    if (preguntasContables.length < cuotas.total) {
+      observaciones.push(`Cantidad total insuficiente: se encontraron ${preguntasContables.length} preguntas y se requieren como mínimo ${cuotas.total}. Corrección: agrega ${cuotas.total - preguntasContables.length} pregunta(s) válida(s) en el Excel.`);
     }
     if (validas < cuotas.total) {
       observaciones.push(`Preguntas válidas insuficientes: hay ${validas} y se requieren como mínimo ${cuotas.total}. Corrección: corrige las filas observadas y vuelve a cargar el archivo.`);
     }
     if (this.countFaciles() < cuotas.facil) {
-      observaciones.push(`Cuota de dificultad fácil incompleta: hay ${this.countFaciles()} y se requieren como mínimo ${cuotas.facil}. Corrección: agrega o corrige ${cuotas.facil - this.countFaciles()} reactivo(s) con dificultad 1.`);
+      observaciones.push(`Cuota de dificultad fácil incompleta: hay ${this.countFaciles()} y se requieren como mínimo ${cuotas.facil}. Corrección: agrega o corrige ${cuotas.facil - this.countFaciles()} pregunta(s) con dificultad 1.`);
     }
     if (this.countMedias() < cuotas.medio) {
-      observaciones.push(`Cuota de dificultad media incompleta: hay ${this.countMedias()} y se requieren como mínimo ${cuotas.medio}. Corrección: agrega o corrige ${cuotas.medio - this.countMedias()} reactivo(s) con dificultad 2.`);
+      observaciones.push(`Cuota de dificultad media incompleta: hay ${this.countMedias()} y se requieren como mínimo ${cuotas.medio}. Corrección: agrega o corrige ${cuotas.medio - this.countMedias()} pregunta(s) con dificultad 2.`);
     }
     if (this.countDificiles() < cuotas.dificil) {
-      observaciones.push(`Cuota de dificultad difícil incompleta: hay ${this.countDificiles()} y se requieren como mínimo ${cuotas.dificil}. Corrección: agrega o corrige ${cuotas.dificil - this.countDificiles()} reactivo(s) con dificultad 3.`);
+      observaciones.push(`Cuota de dificultad difícil incompleta: hay ${this.countDificiles()} y se requieren como mínimo ${cuotas.dificil}. Corrección: agrega o corrige ${cuotas.dificil - this.countDificiles()} pregunta(s) con dificultad 3.`);
     }
 
     return observaciones;
@@ -3029,23 +3037,23 @@ export class BancoPreguntasComponent implements OnInit {
       };
     }
 
-    if (error === 'Falta tipo de reactivo') {
+    if (error === 'Falta tipo de pregunta') {
       return { regla: 'Columna tipo', problema: 'La columna tipo está vacía.', correccion: 'Selecciona una tipología válida, por ejemplo SELECCIÓN_MEJOR_RESPUESTA.' };
     }
-    if (error.startsWith('Tipo de reactivo no reconocido:')) {
-      return { regla: 'Columna tipo', problema: `El valor registrado no pertenece al catálogo oficial: ${error.replace('Tipo de reactivo no reconocido: ', '')}.`, correccion: 'Usa una tipología disponible en la guía del formato del examen y vuelve a cargar el Excel.' };
+    if (error.startsWith('Tipo de pregunta no reconocido:')) {
+      return { regla: 'Columna tipo', problema: `El valor registrado no pertenece al catálogo oficial: ${error.replace('Tipo de pregunta no reconocido: ', '')}.`, correccion: 'Usa una tipología disponible en la guía del formato del examen y vuelve a cargar el Excel.' };
     }
     if (error === 'Falta enunciado de la pregunta') {
-      return { regla: 'Columna enunciado', problema: 'El reactivo no tiene pregunta o enunciado.', correccion: 'Escribe el enunciado completo en la columna enunciado.' };
+      return { regla: 'Columna enunciado', problema: 'La pregunta no tiene texto o enunciado.', correccion: 'Escribe el enunciado completo en la columna enunciado.' };
     }
     if (error.includes('código de grupo')) {
-      return { regla: 'Columna grupo', problema: 'El reactivo agrupado no tiene un código para relacionarlo con su fila principal.', correccion: 'Escribe el mismo código de grupo en la fila madre y en todas sus filas hijas.' };
+      return { regla: 'Columna grupo', problema: 'La pregunta agrupada no tiene un código para relacionarla con su fila principal.', correccion: 'Escribe el mismo código de grupo en la fila madre y en todas sus filas hijas.' };
     }
     if (error === 'El grupo supera el máximo de 100 caracteres') {
       return { regla: 'Columna grupo', problema: 'El código de grupo supera los 100 caracteres.', correccion: 'Usa un código breve, único y compartido por las filas del mismo caso o emparejamiento.' };
     }
     if (error === 'El enunciado supera el máximo de 10000 caracteres') {
-      return { regla: 'Columna enunciado', problema: 'El enunciado supera los 10.000 caracteres.', correccion: 'Reduce el texto del enunciado o divide el contenido en reactivos relacionados.' };
+      return { regla: 'Columna enunciado', problema: 'El enunciado supera los 10.000 caracteres.', correccion: 'Reduce el texto del enunciado o divide el contenido en preguntas relacionadas.' };
     }
     if (error.includes('Una opción supera el máximo de 2000')) {
       const camposLargos = opciones.filter(opcion => opcion.valor.length > 2000).map(opcion => opcion.campo);
@@ -3098,7 +3106,7 @@ export class BancoPreguntasComponent implements OnInit {
       return { regla: 'Respuesta correcta', problema: `${error}.`, correccion: 'Completa la opción indicada o cambia respuesta_correcta a una letra que tenga texto.' };
     }
     if (error.includes('Dificultad obligatoria')) {
-      return { regla: 'Columna dificultad', problema: 'El reactivo no tiene nivel de dificultad.', correccion: 'Registra 1 para fácil, 2 para medio o 3 para difícil.' };
+      return { regla: 'Columna dificultad', problema: 'La pregunta no tiene nivel de dificultad.', correccion: 'Registra 1 para fácil, 2 para medio o 3 para difícil.' };
     }
     if (error.includes('tipología madre no debe llevar dificultad')) {
       return { regla: 'Columna dificultad', problema: 'La fila madre tiene una dificultad que se asigna únicamente a los subítems.', correccion: 'Deja vacía dificultad en la fila madre y registra el nivel en las filas respondibles.' };
@@ -3119,7 +3127,7 @@ export class BancoPreguntasComponent implements OnInit {
       return { regla: 'Imagen de apoyo', problema: `${error}.`, correccion: 'Usa una imagen PNG, JPG, WEBP o GIF válida, de hasta 512 KB, en formato Base64.' };
     }
     if (error.includes('pregunta está duplicada')) {
-      return { regla: 'Pregunta duplicada', problema: 'Existe otra fila con el mismo tipo, grupo y enunciado.', correccion: 'Elimina la fila repetida o cambia su grupo y enunciado si realmente representa otro reactivo.' };
+      return { regla: 'Pregunta duplicada', problema: 'Existe otra fila con el mismo tipo, grupo y enunciado.', correccion: 'Elimina la fila repetida o cambia su grupo y enunciado si realmente representa otra pregunta.' };
     }
     if (error.includes('necesita primero')) {
       return { regla: 'Orden del grupo', problema: `${error}.`, correccion: 'Coloca primero la fila madre y luego sus subítems consecutivos con el mismo código de grupo.' };
@@ -3134,7 +3142,7 @@ export class BancoPreguntasComponent implements OnInit {
       return { regla: 'Cantidad de subítems', problema: `${error}.`, correccion: 'Agrega o elimina filas hijas hasta dejar entre 2 y 10 preguntas relacionadas.' };
     }
 
-    return { regla: 'Validación del reactivo', problema: `${error}.`, correccion: 'Revisa la fila según la guía del formato del examen y vuelve a cargar el Excel.' };
+    return { regla: 'Validación de la pregunta', problema: `${error}.`, correccion: 'Revisa la fila según la guía del formato del examen y vuelve a cargar el Excel.' };
   }
 
   public filtroPdfDificultad = signal<'TODAS' | '1' | '2' | '3'>('TODAS');
@@ -3147,6 +3155,10 @@ export class BancoPreguntasComponent implements OnInit {
     if (this.filtroPdfDificultad() === 'TODAS') return todas;
     return todas.filter(p => p.dificultad === this.filtroPdfDificultad());
   });
+
+  public preguntasValidasContablesParaPdf = computed(() =>
+    this.preguntasValidasParaPdf().filter(p => this.esPreguntaContable(p))
+  );
 
   private validarEstructuraAgrupada(preguntas: PreguntaValidada[]): void {
     this.validarBloqueAgrupado(preguntas, 'CASO_CLINICO_TRONCO', 'SUBITEM_CASO', 'caso o problema', 'preguntas relacionadas');
@@ -3717,10 +3729,10 @@ export class BancoPreguntasComponent implements OnInit {
         // Validaciones Estrictas basadas en formato_banco_preguntas_asig_EF.xlsx
         const errores: string[] = [];
         if (!tipoRaw) {
-          errores.push('Falta tipo de reactivo');
+          errores.push('Falta tipo de pregunta');
         }
         if (tipoNorm === 'TIPO_NO_RECONOCIDO') {
-          errores.push(`Tipo de reactivo no reconocido: ${tipoRaw}`);
+          errores.push(`Tipo de pregunta no reconocido: ${tipoRaw}`);
         }
         if (!enunciadoRaw && tipoNorm !== 'EMPAREJAMIENTO_TRONCO') {
           errores.push('Falta enunciado de la pregunta');
@@ -3854,9 +3866,9 @@ export class BancoPreguntasComponent implements OnInit {
 
       this.preguntasCargadas.set(preguntasParsed);
       if (this.esBancoTotalmenteValido()) {
-        this._mostrarToast(`Archivo verificado: 100% de preguntas conformes (${preguntasParsed.length} reactivos).`);
+        this._mostrarToast(`Archivo verificado: 100% de preguntas conformes (${this.totalPreguntasValidas()} preguntas).`);
       } else {
-        this._mostrarToast(`Archivo procesado: ${preguntasParsed.length} reactivos analizados. Se detectaron observaciones.`);
+        this._mostrarToast(`Archivo procesado: ${this.totalPreguntasValidas()} preguntas analizadas. Se detectaron observaciones.`);
       }
     } catch (err) {
       console.error(err);
@@ -4037,7 +4049,7 @@ export class BancoPreguntasComponent implements OnInit {
       grupo: examenRol.grupo,
       parcial: this.parcialActivo(),
       modalidad: examenRol.conCartilla ? 'Con Cartilla Óptica' : 'Sin Cartilla',
-      totalPreguntas: preguntasValidas.length,
+      totalPreguntas: this.totalPreguntasValidas(),
       hashCriptografico: this.rolExamenActivo()?.hashEncriptacion || '',
       nombreArchivoPkg: this.nombreArchivoPaquete()
     };
@@ -4077,8 +4089,8 @@ FECHA Y HORA: ${c.fechaHora}
 • C.I.: ${c.docenteCi}
 • Correo Institucional: ${c.correoDocente}
 
-3. CERTIFICACIÓN DE REACTIVOS Y BANCO:
-• Total de Preguntas Validadas: ${c.totalPreguntas} reactivos conformes (cuotas mínimas cumplidas)
+3. CERTIFICACIÓN DE PREGUNTAS Y BANCO:
+• Total de Preguntas Validadas: ${c.totalPreguntas} preguntas conformes (cuotas mínimas cumplidas)
 • Archivo del Paquete Encriptado: ${c.nombreArchivoPkg}
 • Sello Criptográfico SHA-256: ${c.hashCriptografico}
 
@@ -4128,7 +4140,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       parcial: this.parcialActivo(),
       timestamp: new Date().toISOString(),
       checksum: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
-      totalPreguntas: preguntasValidas.length,
+      totalPreguntas: this.totalPreguntasValidas(),
       cuotas: {
         faciles: this.countFaciles(),
         medias: this.countMedias(),
@@ -4166,7 +4178,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   public async abrirModalPrevisualizacionPdf(): Promise<void> {
     const preguntas = this.preguntasCargadas().filter(p => p.valido);
     if (!preguntas.length) {
-      this._mostrarToast('No hay reactivos válidos para generar la previsualización PDF.', 'error');
+      this._mostrarToast('No hay preguntas válidas para generar la previsualización PDF.', 'error');
       return;
     }
 
@@ -4576,7 +4588,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       }
 
       // El enunciado principal del emparejamiento es una tarjeta de referencia,
-      // no un reactivo que deba responderse con la marca "___".
+      // no una pregunta que deba responderse con la marca "___".
       if (pregunta.tipo === 'EMPAREJAMIENTO_TRONCO') {
         const opcionesReferencia: Array<[string, string]> = [
           ['A', pregunta.opcion_a], ['B', pregunta.opcion_b], ['C', pregunta.opcion_c],
@@ -4907,7 +4919,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       ci: this.docenteOficialActivo().ci,
       timestamp: new Date().toISOString(),
       checksum: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
-      totalPreguntas: preguntasValidas.length,
+      totalPreguntas: this.totalPreguntasValidas(),
       cuotas: {
         faciles: this.countFaciles(),
         medias: this.countMedias(),
