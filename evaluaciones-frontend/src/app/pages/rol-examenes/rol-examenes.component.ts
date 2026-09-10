@@ -839,6 +839,35 @@ interface InstanciaImportacionItem {
                     class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
                 </div>
 
+                <!-- Horario editable para programación institucional o excepcional -->
+                <div class="col-span-2 rounded-xl border border-blue-100 bg-blue-50/50 p-2.5">
+                  <div class="flex items-center justify-between gap-2 mb-2">
+                    <label class="block font-bold text-muted-foreground">Hora del examen *</label>
+                    <span class="text-[10px] text-blue-700 font-semibold">Editable para casos excepcionales</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="block">
+                      <span class="block text-[10px] font-bold text-muted-foreground mb-1">Hora de inicio</span>
+                      <input
+                        type="time"
+                        [(ngModel)]="formHoraInicio"
+                        aria-label="Hora de inicio del examen"
+                        class="w-full bg-white border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
+                    </label>
+                    <label class="block">
+                      <span class="block text-[10px] font-bold text-muted-foreground mb-1">Hora de conclusión</span>
+                      <input
+                        type="time"
+                        [(ngModel)]="formHoraFin"
+                        aria-label="Hora de conclusión del examen"
+                        class="w-full bg-white border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
+                    </label>
+                  </div>
+                  <p class="mt-1.5 text-[10px] text-muted-foreground">
+                    El horario habitual de SEA se carga como referencia y puedes modificarlo antes de guardar.
+                  </p>
+                </div>
+
                 <!-- Modalidad de Evaluación -->
                 <div class="col-span-2">
                   <label class="block font-bold text-muted-foreground mb-1">Modalidad de Examen</label>
@@ -942,6 +971,8 @@ export class RolExamenesComponent implements OnInit {
 
   public formTipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' = '1er Parcial';
   public formFecha = '';
+  public formHoraInicio = '08:15';
+  public formHoraFin = '09:45';
   public formModalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'PRESENCIAL_CARTILLA';
 
   // Lista de Exámenes del Rol (Cargada desde la BD persistente)
@@ -1064,6 +1095,7 @@ export class RolExamenesComponent implements OnInit {
 
   public seleccionarGrupoSEA(grp: GroupItem): void {
     this.formGrupoObj.set(grp);
+    this._establecerHorarioFormulario(grp);
   }
 
   /**
@@ -1941,6 +1973,7 @@ export class RolExamenesComponent implements OnInit {
     }
     this.formTipo = '1er Parcial';
     this.formFecha = '';
+    this._establecerHorarioFormulario(this.formGrupoObj());
     this.formModalidad = 'PRESENCIAL_CARTILLA';
     this.dialogFormulario.set(true);
   }
@@ -1960,6 +1993,7 @@ export class RolExamenesComponent implements OnInit {
     this.formGrupoObj.set(grp);
     this.formTipo = item.tipo;
     this.formFecha = item.fecha;
+    this._establecerHorarioFormulario(grp, item.horario);
     this.formModalidad = item.modalidad === 'VIRTUAL'
       ? 'VIRTUAL'
       : item.modalidad === 'PRESENCIAL_CARTILLA'
@@ -2001,6 +2035,16 @@ export class RolExamenesComponent implements OnInit {
       this._mostrarToast('La fecha del examen es obligatoria.');
       return;
     }
+    if (!this.formHoraInicio || !this.formHoraFin) {
+      this._mostrarToast('La hora de inicio y conclusión del examen son obligatorias.');
+      return;
+    }
+    const inicioMinutos = this._horaAMinutos(this.formHoraInicio);
+    const finMinutos = this._horaAMinutos(this.formHoraFin);
+    if (inicioMinutos === null || finMinutos === null || inicioMinutos >= finMinutos) {
+      this._mostrarToast('La hora de conclusión debe ser posterior a la hora de inicio.');
+      return;
+    }
     const sch = grp && grp.schedules && grp.schedules.length > 0 ? grp.schedules[0] : null;
 
     let fechaDisp = 'Por Programar';
@@ -2033,11 +2077,12 @@ export class RolExamenesComponent implements OnInit {
       conCartilla,
       semana: edit?.semana || 1,
       // El día mostrado debe corresponder a la fecha del examen. El horario
-      // y el aula siguen proviniendo del grupo oficial de SEA.
+      // se registra desde el formulario; el aula y campus siguen proviniendo
+      // del grupo oficial de SEA.
       dia: this._nombreDiaDeFecha(this.formFecha),
       fecha: this.formFecha,
       fechaDisplay: fechaDisp,
-      horario: sch ? `${sch.startTime} - ${sch.endTime}` : edit?.horario || '08:15 - 09:45',
+      horario: `${this.formHoraInicio} - ${this.formHoraFin}`,
       aula: sch?.classroom || edit?.aula || 'Por definir',
       campus: sch?.campus || edit?.campus || 'Por definir'
     };
@@ -2366,6 +2411,25 @@ export class RolExamenesComponent implements OnInit {
     const horas = Number(coincidencia[1]);
     const minutos = Number(coincidencia[2]);
     return horas >= 0 && horas <= 23 && minutos >= 0 && minutos <= 59 ? horas * 60 + minutos : null;
+  }
+
+  private _establecerHorarioFormulario(grupo: GroupItem | null, horarioExistente?: string): void {
+    const rangoExistente = String(horarioExistente || '').match(/(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/);
+    if (rangoExistente) {
+      this.formHoraInicio = this._normalizarHoraFormulario(rangoExistente[1]);
+      this.formHoraFin = this._normalizarHoraFormulario(rangoExistente[2]);
+      return;
+    }
+
+    const horarioHabitual = grupo?.schedules?.[0];
+    this.formHoraInicio = this._normalizarHoraFormulario(horarioHabitual?.startTime || '08:15');
+    this.formHoraFin = this._normalizarHoraFormulario(horarioHabitual?.endTime || '09:45');
+  }
+
+  private _normalizarHoraFormulario(valor: string): string {
+    const coincidencia = String(valor || '').match(/(\d{1,2}):(\d{2})/);
+    if (!coincidencia) return valor || '';
+    return `${coincidencia[1].padStart(2, '0')}:${coincidencia[2]}`;
   }
 
   private _nombreDiaSemana(dia: number): string {
