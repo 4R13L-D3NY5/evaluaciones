@@ -371,7 +371,7 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                         <td class="p-2 w-[285px] min-w-[255px] max-w-[305px]">
                           @let info = getInformacionParcial(asig);
                           @if (info?.tieneRol) {
-                            <div [class]="'rounded-lg border px-2.5 py-1.5 ' + (info?.cumple ? 'border-emerald-200 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/50')">
+                            <div [class]="'rounded-lg border px-2.5 py-1.5 ' + (info?.cumple || esEstadoPosteriorAValidado(info) ? 'border-emerald-200 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/50')">
                               <div class="flex items-center justify-between gap-2 min-w-0">
                                 <span class="text-[10px] font-black text-primary truncate">{{ info?.etiqueta }}</span>
                                 <span class="inline-flex items-center gap-1 text-[9px] font-black text-foreground whitespace-nowrap" [title]="'Fecha del examen: ' + (info?.fecha || 'sin fecha')">
@@ -383,7 +383,7 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                                 <span class="text-[9px] font-mono text-foreground whitespace-nowrap">
                                   {{ info?.facil }}F · {{ info?.medio }}M · {{ info?.dificil }}D · {{ info?.total }} total
                                 </span>
-                                @if (info?.cumple) {
+                                @if (info?.cumple || esEstadoPosteriorAValidado(info)) {
                                   <span class="bg-emerald-600 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 whitespace-nowrap">
                                     <i class="pi pi-check-circle mr-0.5"></i> OK
                                   </span>
@@ -957,6 +957,23 @@ export class PlanEstudiosComponent implements OnInit {
   public getInformacionParcial(asig: PlanEstudioItem): PlanExamenResumen | null {
     const examenes = asig.examenes || {};
     return examenes[this.parcialActivo()] || null;
+  }
+
+  /**
+   * Desde VALIDADO el examen ya cumple la condición institucional para
+   * mostrarse como confirmado en la malla, aunque el detalle del banco no
+   * haya podido consultarse nuevamente.
+   */
+  public esEstadoPosteriorAValidado(info: PlanExamenResumen | null): boolean {
+    return !!info && [
+      'VALIDADO',
+      'GENERADO',
+      'IMPRESO',
+      'ENTREGADO',
+      'DEVUELTO',
+      'PENDIENTE_NOTAS',
+      'CALIFICADO'
+    ].includes(info.estado);
   }
 
   public cancelarCambio(): void {

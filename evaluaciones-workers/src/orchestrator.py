@@ -200,9 +200,10 @@ def procesar_job(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
     reactivos = db.obtener_reactivos_por_banco(banco_preguntas_id)
-    if len(reactivos) < generation_config["totalPreguntas"]:
+    preguntas = [item for item in reactivos if not generator._es_macro(item)]
+    if len(preguntas) < generation_config["totalPreguntas"]:
         raise ValueError(
-            f"El banco {banco_preguntas_id} no tiene suficientes reactivos ({len(reactivos)} < {generation_config['totalPreguntas']})"
+            f"El banco {banco_preguntas_id} no tiene suficientes preguntas ({len(preguntas)} < {generation_config['totalPreguntas']})"
         )
 
     estudiantes_payload = payload.get("estudiantes")

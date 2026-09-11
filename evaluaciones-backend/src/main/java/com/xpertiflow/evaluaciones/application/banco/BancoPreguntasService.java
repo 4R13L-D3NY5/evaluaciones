@@ -64,6 +64,22 @@ public class BancoPreguntasService {
     }
 
     private BancoPreguntasResponseDto toResponseDto(BancoPreguntas banco) {
+        List<Reactivo> reactivosPersistidos = reactivoRepository
+                .findByBancoIdOrderByNumeroOrdenAsc(banco.getId());
+        boolean tieneDetallePersistido = !reactivosPersistidos.isEmpty();
+        int totalPreguntas = tieneDetallePersistido
+                ? contarPreguntasContables(reactivosPersistidos)
+                : banco.getTotalReactivos();
+        int faciles = tieneDetallePersistido
+                ? contarPorDificultad(reactivosPersistidos, 1)
+                : banco.getFacilesCount();
+        int medias = tieneDetallePersistido
+                ? contarPorDificultad(reactivosPersistidos, 2)
+                : banco.getMediasCount();
+        int dificiles = tieneDetallePersistido
+                ? contarPorDificultad(reactivosPersistidos, 3)
+                : banco.getDificilesCount();
+
         return BancoPreguntasResponseDto.builder()
                 .id(banco.getId())
                 .rolExamenId(banco.getRolExamenId())
@@ -71,10 +87,10 @@ public class BancoPreguntasService {
                 .materiaNombre(banco.getMateriaNombre())
                 .grupo(banco.getGrupo())
                 .tipoParcial(banco.getTipoParcial())
-                .totalReactivos(banco.getTotalReactivos())
-                .facilesCount(banco.getFacilesCount())
-                .mediasCount(banco.getMediasCount())
-                .dificilesCount(banco.getDificilesCount())
+                .totalReactivos(totalPreguntas)
+                .facilesCount(faciles)
+                .mediasCount(medias)
+                .dificilesCount(dificiles)
                 .nombreArchivoExcel(banco.getNombreArchivoExcel())
                 .hashSha256Integridad(banco.getHashSha256Integridad())
                 .estado(banco.getEstado())
@@ -190,10 +206,12 @@ public class BancoPreguntasService {
                         continue;
                     }
                     reactivos.add(r);
-                    switch (r.getNivelDificultad()) {
-                        case 1 -> faciles++;
-                        case 2 -> medias++;
-                        case 3 -> dificiles++;
+                    if (esPreguntaContable(r)) {
+                        switch (r.getNivelDificultad()) {
+                            case 1 -> faciles++;
+                            case 2 -> medias++;
+                            case 3 -> dificiles++;
+                        }
                     }
                 }
                 rowNum++;
@@ -201,7 +219,8 @@ public class BancoPreguntasService {
 
             validarEstructuraAgrupada(estructura, errores);
 
-            validarCuotas(faciles, medias, dificiles, reactivos.size(), errores);
+            int totalPreguntas = contarPreguntasContables(reactivos);
+            validarCuotas(faciles, medias, dificiles, totalPreguntas, errores);
 
             if (!errores.isEmpty()) {
                 return CargaBancoResponseDto.builder()
@@ -252,7 +271,7 @@ public class BancoPreguntasService {
             banco.setMateriaNombre(rol.getMateriaNombre());
             banco.setGrupo(rol.getGrupo());
             banco.setTipoParcial(rol.getTipoParcial().getValor());
-            banco.setTotalReactivos(reactivos.size());
+            banco.setTotalReactivos(totalPreguntas);
             banco.setFacilesCount(faciles);
             banco.setMediasCount(medias);
             banco.setDificilesCount(dificiles);
@@ -290,7 +309,7 @@ public class BancoPreguntasService {
                     .bancoPreguntasId(bancoId)
                     .rolExamenId(rol.getId())
                     .nuevoEstado(EstadoFlujo.VALIDADO.getValor())
-                    .totalReactivos(reactivos.size())
+                    .totalReactivos(totalPreguntas)
                     .facilesCount(faciles)
                     .mediasCount(medias)
                     .dificilesCount(dificiles)
@@ -342,7 +361,7 @@ public class BancoPreguntasService {
         String pesoStr = valor(row, columnas, "peso", evaluador);
 
         if (tipo.isBlank()) {
-            errores.add("Fila " + (rowNum + 1) + ": tipo de reactivo obligatorio");
+            errores.add("Fila " + (rowNum + 1) + ": tipo de pregunta obligatorio");
             return null;
         }
 
@@ -815,7 +834,7 @@ public class BancoPreguntasService {
 
     private void validarCuotas(int faciles, int medias, int dificiles, int total, List<String> errores) {
         if (total < TOTAL_REQUERIDO) {
-            errores.add("El banco debe tener como mínimo " + TOTAL_REQUERIDO + " reactivos; se encontraron " + total);
+            errores.add("El banco debe tener como mínimo " + TOTAL_REQUERIDO + " preguntas; se encontraron " + total);
         }
         if (faciles < CUOTA_FACILES) {
             errores.add("Debe haber como mínimo " + CUOTA_FACILES + " preguntas fáciles; se encontraron " + faciles);
@@ -826,6 +845,27 @@ public class BancoPreguntasService {
         if (dificiles < CUOTA_DIFICILES) {
             errores.add("Debe haber como mínimo " + CUOTA_DIFICILES + " preguntas difíciles; se encontraron " + dificiles);
         }
+    }
+
+    /**
+     * Las filas madre de casos/emparejamientos solo aportan contexto al banco.
+     * Las preguntas respondibles son sus subítems u opciones relacionadas.
+     */
+    private boolean esPreguntaContable(Reactivo reactivo) {
+        return reactivo != null
+                && !Set.of("CASO_CLINICO_TRONCO", "EMPAREJAMIENTO_TRONCO")
+                .contains(reactivo.getTipoReactivo());
+    }
+
+    private int contarPreguntasContables(List<Reactivo> reactivos) {
+        return (int) reactivos.stream().filter(this::esPreguntaContable).count();
+    }
+
+    private int contarPorDificultad(List<Reactivo> reactivos, int dificultad) {
+        return (int) reactivos.stream()
+                .filter(this::esPreguntaContable)
+                .filter(reactivo -> Objects.equals(reactivo.getNivelDificultad(), dificultad))
+                .count();
     }
 
     private String normalizarTipo(String tipo) {

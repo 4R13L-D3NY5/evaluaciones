@@ -18,5 +18,11 @@ public class AjustarCalificacionOmrRequestDto {
     @NotEmpty(message = "Debe informar las respuestas leídas")
     private Map<String, String> respuestas;
 
+    /** Indica que las respuestas fueron modificadas manualmente por un responsable. */
+    private boolean ajusteManual;
+
+    /** Respuestas originales del escaneo, para dejar trazabilidad del cambio. */
+    private Map<String, String> respuestasOriginales;
+
     private String usuario;
 }

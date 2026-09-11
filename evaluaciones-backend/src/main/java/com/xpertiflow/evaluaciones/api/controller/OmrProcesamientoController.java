@@ -3,6 +3,8 @@ package com.xpertiflow.evaluaciones.api.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
 import com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto;
 import com.xpertiflow.evaluaciones.application.OmrProcesamientoService;
@@ -151,7 +153,42 @@ public class OmrProcesamientoController {
     public ResponseEntity<CalificacionOmrResponseDto> ajustarCalificacion(
             @PathVariable String rolExamenId,
             @Valid @RequestBody AjustarCalificacionOmrRequestDto request,
-            Authentication authentication) {
-        return ResponseEntity.ok(omrProcesamientoService.ajustarCalificacion(rolExamenId, request, authentication));
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(omrProcesamientoService.ajustarCalificacion(rolExamenId, request, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
+    }
+
+    @GetMapping("/{rolExamenId}/anulaciones-preguntas")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Listar preguntas OMR anuladas de una evaluación")
+    public ResponseEntity<List<AnulacionPreguntaOmrResponseDto>> listarAnulaciones(@PathVariable String rolExamenId) {
+        return ResponseEntity.ok(omrProcesamientoService.listarAnulaciones(rolExamenId));
+    }
+
+    @PostMapping("/{rolExamenId}/anulaciones-preguntas")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Anular una pregunta OMR por variante")
+    public ResponseEntity<AnulacionPreguntaOmrResponseDto> anularPregunta(
+            @PathVariable String rolExamenId,
+            @Valid @RequestBody AnulacionPreguntaOmrRequestDto request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(omrProcesamientoService.anularPregunta(rolExamenId, request, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
+    }
+
+    @DeleteMapping("/{rolExamenId}/anulaciones-preguntas/{letraVariante}/{numeroPregunta}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Reactivar una pregunta OMR anulada")
+    public ResponseEntity<Void> reactivarPregunta(
+            @PathVariable String rolExamenId,
+            @PathVariable String letraVariante,
+            @PathVariable Integer numeroPregunta,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        omrProcesamientoService.reactivarPregunta(rolExamenId, letraVariante, numeroPregunta, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr());
+        return ResponseEntity.noContent().build();
     }
 }

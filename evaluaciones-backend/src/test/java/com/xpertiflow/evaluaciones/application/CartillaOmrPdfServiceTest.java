@@ -90,6 +90,10 @@ class CartillaOmrPdfServiceTest {
             variante.setLetra(String.valueOf(letra));
             variante.setTotalPreguntas(60);
             variante.setRespuestas(new java.util.LinkedHashMap<>(respuestas));
+            var estudiante = new com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto.EstudiantePatronDto();
+            estudiante.setCodigoEstudiante("2026" + letra);
+            estudiante.setNombreCompleto("ESTUDIANTE VARIANTE " + letra);
+            variante.setEstudiantes(java.util.List.of(estudiante));
             variantes.add(variante);
         }
         var patron = new com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto();
@@ -108,6 +112,8 @@ class CartillaOmrPdfServiceTest {
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("VARIANTE A"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("VARIANTE D"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("60 preguntas"));
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("ESTUDIANTES ASIGNADOS A LA VARIANTE"));
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains("ESTUDIANTE VARIANTE A"));
             org.junit.jupiter.api.Assertions.assertTrue(texto.contains("FIRMA DEL DOCENTE"));
             org.junit.jupiter.api.Assertions.assertFalse(texto.contains("RECEPCIÓN DE EVALUACIONES"));
             org.junit.jupiter.api.Assertions.assertTrue(

@@ -5,6 +5,8 @@ import com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+
 @Component
 public class RolExamenMapper {
 
@@ -94,9 +96,12 @@ public class RolExamenMapper {
                 .modalidad(entity.getModalidad())
                 .estadoFlujo(entity.getEstadoFlujo())
                 .semana(entity.getSemana())
-                .dia(entity.getDia())
+                // El día visible se deriva siempre de la fecha calendario.
+                // Así se corrigen también roles antiguos cuyo campo dia quedó
+                // guardado con un valor desactualizado o incorrecto.
+                .dia(entity.getFecha() != null ? nombreDiaSemana(entity.getFecha()) : entity.getDia())
                 .fecha(entity.getFecha())
-                .fechaDisplay(entity.getFechaDisplay())
+                .fechaDisplay(entity.getFecha() != null ? formatearFecha(entity.getFecha()) : entity.getFechaDisplay())
                 .horario(entity.getHorario())
                 .aula(entity.getAula())
                 .campus(entity.getCampus())
@@ -108,5 +113,21 @@ public class RolExamenMapper {
                 .creadoEn(entity.getCreadoEn())
                 .actualizadoEn(entity.getActualizadoEn())
                 .build();
+    }
+
+    private String formatearFecha(LocalDate fecha) {
+        return String.format("%02d/%02d/%d", fecha.getDayOfMonth(), fecha.getMonthValue(), fecha.getYear());
+    }
+
+    private String nombreDiaSemana(LocalDate fecha) {
+        return switch (fecha.getDayOfWeek()) {
+            case MONDAY -> "Lunes";
+            case TUESDAY -> "Martes";
+            case WEDNESDAY -> "Miércoles";
+            case THURSDAY -> "Jueves";
+            case FRIDAY -> "Viernes";
+            case SATURDAY -> "Sábado";
+            case SUNDAY -> "Domingo";
+        };
     }
 }
