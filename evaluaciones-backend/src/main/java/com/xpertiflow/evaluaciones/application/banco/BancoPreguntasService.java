@@ -588,14 +588,62 @@ public class BancoPreguntasService {
         if (valor.chars().anyMatch(caracter -> Character.isISOControl(caracter) && caracter != '\n' && caracter != '\r' && caracter != '\t')) {
             errores.add("Fila " + (rowNum + 1) + ": " + campo + " contiene caracteres de control no permitidos");
         }
-        if (valor.chars().filter(caracter -> caracter == '$').count() % 2 != 0) {
-            errores.add("Fila " + (rowNum + 1) + ": " + campo + " contiene delimitadores de fórmula $ sin cerrar");
-        }
+        validarSintaxisTipst(campo, valor, rowNum, errores);
         for (String errorFormula : ERRORES_FORMULA) {
             if (valor.toUpperCase(Locale.ROOT).contains(errorFormula)) {
                 errores.add("Fila " + (rowNum + 1) + ": " + campo + " contiene el error de fórmula " + errorFormula);
             }
         }
+    }
+
+    /**
+     * La previsualización divide el texto en bloques $...$ y envía cada bloque
+     * al motor Typst. Una expresión con delimitadores anidados puede pasar la
+     * validación estructural del Excel, pero producir bloques matemáticos con
+     * paréntesis incompletos durante la generación del PDF.
+     */
+    private void validarSintaxisTipst(String campo, String valor, int rowNum, List<String> errores) {
+        long cantidadDolares = valor.chars().filter(caracter -> caracter == '$').count();
+        if (cantidadDolares % 2 != 0) {
+            errores.add("Fila " + (rowNum + 1) + ": " + campo + " contiene delimitadores de fórmula $ sin cerrar");
+            return;
+        }
+
+        int cursor = 0;
+        while (cursor < valor.length()) {
+            int apertura = valor.indexOf('$', cursor);
+            if (apertura < 0) break;
+            int cierre = valor.indexOf('$', apertura + 1);
+            if (cierre < 0) break;
+
+            String bloque = valor.substring(apertura + 1, cierre);
+            if (!agrupadoresBalanceados(bloque)) {
+                errores.add("Fila " + (rowNum + 1) + ": " + campo
+                        + " contiene una expresión matemática incompatible con la previsualización Typst;"
+                        + " no anides signos $ y verifica paréntesis, corchetes y llaves");
+                return;
+            }
+            cursor = cierre + 1;
+        }
+    }
+
+    private boolean agrupadoresBalanceados(String valor) {
+        Deque<Character> abiertos = new ArrayDeque<>();
+        for (char caracter : valor.toCharArray()) {
+            if (caracter == '(' || caracter == '[' || caracter == '{') {
+                abiertos.push(caracter);
+                continue;
+            }
+            if (caracter != ')' && caracter != ']' && caracter != '}') continue;
+            if (abiertos.isEmpty()) return false;
+            char apertura = abiertos.pop();
+            if ((caracter == ')' && apertura != '(')
+                    || (caracter == ']' && apertura != '[')
+                    || (caracter == '}' && apertura != '{')) {
+                return false;
+            }
+        }
+        return abiertos.isEmpty();
     }
 
     private String normalizarImagenBase64(String valor, int rowNum, List<String> errores) {

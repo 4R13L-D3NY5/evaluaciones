@@ -242,6 +242,32 @@ class BancoPreguntasServiceTest {
     }
 
     @Test
+    void rechazaFormulaTypstConDelimitadoresAnidadosAntesDePersistir() throws Exception {
+        MockMultipartFile archivo = crearExcel(60);
+        try (XSSFWorkbook workbook = new XSSFWorkbook(archivo.getInputStream());
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            workbook.getSheet("Banco").getRow(1).getCell(3).setCellValue(
+                    "Costo $P = 10*( $P/A$,10%,3) - 2*($P/F$,10%,3) $");
+            workbook.write(output);
+            archivo = new MockMultipartFile(
+                    "file", "banco-formula-typst-invalida.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    output.toByteArray());
+        }
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(
+                rol.getId(), archivo, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isFalse();
+        assertThat(respuesta.getErroresValidacion())
+                .anyMatch(error -> error.contains("expresión matemática incompatible")
+                        && error.contains("opción A"));
+        verify(bancoRepository, never()).save(any());
+        verify(reactivoRepository, never()).save(any());
+    }
+
+    @Test
     void aceptaUnBloqueDeEmparejamientoConUnPrincipalYDosOpciones() throws Exception {
         MockMultipartFile archivo = crearExcelConBloqueEmparejamientoValido();
         when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));

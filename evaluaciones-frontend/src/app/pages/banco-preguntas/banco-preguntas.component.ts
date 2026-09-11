@@ -48,6 +48,7 @@ interface DetalleErrorDocente {
   regla: string;
   problema: string;
   correccion: string;
+  campo?: string;
 }
 
 type TamanoImagen = 'GRANDE' | 'MEDIANA' | 'PEQUENA' | 'MUY_PEQUENA';
@@ -666,8 +667,8 @@ export interface DiaCalendario {
                   <span>Observaciones que debes corregir antes de aprobar el banco:</span>
                 </div>
                 <div class="rounded-lg border border-rose-200 bg-white/70 px-3 py-2 text-[11px] leading-relaxed text-rose-900">
-                  <strong>¿Dónde corregir la opción?</strong> La aplicación no mueve incisos automáticamente. Corrige la fila en el Excel original,
-                  usando las columnas oficiales <code>respuesta_correcta</code> y <code>opcion_a</code> a <code>opcion_e</code>.
+                  <strong>¿Dónde corregirlo?</strong> La aplicación no mueve incisos automáticamente. Corrige la fila en el Excel original,
+                  usando el campo indicado en cada observación: <code>enunciado</code>, <code>respuesta_correcta</code> u <code>opcion_a</code> a <code>opcion_e</code>.
                   En <strong>Selección de la mejor respuesta</strong> y <strong>Subítem de caso o problema</strong>, si la respuesta es <code>E</code>, <code>opcion_e</code> debe contener el texto de esa alternativa.
                   En <strong>Verdadero o Falso Complejas</strong>, <code>opcion_e</code> debe quedar vacía. La respuesta puede ser la letra o el valor completo de la lista oficial, por ejemplo <code>B: 1 y 3 son verdaderas</code>; ambos formatos se interpretan como la clave <code>B</code>.
                   Luego vuelve a cargar el archivo para ejecutar nuevamente todas las validaciones.
@@ -685,6 +686,9 @@ export interface DiaCalendario {
                           <div class="text-[10px] font-black uppercase tracking-wide text-rose-700">{{ errItem.enunciado ? (errItem.enunciado | slice:0:90) + (errItem.enunciado.length > 90 ? '...' : '') : 'Sin enunciado' }}</div>
                           @for (detalle of getDetalleErroresDocente(errItem); track detalle.regla + detalle.problema) {
                             <div class="border-t border-rose-100 pt-1.5 text-[11px] leading-relaxed">
+                              @if (detalle.campo) {
+                                <div class="mb-0.5 text-[10px] font-black uppercase tracking-wide text-rose-700">Campo afectado: {{ detalle.campo }}</div>
+                              }
                               <strong class="text-rose-950">{{ detalle.regla }}:</strong>
                               <span class="text-rose-900"> {{ detalle.problema }}</span>
                               <div class="mt-0.5 text-rose-700"><strong>Corrección:</strong> {{ detalle.correccion }}</div>
@@ -3009,7 +3013,34 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public getDetalleErroresDocente(pregunta: PreguntaValidada): DetalleErrorDocente[] {
-    return pregunta.errores.map(error => this.detallarErrorDocente(pregunta, error));
+    return pregunta.errores.map(error => ({
+      ...this.detallarErrorDocente(pregunta, error),
+      campo: this.obtenerCampoError(pregunta, error)
+    }));
+  }
+
+  private obtenerCampoError(pregunta: PreguntaValidada, error: string): string | undefined {
+    const campoDirecto = error.match(/\b(enunciado|opcion_[a-e])\b/i)?.[1]?.toLowerCase();
+    if (campoDirecto) return campoDirecto;
+
+    if (error.includes('Una opción supera el máximo de 2000')) {
+      const campos = [
+        ['opcion_a', pregunta.opcion_a],
+        ['opcion_b', pregunta.opcion_b],
+        ['opcion_c', pregunta.opcion_c],
+        ['opcion_d', pregunta.opcion_d],
+        ['opcion_e', pregunta.opcion_e]
+      ].filter(([, valor]) => valor.length > 2000).map(([campo]) => campo);
+      return campos.join(', ') || undefined;
+    }
+
+    if (error.includes('Requiere las 4 proposiciones')) return 'opcion_a, opcion_b, opcion_c, opcion_d';
+    if (error.includes('V/F simple solo permite')) return 'opcion_c, opcion_d, opcion_e';
+    if (error.includes('V/F complejas debe dejar vacía opcion_e') || error.includes('no permite opción E')) return 'opcion_e';
+
+    const opcionInactiva = error.match(/respuesta correcta\s+([A-E])/i)?.[1];
+    if (opcionInactiva) return `opcion_${opcionInactiva.toLowerCase()}`;
+    return undefined;
   }
 
   private detallarErrorDocente(pregunta: PreguntaValidada, error: string): DetalleErrorDocente {
@@ -3121,6 +3152,9 @@ export class BancoPreguntasComponent implements OnInit {
     }
     if (error.startsWith('Peso inválido')) {
       return { regla: 'Columna peso', problema: 'El valor de peso no cumple el formato permitido.', correccion: 'Usa un número mayor que 0, hasta 100 y con máximo dos decimales.' };
+    }
+    if (error.includes('expresión matemática incompatible')) {
+      return { regla: 'Fórmula matemática', problema: 'La expresión contiene delimitadores $ anidados o agrupadores desbalanceados para Typst.', correccion: 'No coloques signos $ dentro de otro bloque $...$. Usa un solo bloque matemático balanceado o escribe la fórmula como texto plano.' };
     }
     if (error.includes('fórmula inválida')) {
       return { regla: 'Fórmula o contenido', problema: 'El enunciado u opción contiene un error de Excel, caracteres no permitidos o signos $ desbalanceados.', correccion: 'Corrige la fórmula o cierra correctamente cada expresión entre signos $.' };
@@ -3827,10 +3861,19 @@ export class BancoPreguntasComponent implements OnInit {
           errores.push('Peso inválido: debe ser mayor que 0, máximo 100 y con hasta 2 decimales');
         }
 
-        const textos = [enunciadoRaw, opA, opB, opC, opD, opE];
-        if (textos.some(texto => this.textoExcelTieneError(texto))) {
-          errores.push('El enunciado u opciones contienen una fórmula inválida, error de Excel o delimitadores $ desbalanceados');
-        }
+        const textosConCampo: Array<[string, string]> = [
+          ['enunciado', enunciadoRaw],
+          ['opcion_a', opA],
+          ['opcion_b', opB],
+          ['opcion_c', opC],
+          ['opcion_d', opD],
+          ['opcion_e', opE]
+        ];
+        textosConCampo.forEach(([campo, texto]) => {
+          const errorTexto = this.validarTextoTypstExcel(texto);
+          if (errorTexto) errores.push(`${campo}: ${errorTexto}`);
+        });
+        const textos = textosConCampo.map(([, texto]) => texto);
         const huellasOpciones = textos.slice(1).filter(Boolean).map(texto => this.huellaTextoExcel(texto));
         if (new Set(huellasOpciones).size !== huellasOpciones.length) {
           errores.push('Las opciones no pueden repetir el mismo texto');
@@ -3932,12 +3975,48 @@ export class BancoPreguntasComponent implements OnInit {
     return errores;
   }
 
-  private textoExcelTieneError(valor: string): boolean {
-    if (!valor) return false;
+  private validarTextoTypstExcel(valor: string): string | null {
+    if (!valor) return null;
     const mayusculas = valor.toUpperCase();
-    return ['#REF!', '#DIV/0!', '#VALUE!', '#NAME?', '#N/A'].some(error => mayusculas.includes(error))
-      || (valor.match(/\$/g) || []).length % 2 !== 0
-      || [...valor].some(caracter => /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(caracter));
+    const errorExcel = ['#REF!', '#DIV/0!', '#VALUE!', '#NAME?', '#N/A']
+      .find(error => mayusculas.includes(error));
+    if (errorExcel) return `contiene el error de fórmula ${errorExcel}`;
+    if ([...valor].some(caracter => /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(caracter))) {
+      return 'contiene caracteres de control no permitidos';
+    }
+
+    const cantidadDolares = (valor.match(/\$/g) || []).length;
+    if (cantidadDolares % 2 !== 0) return 'contiene delimitadores de fórmula $ sin cerrar';
+
+    let cursor = 0;
+    while (cursor < valor.length) {
+      const apertura = valor.indexOf('$', cursor);
+      if (apertura < 0) break;
+      const cierre = valor.indexOf('$', apertura + 1);
+      if (cierre < 0) break;
+      const bloque = valor.slice(apertura + 1, cierre);
+      if (!this.agrupadoresTypstBalanceados(bloque)) {
+        return 'contiene una expresión matemática incompatible con la previsualización Typst; no anides signos $ y verifica paréntesis, corchetes y llaves';
+      }
+      cursor = cierre + 1;
+    }
+    return null;
+  }
+
+  private agrupadoresTypstBalanceados(valor: string): boolean {
+    const abiertos: string[] = [];
+    for (const caracter of valor) {
+      if (['(', '[', '{'].includes(caracter)) {
+        abiertos.push(caracter);
+        continue;
+      }
+      if (![')', ']', '}'].includes(caracter)) continue;
+      const apertura = abiertos.pop();
+      if (!apertura || (caracter === ')' && apertura !== '(')
+        || (caracter === ']' && apertura !== '[')
+        || (caracter === '}' && apertura !== '{')) return false;
+    }
+    return abiertos.length === 0;
   }
 
   private normalizarImagenBase64Excel(valor: string): string | undefined {
