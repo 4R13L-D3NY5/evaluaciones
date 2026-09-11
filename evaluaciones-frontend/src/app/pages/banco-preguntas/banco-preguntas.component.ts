@@ -175,6 +175,44 @@ export interface DiaCalendario {
             <span>Revisar y aprobar</span>
           </div>
         </div>
+
+        <!-- Parcial y recursos oficiales disponibles también para docentes -->
+        <div class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Parcial a validar</span>
+            <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+              @for (p of ['1er Parcial', '2do Parcial', 'Examen Final', '2da Instancia']; track p) {
+                <button
+                  (click)="cambiarParcial(p)"
+                  [class]="parcialActivo() === p ? 'bg-purple-700 text-white font-black shadow-xs' : 'bg-muted/70 text-muted-foreground hover:text-foreground font-bold'"
+                  class="cursor-pointer rounded-xl px-3.5 py-1.5 text-xs transition-all">
+                  {{ p }} ({{ getResumenCuota(p) }})
+                </button>
+              }
+            </div>
+          </div>
+          <div>
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground lg:hidden">Recursos oficiales</span>
+            <div class="mt-1.5 flex flex-wrap items-center gap-2 lg:mt-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              (click)="descargarExcelBaseMacro()"
+              title="Descargar la plantilla oficial en blanco con listas desplegables y fórmulas automáticas"
+              class="flex cursor-pointer items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-xs transition-transform hover:scale-105 hover:bg-emerald-700">
+              <i class="pi pi-download text-xs"></i>
+              <span>Planilla Oficial</span>
+            </button>
+            <button
+              (click)="abrirModalEjemplos()"
+              title="Abrir la guía visual del formato oficial del examen"
+              class="flex cursor-pointer items-center gap-1.5 rounded-xl bg-purple-700 px-3.5 py-2.5 text-xs font-bold text-white shadow-xs transition-transform hover:scale-105 hover:bg-purple-800">
+              <i class="pi pi-book text-xs"></i>
+              <span>Guía del formato del examen</span>
+            </button>
+          </div>
+        </div>
+        </div>
+        </div>
       }
 
       <!-- ================================================================= -->
@@ -362,42 +400,6 @@ export interface DiaCalendario {
               </div>
             </div>
             } @else {
-          <!-- Barra Superior de Acciones y Recursos del Examen -->
-          <div class="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Parcial a Validar</span>
-              <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                @for (p of ['1er Parcial', '2do Parcial', 'Examen Final', '2da Instancia']; track p) {
-                  <button 
-                    (click)="cambiarParcial(p)"
-                    [class]="parcialActivo() === p ? 'bg-purple-700 text-white font-black shadow-xs' : 'bg-muted/70 text-muted-foreground hover:text-foreground font-bold'"
-                    class="px-3.5 py-1.5 text-xs rounded-xl transition-all cursor-pointer">
-                    {{ p }} ({{ getResumenCuota(p) }})
-                  </button>
-                }
-              </div>
-            </div>
-
-            <!-- Recursos oficiales de carga -->
-            <div class="flex flex-wrap items-center gap-2">
-              <button 
-                (click)="descargarExcelBaseMacro()"
-                title="Descargar la plantilla oficial en blanco con 4 hojas, listas desplegables y fórmulas automáticas"
-                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
-                <i class="pi pi-download text-xs"></i>
-                <span>Plantilla Oficial</span>
-              </button>
-
-              <button 
-                (click)="abrirModalEjemplos()"
-                title="Abrir la guía visual del formato oficial del examen"
-                class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
-                <i class="pi pi-book text-xs"></i>
-                <span>Guía del formato del examen</span>
-              </button>
-            </div>
-          </div>
-
           <!-- Zona Principal de Validación y Acciones de Aprobación -->
           <div class="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
             

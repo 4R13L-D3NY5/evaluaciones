@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
 import com.xpertiflow.evaluaciones.api.dto.DetalleRespuestaOmrDto;
@@ -11,6 +13,7 @@ import com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
+import com.xpertiflow.evaluaciones.domain.entity.AnulacionPreguntaOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ConfiguracionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
 import com.xpertiflow.evaluaciones.domain.entity.LoteCartillasOmr;
@@ -19,6 +22,7 @@ import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.CalificacionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
+import com.xpertiflow.evaluaciones.domain.repository.AnulacionPreguntaOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ConfiguracionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.LoteCartillasOmrRepository;
@@ -29,6 +33,7 @@ import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +62,7 @@ public class OmrProcesamientoService {
     private final AppProperties appProperties;
     private final CalificacionOmrRepository calificacionRepository;
     private final AuditoriaEvaluacionRepository auditoriaRepository;
+    private final AnulacionPreguntaOmrRepository anulacionRepository;
     private final ConfiguracionOmrRepository configuracionRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final ExamenVarianteRepository varianteRepository;
@@ -159,6 +165,204 @@ public class OmrProcesamientoService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<AnulacionPreguntaOmrResponseDto> listarAnulaciones(String rolExamenId) {
+        if (!rolExamenRepository.existsById(rolExamenId)) {
+            throw new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId);
+        }
+        return anulacionRepository.findByRolExamenIdAndActivoTrueOrderByLetraVarianteAscNumeroPreguntaAsc(rolExamenId)
+                .stream()
+                .map(this::mapearAnulacion)
+                .toList();
+    }
+
+    @Transactional
+    public AnulacionPreguntaOmrResponseDto anularPregunta(String rolExamenId,
+                                                          AnulacionPreguntaOmrRequestDto request,
+                                                          Authentication authentication,
+                                                          String ipOrigen) {
+        RolExamen rol = buscarRolParaAnulacion(rolExamenId);
+        String varianteSolicitada = texto(request.getLetraVariante()).toUpperCase(Locale.ROOT);
+        Integer numeroPregunta = request.getNumeroPregunta();
+        if (varianteSolicitada.isBlank() || numeroPregunta == null) {
+            throw new IllegalArgumentException("Debe indicar la variante y el número de pregunta.");
+        }
+
+        ExamenVariante variante = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, varianteSolicitada)
+                .orElseThrow(() -> new IllegalArgumentException("La variante " + varianteSolicitada + " no pertenece a esta evaluación."));
+        Map<String, String> patron = leerPatron(variante);
+        if (!patron.containsKey(String.valueOf(numeroPregunta))) {
+            throw new IllegalArgumentException("La pregunta " + numeroPregunta + " no existe en el patrón de la variante " + varianteSolicitada + ".");
+        }
+
+        String motivo = texto(request.getMotivo());
+        if (motivo.length() < 5) {
+            throw new IllegalArgumentException("El motivo de anulación es obligatorio.");
+        }
+        AnulacionPreguntaOmr anulacion = anulacionRepository
+                .findFirstByRolExamenIdAndLetraVarianteAndNumeroPreguntaOrderByIdDesc(
+                        rolExamenId, varianteSolicitada, numeroPregunta)
+                .orElseGet(AnulacionPreguntaOmr::new);
+        if (anulacion.isActivo()) {
+            throw new IllegalArgumentException("La pregunta " + numeroPregunta + " de la variante " + varianteSolicitada + " ya está anulada.");
+        }
+        anulacion.setRolExamenId(rolExamenId);
+        anulacion.setLetraVariante(varianteSolicitada);
+        anulacion.setNumeroPregunta(numeroPregunta);
+        anulacion.setMotivo(motivo);
+        anulacion.setAnuladoPor(usuarioValido(authentication == null ? null : authentication.getName()));
+        anulacion.setActivo(true);
+        AnulacionPreguntaOmr guardada = anulacionRepository.save(anulacion);
+        recalcularCalificacionesDeVariante(rolExamenId, varianteSolicitada);
+        registrarAuditoriaAnulacion(rol, "PREGUNTA_OMR_ANULADA", authentication, ipOrigen,
+                varianteSolicitada, numeroPregunta, motivo);
+        return mapearAnulacion(guardada);
+    }
+
+    @Transactional
+    public void reactivarPregunta(String rolExamenId,
+                                  String letraVariante,
+                                  Integer numeroPregunta,
+                                  Authentication authentication,
+                                  String ipOrigen) {
+        RolExamen rol = buscarRolParaAnulacion(rolExamenId);
+        String varianteSolicitada = texto(letraVariante).toUpperCase(Locale.ROOT);
+        AnulacionPreguntaOmr anulacion = anulacionRepository
+                .findByRolExamenIdAndLetraVarianteAndNumeroPreguntaAndActivoTrue(
+                        rolExamenId, varianteSolicitada, numeroPregunta)
+                .orElseThrow(() -> new IllegalArgumentException("No existe una anulación activa para esa pregunta."));
+        anulacion.setActivo(false);
+        anulacionRepository.save(anulacion);
+        recalcularCalificacionesDeVariante(rolExamenId, varianteSolicitada);
+        registrarAuditoriaAnulacion(rol, "PREGUNTA_OMR_REACTIVADA", authentication, ipOrigen,
+                varianteSolicitada, numeroPregunta, "La pregunta volvió a participar en la calificación.");
+    }
+
+    private RolExamen buscarRolParaAnulacion(String rolExamenId) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS").contains(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("Las preguntas solo pueden anularse mientras la evaluación está devuelta o pendiente de notas.");
+        }
+        if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_CARTILLA) {
+            throw new IllegalStateException("La anulación por pregunta solo aplica a evaluaciones calificadas con cartilla OMR.");
+        }
+        return rol;
+    }
+
+    private void recalcularCalificacionesDeVariante(String rolExamenId, String letraVariante) {
+        ExamenVariante variante = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, letraVariante)
+                .orElseThrow(() -> new IllegalArgumentException("La variante no pertenece a esta evaluación."));
+        Map<String, String> patron = leerPatron(variante);
+        Set<Integer> anuladas = preguntasAnuladas(rolExamenId, letraVariante);
+        calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId).stream()
+                .filter(calificacion -> letraVariante.equalsIgnoreCase(calificacion.getLetraVariante()))
+                .forEach(calificacion -> {
+                    Map<String, String> respuestas = leerRespuestasGuardadas(calificacion.getRespuestasDetectadasJson());
+                    aplicarMetricas(calificacion, patron, respuestas, anuladas);
+                    calificacionRepository.save(calificacion);
+                });
+    }
+
+    private void aplicarMetricas(CalificacionOmr calificacion,
+                                 Map<String, String> patron,
+                                 Map<String, String> respuestas,
+                                 Set<Integer> anuladas) {
+        ResultadoCalificacion resultado = calcularMetricas(patron, respuestas, anuladas);
+        calificacion.setTotalReactivos(resultado.total());
+        calificacion.setAciertos(resultado.aciertos());
+        calificacion.setFallos(resultado.fallos());
+        calificacion.setBlancos(resultado.blancos());
+        calificacion.setDoblesMarcas(resultado.dobles());
+        calificacion.setNotaSobre60(resultado.notaSobre60());
+        calificacion.setNotaSobre100(resultado.notaSobre100());
+        calificacion.setEstadoCalificacion(resultado.notaSobre100().doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
+    }
+
+    private ResultadoCalificacion calcularMetricas(Map<String, String> patron,
+                                                   Map<String, String> respuestas,
+                                                   Set<Integer> anuladas) {
+        int base = patron.isEmpty() ? (respuestas.isEmpty() ? 30 : respuestas.size()) : patron.size();
+        int total = Math.max(0, base - (int) anuladas.stream().filter(numero -> numero <= base).count());
+        int aciertos = 0;
+        int blancos = 0;
+        int dobles = 0;
+        for (int pregunta = 1; pregunta <= base; pregunta++) {
+            if (anuladas.contains(pregunta)) continue;
+            String respuesta = respuestas.getOrDefault(String.valueOf(pregunta), "");
+            if (respuesta.isBlank()) {
+                blancos++;
+            } else if (respuesta.length() > 1) {
+                dobles++;
+            } else if (respuesta.equalsIgnoreCase(patron.getOrDefault(String.valueOf(pregunta), ""))) {
+                aciertos++;
+            }
+        }
+        int fallos = Math.max(0, total - aciertos - blancos);
+        BigDecimal nota100 = total == 0 ? BigDecimal.ZERO
+                : BigDecimal.valueOf(aciertos * 100.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal nota60 = total == 0 ? BigDecimal.ZERO
+                : BigDecimal.valueOf(aciertos * 60.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
+        return new ResultadoCalificacion(total, aciertos, fallos, blancos, dobles, nota60, nota100);
+    }
+
+    private Set<Integer> preguntasAnuladas(String rolExamenId, String letraVariante) {
+        return anulacionRepository.findByRolExamenIdAndLetraVarianteAndActivoTrueOrderByNumeroPreguntaAsc(
+                        rolExamenId, letraVariante)
+                .stream()
+                .map(AnulacionPreguntaOmr::getNumeroPregunta)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    private Map<String, String> leerRespuestasGuardadas(String respuestasJson) {
+        if (respuestasJson == null || respuestasJson.isBlank()) return Map.of();
+        try {
+            return objectMapper.readValue(respuestasJson, new TypeReference<LinkedHashMap<String, String>>() {});
+        } catch (IOException exception) {
+            throw new IllegalStateException("No se pudieron leer las respuestas guardadas del OMR.", exception);
+        }
+    }
+
+    private void registrarAuditoriaAnulacion(RolExamen rol,
+                                             String accion,
+                                             Authentication authentication,
+                                             String ipOrigen,
+                                             String variante,
+                                             Integer pregunta,
+                                             String motivo) {
+        String detalles = "{\"variante\":\"" + escaparJson(variante) + "\",\"pregunta\":" + pregunta
+                + ",\"motivo\":\"" + escaparJson(motivo) + "\"}";
+        auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                .rolExamen(rol)
+                .etapaOrigen(rol.getEstadoFlujo().getValor())
+                .etapaDestino(rol.getEstadoFlujo().getValor())
+                .accion(accion)
+                .usuario(usuarioValido(authentication == null ? null : authentication.getName()))
+                .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                .detallesJson(detalles)
+                .build());
+    }
+
+    private String escaparJson(String valor) {
+        return texto(valor).replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+    }
+
+    private AnulacionPreguntaOmrResponseDto mapearAnulacion(AnulacionPreguntaOmr anulacion) {
+        AnulacionPreguntaOmrResponseDto dto = new AnulacionPreguntaOmrResponseDto();
+        dto.setId(anulacion.getId());
+        dto.setRolExamenId(anulacion.getRolExamenId());
+        dto.setLetraVariante(anulacion.getLetraVariante());
+        dto.setNumeroPregunta(anulacion.getNumeroPregunta());
+        dto.setMotivo(anulacion.getMotivo());
+        dto.setAnuladoPor(anulacion.getAnuladoPor());
+        dto.setAnuladoEn(anulacion.getAnuladoEn());
+        dto.setActivo(anulacion.isActivo());
+        return dto;
+    }
+
+    private record ResultadoCalificacion(int total, int aciertos, int fallos, int blancos, int dobles,
+                                         BigDecimal notaSobre60, BigDecimal notaSobre100) {}
+
     /**
      * Devuelve el patrón cuando el examen ya fue devuelto y pasó a la etapa
      * de notas, o cuando ya quedó calificado. Las claves se leen desde el
@@ -174,6 +378,7 @@ public class OmrProcesamientoService {
             throw new IllegalStateException("El patrón solo puede consultarse después de devolver el examen y habilitar la revisión de notas.");
         }
 
+        List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);
         List<PatronCalificadoResponseDto.VariantePatronDto> variantes = varianteRepository.findByRolExamenId(rolExamenId)
                 .stream()
                 .sorted(Comparator.comparing(ExamenVariante::getLetraVariante))
@@ -188,6 +393,18 @@ public class OmrProcesamientoService {
                     dto.setTotalPreguntas(variante.getTotalPreguntas() == null ? respuestas.size() : variante.getTotalPreguntas());
                     dto.setRespuestas(respuestas);
                     dto.setTrazabilidad(leerTrazabilidad(contenido));
+                    dto.setEstudiantes(mapeos.stream()
+                            .filter(mapeo -> variante.getLetraVariante().equalsIgnoreCase(mapeo.getLetraVariante()))
+                            .sorted(Comparator.comparing((MapeoEstudianteVariante mapeo) ->
+                                    nombreCompleto(mapeo).toLowerCase(Locale.ROOT)))
+                            .map(mapeo -> {
+                                PatronCalificadoResponseDto.EstudiantePatronDto estudiante =
+                                        new PatronCalificadoResponseDto.EstudiantePatronDto();
+                                estudiante.setCodigoEstudiante(mapeo.getCodigoEstudiante());
+                                estudiante.setNombreCompleto(nombreCompleto(mapeo));
+                                return estudiante;
+                            })
+                            .toList());
                     return dto;
                 })
                 .toList();
@@ -413,6 +630,17 @@ public class OmrProcesamientoService {
     public CalificacionOmrResponseDto ajustarCalificacion(String rolExamenId,
                                                          AjustarCalificacionOmrRequestDto request,
                                                          Authentication authentication) {
+        return ajustarCalificacion(rolExamenId, request, authentication, null);
+    }
+
+    @Transactional
+    public CalificacionOmrResponseDto ajustarCalificacion(String rolExamenId,
+                                                         AjustarCalificacionOmrRequestDto request,
+                                                         Authentication authentication,
+                                                         String ipOrigen) {
+        RolExamen rolParaAuditoria = request.isAjusteManual()
+                ? validarAjusteManual(rolExamenId, authentication)
+                : null;
         String codigo = request.getCodigoEstudiante() == null ? "" : request.getCodigoEstudiante().trim();
         if (codigo.isBlank()) {
             throw new IllegalArgumentException("El código del estudiante es obligatorio.");
@@ -432,43 +660,25 @@ public class OmrProcesamientoService {
 
         Map<String, String> respuestas = normalizarRespuestas(request.getRespuestas());
         Map<String, String> patron = leerPatron(variante);
-        int total = patron.isEmpty() ? (respuestas.isEmpty() ? 30 : respuestas.size()) : patron.size();
-        int aciertos = 0;
-        int blancos = 0;
-        int dobles = 0;
-        for (int pregunta = 1; pregunta <= total; pregunta++) {
-            String respuesta = respuestas.getOrDefault(String.valueOf(pregunta), "");
-            if (respuesta.isBlank()) {
-                blancos++;
-            } else if (respuesta.length() > 1) {
-                dobles++;
-            } else if (respuesta.equalsIgnoreCase(patron.getOrDefault(String.valueOf(pregunta), ""))) {
-                aciertos++;
-            }
-        }
-        int fallos = Math.max(0, total - aciertos - blancos);
-        BigDecimal nota100 = total == 0
-                ? BigDecimal.ZERO
-                : BigDecimal.valueOf(aciertos * 100.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
-        BigDecimal nota60 = total == 0
-                ? BigDecimal.ZERO
-                : BigDecimal.valueOf(aciertos * 60.0 / total).setScale(2, java.math.RoundingMode.HALF_UP);
+        ResultadoCalificacion resultado = calcularMetricas(patron, respuestas,
+                preguntasAnuladas(rolExamenId, mapeo.getLetraVariante()));
 
         CalificacionOmr calificacion = calificacionRepository
                 .findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigo)
                 .orElseGet(CalificacionOmr::new);
+        Map<String, String> respuestasPrevias = leerRespuestasGuardadas(calificacion.getRespuestasDetectadasJson());
         calificacion.setRolExamenId(rolExamenId);
         calificacion.setCodigoEstudiante(codigo);
         calificacion.setEstudianteNombreCompleto(nombreCompleto(mapeo));
         calificacion.setLetraVariante(mapeo.getLetraVariante());
-        calificacion.setTotalReactivos(total);
-        calificacion.setAciertos(aciertos);
-        calificacion.setFallos(fallos);
-        calificacion.setBlancos(blancos);
-        calificacion.setDoblesMarcas(dobles);
-        calificacion.setNotaSobre60(nota60);
-        calificacion.setNotaSobre100(nota100);
-        calificacion.setEstadoCalificacion(nota100.doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
+        calificacion.setTotalReactivos(resultado.total());
+        calificacion.setAciertos(resultado.aciertos());
+        calificacion.setFallos(resultado.fallos());
+        calificacion.setBlancos(resultado.blancos());
+        calificacion.setDoblesMarcas(resultado.dobles());
+        calificacion.setNotaSobre60(resultado.notaSobre60());
+        calificacion.setNotaSobre100(resultado.notaSobre100());
+        calificacion.setEstadoCalificacion(resultado.notaSobre100().doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
         try {
             calificacion.setRespuestasDetectadasJson(objectMapper.writeValueAsString(respuestas));
         } catch (IOException exception) {
@@ -476,7 +686,74 @@ public class OmrProcesamientoService {
         }
         String usuario = authentication != null ? authentication.getName() : request.getUsuario();
         calificacion.setProcesadoPor(usuarioValido(usuario) + "_AJUSTE_OMR");
-        return mapearCalificacion(calificacionRepository.save(calificacion));
+        CalificacionOmr guardada = calificacionRepository.save(calificacion);
+        if (request.isAjusteManual()) {
+            Map<String, String> respuestasOriginales = request.getRespuestasOriginales() == null
+                    ? respuestasPrevias
+                    : normalizarRespuestas(request.getRespuestasOriginales());
+            registrarAuditoriaAjusteManual(rolParaAuditoria, guardada, request.getPagina(),
+                    respuestasOriginales, respuestas, authentication, ipOrigen);
+        }
+        return mapearCalificacion(guardada);
+    }
+
+    private RolExamen validarAjusteManual(String rolExamenId, Authentication authentication) {
+        boolean responsable = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_RESPONSABLE_EVALUACIONES".equals(authority.getAuthority()));
+        if (!responsable) {
+            throw new AccessDeniedException("Solo el responsable de evaluaciones puede ajustar manualmente los incisos.");
+        }
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS").contains(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("Los incisos solo pueden ajustarse mientras la evaluación está devuelta o pendiente de notas.");
+        }
+        if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_CARTILLA) {
+            throw new IllegalStateException("El ajuste manual de incisos solo aplica a evaluaciones con cartilla OMR.");
+        }
+        return rol;
+    }
+
+    private void registrarAuditoriaAjusteManual(RolExamen rol,
+                                                CalificacionOmr calificacion,
+                                                Integer pagina,
+                                                Map<String, String> respuestasOriginales,
+                                                Map<String, String> respuestasNuevas,
+                                                Authentication authentication,
+                                                String ipOrigen) {
+        List<Map<String, Object>> cambios = new ArrayList<>();
+        Set<String> preguntas = new java.util.TreeSet<>();
+        preguntas.addAll(respuestasOriginales.keySet());
+        preguntas.addAll(respuestasNuevas.keySet());
+        for (String pregunta : preguntas) {
+            String anterior = respuestasOriginales.getOrDefault(pregunta, "");
+            String nueva = respuestasNuevas.getOrDefault(pregunta, "");
+            if (anterior.equalsIgnoreCase(nueva)) continue;
+            Map<String, Object> cambio = new LinkedHashMap<>();
+            cambio.put("pregunta", pregunta);
+            cambio.put("respuestaAnterior", anterior);
+            cambio.put("respuestaNueva", nueva);
+            cambios.add(cambio);
+        }
+        if (cambios.isEmpty()) return;
+        Map<String, Object> detalles = new LinkedHashMap<>();
+        detalles.put("codigoEstudiante", calificacion.getCodigoEstudiante());
+        detalles.put("variante", calificacion.getLetraVariante());
+        detalles.put("pagina", pagina);
+        detalles.put("cambios", cambios);
+        try {
+            auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen(rol.getEstadoFlujo().getValor())
+                    .etapaDestino(rol.getEstadoFlujo().getValor())
+                    .accion("CALIFICACION_OMR_AJUSTADA")
+                    .usuario(usuarioValido(authentication == null ? null : authentication.getName()))
+                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                    .detallesJson(objectMapper.writeValueAsString(detalles))
+                    .build());
+        } catch (IOException exception) {
+            throw new IllegalStateException("No se pudo registrar la auditoría del ajuste manual OMR.", exception);
+        }
     }
 
     private Map<String, String> leerPatron(ExamenVariante variante) {
@@ -585,10 +862,19 @@ public class OmrProcesamientoService {
                 .findByRolExamenIdAndLetraVariante(calificacion.getRolExamenId(), calificacion.getLetraVariante())
                 .map(this::leerPatron)
                 .orElse(Map.of());
-        int total = calificacion.getTotalReactivos() == null ? 0 : calificacion.getTotalReactivos();
+        Map<Integer, AnulacionPreguntaOmr> anulaciones = anulacionRepository
+                .findByRolExamenIdAndLetraVarianteAndActivoTrueOrderByNumeroPreguntaAsc(
+                        calificacion.getRolExamenId(), calificacion.getLetraVariante())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(AnulacionPreguntaOmr::getNumeroPregunta,
+                        anulacion -> anulacion, (primera, segunda) -> primera));
+        int total = patron.isEmpty()
+                ? (calificacion.getTotalReactivos() == null ? 0 : calificacion.getTotalReactivos())
+                : patron.size();
         List<DetalleRespuestaOmrDto> detalles = new ArrayList<>();
         for (int pregunta = 1; pregunta <= total; pregunta++) {
             String numero = String.valueOf(pregunta);
+            AnulacionPreguntaOmr anulacion = anulaciones.get(pregunta);
             String respuesta = respuestas.getOrDefault(numero, "");
             String correcta = patron.getOrDefault(numero, "");
             String estado;
@@ -605,7 +891,9 @@ public class OmrProcesamientoService {
             detalle.setPregunta(pregunta);
             detalle.setRespuesta(respuesta);
             detalle.setRespuestaCorrecta(correcta);
-            detalle.setEstado(estado);
+            detalle.setAnulada(anulacion != null);
+            detalle.setMotivoAnulacion(anulacion == null ? null : anulacion.getMotivo());
+            detalle.setEstado(anulacion != null ? "ANULADA" : estado);
             detalles.add(detalle);
         }
         return detalles;

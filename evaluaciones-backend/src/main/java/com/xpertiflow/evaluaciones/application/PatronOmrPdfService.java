@@ -35,6 +35,7 @@ public class PatronOmrPdfService {
     private static final float MARGIN = 32f;
     private static final float CONTENT_WIDTH = PAGE_WIDTH - (MARGIN * 2f);
     private static final float ALTO_BLOQUE_VARIANTE = 109f;
+    private static final float ALTO_LISTA_LINEA = 13f;
     private static final float ALTO_FIRMA = 72f;
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
@@ -48,15 +49,18 @@ public class PatronOmrPdfService {
             try {
                 for (int indice = 0; indice < variantes.size(); indice++) {
                     PatronCalificadoResponseDto.VariantePatronDto variante = variantes.get(indice);
-                    if (contenido == null || cursor + ALTO_BLOQUE_VARIANTE > PAGE_HEIGHT - MARGIN) {
+                    List<PatronCalificadoResponseDto.EstudiantePatronDto> estudiantes =
+                            variante.getEstudiantes() == null ? List.of() : variante.getEstudiantes();
+                    float altoBloque = altoBloqueVariante(estudiantes);
+                    if (contenido == null || cursor + altoBloque > PAGE_HEIGHT - MARGIN) {
                         if (contenido != null) contenido.close();
                         contenido = abrirPagina(documento);
                         cursor = documento.getNumberOfPages() == 1
                                 ? dibujarCabecera(documento, contenido, rol, true)
                                 : dibujarCabecera(documento, contenido, rol, false);
                     }
-                    dibujarVariante(contenido, variante, cursor);
-                    cursor += ALTO_BLOQUE_VARIANTE;
+                    dibujarVariante(contenido, variante, estudiantes, cursor);
+                    cursor += altoBloque;
                 }
 
                 if (contenido == null || cursor + ALTO_FIRMA + 30f > PAGE_HEIGHT - MARGIN) {
@@ -112,12 +116,54 @@ public class PatronOmrPdfService {
 
     private void dibujarVariante(PDPageContentStream contenido,
                                  PatronCalificadoResponseDto.VariantePatronDto variante,
+                                 List<PatronCalificadoResponseDto.EstudiantePatronDto> estudiantes,
                                  float top) throws IOException {
         texto(contenido, "VARIANTE " + seguro(variante.getLetra()) + " · "
                         + (variante.getTotalPreguntas() == null ? 0 : variante.getTotalPreguntas())
                         + " preguntas · Generado: " + FECHA_HORA.format(LocalDateTime.now()),
                 MARGIN, top + 12, PDType1Font.HELVETICA_BOLD, 8, new java.awt.Color(55, 43, 125));
-        dibujarTabla(contenido, variante, top + 22);
+        float altoTabla = dibujarTabla(contenido, variante, top + 22);
+        if (!estudiantes.isEmpty()) {
+            dibujarListaEstudiantes(contenido, estudiantes, top + 22 + altoTabla + 8);
+        }
+    }
+
+    private float altoBloqueVariante(List<PatronCalificadoResponseDto.EstudiantePatronDto> estudiantes) {
+        if (estudiantes.isEmpty()) return ALTO_BLOQUE_VARIANTE;
+        int filas = (int) Math.ceil(estudiantes.size() / 2d);
+        return ALTO_BLOQUE_VARIANTE + 24f + (filas * ALTO_LISTA_LINEA);
+    }
+
+    private void dibujarListaEstudiantes(
+            PDPageContentStream contenido,
+            List<PatronCalificadoResponseDto.EstudiantePatronDto> estudiantes,
+            float top) throws IOException {
+        int columnas = 2;
+        int filas = (int) Math.ceil(estudiantes.size() / (double) columnas);
+        float rowHeight = ALTO_LISTA_LINEA;
+        float alto = 22f + filas * rowHeight + 4f;
+        float yBottom = PAGE_HEIGHT - top - alto;
+        float anchoColumna = CONTENT_WIDTH / columnas;
+
+        contenido.setStrokingColor(new java.awt.Color(205, 214, 228));
+        contenido.setNonStrokingColor(new java.awt.Color(250, 251, 253));
+        contenido.addRect(MARGIN, yBottom, CONTENT_WIDTH, alto);
+        contenido.fillAndStroke();
+
+        texto(contenido, "ESTUDIANTES ASIGNADOS A LA VARIANTE (" + estudiantes.size() + ")",
+                MARGIN + 7, top + 13, PDType1Font.HELVETICA_BOLD, 7, new java.awt.Color(55, 43, 125));
+
+        for (int indice = 0; indice < estudiantes.size(); indice++) {
+            PatronCalificadoResponseDto.EstudiantePatronDto estudiante = estudiantes.get(indice);
+            int columna = indice % columnas;
+            int fila = indice / columnas;
+            float x = MARGIN + 7 + (columna * anchoColumna);
+            float y = top + 27 + (fila * rowHeight);
+            String codigo = seguro(estudiante.getCodigoEstudiante());
+            String nombre = seguro(estudiante.getNombreCompleto());
+            texto(contenido, limitar(codigo + " · " + nombre, 54),
+                    x, y, PDType1Font.HELVETICA, 6.8f, java.awt.Color.DARK_GRAY);
+        }
     }
 
     private void dibujarFirmas(PDPageContentStream contenido, RolExamen rol, float top) throws IOException {
@@ -164,9 +210,9 @@ public class PatronOmrPdfService {
         return rutas;
     }
 
-    private void dibujarTabla(PDPageContentStream contenido,
-                              PatronCalificadoResponseDto.VariantePatronDto variante,
-                              float top) throws IOException {
+    private float dibujarTabla(PDPageContentStream contenido,
+                               PatronCalificadoResponseDto.VariantePatronDto variante,
+                               float top) throws IOException {
         int total = variante.getTotalPreguntas() == null ? 0 : variante.getTotalPreguntas();
         Map<String, String> respuestas = variante.getRespuestas() == null ? Map.of() : variante.getRespuestas();
         int columnas = 15;
@@ -204,6 +250,7 @@ public class PatronOmrPdfService {
             texto(contenido, seguro(respuestas.getOrDefault(String.valueOf(pregunta), "—")),
                     x + cellWidth - 9, y, PDType1Font.HELVETICA_BOLD, 9, new java.awt.Color(55, 43, 125));
         }
+        return filas * rowHeight;
     }
 
     private void texto(PDPageContentStream contenido, String valor, float x, float y,
@@ -219,5 +266,10 @@ public class PatronOmrPdfService {
     private String seguro(String valor) {
         if (valor == null || valor.isBlank()) return "-";
         return valor.replaceAll("[\\r\\n]+", " ").trim();
+    }
+
+    private String limitar(String valor, int maximo) {
+        if (valor.length() <= maximo) return valor;
+        return valor.substring(0, Math.max(0, maximo - 1)).trim() + "…";
     }
 }

@@ -23,6 +23,13 @@ public class PatronCalificadoResponseDto {
         private Integer totalPreguntas;
         private Map<String, String> respuestas;
         private List<TrazabilidadPreguntaDto> trazabilidad;
+        private List<EstudiantePatronDto> estudiantes;
+    }
+
+    @Data
+    public static class EstudiantePatronDto {
+        private String codigoEstudiante;
+        private String nombreCompleto;
     }
 
     @Data

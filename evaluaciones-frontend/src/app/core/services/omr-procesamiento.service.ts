@@ -27,7 +27,7 @@ export interface OmrLecturaResponse {
     pregunta: number;
     respuesta: string;
     respuestaCorrecta?: string;
-    estado?: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA' | 'SIN_PATRON';
+    estado?: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA' | 'SIN_PATRON' | 'ANULADA';
     densidades: number[];
   }>;
   estudianteNombre?: string;
@@ -46,6 +46,8 @@ export interface AjustarCalificacionOmrRequest {
   codigoAnterior?: string | null;
   codigoEstudiante: string;
   respuestas: Record<string, string>;
+  ajusteManual?: boolean;
+  respuestasOriginales?: Record<string, string>;
   usuario?: string;
 }
 
@@ -68,13 +70,32 @@ export interface CalificacionOmrResponse {
     pregunta: number;
     respuesta: string;
     respuestaCorrecta?: string;
-    estado?: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA' | 'SIN_PATRON';
+    estado?: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA' | 'SIN_PATRON' | 'ANULADA';
+    anulada?: boolean;
+    motivoAnulacion?: string;
     densidades: number[];
   }>;
   imagenCartillaAnotadaPath?: string;
   archivoEscaneadoPath?: string;
   procesadoPor?: string;
   fechaProcesamiento?: string;
+}
+
+export interface AnulacionPreguntaOmr {
+  id: number;
+  rolExamenId: string;
+  letraVariante: string;
+  numeroPregunta: number;
+  motivo: string;
+  anuladoPor: string;
+  anuladoEn?: string;
+  activo: boolean;
+}
+
+export interface AnulacionPreguntaOmrRequest {
+  letraVariante: string;
+  numeroPregunta: number;
+  motivo: string;
 }
 
 export interface ConfiguracionOmr {
@@ -102,6 +123,10 @@ export interface PatronCalificadoVariante {
   letra: string;
   totalPreguntas: number;
   respuestas: Record<string, string>;
+  estudiantes?: Array<{
+    codigoEstudiante: string;
+    nombreCompleto: string;
+  }>;
   trazabilidad?: Array<{
     numeroPresentado: number;
     numeroBanco?: number;
@@ -185,5 +210,17 @@ export class OmrProcesamientoService {
 
   public ajustarCalificacion(rolExamenId: string, request: AjustarCalificacionOmrRequest): Observable<CalificacionOmrResponse> {
     return this._http.put<CalificacionOmrResponse>(`/api/omr/${rolExamenId}/calificaciones/ajustar`, request);
+  }
+
+  public listarAnulaciones(rolExamenId: string): Observable<AnulacionPreguntaOmr[]> {
+    return this._http.get<AnulacionPreguntaOmr[]>(`/api/omr/${encodeURIComponent(rolExamenId)}/anulaciones-preguntas`);
+  }
+
+  public anularPregunta(rolExamenId: string, request: AnulacionPreguntaOmrRequest): Observable<AnulacionPreguntaOmr> {
+    return this._http.post<AnulacionPreguntaOmr>(`/api/omr/${encodeURIComponent(rolExamenId)}/anulaciones-preguntas`, request);
+  }
+
+  public reactivarPregunta(rolExamenId: string, letraVariante: string, numeroPregunta: number): Observable<void> {
+    return this._http.delete<void>(`/api/omr/${encodeURIComponent(rolExamenId)}/anulaciones-preguntas/${encodeURIComponent(letraVariante)}/${numeroPregunta}`);
   }
 }

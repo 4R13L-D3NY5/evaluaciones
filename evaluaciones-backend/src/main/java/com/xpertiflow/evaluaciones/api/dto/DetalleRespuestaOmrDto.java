@@ -10,5 +10,7 @@ public class DetalleRespuestaOmrDto {
     private String respuesta;
     private String respuestaCorrecta;
     private String estado;
+    private boolean anulada;
+    private String motivoAnulacion;
     private List<Double> densidades = List.of();
 }
