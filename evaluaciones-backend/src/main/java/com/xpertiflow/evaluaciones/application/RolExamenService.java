@@ -164,7 +164,24 @@ public class RolExamenService {
         RolExamen guardado = rolExamenRepository.save(entity);
         registrarAuditoria(guardado, null, EstadoFlujo.PROGRAMADO, "CREACION_ROL_EXAMEN",
                 actor(authentication, null), "127.0.0.1");
+        vincularBancoPendiente(guardado);
         return mapper.toResponseDto(guardado);
+    }
+
+    private void vincularBancoPendiente(RolExamen rol) {
+        bancoPreguntasRepository
+                .findTopByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
+                        rol.getMateriaCodigo(), rol.getGrupo(), rol.getTipoParcial().getValor())
+                .ifPresent(banco -> {
+                    banco.setRolExamenId(rol.getId());
+                    bancoPreguntasRepository.save(banco);
+                    rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
+                    rol.setHashEncriptacion(banco.getHashSha256Integridad());
+                    rol.setFechaValidacion(LocalDateTime.now());
+                    rolExamenRepository.save(rol);
+                    registrarAuditoria(rol, EstadoFlujo.PROGRAMADO, EstadoFlujo.VALIDADO,
+                            "VINCULACION_BANCO_PREGUNTAS_PENDIENTE", "SISTEMA", "127.0.0.1");
+                });
     }
 
     @Transactional

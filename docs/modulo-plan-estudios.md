@@ -2,7 +2,7 @@
 
 ## Resumen funcional
 
-La vista **Plan de Estudios** consulta el catálogo oficial de SEA y muestra las asignaturas de la sede y carrera seleccionadas. Los grupos, docentes y sus identificadores se consultan directamente desde el servicio SEA de grupos y horarios, sin depender de que exista un rol de examen. Los roles registrados se usan únicamente para completar el seguimiento de cada parcial.
+La vista **Plan de Estudios** consulta el catálogo oficial de SEA y muestra las asignaturas de la sede y carrera seleccionadas. Cada grupo se presenta en una fila independiente, porque cada grupo puede tener su propio rol, banco de preguntas y estado de evaluación. Los grupos, docentes y sus identificadores se consultan directamente desde el servicio SEA de grupos y horarios, sin depender de que exista un rol de examen. Los roles registrados se usan únicamente para completar el seguimiento de cada parcial del grupo correspondiente.
 
 ## Información de exámenes
 
@@ -56,7 +56,8 @@ curriculares; no se presentan planes fijos o inventados.
 - La sede Cochabamba y la carrera de Sistemas solo se usan como selección inicial si están disponibles en el catálogo oficial; el usuario puede cambiar ambas.
 - Si una carrera no tiene roles registrados, sus asignaturas siguen visibles y muestran el grupo/docente entregado por SEA; solo el parcial se muestra como **Sin examen**.
 - El catálogo institucional entrega el nombre del docente en `teacherFullName`; el sistema lo normaliza como nombre del docente para mostrarlo en todas las vistas. Si excepcionalmente no llega el nombre pero sí el CI, se muestra **Nombre no disponible (CI ...)** y no un nombre inventado.
-- La información de cada parcial se construye con el rol y banco que corresponden a esa asignatura; el grupo/docente se conserva desde SEA.
+- La información de cada parcial se construye con el rol y banco que corresponden a esa asignatura y grupo; nunca se mezclan bancos o estados de grupos distintos en una misma fila.
+- Cuando una asignatura tiene varios grupos, se generan varias filas con el mismo código y nombre de asignatura, pero con docente, grupo, rol y banco independientes.
 - Los grupos se consultan usando la gestión seleccionada. Los roles se
   intersectan con esos grupos por `seaGroupId` para evitar mostrar la fecha de
   otra gestión; si SEA no devuelve grupos vigentes, no se muestran roles ni

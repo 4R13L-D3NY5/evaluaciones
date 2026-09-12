@@ -63,6 +63,14 @@ public class BancoPreguntasService {
         return toResponseDto(banco);
     }
 
+    public BancoPreguntasResponseDto obtenerPorContexto(String materiaCodigo, String grupo, String tipoParcial) {
+        BancoPreguntas banco = bancoRepository
+                .findTopByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
+                        materiaCodigo, grupo, tipoParcial)
+                .orElseThrow(() -> new RuntimeException("No existe banco pendiente de rol para la materia, grupo y parcial seleccionados"));
+        return toResponseDto(banco);
+    }
+
     private BancoPreguntasResponseDto toResponseDto(BancoPreguntas banco) {
         List<Reactivo> reactivosPersistidos = reactivoRepository
                 .findByBancoIdOrderByNumeroOrdenAsc(banco.getId());
@@ -115,18 +123,26 @@ public class BancoPreguntasService {
     @Transactional
     public CargaBancoResponseDto cargarDesdeExcelPorParametros(
             String materiaCodigo, String grupo, String tipoParcialValor, MultipartFile file, String docenteAprobador) {
-        return cargarDesdeExcelPorParametros(materiaCodigo, grupo, tipoParcialValor, file, docenteAprobador, null);
+        return cargarDesdeExcelPorParametros(materiaCodigo, null, grupo, tipoParcialValor, file, docenteAprobador, null);
     }
 
     @Transactional
     public CargaBancoResponseDto cargarDesdeExcelPorParametros(
             String materiaCodigo, String grupo, String tipoParcialValor, MultipartFile file,
             String docenteAprobador, String usuarioAuditoria) {
+        return cargarDesdeExcelPorParametros(
+                materiaCodigo, null, grupo, tipoParcialValor, file, docenteAprobador, usuarioAuditoria);
+    }
+
+    @Transactional
+    public CargaBancoResponseDto cargarDesdeExcelPorParametros(
+            String materiaCodigo, String materiaNombre, String grupo, String tipoParcialValor, MultipartFile file,
+            String docenteAprobador, String usuarioAuditoria) {
         TipoParcial tipoParcial = TipoParcial.fromValor(tipoParcialValor);
 
-        // Primero buscar un rol PROGRAMADO; si no existe, buscar el más reciente en cualquier estado.
-        // La validación final de estado se realiza antes de procesar el archivo
-        // y solo permite PROGRAMADO o VALIDADO.
+        // Si existe un rol, se conserva el flujo tradicional. Si todavía no
+        // existe una fecha/rol, el banco queda pendiente de vinculación y se
+        // puede asociar automáticamente cuando se cree la programación.
         Optional<RolExamen> rolOpt = rolRepository.findFirstByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujo(
                         materiaCodigo, grupo, tipoParcial, EstadoFlujo.PROGRAMADO);
 
@@ -135,12 +151,18 @@ public class BancoPreguntasService {
                     materiaCodigo, grupo, tipoParcial);
         }
 
-        RolExamen rol = rolOpt.orElseThrow(() -> new RuntimeException(
-                "No existe rol de examen para materia=" + materiaCodigo
-                        + ", grupo=" + grupo + ", parcial=" + tipoParcialValor
-                        + ". Debe crearse el rol de examen antes de cargar el banco de preguntas."));
+        if (rolOpt.isPresent()) {
+            return cargarDesdeExcelConRol(rolOpt.get(), file, docenteAprobador, usuarioAuditoria);
+        }
 
-        return cargarDesdeExcelConRol(rol, file, docenteAprobador, usuarioAuditoria);
+        RolExamen contexto = RolExamen.builder()
+                .materiaCodigo(materiaCodigo)
+                .materiaNombre(materiaNombre == null || materiaNombre.isBlank() ? materiaCodigo : materiaNombre)
+                .grupo(grupo)
+                .tipoParcial(tipoParcial)
+                .estadoFlujo(EstadoFlujo.PROGRAMADO)
+                .build();
+        return cargarDesdeExcelSinRol(contexto, file, docenteAprobador, usuarioAuditoria);
     }
 
     @Transactional
@@ -151,6 +173,17 @@ public class BancoPreguntasService {
     @Transactional
     public CargaBancoResponseDto cargarDesdeExcelConRol(RolExamen rol, MultipartFile file,
                                                         String docenteAprobador, String usuarioAuditoria) {
+        return cargarDesdeExcelInterno(rol, file, docenteAprobador, usuarioAuditoria, true);
+    }
+
+    private CargaBancoResponseDto cargarDesdeExcelSinRol(RolExamen contexto, MultipartFile file,
+                                                         String docenteAprobador, String usuarioAuditoria) {
+        return cargarDesdeExcelInterno(contexto, file, docenteAprobador, usuarioAuditoria, false);
+    }
+
+    private CargaBancoResponseDto cargarDesdeExcelInterno(RolExamen rol, MultipartFile file,
+                                                         String docenteAprobador, String usuarioAuditoria,
+                                                         boolean vincularRol) {
 
         List<String> errores = new ArrayList<>();
         List<Reactivo> reactivos = new ArrayList<>();
@@ -158,7 +191,7 @@ public class BancoPreguntasService {
         // La carga o sustitución solo es válida antes de que se generen los
         // cuadernillos. Esta comprobación debe ejecutarse antes de procesar o
         // persistir contenido para impedir cargas parciales en estados finales.
-        if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO
+        if (vincularRol && rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO
                 && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
             return respuestaFallida(rol, List.of(
                     "El banco solo se puede cargar o reemplazar antes de GENERADO; estado actual: "
@@ -242,19 +275,27 @@ public class BancoPreguntasService {
             String paqueteJson = objectMapper.writeValueAsString(reactivos);
             String hash = calcularSha256(paqueteJson);
 
-            if (bancoRepository.existsByRolExamenIdAndHashSha256Integridad(rol.getId(), hash)) {
+            boolean hashDuplicado = vincularRol
+                    ? bancoRepository.existsByRolExamenIdAndHashSha256Integridad(rol.getId(), hash)
+                    : bancoRepository.existsByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullAndHashSha256Integridad(
+                            rol.getMateriaCodigo(), rol.getGrupo(), rol.getTipoParcial().getValor(), hash);
+            if (hashDuplicado) {
                 return respuestaFallida(rol, List.of("El mismo banco ya fue registrado para este rol de examen (hash SHA-256 duplicado)."));
             }
 
-            String docenteOficial = rolExamenService.resolverNombreDocenteOficial(rol);
+            String docenteOficial = vincularRol
+                    ? rolExamenService.resolverNombreDocenteOficial(rol)
+                    : docenteAprobador;
             if (docenteOficial == null || docenteOficial.isBlank()) {
                 throw new RuntimeException("No se encontró un docente oficial en los servicios institucionales para este rol de examen");
             }
 
             // Una carga posterior a VALIDADO reemplaza el banco vigente para
             // que no queden dos bancos activos asociados al mismo rol.
-            List<BancoPreguntas> bancosAnteriores = bancoRepository
-                    .findByRolExamenIdOrderByFechaAprobacionDesc(rol.getId());
+            List<BancoPreguntas> bancosAnteriores = vincularRol
+                    ? bancoRepository.findByRolExamenIdOrderByFechaAprobacionDesc(rol.getId())
+                    : bancoRepository.findByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
+                            rol.getMateriaCodigo(), rol.getGrupo(), rol.getTipoParcial().getValor());
             if (!bancosAnteriores.isEmpty()) {
                 bancoRepository.deleteAll(bancosAnteriores);
             }
@@ -266,7 +307,7 @@ public class BancoPreguntasService {
             BancoEncryptedPayload paqueteCifrado = cifradoService.cifrarJson(reactivos, contexto);
             BancoPreguntas banco = new BancoPreguntas();
             banco.setId(bancoId);
-            banco.setRolExamenId(rol.getId());
+            banco.setRolExamenId(vincularRol ? rol.getId() : null);
             banco.setMateriaCodigo(rol.getMateriaCodigo());
             banco.setMateriaNombre(rol.getMateriaNombre());
             banco.setGrupo(rol.getGrupo());
@@ -301,14 +342,18 @@ public class BancoPreguntasService {
                 reactivoRepository.save(r);
             }
 
-            rolExamenService.validarPorBanco(rol.getId(), hash, usuarioAuditoria);
+            if (vincularRol) {
+                rolExamenService.validarPorBanco(rol.getId(), hash, usuarioAuditoria);
+            }
 
             return CargaBancoResponseDto.builder()
                     .exito(true)
-                    .mensaje("Banco de preguntas validado y almacenado correctamente")
+                    .mensaje(vincularRol
+                            ? "Banco de preguntas validado y almacenado correctamente"
+                            : "Banco de preguntas validado y almacenado. Queda pendiente de asociar a la programación del examen.")
                     .bancoPreguntasId(bancoId)
-                    .rolExamenId(rol.getId())
-                    .nuevoEstado(EstadoFlujo.VALIDADO.getValor())
+                    .rolExamenId(vincularRol ? rol.getId() : null)
+                    .nuevoEstado(vincularRol ? EstadoFlujo.VALIDADO.getValor() : "PENDIENTE_DE_ROL")
                     .totalReactivos(totalPreguntas)
                     .facilesCount(faciles)
                     .mediasCount(medias)
@@ -382,6 +427,9 @@ public class BancoPreguntasService {
             errores.add("Fila " + (rowNum + 1) + ": enunciado vacío");
         }
         validarTexto("enunciado", enunciado, rowNum, 10000, errores);
+        if ("RESPUESTA_PREMISAS_ABCD".equals(tipoNormalizado) && !enunciadoPremisasValido(enunciado)) {
+            errores.add("Fila " + (rowNum + 1) + ": enunciado de A/B/Ambas/Ninguna debe contener exactamente 2 líneas no vacías: una para cada premisa");
+        }
 
         if (grupo.length() > 100) {
             errores.add("Fila " + (rowNum + 1) + ": grupo supera los 100 caracteres");
@@ -594,6 +642,12 @@ public class BancoPreguntasService {
                 errores.add("Fila " + (rowNum + 1) + ": " + campo + " contiene el error de fórmula " + errorFormula);
             }
         }
+    }
+
+    private boolean enunciadoPremisasValido(String enunciado) {
+        String normalizado = enunciado.replace("\r\n", "\n").replace('\r', '\n');
+        String[] lineas = normalizado.split("\\n", -1);
+        return lineas.length == 2 && Arrays.stream(lineas).allMatch(linea -> !linea.isBlank());
     }
 
     /**

@@ -17,4 +17,13 @@ public interface BancoPreguntasRepository extends JpaRepository<BancoPreguntas, 
     List<BancoPreguntas> findByRolExamenIdIn(Iterable<String> rolExamenIds);
 
     boolean existsByRolExamenIdAndHashSha256Integridad(String rolExamenId, String hashSha256Integridad);
+
+    Optional<BancoPreguntas> findTopByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
+            String materiaCodigo, String grupo, String tipoParcial);
+
+    List<BancoPreguntas> findByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
+            String materiaCodigo, String grupo, String tipoParcial);
+
+    boolean existsByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullAndHashSha256Integridad(
+            String materiaCodigo, String grupo, String tipoParcial, String hashSha256Integridad);
 }

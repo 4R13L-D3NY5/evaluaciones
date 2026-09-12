@@ -6,7 +6,7 @@ import { EvaluacionesStorageService } from '../../core/services/evaluaciones-sto
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
-import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
+import { BancoPreguntasContexto, BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import { AuthService } from '../../core/services/auth.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
@@ -353,15 +353,34 @@ export interface DiaCalendario {
                 <span>Este rol de examen ya está en <strong>{{ rol.estadoFlujo }}</strong>. Para reemplazar o volver a registrar el banco, primero debes restablecerlo a <strong>VALIDADO</strong> desde Evaluaciones del día, indicando el motivo.</span>
                 </div>
               }
-            } @else {
-              <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                <i class="pi pi-exclamation-triangle"></i>
-                <span>No existe un rol de examen oficial para esta materia, grupo y parcial. Ponte en contacto con tu director de carrera.</span>
+            } @else if (contextoBancoDisponible()) {
+              <div class="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950">
+                <i class="pi pi-exclamation-triangle mt-0.5"></i>
+                <div>
+                  <strong class="block">Grupo sin fecha programada todavía</strong>
+                  <span>Puedes cargar y validar el banco de preguntas. Se guardará como pendiente de rol y se asociará automáticamente cuando se registre la fecha del examen.</span>
+                </div>
               </div>
+              @if (cargandoBancoPersistido()) {
+                <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700">
+                  <i class="pi pi-spin pi-spinner"></i><span>Consultando banco de preguntas guardado...</span>
+                </div>
+              } @else {
+                @if (bancoPersistido(); as banco) {
+                  <div class="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-950">
+                    <i class="pi pi-check-circle text-emerald-700"></i>
+                    <span><strong>Banco pendiente de rol:</strong> {{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · Validado</span>
+                  </div>
+                } @else {
+                  <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                    <i class="pi pi-info-circle"></i><span>Este grupo todavía no tiene banco de preguntas cargado para {{ parcialActivo() }}.</span>
+                  </div>
+                }
+              }
             }
           </div>
           
-          @if (rolExamenActivo()) {
+          @if (contextoBancoDisponible()) {
             @if (esSinCartillaActivo()) {
             <!-- Flujo específico: examen presencial sin cartilla -->
             <div class="bg-card border border-emerald-200 rounded-2xl p-6 shadow-xs space-y-5">
@@ -416,6 +435,7 @@ export interface DiaCalendario {
               <!-- Botones de Acción: Forzar Previsualización PDF antes de Descargar o Previsualizar Encriptado -->
               @if (esBancoTotalmenteValido() && rolPuedeCargarBanco()) {
                 <div class="flex flex-wrap items-center gap-2.5 animate-fade-in">
+                  @if (rolExamenActivo()) {
                   
                   <!-- BOTÓN 1: PREVISUALIZAR PDF (OBLIGATORIO) -->
                   <button 
@@ -486,13 +506,24 @@ export interface DiaCalendario {
                       </button>
                     }
                   }
+                  }
+
+                  @if (!rolExamenActivo() && contextoBancoDisponible() && esBancoTotalmenteValido()) {
+                    <button
+                      (click)="aprobarDiagramacionPdf()"
+                      [disabled]="cargandoBanco()"
+                      class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all hover:scale-105 cursor-pointer disabled:opacity-50">
+                      <i class="pi pi-database text-sm"></i>
+                      <span>{{ cargandoBanco() ? 'Guardando...' : 'Guardar banco pendiente de rol' }}</span>
+                    </button>
+                  }
 
                 </div>
               }
             </div>
 
             <!-- Banner de Estado de Previsualización Obligatoria -->
-            @if (esBancoTotalmenteValido() && rolPuedeCargarBanco()) {
+            @if (rolExamenActivo() && esBancoTotalmenteValido() && rolPuedeCargarBanco()) {
               @if (!pdfPrevisualizadoYConforme()) {
                 <div class="p-4 bg-amber-500/10 border border-amber-300 dark:border-amber-700 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fade-in">
                   <div class="h-9 w-9 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 flex items-center justify-center shrink-0 mt-0.5 border border-amber-300">
@@ -537,7 +568,7 @@ export interface DiaCalendario {
               }
             }
 
-            @if (esBancoTotalmenteValido() && !rolPuedeCargarBanco()) {
+            @if (rolExamenActivo() && esBancoTotalmenteValido() && !rolPuedeCargarBanco()) {
               <div class="p-4 bg-amber-500/10 border border-amber-300 dark:border-amber-700 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fade-in">
                 <div class="h-9 w-9 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 flex items-center justify-center shrink-0 mt-0.5 border border-amber-300">
                   <i class="pi pi-lock text-base"></i>
@@ -837,8 +868,8 @@ export interface DiaCalendario {
             <div class="flex items-start gap-3 rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-4 text-xs text-muted-foreground">
               <i class="pi pi-arrow-up-right mt-0.5 text-purple-700"></i>
               <div>
-                <strong class="block text-foreground">Selecciona un rol de examen para continuar</strong>
-                <span>El cargador, la validación y las métricas aparecerán cuando exista una asignatura, grupo y parcial compatibles.</span>
+                <strong class="block text-foreground">Selecciona una asignatura y un grupo para continuar</strong>
+                <span>El cargador y la validación aparecerán cuando exista un contexto académico compatible.</span>
               </div>
             </div>
           }
@@ -2485,6 +2516,34 @@ export class BancoPreguntasComponent implements OnInit {
     return rolSeleccionado || null;
   });
 
+  public contextoBancoDisponible = computed(() => {
+    return !!this.sedeSeleccionada()
+      && !!this.carreraSeleccionada()
+      && !!this.asignaturaSeleccionada()
+      && !!this.grupoSeleccionado()
+      && !!this._mapParcialBackend(this.parcialActivo());
+  });
+
+  public contextoBanco = computed<BancoPreguntasContexto | null>(() => {
+    const sede = this.sedeSeleccionada();
+    const carrera = this.carreraSeleccionada();
+    const asignatura = this.asignaturaSeleccionada();
+    const grupo = this.grupos().find(item => item.code === this.grupoSeleccionado());
+    if (!sede || !carrera || !asignatura || !grupo || !this.contextoBancoDisponible()) return null;
+    return {
+      materiaCodigo: asignatura.courseCode,
+      materiaNombre: asignatura.courseName,
+      grupo: grupo.code,
+      tipoParcial: this._mapParcialBackend(this.parcialActivo()),
+      sedeCodigo: sede.code,
+      carreraCodigo: carrera.careerCode,
+      branchOfficeId: sede.branchOfficeId,
+      careerId: carrera.careerId,
+      syllabusCourseId: asignatura.syllabusCourseId,
+      seaGroupId: grupo.groupId
+    };
+  });
+
   public docenteOficialActivo = computed(() => {
     const rol = this.rolExamenActivo();
     return {
@@ -2495,7 +2554,9 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public rolPuedeCargarBanco = computed(() => {
-    const estado = this.rolExamenActivo()?.estadoFlujo;
+    const rol = this.rolExamenActivo();
+    if (!rol) return this.contextoBancoDisponible();
+    const estado = rol.estadoFlujo;
     return estado === 'PROGRAMADO' || estado === 'VALIDADO';
   });
 
@@ -2670,6 +2731,7 @@ export class BancoPreguntasComponent implements OnInit {
   public onGrupoChange(grupo: string): void {
     this.grupoSeleccionado.set(grupo);
     this._sincronizarRolSeleccionadoConContexto();
+    this._cargarBancoPersistido();
     this.pdfPrevisualizadoYConforme.set(false);
   }
 
@@ -2700,6 +2762,7 @@ export class BancoPreguntasComponent implements OnInit {
             : rolDeSeleccion?.grupo;
           this.grupoSeleccionado.set(codigoPreferido || data[0].code);
           this._sincronizarRolSeleccionadoConContexto();
+          this._cargarBancoPersistido();
         } else {
           const rol = this.rolesOficiales().find(r =>
             r.materiaCodigo === this.asignaturaSeleccionada()?.courseCode &&
@@ -2707,6 +2770,7 @@ export class BancoPreguntasComponent implements OnInit {
           );
           this.grupoSeleccionado.set(grupoPreferido || rol?.grupo || '');
           this._sincronizarRolSeleccionadoConContexto();
+          this._cargarBancoPersistido();
         }
       },
       error: () => {
@@ -2717,6 +2781,7 @@ export class BancoPreguntasComponent implements OnInit {
         );
         this.grupoSeleccionado.set(grupoPreferido || rol?.grupo || '');
         this._sincronizarRolSeleccionadoConContexto();
+        this._cargarBancoPersistido();
       }
     });
   }
@@ -3098,6 +3163,13 @@ export class BancoPreguntasComponent implements OnInit {
     if (error.includes('Respuesta en premisas')) {
       return { regla: 'Respuesta correcta', problema: 'La tipología de premisas solo admite las claves A, B, C o D.', correccion: 'Registra una de esas cuatro letras y verifica las dos premisas.' };
     }
+    if (error.includes('Enunciado de A/B/Ambas/Ninguna')) {
+      return {
+        regla: 'Formato del enunciado',
+        problema: 'El enunciado debe tener exactamente dos líneas no vacías.',
+        correccion: 'En la celda enunciado, escribe la primera premisa, pulsa Alt+Enter y escribe la segunda premisa. No agregues una tercera línea ni dejes líneas vacías.'
+      };
+    }
     if (error.includes('Requiere las 4 proposiciones')) {
       return { regla: 'Proposiciones 1–4', problema: 'Falta una o más proposiciones en las columnas opcion_a a opcion_d.', correccion: 'Completa exactamente las cuatro proposiciones y no uses opcion_e para esta tipología.' };
     }
@@ -3298,6 +3370,7 @@ export class BancoPreguntasComponent implements OnInit {
     this.parcialActivo.set(parcial as any);
     this.examenRolSeleccionadoId.set(null);
     this._sincronizarRolSeleccionadoConContexto();
+    this._cargarBancoPersistido();
     this.pdfPrevisualizadoYConforme.set(false);
     this._mostrarToast(`Examen configurado para ${parcial} (${this.getResumenCuota(parcial)}).`);
   }
@@ -3325,10 +3398,24 @@ export class BancoPreguntasComponent implements OnInit {
 
   private _cargarBancoPersistido(): void {
     const rol = this.rolExamenActivo();
+    const contexto = this.contextoBanco();
     this.bancoPersistido.set(null);
     this.documentoSinCartilla.set(null);
     this.archivoSinCartillaSeleccionado.set(null);
     this.cargandoBancoPersistido.set(false);
+    if (!rol && !contexto) return;
+
+    if (!rol && contexto) {
+      this.cargandoBancoPersistido.set(true);
+      this._bancoService.obtenerPorContexto(contexto).pipe(
+        catchError(() => of(null))
+      ).subscribe(banco => {
+        this.bancoPersistido.set(banco);
+        this.cargandoBancoPersistido.set(false);
+      });
+      return;
+    }
+
     if (!rol) return;
 
     if (rol.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
@@ -3795,6 +3882,9 @@ export class BancoPreguntasComponent implements OnInit {
           if (!['A', 'B', 'C', 'D'].includes(respNorm)) {
             errores.push('Respuesta en premisas debe ser A, B, C o D');
           }
+          if (!this.enunciadoPremisasValido(enunciadoRaw)) {
+            errores.push('Enunciado de A/B/Ambas/Ninguna debe contener exactamente 2 líneas no vacías: una para cada premisa');
+          }
         } else if (tipoNorm === 'VERDADERO_O_FALSO_COMPLEJAS') {
           if (!opA || !opB || !opC || !opD) {
             errores.push('Requiere las 4 proposiciones (1 a 4) en incisos A-D');
@@ -4001,6 +4091,11 @@ export class BancoPreguntasComponent implements OnInit {
       cursor = cierre + 1;
     }
     return null;
+  }
+
+  private enunciadoPremisasValido(valor: string): boolean {
+    const lineas = valor.replace(/\r\n?/g, '\n').split('\n');
+    return lineas.length === 2 && lineas.every(linea => linea.trim().length > 0);
   }
 
   private agrupadoresTypstBalanceados(valor: string): boolean {
@@ -4901,12 +4996,13 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
   public aprobarDiagramacionPdf(): void {
     const rol = this.rolExamenActivo();
+    const contexto = this.contextoBanco();
     const file = this.archivoExcelSeleccionado();
-    if (!rol) {
-      this._mostrarToast('No existe un rol de examen oficial para la selección actual.', 'error');
+    if (!rol && !contexto) {
+      this._mostrarToast('Selecciona una asignatura y un grupo oficiales antes de guardar el banco.', 'error');
       return;
     }
-    if (!this.rolPuedeCargarBanco()) {
+    if (rol && !this.rolPuedeCargarBanco()) {
       this._mostrarToast(`El rol de examen está en ${rol.estadoFlujo}. Restablécelo a VALIDADO antes de registrar el banco.`, 'error');
       return;
     }
@@ -4920,7 +5016,10 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     }
 
     this.cargandoBanco.set(true);
-    this._bancoService.cargarPorRol(rol.id, file).subscribe({
+    const carga$ = rol
+      ? this._bancoService.cargarPorRol(rol.id, file)
+      : this._bancoService.cargarPorContexto(contexto!, file);
+    carga$.subscribe({
       next: resultado => {
         this.cargandoBanco.set(false);
         if (!resultado.exito) {
@@ -4928,12 +5027,15 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
           return;
         }
 
-        this.pdfPrevisualizadoYConforme.set(true);
+        this.pdfPrevisualizadoYConforme.set(!!rol);
         this.dialogPrevisualizacionPdf.set(false);
         const sede = this.sedeSeleccionada();
         const carrera = this.carreraSeleccionada();
-        if (sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
-        this._mostrarToast(`Banco ${resultado.bancoPreguntasId} validado y registrado en PostgreSQL.`);
+        if (rol && sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
+        if (!rol) this._cargarBancoPersistido();
+        this._mostrarToast(rol
+          ? `Banco ${resultado.bancoPreguntasId} validado y registrado en PostgreSQL.`
+          : `Banco ${resultado.bancoPreguntasId} validado y guardado como pendiente de rol.`);
       },
       error: err => {
         this.cargandoBanco.set(false);
