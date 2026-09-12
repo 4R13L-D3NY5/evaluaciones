@@ -250,6 +250,7 @@ def _sanitize_math(math_text: str) -> str:
     # Typst antes de envolver palabras de texto para que no aparezcan como
     # texto literal en el PDF final. Nunca se alteran cadenas entre comillas.
     math_text = _replace_math_outside_quotes(math_text, r"\\(?:times|cdot)\b", "times", re.IGNORECASE)
+    math_text = _replace_math_outside_quotes(math_text, r"\s*\\equiv\s*", " equiv ", re.IGNORECASE)
     math_text = _replace_math_outside_quotes(math_text, r"\\(?:rightarrow|to)\b", "arrow", re.IGNORECASE)
     math_text = _replace_math_outside_quotes(math_text, r"\\pm\b", "plus.minus")
     math_text = _replace_math_outside_quotes(math_text, r"\+\s*-", "plus.minus")
@@ -262,7 +263,7 @@ def _sanitize_math(math_text: str) -> str:
         "sinh", "cosh", "tanh", "exp", "sqrt", "lim", "sum", "prod",
         "int", "pi", "alpha", "beta", "gamma", "delta", "epsilon",
         "theta", "lambda", "mu", "sigma", "omega", "phi", "psi",
-        "times", "arrow", "plus", "minus",
+        "times", "arrow", "equiv", "plus", "minus",
     }
 
     def _repl(match: re.Match) -> str:

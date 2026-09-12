@@ -329,8 +329,8 @@ class RolExamenServiceTest {
         when(mapper.toEntity(solicitud)).thenReturn(previsualizacion);
         when(unitepcGatewayClient.getGroups("2-2026", null, null, null))
                 .thenReturn(List.of(grupoOficial));
-        when(rolExamenRepository.findTopBySeaGroupIdAndTipoParcialOrderByVersionDesc(
-                "GROUP-1", solicitud.getTipoParcial()))
+        when(rolExamenRepository.findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                "GROUP-1", solicitud.getTipoParcial(), EstadoFlujo.SUSPENDIDO))
                 .thenReturn(Optional.of(RolExamen.builder().id("ROL-EXISTENTE").version(1).build()));
 
         assertThatThrownBy(() -> service.crear(solicitud))
@@ -338,6 +338,8 @@ class RolExamenServiceTest {
                 .hasMessageContaining("ya cuenta con una programación")
                 .hasMessageContaining("cambios deben registrarse manualmente");
 
+        verify(rolExamenRepository).findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                "GROUP-1", solicitud.getTipoParcial(), EstadoFlujo.SUSPENDIDO);
         verify(rolExamenRepository, never()).save(org.mockito.ArgumentMatchers.any(RolExamen.class));
         verify(rolExamenRepository, never()).existsById(org.mockito.ArgumentMatchers.anyString());
     }

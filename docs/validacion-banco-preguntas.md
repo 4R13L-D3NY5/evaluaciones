@@ -98,7 +98,7 @@ La carga anticipada usa `POST /api/bancos-preguntas/upload` con el contexto de s
 - Respuestas `AB`, `A/B`, `Apple`, respuestas descriptivas oficiales como `B: 1 y 3 son verdaderas`, `VERDADERO`, `FALSO` y vacía.
 - Dificultades `1`, `2`, `3`, vacía, decimal y texto inválido.
 - Pesos positivos, cero, negativos, texto y más de dos decimales.
-- Enunciados duplicados, fórmulas con error y `$` sin cerrar.
+- Enunciados duplicados, fórmulas con error, `$` sin cerrar y comandos Typst frecuentes como `\equiv` dentro de expresiones matemáticas.
 - Totales 59, 60 y 61; cuotas 14/31/15 (inválido por faltar fáciles) y 15/30/15 (válido). Un total de 61 o más es válido si también cumple todos los mínimos.
 - Rol en cada estado del flujo y segundo registro del mismo archivo.
 - Carga válida con grupo sin rol/fecha: debe mostrar advertencia, guardar el banco pendiente y permitir seleccionar el archivo.

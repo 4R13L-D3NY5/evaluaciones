@@ -39,6 +39,7 @@ Cada fila puede generar hasta cuatro roles:
 - Las observaciones se muestran antes de importar, con mensajes comprensibles para el usuario.
 - La visualización predeterminada de los listados se ordena por código de asignatura; los empates se ordenan por grupo, tipo de parcial y versión.
 - La importación dispone de una opción explícita para "Eliminar y subir nuevamente". Solo elimina coincidencias en `PROGRAMADO` o `VALIDADO`; los estados `GENERADO` y posteriores quedan protegidos.
+- En la validación de duplicados de la importación, los roles en estado `SUSPENDIDO` se consideran bajas lógicas y no bloquean una nueva programación para el mismo grupo y parcial.
 - La edición y eliminación individual solo están disponibles en `PROGRAMADO` o `VALIDADO`, y la regla también se valida en el backend.
 
 ## Persistencia y seguridad operativa
