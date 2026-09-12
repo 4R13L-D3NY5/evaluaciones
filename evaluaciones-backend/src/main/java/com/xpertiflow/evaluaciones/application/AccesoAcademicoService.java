@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -202,6 +203,45 @@ public class AccesoAcademicoService {
         }
         Set<String> carrerasPermitidas = codigosCarrerasPermitidas(authentication);
         return carrerasPermitidas == null || carrerasPermitidas.contains(normalizar(carreraCodigo));
+    }
+
+    /**
+     * Resuelve un grupo oficial dentro del alcance del usuario. Se usa para
+     * operaciones que todavía no tienen un rol de examen, como la carga
+     * anticipada de un banco de preguntas.
+     */
+    public GroupItemDto exigirGrupoAccesible(String sedeCodigo,
+                                              String carreraCodigo,
+                                              String branchOfficeId,
+                                              String careerId,
+                                              String syllabusCourseId,
+                                              String groupId,
+                                              String groupCode,
+                                              Authentication authentication) {
+        if (!puedeConsultarCarrera(sedeCodigo, carreraCodigo, authentication)) {
+            throw new AccessDeniedException("No tienes acceso a la sede o carrera seleccionada");
+        }
+
+        List<GroupItemDto> grupos = unitepcGatewayClient.getGroups(
+                GESTION_ACTIVA, branchOfficeId, careerId, syllabusCourseId);
+        Optional<GroupItemDto> grupo = filtrarGruposParaUsuario(grupos, authentication).stream()
+                .filter(item -> coincideGrupo(item, syllabusCourseId, groupId, groupCode))
+                .findFirst();
+        return grupo.orElseThrow(() -> new AccessDeniedException(
+                "El grupo seleccionado no pertenece al alcance académico del usuario"));
+    }
+
+    private boolean coincideGrupo(GroupItemDto grupo,
+                                  String syllabusCourseId,
+                                  String groupId,
+                                  String groupCode) {
+        if (syllabusCourseId != null && !syllabusCourseId.isBlank()
+                && !coincide(grupo.getSyllabusCourseId(), syllabusCourseId)) return false;
+        if (groupId != null && !groupId.isBlank()) {
+            return coincide(grupo.getGroupId(), groupId);
+        }
+        return groupCode != null && !groupCode.isBlank()
+                && coincide(grupo.getCode(), groupCode);
     }
 
     public void exigirAccesoRol(String rolExamenId, Authentication authentication) {

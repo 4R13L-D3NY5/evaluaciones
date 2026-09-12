@@ -220,11 +220,11 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
       <!-- Tarjetas de Estadísticas -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         
-        <!-- Total Plan de Estudios -->
+        <!-- Total de registros por grupo -->
         <div class="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
           <div class="space-y-0.5">
             <span class="text-3xl font-black text-primary font-mono">{{ totalPlan() }}</span>
-            <p class="text-xs font-bold text-muted-foreground">Total Plan de Estudios</p>
+            <p class="text-xs font-bold text-muted-foreground">Total registros por grupo</p>
           </div>
           <div class="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
             <i class="pi pi-book text-xl"></i>
@@ -272,7 +272,7 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                 <div>
                   <h3 class="text-sm font-black text-foreground">{{ sem.nombre }}</h3>
                   <p class="text-[11px] text-muted-foreground font-medium">
-                    {{ sem.asignaturas.length }} planes de estudio · {{ sem.horasTotales }} horas
+                    {{ sem.cursosTotales || sem.asignaturas.length }} asignaturas · {{ sem.asignaturas.length }} registros por grupo · {{ sem.horasTotales }} horas
                   </p>
                 </div>
               </div>
@@ -726,10 +726,15 @@ export class PlanEstudiosComponent implements OnInit {
   ): PlanEstudioSemestre[] {
     const rolesPorCurso = new Map<string, RolExamenResponse[]>();
     for (const rol of roles) {
-      const llave = rol.seaSyllabusCourseId || rol.materiaCodigo;
-      const actuales = rolesPorCurso.get(llave) || [];
-      actuales.push(rol);
-      rolesPorCurso.set(llave, actuales);
+      const llaves = [...new Set([
+        rol.seaSyllabusCourseId,
+        rol.materiaCodigo
+      ].map(llave => this.normalizarTexto(llave)).filter(Boolean))];
+      for (const llave of llaves) {
+        const actuales = rolesPorCurso.get(llave) || [];
+        if (!actuales.some(item => item.id === rol.id)) actuales.push(rol);
+        rolesPorCurso.set(llave, actuales);
+      }
     }
 
     const docente = this.auth.usuario()?.rol === 'DOCENTE';
@@ -740,12 +745,37 @@ export class PlanEstudiosComponent implements OnInit {
     const items: PlanEstudioItem[] = [];
     let id = 1;
     for (const curso of cursosVisibles) {
-      const rolesCurso = rolesPorCurso.get(curso.syllabusCourseId) || [];
-      const gruposCurso = grupos.filter(grupo => grupo.syllabusCourseId === curso.syllabusCourseId);
+      const rolesCurso = rolesPorCurso.get(this.normalizarTexto(curso.syllabusCourseId)) || [];
+      const gruposCurso = grupos.filter(grupo =>
+        this.normalizarTexto(grupo.syllabusCourseId) === this.normalizarTexto(curso.syllabusCourseId)
+      );
+      const gruposUnicos = this.deduplicarGrupos(gruposCurso, curso.syllabusCourseId);
 
-      // El grupo/docente proviene del catálogo SEA aunque todavía no exista
-      // un rol de examen. Los roles solo complementan el estado del parcial.
-      items.push(this.crearItemPlan(curso, gruposCurso, rolesCurso, id++, bancosPorRol));
+      // Cada grupo tiene su propia asignación, banco y seguimiento de examen.
+      // Por eso no se deben mezclar varios grupos en una misma fila.
+      if (gruposUnicos.length > 0) {
+        for (const grupo of gruposUnicos) {
+          const rolesDelGrupo = rolesCurso.filter(rol => this.rolPerteneceAlGrupo(rol, grupo));
+          items.push(this.crearItemPlan(curso, [grupo], rolesDelGrupo, id++, bancosPorRol));
+        }
+        continue;
+      }
+
+      // Respaldo para roles históricos o respuestas incompletas de SEA que no
+      // traen el catálogo de grupos, pero sí conservan el código del grupo.
+      const codigosGrupo = [...new Set(
+        rolesCurso.map(rol => rol.grupo?.trim()).filter(Boolean)
+      )] as string[];
+      if (codigosGrupo.length > 0) {
+        for (const codigoGrupo of codigosGrupo) {
+          const rolesDelGrupo = rolesCurso.filter(rol => this.normalizarTexto(rol.grupo) === this.normalizarTexto(codigoGrupo));
+          items.push(this.crearItemPlan(curso, [], rolesDelGrupo, id++, bancosPorRol));
+        }
+      } else {
+        // Las asignaturas vacantes siguen visibles para que puedan ser
+        // identificadas y asignadas posteriormente.
+        items.push(this.crearItemPlan(curso, [], rolesCurso, id++, bancosPorRol));
+      }
     }
 
     const porSemestre = new Map<number, PlanEstudioItem[]>();
@@ -756,12 +786,19 @@ export class PlanEstudiosComponent implements OnInit {
 
     return [...porSemestre.entries()]
       .sort(([semestreA], [semestreB]) => semestreA - semestreB)
-      .map(([numero, asignaturas]) => ({
-        numero,
-        nombre: numero > 0 ? `${numero}° Semestre` : 'Sin semestre asignado',
-        horasTotales: asignaturas.reduce((total, item) => total + item.horas, 0),
-        asignaturas
-      }));
+      .map(([numero, asignaturas]) => {
+        const cursosUnicos = new Map<string, number>();
+        for (const item of asignaturas) {
+          if (!cursosUnicos.has(item.codigo)) cursosUnicos.set(item.codigo, item.horas);
+        }
+        return {
+          numero,
+          nombre: numero > 0 ? `${numero}° Semestre` : 'Sin semestre asignado',
+          cursosTotales: cursosUnicos.size,
+          horasTotales: [...cursosUnicos.values()].reduce((total, horas) => total + horas, 0),
+          asignaturas
+        };
+      });
   }
 
   private crearItemPlan(
@@ -773,9 +810,7 @@ export class PlanEstudiosComponent implements OnInit {
   ): PlanEstudioItem {
     const rolPrincipal = roles[0];
     const grupoPrincipal = grupos[0];
-    const gruposUnicos = grupos.filter((grupo, indice, lista) =>
-      lista.findIndex(item => item.groupId === grupo.groupId) === indice
-    );
+    const gruposUnicos = this.deduplicarGrupos(grupos, curso.syllabusCourseId);
     const gruposLabel = gruposUnicos.map(grupo => grupo.code).filter(Boolean).join(' · ');
     const docentesGrupo = gruposUnicos.map(grupo => {
       const rolGrupo = roles.find(rol => (rol.grupo || '').trim() === grupo.code);
@@ -844,6 +879,37 @@ export class PlanEstudiosComponent implements OnInit {
       estadoExamen2P: this.mapEstadoLegacy(examenes['2P'].estado),
       estadoExamenFinal: this.mapEstadoLegacy(examenes['FINAL'].estado)
     };
+  }
+
+  private rolPerteneceAlGrupo(rol: RolExamenResponse, grupo: GroupItem): boolean {
+    const rolGroupId = this.normalizarTexto(rol.seaGroupId);
+    const grupoId = this.normalizarTexto(grupo.groupId);
+    if (rolGroupId && grupoId && rolGroupId === grupoId) return true;
+    return !rolGroupId
+      && this.normalizarTexto(rol.grupo) === this.normalizarTexto(grupo.code);
+  }
+
+  /**
+   * El catálogo puede devolver varias filas del mismo grupo por horario o
+   * puede omitir groupId en respuestas históricas. En ese caso no se debe
+   * usar un valor vacío como clave común, porque terminaría fusionando todos
+   * los grupos de una asignatura en una sola fila.
+   */
+  private deduplicarGrupos(grupos: GroupItem[], syllabusCourseId: string): GroupItem[] {
+    const vistos = new Set<string>();
+    return grupos.filter(grupo => {
+      const groupId = this.normalizarTexto(grupo.groupId);
+      const code = this.normalizarTexto(grupo.code);
+      const curso = this.normalizarTexto(grupo.syllabusCourseId || syllabusCourseId);
+      const clave = groupId
+        ? `id:${groupId}`
+        : code
+          ? `curso:${curso}::codigo:${code}`
+          : `curso:${curso}::docente:${this.normalizarTexto(grupo.teacherIdentityNumber || grupo.teacherName || grupo.teacherFullName)}`;
+      if (vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    });
   }
 
   private aResumenDificultad(info: PlanExamenResumen): { facil: number; medio: number; dificil: number; total: number } {

@@ -139,6 +139,33 @@ class BancoPreguntasServiceTest {
     }
 
     @Test
+    void cargaValidaBancoSinRolYLoDejaPendienteDeVinculacion() throws Exception {
+        MockMultipartFile archivo = crearExcel(60);
+        when(rolRepository.findFirstByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujo(
+                "PRD-314", "TA-01", TipoParcial.PRIMER_PARCIAL, EstadoFlujo.PROGRAMADO))
+                .thenReturn(Optional.empty());
+        when(rolRepository.findFirstByMateriaCodigoAndGrupoAndTipoParcialOrderByCreadoEnDesc(
+                "PRD-314", "TA-01", TipoParcial.PRIMER_PARCIAL))
+                .thenReturn(Optional.empty());
+
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcelPorParametros(
+                "PRD-314", "Prótesis Dental", "TA-01", "1er Parcial", archivo,
+                "Docente SEA", null);
+
+        assertThat(respuesta.isExito()).isTrue();
+        assertThat(respuesta.getRolExamenId()).isNull();
+        assertThat(respuesta.getNuevoEstado()).isEqualTo("PENDIENTE_DE_ROL");
+        assertThat(respuesta.getMensaje()).contains("pendiente de asociar");
+        verify(rolExamenService, never()).validarPorBanco(anyString(), anyString(), anyString());
+
+        ArgumentCaptor<BancoPreguntas> banco = ArgumentCaptor.forClass(BancoPreguntas.class);
+        verify(bancoRepository).save(banco.capture());
+        assertThat(banco.getValue().getRolExamenId()).isNull();
+        assertThat(banco.getValue().getMateriaCodigo()).isEqualTo("PRD-314");
+        assertThat(banco.getValue().getGrupo()).isEqualTo("TA-01");
+    }
+
+    @Test
     void cargaInvalidaNoPersisteDatosNiCambiaElRol() throws Exception {
         MockMultipartFile archivo = crearExcel(59);
         when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
@@ -188,6 +215,31 @@ class BancoPreguntasServiceTest {
         assertThat(respuesta.isExito()).isTrue();
         assertThat(respuesta.getErroresValidacion()).isEmpty();
         verify(reactivoRepository, times(60)).save(any(Reactivo.class));
+    }
+
+    @Test
+    void rechazaPremisasCuandoElEnunciadoNoTieneDosLineas() throws Exception {
+        MockMultipartFile archivo = crearExcel(60, new String[]{"Respuesta A/B/Ambas/Ninguna"});
+        try (XSSFWorkbook workbook = new XSSFWorkbook(archivo.getInputStream());
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            workbook.getSheet("Banco").getRow(1).getCell(2).setCellValue("Solo se registró una premisa");
+            workbook.write(output);
+            archivo = new MockMultipartFile(
+                    "file", "premisas-sin-dos-lineas.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    output.toByteArray());
+        }
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(
+                rol.getId(), archivo, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isFalse();
+        assertThat(respuesta.getErroresValidacion())
+                .anyMatch(error -> error.contains("enunciado de A/B/Ambas/Ninguna")
+                        && error.contains("exactamente 2 líneas"));
+        verify(bancoRepository, never()).save(any());
+        verify(reactivoRepository, never()).save(any());
     }
 
     @Test
@@ -327,10 +379,13 @@ class BancoPreguntasServiceTest {
                 String tipo = tipos[(indice - 1) % tipos.length];
                 row.createCell(0).setCellValue(tipo);
                 row.createCell(1).setCellValue("Unidad " + indice);
-                row.createCell(2).setCellValue("Pregunta oficial " + indice);
+                boolean premisas = tipo.toUpperCase().contains("RESPUESTA A/B") || tipo.toUpperCase().contains("PREMISA");
+                String enunciado = premisas
+                        ? "Primera premisa de la pregunta " + indice + "\nSegunda premisa de la pregunta " + indice
+                        : "Pregunta oficial " + indice;
+                row.createCell(2).setCellValue(enunciado);
                 boolean vfSimple = tipo.toUpperCase().contains("VERDADERO O FALSO SIMPLE");
                 boolean vfCompleja = tipo.toUpperCase().contains("VERDADERO O FALSO COMPLEJ");
-                boolean premisas = tipo.toUpperCase().contains("RESPUESTA A/B") || tipo.toUpperCase().contains("PREMISA");
                 boolean emparejamiento = tipo.toUpperCase().contains("EMPAREJAMIENTO");
                 boolean subitem = tipo.toUpperCase().contains("SUBÍTEM") || tipo.toUpperCase().contains("SUBITEM");
                 boolean emparejamientoHijo = emparejamiento && !subitem;

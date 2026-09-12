@@ -13,6 +13,7 @@ export interface PlanEstudioSemestre {
   numero: number;
   nombre: string;
   horasTotales: number;
+  cursosTotales?: number;
   asignaturas: PlanEstudioItem[];
 }
 

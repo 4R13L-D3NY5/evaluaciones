@@ -1739,7 +1739,7 @@ interface CampusDisponible extends Campus {
                   <div class="text-right text-[10px] text-slate-500"><strong class="block text-slate-900">Fecha: {{ formatearFechaReporteDiario() }}</strong><span>{{ evaluacionesParaReporteDiario().length }} evaluaciones</span></div>
                 </div>
                 <div class="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[10px]"><span><strong class="text-slate-500">CAMPUS</strong><br>{{ campusSeleccionado()?.name || 'Todos' }}</span><span><strong class="text-slate-500">SEDE</strong><br>{{ sedeSeleccionada()?.name || 'Todas' }}</span><span><strong class="text-slate-500">CARRERA</strong><br>{{ etiquetaCarreraSeleccionada() }}</span><span><strong class="text-slate-500">PARCIAL</strong><br>{{ filtroParcial }}</span></div>
-                <div class="mt-4 overflow-x-auto"><table class="w-full text-[10px]"><thead><tr class="bg-indigo-950 text-white text-left uppercase tracking-wide"><th class="p-2 text-center">N°</th><th class="p-2">Hora</th><th class="p-2">Materia / grupo</th><th class="p-2">Docente</th><th class="p-2 text-center">Modalidad</th><th class="p-2 text-center">Recojo</th><th class="p-2 text-center">Cant.</th><th class="p-2">Firma</th><th class="p-2 text-center">Dev.</th><th class="p-2 text-center">Cant.</th><th class="p-2">Firma</th><th class="p-2">Observaciones</th></tr></thead><tbody>@for (item of evaluacionesParaReporteDiario(); track item.id) {<tr class="border-b border-slate-200"><td class="p-2 text-center font-bold">{{ $index + 1 }}</td><td class="p-2 font-mono font-bold">{{ item.hora || item.horario || '-' }}</td><td class="p-2"><strong>{{ item.codigo }} - {{ item.materia }}</strong><br><span class="text-[9px] text-slate-500">{{ item.carreraNombre || item.careerCode }} - {{ item.grupo }}</span></td><td class="p-2">{{ item.docenteNombre || '-' }}</td><td class="p-2 text-center">{{ etiquetaModalidad(item) }}</td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td></tr>} @if (!evaluacionesParaReporteDiario().length) {<tr><td colspan="12" class="p-5 text-center text-slate-500">No hay evaluaciones para la fecha seleccionada.</td></tr>}</tbody></table></div>
+                <div class="mt-4 overflow-x-auto"><table class="w-full text-[10px]"><thead><tr class="bg-indigo-950 text-white text-left uppercase tracking-wide"><th class="p-2.5 text-center">N°</th><th class="p-2.5">Hora</th><th class="p-2.5">Materia / grupo</th><th class="p-2.5">Docente</th><th class="p-2.5 text-center">Modalidad</th><th class="p-2.5 text-center">Recojo</th><th class="p-2.5 text-center">Cant.</th><th class="p-2.5">Firma</th><th class="p-2.5 text-center">Dev.</th><th class="p-2.5 text-center">Cant.</th><th class="p-2.5">Firma</th><th class="p-2.5">Observaciones</th></tr></thead><tbody>@for (item of evaluacionesParaReporteDiario(); track item.id) {<tr class="border-b border-slate-200 align-middle"><td class="p-2.5 text-center font-bold">{{ $index + 1 }}</td><td class="p-2.5 font-mono font-bold">{{ item.hora || item.horario || '-' }}</td><td class="p-2.5"><strong>{{ item.codigo }} - {{ item.materia }}</strong><br><span class="text-[9px] text-slate-500">{{ item.carreraNombre || item.careerCode }} - <strong class="text-slate-900">{{ item.grupo }}</strong></span></td><td class="p-2.5">{{ item.docenteNombre || '-' }}</td><td class="p-2.5 text-center">{{ etiquetaModalidad(item) }}</td><td class="p-2.5"></td><td class="p-2.5"></td><td class="p-2.5"></td><td class="p-2.5"></td><td class="p-2.5"></td><td class="p-2.5"></td><td class="p-2.5"></td></tr>} @if (!evaluacionesParaReporteDiario().length) {<tr><td colspan="12" class="p-5 text-center text-slate-500">No hay evaluaciones para la fecha seleccionada.</td></tr>}</tbody></table></div>
               </div>
             </div>
             <div class="bg-muted/60 border-t border-border p-3 flex items-center justify-end shrink-0">
@@ -2574,6 +2574,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }
 
     return [...list].sort((a, b) => {
+      const fecha = (a.fecha || '').localeCompare(b.fecha || '');
+      if (fecha !== 0) return fecha;
+      const hora = this.compararHoraEvaluacion(a, b);
+      if (hora !== 0) return hora;
       const codigo = a.codigo.localeCompare(b.codigo, 'es', { numeric: true, sensitivity: 'base' });
       if (codigo !== 0) return codigo;
       const grupo = a.grupo.localeCompare(b.grupo, 'es', { numeric: true, sensitivity: 'base' });
@@ -2584,6 +2588,17 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return (a.version || 1) - (b.version || 1);
     });
   });
+
+  private compararHoraEvaluacion(a: EvaluacionItemUI, b: EvaluacionItemUI): number {
+    return this.valorHoraEvaluacion(a) - this.valorHoraEvaluacion(b);
+  }
+
+  private valorHoraEvaluacion(item: EvaluacionItemUI): number {
+    const textoHora = String(item.hora || item.horario || '');
+    const coincidencia = textoHora.match(/(\d{1,2}):(\d{2})/);
+    if (!coincidencia) return Number.MAX_SAFE_INTEGER;
+    return Number(coincidencia[1]) * 60 + Number(coincidencia[2]);
+  }
 
   public ngOnInit(): void {
     this.ratioEstudiantesPorVariante.set(
@@ -4769,7 +4784,14 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public evaluacionesParaReporteDiario(): EvaluacionItemUI[] {
     const fechaFinal = this.filtroFechaFin || this.fechaActualLocal();
-    return this.evaluacionesFiltradas().filter(item => item.fecha === fechaFinal);
+    return this.evaluacionesFiltradas()
+      .filter(item => item.fecha === fechaFinal)
+      .slice()
+      .sort((a, b) => {
+        const hora = this.compararHoraEvaluacion(a, b);
+        if (hora !== 0) return hora;
+        return a.codigo.localeCompare(b.codigo, 'es', { numeric: true, sensitivity: 'base' });
+      });
   }
 
   public formatearFechaReporteDiario(): string {
@@ -4797,12 +4819,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const ink = { r: 20, g: 29, b: 49 };
     const muted = { r: 91, g: 105, b: 128 };
     const grid = { r: 205, g: 214, b: 228 };
-    const soft = { r: 246, g: 248, b: 252 };
-    const modalidadColor = (item: EvaluacionItemUI): { r: number; g: number; b: number } => {
-      if (item.modalidad === 'VIRTUAL') return { r: 126, g: 58, b: 237 };
-      if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') return { r: 180, g: 83, b: 9 };
-      return { r: 15, g: 118, b: 110 };
-    };
+    const soft = { r: 248, g: 249, b: 251 };
     const texto = (valor: unknown, fallback = '-'): string => {
       const limpio = String(valor ?? '').trim();
       return limpio || fallback;
@@ -4811,51 +4828,72 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return pdf.splitTextToSize(texto(valor, fallback), ancho) as string[];
     };
     const dibujarEncabezado = (numeroPagina: number): number => {
-      pdf.setFillColor(purple.r, purple.g, purple.b);
-      pdf.rect(0, 0, pageWidth, 22, 'F');
-      pdf.setTextColor(255, 255, 255);
+      // Cabecera clara y monocromática, alineada con la previsualización.
+      // El contraste se conserva al imprimir en blanco y negro.
+      pdf.setTextColor(purple.r, purple.g, purple.b);
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9);
-      pdf.text('UNITEPC', margin, 9);
-      pdf.setFontSize(13);
-      pdf.text('REPORTE DIARIO DE SEGUIMIENTO DE EVALUACIONES', margin, 16);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
-      pdf.text('CONTROL DE ENTREGA Y RECEPCION', pageWidth - margin, 9, { align: 'right' });
-      pdf.text(`Pagina ${numeroPagina}`, pageWidth - margin, 16, { align: 'right' });
-
+      pdf.setFontSize(9.5);
+      pdf.text('SISTEMA DE EVALUACIONES UNITEPC', margin, 10);
       pdf.setTextColor(ink.r, ink.g, ink.b);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7.5);
-      pdf.text(`CAMPUS: ${texto(this.campusSeleccionado()?.name, 'Todos').toUpperCase()}`, margin, 32);
-      pdf.text(`SEDE: ${texto(this.sedeSeleccionada()?.name, 'Todas').toUpperCase()}`, pageWidth / 2 - 35, 32);
-      pdf.text(`FECHA: ${this.formatearFechaReporteDiario()}`, pageWidth - margin, 32, { align: 'right' });
+      pdf.setFontSize(13);
+      pdf.text('REPORTE DIARIO DE SEGUIMIENTO', margin, 18);
       pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(muted.r, muted.g, muted.b);
       pdf.setFontSize(7);
-      pdf.text(`Carrera: ${texto(this.etiquetaCarreraSeleccionada(), 'Todas')}`, margin, 38, { maxWidth: pageWidth / 2 - margin - 8 });
-      pdf.text(`Parcial: ${texto(this.filtroParcial, 'Todos')}  |  Total: ${items.length} evaluacion(es)`, pageWidth - margin, 38, { align: 'right' });
-      return 44;
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text('Control de entrega y recepción de evaluaciones', margin, 24);
+      pdf.text(`Fecha: ${this.formatearFechaReporteDiario()}`, pageWidth - margin, 10, { align: 'right' });
+      pdf.text(`${items.length} evaluaciones`, pageWidth - margin, 15, { align: 'right' });
+      pdf.text(`Página ${numeroPagina}`, pageWidth - margin, 20, { align: 'right' });
+
+      pdf.setDrawColor(purple.r, purple.g, purple.b);
+      pdf.setLineWidth(0.7);
+      pdf.line(margin, 29, pageWidth - margin, 29);
+
+      const metaY = 34;
+      const metaHeight = 16;
+      pdf.setFillColor(246, 247, 249);
+      pdf.setDrawColor(grid.r, grid.g, grid.b);
+      pdf.roundedRect(margin, metaY, contentWidth, metaHeight, 2, 2, 'FD');
+      const meta = [
+        ['CAMPUS', texto(this.campusSeleccionado()?.name, 'Todos')],
+        ['SEDE', texto(this.sedeSeleccionada()?.name, 'Todas')],
+        ['CARRERA', texto(this.etiquetaCarreraSeleccionada(), 'Todas')],
+        ['PARCIAL', texto(this.filtroParcial, 'Todos')]
+      ];
+      const metaWidth = contentWidth / meta.length;
+      meta.forEach(([label, value], index) => {
+        const x = margin + index * metaWidth + 4;
+        if (index > 0) pdf.line(margin + index * metaWidth, metaY + 2, margin + index * metaWidth, metaY + metaHeight - 2);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(muted.r, muted.g, muted.b);
+        pdf.text(label, x, metaY + 6);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7);
+        pdf.setTextColor(ink.r, ink.g, ink.b);
+        pdf.text(pdf.splitTextToSize(value, metaWidth - 8) as string[], x, metaY + 11, { maxWidth: metaWidth - 8 });
+      });
+      return 54;
     };
     const columnWidths = [9, 18, 62, 50, 26, 18, 12, 25, 18, 12, 25, 31];
     const headers = ['N°', 'HORA', 'MATERIA / GRUPO', 'DOCENTE', 'MODALIDAD', 'H. RECOJO', 'CANT.', 'FIRMA', 'H. DEV.', 'CANT.', 'FIRMA', 'OBSERVACIONES'];
-    const headerHeight = 10;
+    const headerHeight = 9;
     let page = 1;
     let y = dibujarEncabezado(page);
     const dibujarCabeceraTabla = (): void => {
-      pdf.setFillColor(purple.r, purple.g, purple.b);
+      pdf.setFillColor(232, 234, 239);
       pdf.rect(margin, y, contentWidth, headerHeight, 'F');
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(6.3);
-      pdf.setTextColor(255, 255, 255);
+      pdf.setTextColor(ink.r, ink.g, ink.b);
       let x = margin;
       headers.forEach((header, index) => {
         const align = [0, 1, 4, 5, 6, 8, 9].includes(index) ? 'center' : 'left';
         const textX = align === 'center' ? x + columnWidths[index] / 2 : x + 2;
         const headerLines = pdf.splitTextToSize(header, columnWidths[index] - 3) as string[];
-        pdf.setDrawColor(116, 96, 160);
+        pdf.setDrawColor(grid.r, grid.g, grid.b);
         pdf.rect(x, y, columnWidths[index], headerHeight, 'S');
-        pdf.text(headerLines, textX, y + (headerLines.length > 1 ? 4.2 : 6), { align, maxWidth: columnWidths[index] - 3 });
+        pdf.text(headerLines, textX, y + (headerLines.length > 1 ? 3.8 : 5.8), { align, maxWidth: columnWidths[index] - 3 });
         x += columnWidths[index];
       });
       y += headerHeight;
@@ -4864,9 +4902,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
     items.forEach((item, indice) => {
       const materia = textoCortado(`${texto(item.codigo)} - ${texto(item.materia)}`, columnWidths[2] - 4).slice(0, 1);
-      const grupo = textoCortado(`${texto(item.carreraNombre || item.careerCode)} - ${texto(item.grupo)}`, columnWidths[2] - 4, '').slice(0, 1);
+      const carrera = texto(item.carreraNombre || item.careerCode, '');
+      const grupo = texto(item.grupo);
       const docente = textoCortado(item.docenteNombre, columnWidths[3] - 4).slice(0, 2);
-      const rowHeight = 10.5;
+      const rowHeight = 10.2;
       if (y + rowHeight > pageHeight - 14) {
         pdf.setDrawColor(grid.r, grid.g, grid.b);
         pdf.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
@@ -4899,12 +4938,26 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       };
       dibujarTexto([String(indice + 1)], columnWidths[0], 'center', true);
       dibujarTexto([texto(item.hora || item.horario)], columnWidths[1], 'center', true);
-      dibujarTexto(materia.concat(grupo), columnWidths[2], 'left', true);
+      const materiaX = x;
+      dibujarTexto(materia, columnWidths[2], 'left', true);
+      // Código y asignatura quedan destacados; la segunda línea conserva el
+      // grupo visible y separado para facilitar la clasificación manual.
+      const grupoEtiqueta = `GRUPO: ${grupo}`;
+      const anchoGrupo = pdf.getTextWidth(grupoEtiqueta) + 1;
+      const anchoCarrera = Math.max(8, columnWidths[2] - 6 - anchoGrupo);
+      const carreraCorta = pdf.splitTextToSize(carrera, anchoCarrera) as string[];
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(5.2);
+        pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(carreraCorta[0] || '', materiaX + 2, y + 7.1, { maxWidth: anchoCarrera });
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(5.2);
+      pdf.setTextColor(ink.r, ink.g, ink.b);
+      pdf.text(grupoEtiqueta, materiaX + columnWidths[2] - 2, y + 7.1, { align: 'right', maxWidth: anchoGrupo });
       dibujarTexto(docente, columnWidths[3]);
-      const color = modalidadColor(item);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(5.6);
-      pdf.setTextColor(color.r, color.g, color.b);
+      pdf.setTextColor(ink.r, ink.g, ink.b);
       pdf.text(pdf.splitTextToSize(texto(this.etiquetaModalidad(item)), columnWidths[4] - 4) as string[], x + columnWidths[4] / 2, y + 3.3, { align: 'center', maxWidth: columnWidths[4] - 4 });
       x += columnWidths[4];
       [5, 6, 7, 8, 9, 10, 11].forEach(index => {

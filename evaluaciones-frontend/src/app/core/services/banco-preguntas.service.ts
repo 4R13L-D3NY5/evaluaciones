@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -35,6 +35,19 @@ export interface CargaBancoResponse {
   erroresValidacion: string[];
 }
 
+export interface BancoPreguntasContexto {
+  materiaCodigo: string;
+  materiaNombre: string;
+  grupo: string;
+  tipoParcial: string;
+  sedeCodigo: string;
+  carreraCodigo: string;
+  branchOfficeId: string;
+  careerId: string;
+  syllabusCourseId: string;
+  seaGroupId: string;
+}
+
 /**
  * Servicio frontend para consultar bancos de preguntas cargados en el backend.
  */
@@ -68,6 +81,56 @@ export class BancoPreguntasService {
     return this._http.post<CargaBancoResponse>(`${this._baseUrl}/${rolExamenId}/upload`, formData).pipe(
       catchError(err => {
         console.error(`[BancoPreguntasService] Error al cargar banco para rol ${rolExamenId}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public obtenerPorContexto(
+    contexto: BancoPreguntasContexto
+  ): Observable<BancoPreguntasResponse> {
+    let params = new HttpParams()
+      .set('materiaCodigo', contexto.materiaCodigo)
+      .set('grupo', contexto.grupo)
+      .set('tipoParcial', contexto.tipoParcial)
+      .set('sedeCodigo', contexto.sedeCodigo)
+      .set('carreraCodigo', contexto.carreraCodigo)
+      .set('branchOfficeId', contexto.branchOfficeId)
+      .set('careerId', contexto.careerId)
+      .set('syllabusCourseId', contexto.syllabusCourseId)
+      .set('seaGroupId', contexto.seaGroupId);
+    return this._http.get<BancoPreguntasResponse>(`${this._baseUrl}/contexto`, { params }).pipe(
+      catchError(err => {
+        console.error('[BancoPreguntasService] Error al obtener banco pendiente de rol:', err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public cargarPorContexto(
+    contexto: BancoPreguntasContexto,
+    file: File,
+    docenteAprobador?: string
+  ): Observable<CargaBancoResponse> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    if (docenteAprobador) formData.append('docenteAprobador', docenteAprobador);
+
+    let params = new HttpParams()
+      .set('materiaCodigo', contexto.materiaCodigo)
+      .set('materiaNombre', contexto.materiaNombre)
+      .set('grupo', contexto.grupo)
+      .set('tipoParcial', contexto.tipoParcial)
+      .set('sedeCodigo', contexto.sedeCodigo)
+      .set('carreraCodigo', contexto.carreraCodigo)
+      .set('branchOfficeId', contexto.branchOfficeId)
+      .set('careerId', contexto.careerId)
+      .set('syllabusCourseId', contexto.syllabusCourseId)
+      .set('seaGroupId', contexto.seaGroupId);
+
+    return this._http.post<CargaBancoResponse>(`${this._baseUrl}/upload`, formData, { params }).pipe(
+      catchError(err => {
+        console.error('[BancoPreguntasService] Error al cargar banco pendiente de rol:', err);
         return throwError(() => err);
       })
     );
