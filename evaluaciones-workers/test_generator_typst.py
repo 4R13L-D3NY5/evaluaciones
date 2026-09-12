@@ -17,12 +17,18 @@ class FormulasTypstTest(unittest.TestCase):
         '$ "Reparo" = 150.000 times 25% $',
         '$ x = (-b + sqrt(b^2 - 4a c)) / (2a) $',
         '$ H_2 S O_4 + 2 N a O H arrow N a_2 S O_4 + H_2 O $',
+        '$ C\\equiv C $',
     ]
 
     def test_preserva_texto_entre_comillas(self):
         resultado = generator._sanitize_math('"Reparo" = 150.000 times 25%')
         self.assertEqual(resultado, '"Reparo" = 150.000 times 25%')
         self.assertNotIn('""Reparo""', resultado)
+
+    def test_convierte_equiv_tex_a_typst(self):
+        resultado = generator._sanitize_math(r'C\equiv C')
+        self.assertEqual(resultado, 'C equiv C')
+        self.assertNotIn('\\"equiv"', resultado)
 
     def test_limpia_prefijos_de_inciso_y_no_duplica_cuadro_de_caso(self):
         opciones = json.dumps([

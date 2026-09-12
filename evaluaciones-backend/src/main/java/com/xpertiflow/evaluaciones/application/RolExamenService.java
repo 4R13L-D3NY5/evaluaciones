@@ -462,12 +462,12 @@ public class RolExamenService {
     private int siguienteVersion(RolExamenRequestDto dto) {
         Optional<RolExamen> ultimo = Optional.empty();
         if (dto.getSeaGroupId() != null && !dto.getSeaGroupId().isBlank()) {
-            ultimo = rolExamenRepository.findTopBySeaGroupIdAndTipoParcialOrderByVersionDesc(
-                    dto.getSeaGroupId(), dto.getTipoParcial());
+            ultimo = rolExamenRepository.findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                    dto.getSeaGroupId(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO);
         }
         if (ultimo.isEmpty()) {
-            ultimo = rolExamenRepository.findTopByMateriaCodigoAndGrupoAndTipoParcialOrderByVersionDesc(
-                    dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial());
+            ultimo = rolExamenRepository.findTopByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                    dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO);
         }
         return ultimo.map(rol -> rol.getVersion() == null ? 1 : rol.getVersion() + 1).orElse(1);
     }
@@ -479,12 +479,12 @@ public class RolExamenService {
      */
     private boolean existeProgramacionParaImportacion(RolExamenRequestDto dto) {
         if (dto.getSeaGroupId() != null && !dto.getSeaGroupId().isBlank()
-                && rolExamenRepository.findTopBySeaGroupIdAndTipoParcialOrderByVersionDesc(
-                dto.getSeaGroupId(), dto.getTipoParcial()).isPresent()) {
+                && rolExamenRepository.findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                dto.getSeaGroupId(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO).isPresent()) {
             return true;
         }
-        return rolExamenRepository.findTopByMateriaCodigoAndGrupoAndTipoParcialOrderByVersionDesc(
-                dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial()).isPresent();
+        return rolExamenRepository.findTopByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO).isPresent();
     }
 
     private String construirId(RolExamenRequestDto dto, int version) {
