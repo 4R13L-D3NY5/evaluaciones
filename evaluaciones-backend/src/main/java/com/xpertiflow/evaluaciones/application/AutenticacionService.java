@@ -102,6 +102,7 @@ public class AutenticacionService {
             case "DOCENTE" -> "Docente";
             case "VICERRECTOR" -> "Vicerrector";
             case "DIRECTOR_CARRERA" -> "Director de carrera";
+            case "VERIFICADOR" -> "Verificador de exámenes";
             default -> codigo;
         };
     }

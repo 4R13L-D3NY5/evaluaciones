@@ -1,5 +1,6 @@
 package com.xpertiflow.evaluaciones.api;
 
+import com.xpertiflow.evaluaciones.application.VerificacionRequeridaException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -12,6 +13,15 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(VerificacionRequeridaException.class)
+    public ResponseEntity<Map<String, Object>> handleVerificacionRequerida(VerificacionRequeridaException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("error", ex.getMessage());
+        body.put("codigo", "VERIFICACION_REQUERIDA");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException ex) {

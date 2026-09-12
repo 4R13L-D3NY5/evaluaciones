@@ -304,6 +304,16 @@ public class AccesoAcademicoService {
             return !usuario.getSedes().isEmpty() && usuario.getSedes().stream()
                     .anyMatch(item -> coincide(item.getCodigo(), rol.getSedeCodigo()));
         }
+        if ("VERIFICADOR".equals(rolUsuario)) {
+            boolean sedeValida = usuario.getSedes().stream()
+                    .anyMatch(item -> coincide(item.getCodigo(), rol.getSedeCodigo()));
+            boolean carreraValida = usuario.getCarreras().stream()
+                    .anyMatch(item -> coincide(item.getCodigo(), rol.getCarreraCodigo()));
+            boolean asignacionValida = usuario.getAsignaciones().stream().anyMatch(item ->
+                    coincide(item.getSedeCodigo(), rol.getSedeCodigo())
+                            && coincide(item.getCarreraCodigo(), rol.getCarreraCodigo()));
+            return sedeValida || carreraValida || asignacionValida;
+        }
         return false;
     }
 
@@ -335,7 +345,7 @@ public class AccesoAcademicoService {
                     .collect(Collectors.toSet());
         }
         if (usuario.getSedes().isEmpty()) {
-            return Set.of("PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "VICERRECTOR").contains(usuario.getRolCodigo())
+            return Set.of("PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "VICERRECTOR", "VERIFICADOR").contains(usuario.getRolCodigo())
                     ? Set.of() : null;
         }
         return usuario.getSedes().stream()
@@ -370,7 +380,7 @@ public class AccesoAcademicoService {
                     .collect(Collectors.toSet());
         }
         if (usuario.getCarreras().isEmpty()) {
-            return Set.of("PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA").contains(usuario.getRolCodigo())
+            return Set.of("PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "VERIFICADOR").contains(usuario.getRolCodigo())
                     ? Set.of() : null;
         }
         return usuario.getCarreras().stream()

@@ -19,6 +19,9 @@ export interface BancoPreguntasResponse {
   estado: string;
   docenteAprobador: string;
   fechaAprobacion: string;
+  estadoVerificacion?: string;
+  observacionesVerificacion?: string;
+  observacionesVerificacionPreguntas?: Record<string, string>;
 }
 
 export interface CargaBancoResponse {

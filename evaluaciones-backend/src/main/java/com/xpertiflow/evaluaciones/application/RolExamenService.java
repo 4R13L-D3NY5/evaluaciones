@@ -45,6 +45,7 @@ public class RolExamenService {
     private final RolExamenMapper mapper;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AccesoAcademicoService accesoAcademicoService;
+    private final VerificacionPoliticaService verificacionPoliticaService;
 
     private static final long CACHE_GRUPOS_SEA_MILLIS = 60_000L;
     private volatile List<GroupItemDto> gruposSeaCache = List.of();
@@ -641,6 +642,9 @@ public class RolExamenService {
         Set<EstadoFlujo> permitidos = TRANSICIONES_VALIDAS.getOrDefault(origen, Set.of());
         if (rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA && destino == EstadoFlujo.GENERADO) {
             throw new RuntimeException("Los exámenes sin cartilla no requieren generación de variantes ni PDF.");
+        }
+        if (destino == EstadoFlujo.GENERADO) {
+            verificacionPoliticaService.exigirVerificado(rol);
         }
         if (!transicionVirtualFinal && !transicionSinCartillaAImpreso && !permitidos.contains(destino)) {
             throw new RuntimeException(

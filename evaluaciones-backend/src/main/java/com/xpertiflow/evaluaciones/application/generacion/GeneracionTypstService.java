@@ -70,6 +70,7 @@ public class GeneracionTypstService {
     private final ConfiguracionEvaluacionesService configuracionEvaluacionesService;
     private final AppProperties appProperties;
     private final UnitepcGatewayClient unitepcGatewayClient;
+    private final com.xpertiflow.evaluaciones.application.VerificacionPoliticaService verificacionPoliticaService;
 
     private final Map<String, GeneracionTypstResultadoDto> estados = new ConcurrentHashMap<>();
     private static final Set<EstadoFlujo> ESTADOS_CON_DOCUMENTO = Set.of(
@@ -87,6 +88,8 @@ public class GeneracionTypstService {
 
         BancoPreguntas banco = bancoRepository.findById(request.getBancoPreguntasId())
                 .orElseThrow(() -> new RuntimeException("Banco de preguntas no encontrado: " + request.getBancoPreguntasId()));
+
+        verificacionPoliticaService.exigirVerificado(rol);
 
         String jobId = request.getJobId();
         if (jobId == null || jobId.isBlank()) {
@@ -161,6 +164,8 @@ public class GeneracionTypstService {
         mensaje.put("jobId", jobId);
         mensaje.put("rolExamenId", request.getRolExamenId());
         mensaje.put("modoPrevisualizacion", true);
+        mensaje.put("modoVerificacion", Boolean.TRUE.equals(request.getModoVerificacion()));
+        mensaje.put("incluirClave", Boolean.TRUE.equals(request.getIncluirClave()));
         mensaje.put("preguntasPreview", request.getPreguntas());
         mensaje.put("outputBasePath", outputBase);
         mensaje.put("configuracionGeneracion", configuracionParaWorker(

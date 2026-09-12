@@ -60,7 +60,7 @@ public class GeneracionTypstController {
     }
 
     @GetMapping("/{jobId}/resultado")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE','VERIFICADOR')")
     @Operation(summary = "Consultar estado/resultado de una generación")
     public ResponseEntity<GeneracionTypstResultadoDto> consultar(@PathVariable String jobId) {
         GeneracionTypstResultadoDto estado = generacionTypstService.consultarEstado(jobId);

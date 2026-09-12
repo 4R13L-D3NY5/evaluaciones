@@ -39,6 +39,20 @@ export const roleGuard = (roles: AppRole[]): CanActivateFn => () => {
   );
 };
 
+/** Guard estricto para módulos que no deben ser accesibles por el bypass del administrador. */
+export const strictRoleGuard = (roles: AppRole[]): CanActivateFn => () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  return auth.restaurarSesion().pipe(
+    map(usuario => {
+      if (!usuario) return router.createUrlTree(['/login']);
+      return roles.includes(usuario.rol) ? true : router.createUrlTree(['/dashboard']);
+    }),
+    catchError(() => of(router.createUrlTree(['/login'])))
+  );
+};
+
 export const passwordGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);

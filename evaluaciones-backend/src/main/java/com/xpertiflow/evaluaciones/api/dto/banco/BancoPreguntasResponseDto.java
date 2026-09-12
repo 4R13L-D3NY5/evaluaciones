@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @Builder
@@ -24,4 +25,7 @@ public class BancoPreguntasResponseDto {
     private String estado;
     private String docenteAprobador;
     private LocalDateTime fechaAprobacion;
+    private String estadoVerificacion;
+    private String observacionesVerificacion;
+    private Map<String, String> observacionesVerificacionPreguntas;
 }
