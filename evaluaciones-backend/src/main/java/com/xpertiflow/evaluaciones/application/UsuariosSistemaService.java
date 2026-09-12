@@ -5,6 +5,8 @@ import com.xpertiflow.evaluaciones.api.dto.auth.AlcanceCampusDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.AsignacionAcademicaDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.AnalisisDocentesSeaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.CredencialTemporalDto;
+import com.xpertiflow.evaluaciones.api.dto.auth.CargaAcademicaDocenteDto;
+import com.xpertiflow.evaluaciones.api.dto.auth.HorarioDocenteDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.DocenteSeaAnalisisDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.ErrorImportacionUsuarioDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.ImportacionUsuariosResponseDto;
@@ -16,6 +18,8 @@ import com.xpertiflow.evaluaciones.api.dto.auth.UsuarioSistemaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.BranchOfficeDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.CareerDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.CourseDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.ScheduleItemDto;
 import com.xpertiflow.evaluaciones.domain.entity.AlcanceCarrera;
 import com.xpertiflow.evaluaciones.domain.entity.AlcanceCampus;
 import com.xpertiflow.evaluaciones.domain.entity.AlcanceSede;
@@ -93,6 +97,104 @@ public class UsuariosSistemaService {
         return rolRepository.findByActivoTrueOrderByNombreAsc().stream()
                 .map(rol -> new RolSistemaResponseDto(rol.getCodigo(), rol.getNombre(), rol.getDescripcion()))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CargaAcademicaDocenteDto> cargaAcademicaDocente(Long usuarioId, String gestion) {
+        UsuarioSistema usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + usuarioId));
+        if (!"DOCENTE".equalsIgnoreCase(usuario.getRolCodigo())) {
+            throw new IllegalArgumentException("La carga académica solo está disponible para usuarios con rol DOCENTE");
+        }
+
+        String term = gestion == null || gestion.isBlank() ? "2-2026" : gestion.trim();
+        String ci = ciParaComparacion(usuario);
+        if (ci.isBlank()) return List.of();
+
+        List<GroupItemDto> grupos = unitepcGatewayClient.getGroups(term, null, null, null);
+        if (grupos == null || grupos.isEmpty()) return List.of();
+
+        List<BranchOfficeDto> sedes = unitepcGatewayClient.getBranchOffices();
+        Map<String, List<CareerDto>> carrerasPorSede = new LinkedHashMap<>();
+        Map<String, List<CourseDto>> cursosPorCarrera = new LinkedHashMap<>();
+
+        return grupos.stream()
+                .filter(grupo -> ci.equals(ciComparacion(grupo.getTeacherIdentityNumber())))
+                .map(grupo -> mapearCargaAcademica(grupo, term, sedes, carrerasPorSede, cursosPorCarrera))
+                .sorted(Comparator.comparing(CargaAcademicaDocenteDto::sedeCodigo, Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(CargaAcademicaDocenteDto::carreraCodigo, Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(CargaAcademicaDocenteDto::asignaturaCodigo, Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(CargaAcademicaDocenteDto::grupo, Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+    }
+
+    private CargaAcademicaDocenteDto mapearCargaAcademica(
+            GroupItemDto grupo,
+            String gestion,
+            List<BranchOfficeDto> sedes,
+            Map<String, List<CareerDto>> carrerasPorSede,
+            Map<String, List<CourseDto>> cursosPorCarrera) {
+        BranchOfficeDto sede = resolverSedeSea(grupo.getBranchOfficeId(), sedes == null ? List.of() : sedes);
+        String sedeCodigo = sede == null ? valorSeguro(grupo.getBranchOfficeId()) : valorSeguro(sede.getCode());
+        String sedeNombre = sede == null ? sedeCodigo : valorSeguro(sede.getName());
+
+        List<CareerDto> carreras = carrerasPorSede.computeIfAbsent(normalizar(sedeCodigo), clave -> {
+            try {
+                List<CareerDto> resultado = unitepcGatewayClient.getCareers(sedeCodigo);
+                return resultado == null ? List.of() : resultado;
+            } catch (RuntimeException exception) {
+                return List.of();
+            }
+        });
+        CareerDto carrera = carreras.stream()
+                .filter(item -> coincide(item.getCareerId(), grupo.getCareerId()))
+                .findFirst()
+                .orElse(null);
+        String carreraCodigo = carrera == null ? valorSeguro(grupo.getCareerId()) : valorSeguro(carrera.getCareerCode());
+        String carreraNombre = carrera == null ? carreraCodigo : valorSeguro(carrera.getCareerName());
+
+        String claveCursos = normalizar(sedeCodigo) + "|" + valorSeguro(grupo.getCareerId());
+        List<CourseDto> cursos = cursosPorCarrera.computeIfAbsent(claveCursos, clave -> {
+            try {
+                List<CourseDto> resultado = unitepcGatewayClient.getCourses(sedeCodigo, grupo.getCareerId());
+                return resultado == null ? List.of() : resultado;
+            } catch (RuntimeException exception) {
+                return List.of();
+            }
+        });
+        CourseDto curso = cursos.stream()
+                .filter(item -> coincide(item.getSyllabusCourseId(), grupo.getSyllabusCourseId()))
+                .findFirst()
+                .orElse(null);
+        String asignaturaCodigo = curso == null ? valorSeguro(grupo.getSyllabusCourseId()) : valorSeguro(curso.getCourseCode());
+        String asignaturaNombre = curso == null ? asignaturaCodigo : valorSeguro(curso.getCourseName());
+
+        List<HorarioDocenteDto> horarios = grupo.getSchedules() == null ? List.of() : grupo.getSchedules().stream()
+                .map(this::mapearHorarioDocente)
+                .sorted(Comparator.comparing(HorarioDocenteDto::dia, Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(HorarioDocenteDto::horaInicio, Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+
+        return new CargaAcademicaDocenteDto(
+                gestion,
+                sedeCodigo,
+                sedeNombre,
+                carreraCodigo,
+                carreraNombre,
+                asignaturaCodigo,
+                asignaturaNombre,
+                valorSeguro(grupo.getCode()),
+                valorSeguro(grupo.getClassType()),
+                horarios);
+    }
+
+    private HorarioDocenteDto mapearHorarioDocente(ScheduleItemDto horario) {
+        return new HorarioDocenteDto(
+                valorSeguro(horario.getDay()),
+                valorSeguro(horario.getStartTime()),
+                valorSeguro(horario.getEndTime()),
+                valorSeguro(horario.getClassroom()),
+                valorSeguro(horario.getCampus()));
     }
 
     @Transactional(readOnly = true)

@@ -296,7 +296,7 @@ class RolExamenServiceTest {
     }
 
     @Test
-    void importacionNoCreaUnaNuevaVersionSiElGrupoYaTieneElParcialProgramado() {
+    void importacionActualizaLaProgramacionExistenteSiEstaProgramada() {
         RolExamenRequestDto solicitud = RolExamenRequestDto.builder()
                 .id("ROL-GROUP-1-1P-2026-09-03")
                 .seaGroupId("GROUP-1")
@@ -329,17 +329,64 @@ class RolExamenServiceTest {
         when(mapper.toEntity(solicitud)).thenReturn(previsualizacion);
         when(unitepcGatewayClient.getGroups("2-2026", null, null, null))
                 .thenReturn(List.of(grupoOficial));
+        RolExamen existente = RolExamen.builder()
+                .id("ROL-EXISTENTE")
+                .version(1)
+                .estadoFlujo(EstadoFlujo.PROGRAMADO)
+                .build();
         when(rolExamenRepository.findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
                 "GROUP-1", solicitud.getTipoParcial(), EstadoFlujo.SUSPENDIDO))
-                .thenReturn(Optional.of(RolExamen.builder().id("ROL-EXISTENTE").version(1).build()));
+                .thenReturn(Optional.of(existente));
+        when(rolExamenRepository.findById("ROL-EXISTENTE")).thenReturn(Optional.of(existente));
+        when(rolExamenRepository.save(existente)).thenReturn(existente);
+        when(mapper.toResponseDto(existente)).thenReturn(null);
 
-        assertThatThrownBy(() -> service.crear(solicitud))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ya cuenta con una programación")
-                .hasMessageContaining("cambios deben registrarse manualmente");
+        service.crear(solicitud);
 
         verify(rolExamenRepository).findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
                 "GROUP-1", solicitud.getTipoParcial(), EstadoFlujo.SUSPENDIDO);
+        verify(rolExamenRepository).findById("ROL-EXISTENTE");
+        verify(rolExamenRepository).save(existente);
+        verify(rolExamenRepository, never()).existsById(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void importacionRechazaUnaProgramacionQueYaAvanzoEnElFlujo() {
+        RolExamenRequestDto solicitud = RolExamenRequestDto.builder()
+                .id("ROL-GROUP-1-1P-2026-09-03")
+                .seaGroupId("GROUP-1")
+                .materiaCodigo("SIS-413")
+                .grupo("TA-01")
+                .tipoParcial(com.xpertiflow.evaluaciones.domain.enums.TipoParcial.PRIMER_PARCIAL)
+                .fecha(LocalDate.of(2026, 9, 3))
+                .importacion(true)
+                .build();
+        RolExamen previsualizacion = RolExamen.builder()
+                .seaGroupId("GROUP-1")
+                .seaSyllabusCourseId("COURSE-1")
+                .grupo("TA-01")
+                .materiaCodigo("SIS-413")
+                .build();
+        RolExamen existente = RolExamen.builder()
+                .id("ROL-EXISTENTE")
+                .estadoFlujo(EstadoFlujo.GENERADO)
+                .build();
+        when(mapper.toEntity(solicitud)).thenReturn(previsualizacion);
+        GroupItemDto grupoOficial = new GroupItemDto();
+        grupoOficial.setGroupId("GROUP-1");
+        grupoOficial.setCode("TA-01");
+        grupoOficial.setSyllabusCourseId("COURSE-1");
+        grupoOficial.setTeacherName("DOCENTE OFICIAL");
+        when(unitepcGatewayClient.getGroups("2-2026", null, null, null)).thenReturn(List.of(grupoOficial));
+        when(rolExamenRepository.findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                "GROUP-1", solicitud.getTipoParcial(), EstadoFlujo.SUSPENDIDO))
+                .thenReturn(Optional.of(existente));
+
+        assertThatThrownBy(() -> service.crear(solicitud))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("estado GENERADO")
+                .hasMessageContaining("no puede modificar");
+
         verify(rolExamenRepository, never()).save(org.mockito.ArgumentMatchers.any(RolExamen.class));
         verify(rolExamenRepository, never()).existsById(org.mockito.ArgumentMatchers.anyString());
     }

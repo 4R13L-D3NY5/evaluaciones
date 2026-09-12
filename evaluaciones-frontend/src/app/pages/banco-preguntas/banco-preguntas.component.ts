@@ -3228,6 +3228,9 @@ export class BancoPreguntasComponent implements OnInit {
     if (error.includes('expresión matemática incompatible')) {
       return { regla: 'Fórmula matemática', problema: 'La expresión contiene delimitadores $ anidados o agrupadores desbalanceados para Typst.', correccion: 'No coloques signos $ dentro de otro bloque $...$. Usa un solo bloque matemático balanceado o escribe la fórmula como texto plano.' };
     }
+    if (error.includes('comando de fórmula')) {
+      return { regla: 'Compatibilidad Typst', problema: `${error}.`, correccion: 'Usa únicamente los comandos compatibles con la plantilla: \\times, \\cdot, \\rightarrow, \\to, \\pm y \\equiv. Para raíces y potencias usa la sintaxis Typst sin barra, por ejemplo sqrt(...) o x^2.' };
+    }
     if (error.includes('fórmula inválida')) {
       return { regla: 'Fórmula o contenido', problema: 'El enunciado u opción contiene un error de Excel, caracteres no permitidos o signos $ desbalanceados.', correccion: 'Corrige la fórmula o cierra correctamente cada expresión entre signos $.' };
     }
@@ -4075,6 +4078,10 @@ export class BancoPreguntasComponent implements OnInit {
       return 'contiene caracteres de control no permitidos';
     }
 
+    return this.validarCompatibilidadTypst(valor);
+  }
+
+  private validarCompatibilidadTypst(valor: string): string | null {
     const cantidadDolares = (valor.match(/\$/g) || []).length;
     if (cantidadDolares % 2 !== 0) return 'contiene delimitadores de fórmula $ sin cerrar';
 
@@ -4088,9 +4095,34 @@ export class BancoPreguntasComponent implements OnInit {
       if (!this.agrupadoresTypstBalanceados(bloque)) {
         return 'contiene una expresión matemática incompatible con la previsualización Typst; no anides signos $ y verifica paréntesis, corchetes y llaves';
       }
+      const comandosNoSoportados = [...bloque.matchAll(/\\([A-Za-z]+)\b/g)]
+        .map(coincidencia => coincidencia[1].toLowerCase())
+        .filter(comando => !['times', 'cdot', 'rightarrow', 'to', 'pm', 'equiv'].includes(comando));
+      if (comandosNoSoportados.length > 0) {
+        return `contiene el comando de fórmula \\${comandosNoSoportados[0]} no compatible con la previsualización Typst`;
+      }
+      if (/\\(?![A-Za-z])/.test(bloque)) {
+        return 'contiene una barra invertida sin un comando de fórmula válido para Typst';
+      }
       cursor = cierre + 1;
     }
     return null;
+  }
+
+  private detectarProblemasCompatibilidadTypst(preguntas: PreguntaValidada[]): Array<{ fila: number; campo: string; mensaje: string }> {
+    const campos: Array<[string, keyof PreguntaValidada]> = [
+      ['enunciado', 'enunciado'],
+      ['opcion_a', 'opcion_a'],
+      ['opcion_b', 'opcion_b'],
+      ['opcion_c', 'opcion_c'],
+      ['opcion_d', 'opcion_d'],
+      ['opcion_e', 'opcion_e']
+    ];
+
+    return preguntas.flatMap(pregunta => campos.flatMap(([campo, propiedad]) => {
+      const problema = this.validarCompatibilidadTypst(String(pregunta[propiedad] || ''));
+      return problema ? [{ fila: pregunta.fila, campo, mensaje: `${campo}: ${problema}` }] : [];
+    }));
   }
 
   private enunciadoPremisasValido(valor: string): boolean {
@@ -4355,6 +4387,26 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     const preguntas = this.preguntasCargadas().filter(p => p.valido);
     if (!preguntas.length) {
       this._mostrarToast('No hay preguntas válidas para generar la previsualización PDF.', 'error');
+      return;
+    }
+
+    const problemasTypst = this.detectarProblemasCompatibilidadTypst(preguntas);
+    if (problemasTypst.length > 0) {
+      const erroresPorFila = new Map<number, string[]>();
+      problemasTypst.forEach(problema => {
+        erroresPorFila.set(problema.fila, [
+          ...(erroresPorFila.get(problema.fila) || []),
+          problema.mensaje
+        ]);
+      });
+      this.preguntasCargadas.set(this.preguntasCargadas().map(pregunta => {
+        const nuevosErrores = erroresPorFila.get(pregunta.fila);
+        if (!nuevosErrores?.length) return pregunta;
+        const errores = [...pregunta.errores, ...nuevosErrores.filter(error => !pregunta.errores.includes(error))];
+        return { ...pregunta, errores, observaciones: errores.join(', '), valido: false };
+      }));
+      const filas = [...new Set(problemasTypst.map(problema => problema.fila))].join(', ');
+      this._mostrarToast(`Se detectaron problemas de compatibilidad Typst en ${filas.length ? `las filas ${filas}` : 'el banco'}. Corrige las observaciones antes de previsualizar.`, 'error');
       return;
     }
 

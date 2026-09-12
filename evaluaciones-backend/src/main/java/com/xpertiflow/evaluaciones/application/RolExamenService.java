@@ -143,9 +143,21 @@ public class RolExamenService {
         GroupItemDto grupoOficial = resolverGrupoOficialDesdeSea(previsualizacion);
         aplicarDocenteOficial(previsualizacion, grupoOficial);
         dto.setSeaGroupId(previsualizacion.getSeaGroupId());
-        if (dto.isImportacion() && existeProgramacionParaImportacion(dto)) {
-            throw new IllegalArgumentException("El grupo " + dto.getGrupo() + " ya cuenta con una programación para "
-                    + dto.getTipoParcial() + ". Los cambios deben registrarse manualmente.");
+        if (dto.isImportacion()) {
+            Optional<RolExamen> programacionExistente = buscarProgramacionVigente(dto);
+            if (programacionExistente.isPresent()) {
+                RolExamen rolExistente = programacionExistente.get();
+                if (rolExistente.getEstadoFlujo() == EstadoFlujo.PROGRAMADO
+                        || rolExistente.getEstadoFlujo() == EstadoFlujo.VALIDADO) {
+                    // La importación actualiza el registro vigente y conserva su
+                    // estado, banco asociado, hash y trazabilidad.
+                    dto.setId(rolExistente.getId());
+                    return actualizar(rolExistente.getId(), dto, authentication);
+                }
+                throw new IllegalArgumentException("El grupo " + dto.getGrupo() + " ya tiene una programación para "
+                        + dto.getTipoParcial() + " en estado " + rolExistente.getEstadoFlujo()
+                        + ". La importación no puede modificar un examen que ya avanzó en el flujo.");
+            }
         }
         int version = siguienteVersion(dto);
         dto.setVersion(version);
@@ -472,19 +484,19 @@ public class RolExamenService {
         return ultimo.map(rol -> rol.getVersion() == null ? 1 : rol.getVersion() + 1).orElse(1);
     }
 
-    /**
-     * La importación masiva no crea versiones alternativas de un grupo/parcial
-     * ya programado. La creación manual conserva el comportamiento anterior y
-     * sigue permitiendo registrar una nueva versión cuando corresponda.
-     */
-    private boolean existeProgramacionParaImportacion(RolExamenRequestDto dto) {
+    private Optional<RolExamen> buscarProgramacionVigente(RolExamenRequestDto dto) {
         if (dto.getSeaGroupId() != null && !dto.getSeaGroupId().isBlank()
-                && rolExamenRepository.findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
-                dto.getSeaGroupId(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO).isPresent()) {
-            return true;
+                ) {
+            Optional<RolExamen> porSea = rolExamenRepository
+                    .findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                            dto.getSeaGroupId(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO);
+            if (porSea.isPresent()) {
+                return porSea;
+            }
         }
-        return rolExamenRepository.findTopByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
-                dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO).isPresent();
+        return rolExamenRepository
+                .findTopByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                        dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO);
     }
 
     private String construirId(RolExamenRequestDto dto, int version) {

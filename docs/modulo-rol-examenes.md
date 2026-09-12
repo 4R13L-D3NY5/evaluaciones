@@ -28,18 +28,18 @@ Cada fila puede generar hasta cuatro roles:
 - El docente, su identificador y el grupo oficial se obtienen exclusivamente desde los servicios SEA. Si SEA no devuelve un docente válido, el rol se rechaza o la operación se detiene; nunca se utiliza como respaldo el nombre o CI escrito en la planilla.
 - Las fechas numéricas propias de Excel se convierten a fecha ISO para guardar y a `DD/MM/AAAA` para mostrar.
 - Las horas numéricas de Excel se convierten a `HH:mm`.
-- Todos los roles importados quedan inicialmente en estado `PROGRAMADO`.
+- Los roles nuevos importados quedan en estado `PROGRAMADO`.
 - Las únicas modalidades oficiales son `PRESENCIAL_CARTILLA` (Con Cartilla), `PRESENCIAL_SIN_CARTILLA` (Sin Cartilla) y `VIRTUAL` (Virtual).
 - La hoja oficial no trae una columna de modalidad. Cuando el grupo tiene formato `TA-##` (teórico), se asigna automáticamente `PRESENCIAL_CARTILLA`.
 - Todos los roles existentes se consideran versión 1 cuando no tenían versionado previo.
-- Una nueva importación para el mismo grupo y tipo de parcial recibe la siguiente versión disponible (`V2`, `V3`, etc.), aunque la fecha sea la misma.
-- La importación posterior no reemplaza la versión anterior: conserva `V1` y registra una nueva versión correlativa.
+- Si ya existe el mismo grupo y tipo de parcial, la importación actualiza el registro vigente cuando está en estado `PROGRAMADO` o `VALIDADO`. Se conserva el mismo ID, versión, banco asociado, hash de integridad y trazabilidad; se actualizan los datos de programación, incluida la fecha y el horario.
+- Los roles en estados posteriores a `VALIDADO` (`GENERADO`, `IMPRESO`, `ENTREGADO`, `DEVUELTO`, `PENDIENTE_NOTAS` o `CALIFICADO`) no se modifican desde Excel y se informan como protegidos.
+- Las filas nuevas no crean versiones alternativas por una importación repetida: si existiera una baja lógica `SUSPENDIDO`, esta no bloquea la nueva programación.
 - Si una fila aparece repetida con el mismo grupo, parcial y fecha dentro del mismo archivo, se omite y se informa la fila afectada.
 - Una fecha faltante afecta únicamente al examen de esa columna; los demás exámenes válidos de la fila pueden importarse.
 - Las observaciones se muestran antes de importar, con mensajes comprensibles para el usuario.
 - La visualización predeterminada de los listados se ordena por código de asignatura; los empates se ordenan por grupo, tipo de parcial y versión.
-- La importación dispone de una opción explícita para "Eliminar y subir nuevamente". Solo elimina coincidencias en `PROGRAMADO` o `VALIDADO`; los estados `GENERADO` y posteriores quedan protegidos.
-- En la validación de duplicados de la importación, los roles en estado `SUSPENDIDO` se consideran bajas lógicas y no bloquean una nueva programación para el mismo grupo y parcial.
+- La importación informa previamente qué programaciones serán actualizadas y cuáles quedan protegidas. La opción independiente "Eliminar y subir nuevamente" solo elimina coincidencias en `PROGRAMADO` o `VALIDADO`; los estados `GENERADO` y posteriores quedan protegidos.
 - La edición y eliminación individual solo están disponibles en `PROGRAMADO` o `VALIDADO`, y la regla también se valida en el backend.
 
 ## Persistencia y seguridad operativa

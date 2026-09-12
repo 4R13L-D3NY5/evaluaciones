@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
-import { UsuariosSistemaService, UsuarioSistema, RolSistema, AlcanceAcademico, AlcanceCampus, AsignacionAcademica, UsuarioSistemaRequest, ImportacionUsuariosResponse, CredencialTemporal, AnalisisDocentesSeaResponse, DocenteSeaAnalisis, SincronizacionDocentesSeaResponse } from '../../core/services/usuarios-sistema.service';
+import { UsuariosSistemaService, UsuarioSistema, RolSistema, AlcanceAcademico, AlcanceCampus, AsignacionAcademica, UsuarioSistemaRequest, ImportacionUsuariosResponse, CredencialTemporal, AnalisisDocentesSeaResponse, DocenteSeaAnalisis, SincronizacionDocentesSeaResponse, CargaAcademicaDocente } from '../../core/services/usuarios-sistema.service';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import { BranchOffice, Campus, Career, Course } from '../../core/models/unitepc-gateway.models';
@@ -198,7 +198,7 @@ interface RolCatalogo extends RolSistema {
                   <td class="px-4 py-3 align-top"><span class="role-pill">{{ usuario.rolNombre }}</span></td>
                   <td class="px-4 py-3 align-top"><span class="block font-semibold text-foreground">{{ resumenAlcance(usuario) }}</span><span class="mt-1 block max-w-xs text-[10px] text-muted-foreground">{{ nombresAlcance(usuario) }}</span>@if (usuario.alcanceDesdeSea) { <span class="mt-1 block text-[10px] font-semibold text-sky-700">Alcance consultado en SEA · no persistido localmente</span> }</td>
                   <td class="px-4 py-3 align-top"><span [class]="usuario.activo ? 'status-pill active' : 'status-pill inactive'">{{ usuario.activo ? 'ACTIVO' : 'INACTIVO' }}</span>@if (usuario.debeCambiarContrasena) { <span class="mt-1 block text-[10px] font-bold text-amber-700">Cambiar clave</span> }</td>
-                  <td class="px-4 py-3 text-right align-top"><div class="flex justify-end gap-1"><button class="icon-button" title="Editar" (click)="editar(usuario)"><i class="pi pi-pencil"></i></button><button class="icon-button warning" title="Restablecer contraseña" (click)="restablecer(usuario)"><i class="pi pi-key"></i></button></div></td>
+                  <td class="px-4 py-3 text-right align-top"><div class="flex justify-end gap-1">@if (usuario.rol === 'DOCENTE') {<button class="icon-button" title="Ver materias y grupos" (click)="verCargaAcademica(usuario)"><i class="pi pi-book"></i></button>}<button class="icon-button" title="Editar" (click)="editar(usuario)"><i class="pi pi-pencil"></i></button><button class="icon-button warning" title="Restablecer contraseña" (click)="restablecer(usuario)"><i class="pi pi-key"></i></button></div></td>
                 </tr>
               } @empty {
                 <tr><td colspan="6" class="px-4 py-12 text-center text-muted-foreground"><i class="pi pi-users mb-2 block text-2xl"></i>No hay usuarios que coincidan con los filtros.</td></tr>
@@ -207,6 +207,35 @@ interface RolCatalogo extends RolSistema {
           </table>
         </div>
       </div>
+      }
+
+      @if (cargaAcademicaAbierta()) {
+        <div class="modal-backdrop" (click)="cerrarCargaAcademica()">
+          <div class="modal-card max-w-6xl" (click)="$event.stopPropagation()">
+            <div class="flex items-start justify-between border-b border-border px-6 py-5">
+              <div>
+                <p class="eyebrow">Fuente oficial SEA · Gestión {{ gestionCargaAcademica }}</p>
+                <h2 class="text-xl font-black">Carga académica del docente</h2>
+                @if (usuarioCargaAcademica(); as docente) {<p class="mt-1 text-xs text-muted-foreground">{{ docente.nombreCompleto }} · CI {{ docente.ci }}</p>}
+              </div>
+              <button class="icon-button" (click)="cerrarCargaAcademica()"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="space-y-4 p-6">
+              <div class="flex flex-col gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800 sm:flex-row sm:items-end sm:justify-between">
+                <div><strong>Materias y grupos oficiales</strong><p class="mt-1">La consulta se realiza directamente en SEA y no modifica las asignaciones guardadas.</p></div>
+                <label class="form-label min-w-36">Gestión<input class="field-input" [(ngModel)]="gestionCargaAcademica" (keyup.enter)="recargarCargaAcademica()"></label>
+              </div>
+              @if (cargandoCargaAcademica()) {<div class="message info"><i class="pi pi-spin pi-spinner"></i><span>Consultando materias, grupos y horarios...</span></div>}
+              @else if (errorCargaAcademica()) {<div class="message error"><i class="pi pi-exclamation-circle"></i><span>{{ errorCargaAcademica() }}</span></div>}
+              @else if (!cargaAcademica().length) {<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-8 text-center text-xs text-amber-800"><i class="pi pi-info-circle mb-2 block text-xl"></i>No se encontraron materias o grupos para este docente en la gestión indicada.</div>}
+              @else {
+                <div class="grid gap-3 sm:grid-cols-3"><div class="metric-card"><span>Grupos</span><strong>{{ cargaAcademica().length }}</strong><small>asignaciones oficiales</small></div><div class="metric-card"><span>Materias</span><strong>{{ materiasCargaAcademica() }}</strong><small>códigos únicos</small></div><div class="metric-card"><span>Horarios</span><strong>{{ horariosCargaAcademica() }}</strong><small>registros oficiales</small></div></div>
+                <div class="overflow-x-auto rounded-xl border border-border"><table class="min-w-full text-left text-xs"><thead><tr class="border-b border-border bg-muted/60 text-[10px] uppercase tracking-wider text-muted-foreground"><th class="px-3 py-3">Sede</th><th class="px-3 py-3">Carrera</th><th class="px-3 py-3">Asignatura</th><th class="px-3 py-3">Grupo</th><th class="px-3 py-3">Tipo</th><th class="px-3 py-3">Horario y aula</th></tr></thead><tbody>@for (item of cargaAcademica(); track claveCargaAcademica(item)) {<tr class="border-b border-border/70 last:border-0 hover:bg-muted/30"><td class="px-3 py-3 align-top"><strong>{{ item.sedeCodigo }}</strong><small class="mt-1 block text-muted-foreground">{{ item.sedeNombre }}</small></td><td class="px-3 py-3 align-top"><strong>{{ item.carreraCodigo }}</strong><small class="mt-1 block max-w-48 text-muted-foreground">{{ item.carreraNombre }}</small></td><td class="px-3 py-3 align-top"><strong class="text-primary">{{ item.asignaturaCodigo }}</strong><small class="mt-1 block max-w-56 text-muted-foreground">{{ item.asignaturaNombre }}</small></td><td class="px-3 py-3 align-top"><span class="role-pill">{{ item.grupo }}</span></td><td class="px-3 py-3 align-top">{{ item.tipoClase || '—' }}</td><td class="px-3 py-3 align-top">@for (horario of item.horarios; track horario.dia + horario.horaInicio + horario.aula) {<span class="mb-1 block">{{ horario.dia || 'Día no definido' }} · {{ horario.horaInicio || '—' }}–{{ horario.horaFin || '—' }}</span><small class="block text-muted-foreground">{{ horario.aula || 'Aula no definida' }}@if (horario.campus) { · {{ horario.campus }}}</small>} @empty {<span class="text-muted-foreground">Sin horario registrado</span>}</td></tr>}</tbody></table></div>
+              }
+              <div class="flex justify-end border-t border-border pt-4"><button class="secondary-button" (click)="cerrarCargaAcademica()">Cerrar</button></div>
+            </div>
+          </div>
+        </div>
       }
 
       @if (formularioAbierto()) {
@@ -299,6 +328,12 @@ export class UsuariosSistemaComponent implements OnInit {
   public readonly busqueda = signal('');
   public readonly filtroRol = signal('');
   public readonly filtroEstado = signal<'TODOS' | 'ACTIVOS' | 'INACTIVOS'>('TODOS');
+  public readonly cargaAcademicaAbierta = signal(false);
+  public readonly usuarioCargaAcademica = signal<UsuarioSistema | null>(null);
+  public readonly cargaAcademica = signal<CargaAcademicaDocente[]>([]);
+  public readonly cargandoCargaAcademica = signal(false);
+  public readonly errorCargaAcademica = signal<string | null>(null);
+  public gestionCargaAcademica = '2-2026';
   public gestionSea = '2-2026';
   public readonly filtroDocenteSea = signal('');
   public sedes: BranchOffice[] = [];
@@ -468,6 +503,30 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public cerrarFormulario(): void { if (!this.guardando()) this.formularioAbierto.set(false); }
+
+  public verCargaAcademica(usuario: UsuarioSistema): void {
+    this.usuarioCargaAcademica.set(usuario);
+    this.cargaAcademica.set([]);
+    this.errorCargaAcademica.set(null);
+    this.cargaAcademicaAbierta.set(true);
+    this.recargarCargaAcademica();
+  }
+
+  public recargarCargaAcademica(): void {
+    const usuario = this.usuarioCargaAcademica();
+    if (!usuario) return;
+    this.cargandoCargaAcademica.set(true);
+    this.errorCargaAcademica.set(null);
+    this.service.cargaAcademicaDocente(usuario.id, this.gestionCargaAcademica.trim() || '2-2026').subscribe({
+      next: carga => { this.cargaAcademica.set(carga); this.cargandoCargaAcademica.set(false); },
+      error: error => { this.cargaAcademica.set([]); this.cargandoCargaAcademica.set(false); this.errorCargaAcademica.set(error?.error?.error || error?.error?.message || 'No se pudo consultar la carga académica en SEA.'); }
+    });
+  }
+
+  public cerrarCargaAcademica(): void { if (!this.cargandoCargaAcademica()) this.cargaAcademicaAbierta.set(false); }
+  public materiasCargaAcademica(): number { return new Set(this.cargaAcademica().map(item => item.asignaturaCodigo || item.asignaturaNombre)).size; }
+  public horariosCargaAcademica(): number { return this.cargaAcademica().reduce((total, item) => total + item.horarios.length, 0); }
+  public claveCargaAcademica(item: CargaAcademicaDocente): string { return `${item.sedeCodigo}|${item.carreraCodigo}|${item.asignaturaCodigo}|${item.grupo}`; }
 
   public tieneSede(codigo: string): boolean { return this.sedesSeleccionadas.has(codigo); }
   public tieneCarrera(codigo: string): boolean { return this.carrerasSeleccionadas.has(codigo); }

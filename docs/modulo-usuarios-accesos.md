@@ -205,6 +205,20 @@ El apartado **Usuarios y accesos → Fuente oficial SEA → Sincronización de d
 
 La ausencia no elimina información histórica: la sincronización masiva la convierte en inactiva y registra el evento en auditoría. Si un docente vuelve a aparecer en SEA, la sincronización reactiva su cuenta. Las contraseñas existentes se conservan; las cuentas nuevas se crean con el CI como clave temporal y exigen cambio en el primer ingreso. Las credenciales temporales se muestran una sola vez en el resultado de la operación.
 
+## Carga académica del docente
+
+En **Usuarios y accesos**, las cuentas con rol `DOCENTE` disponen de la acción **Ver materias y grupos**. La vista consulta en tiempo real la gestión seleccionada en SEA y muestra, por cada grupo del docente identificado por su CI, la sede, carrera, asignatura, grupo, tipo de clase y horarios con aula/campus.
+
+La consulta es de solo lectura y no modifica las asignaciones académicas guardadas en el sistema. Los grupos se ordenan por sede, carrera, asignatura y grupo. Si el catálogo SEA no devuelve el nombre o código de una relación, se conserva el identificador oficial disponible para no ocultar la carga. La gestión predeterminada es `2-2026` y puede cambiarse desde la ventana de detalle.
+
+### Endpoint
+
+| Método | Ruta | Uso |
+|---|---|---|
+| `GET` | `/api/usuarios/{id}/carga-academica?gestion=2-2026` | Consulta las materias, grupos y horarios oficiales del usuario docente. |
+
+El endpoint está protegido por la autorización general de administración de usuarios (`ADMINISTRADOR_SISTEMA` y `RESPONSABLE_EVALUACIONES`). Solo acepta cuentas con rol `DOCENTE`; la información se resuelve bajo demanda desde SEA y no se persiste localmente.
+
 ### Operaciones disponibles
 
 - **Analizar SEA**: consulta nuevamente la gestión indicada, actualiza los cinco indicadores y muestra el detalle por docente.
@@ -244,5 +258,7 @@ Para la operación masiva se envía `cis: []` y `desactivarAusentes: true`. Ambo
 - [x] Análisis comparativo de docentes SEA frente a cuentas internas por gestión.
 - [x] Sincronización individual y masiva con creación, actualización, reactivación y baja lógica.
 - [x] Auditoría específica de operaciones de sincronización SEA y credenciales temporales de nuevas cuentas.
+- [x] Consulta bajo demanda de materias, grupos y horarios oficiales por docente y gestión.
+- [x] Vista integrada en la lista de usuarios con indicadores de grupos, materias y horarios.
 - [x] Aplicar el control de alcance del director de carrera al catálogo académico, plan de estudios, roles, lista de evaluaciones y reportes.
 - [ ] Conectar autenticación y roles con Keycloak cuando el SSO del SEA esté disponible.

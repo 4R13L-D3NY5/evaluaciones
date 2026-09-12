@@ -31,6 +31,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -56,6 +58,10 @@ public class BancoPreguntasService {
     private static final Set<String> MIME_IMAGENES_PERMITIDOS = Set.of(
             "image/png", "image/jpeg", "image/webp", "image/gif");
     private static final Set<String> ERRORES_FORMULA = Set.of("#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#N/A");
+    private static final Set<String> COMANDOS_FORMULA_TYPST_PERMITIDOS = Set.of(
+            "times", "cdot", "rightarrow", "to", "pm", "equiv");
+    private static final Pattern COMANDO_FORMULA_TYPST = Pattern.compile("\\\\([A-Za-z]+)\\b");
+    private static final Pattern BARRA_FORMULA_TYPST_INVALIDA = Pattern.compile("\\\\(?![A-Za-z])");
 
     public BancoPreguntasResponseDto obtenerPorRolExamenId(String rolExamenId) {
         BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId)
@@ -675,6 +681,21 @@ public class BancoPreguntasService {
                 errores.add("Fila " + (rowNum + 1) + ": " + campo
                         + " contiene una expresión matemática incompatible con la previsualización Typst;"
                         + " no anides signos $ y verifica paréntesis, corchetes y llaves");
+                return;
+            }
+            Matcher comando = COMANDO_FORMULA_TYPST.matcher(bloque);
+            while (comando.find()) {
+                String nombre = comando.group(1).toLowerCase(Locale.ROOT);
+                if (!COMANDOS_FORMULA_TYPST_PERMITIDOS.contains(nombre)) {
+                    errores.add("Fila " + (rowNum + 1) + ": " + campo
+                            + " contiene el comando de fórmula \\" + comando.group(1)
+                            + " no compatible con la previsualización Typst");
+                    return;
+                }
+            }
+            if (BARRA_FORMULA_TYPST_INVALIDA.matcher(bloque).find()) {
+                errores.add("Fila " + (rowNum + 1) + ": " + campo
+                        + " contiene una barra invertida sin un comando de fórmula válido para Typst");
                 return;
             }
             cursor = cierre + 1;

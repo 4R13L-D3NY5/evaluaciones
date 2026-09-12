@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tareas del proyecto · Evaluaciones</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#64748b; --line:#dbe4f0; --bg:#f5f7fb; --primary:#4f46e5; --green:#059669; --amber:#d97706; --red:#e11d48; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color:var(--ink); background:var(--bg); }
+    main { max-width:1400px; margin:0 auto; padding:32px 22px 48px; }
+    header { display:flex; justify-content:space-between; gap:20px; align-items:end; margin-bottom:28px; }
+    h1 { margin:0; font-size:clamp(1.6rem, 3vw, 2.4rem); }
+    header p { margin:7px 0 0; color:var(--muted); }
+    .summary { display:flex; flex-wrap:wrap; gap:10px; }
+    .summary span { background:white; border:1px solid var(--line); border-radius:999px; padding:8px 13px; font-size:.86rem; font-weight:700; }
+    .board { display:grid; grid-template-columns:repeat(5, minmax(220px, 1fr)); gap:15px; align-items:start; }
+    .column { min-height:180px; background:#eef2f8; border:1px solid var(--line); border-radius:16px; padding:13px; }
+    .column h2 { margin:0 0 12px; font-size:1rem; }
+    .column.pending h2 { color:var(--primary); } .column.progress h2 { color:var(--amber); } .column.review h2 { color:#7c3aed; } .column.blocked h2 { color:var(--red); } .column.done h2 { color:var(--green); }
+    .card { background:white; border:1px solid var(--line); border-radius:13px; padding:14px; margin-bottom:11px; box-shadow:0 4px 12px #1720330b; }
+    .card:last-child { margin-bottom:0; }
+    .card h3 { margin:0 0 10px; font-size:.94rem; line-height:1.35; }
+    .card p { margin:7px 0; color:var(--muted); font-size:.78rem; line-height:1.45; }
+    .card strong { color:var(--ink); }
+    .copy { width:100%; border:0; border-radius:9px; padding:9px 10px; margin-top:9px; color:white; background:var(--primary); font-weight:800; cursor:pointer; }
+    .copy:hover { filter:brightness(.94); }
+    .empty { color:var(--muted); font-size:.82rem; font-style:italic; padding:8px 2px; }
+    footer { margin-top:18px; color:var(--muted); font-size:.78rem; }
+    @media (max-width:1100px) { .board { grid-template-columns:repeat(2, minmax(240px, 1fr)); } }
+    @media (max-width:620px) { main { padding:22px 13px 35px; } header { display:block; } .summary { margin-top:18px; } .board { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Tablero de tareas</h1>
+        <p>Proyecto Sistema de Evaluaciones · vista rápida para copiar tarjetas</p>
+      </div>
+      <div class="summary" aria-label="Resumen">
+        <span>4 pendientes</span><span>0 en progreso</span><span>0 en revisión</span><span>0 bloqueadas</span><span>0 completadas</span>
+      </div>
+    </header>
+
+    <section class="board" aria-label="Tareas por estado">
+      <div class="column pending"><h2>Pendiente</h2>
+        <article class="card" data-copy="T-001 — Desplegar y validar en servidor la actualización de roles por Excel\nPrioridad: Alta\nÁrea: Rol de Exámenes / Importación Excel\nCriterio: Confirmar la actualización de programaciones existentes desde Excel y proteger estados posteriores.">
+          <h3>T-001 — Desplegar y validar en servidor la actualización de roles por Excel</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Rol de Exámenes / Importación Excel</p><p>La corrección ya fue verificada localmente.</p><button class="copy" type="button">Copiar tarjeta</button>
+        </article>
+        <article class="card" data-copy="T-002 — Revisar carga de exámenes sin cartilla por parte del docente\nPrioridad: Alta\nÁrea: Exámenes sin cartilla / Docentes\nCriterio: Reproducir la operación y documentar o corregir cualquier bloqueo.">
+          <h3>T-002 — Revisar carga de exámenes sin cartilla por parte del docente</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Exámenes sin cartilla / Docentes</p><button class="copy" type="button">Copiar tarjeta</button>
+        </article>
+        <article class="card" data-copy="T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor\nPrioridad: Alta\nÁrea: Calificación OMR / Servidor\nRevisar HTTP 413 y Unexpected token '<'.">
+          <h3>T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Calificación OMR / Servidor</p><p>Revisar HTTP 413 y <em>Unexpected token '&lt;'</em>.</p><button class="copy" type="button">Copiar tarjeta</button>
+        </article>
+        <article class="card" data-copy="T-004 — Integrar la anulación de preguntas de OMR en la calificación\nPrioridad: Alta\nÁrea: Calificación OMR / Anulación de preguntas\nPermitirlo para Responsable de Evaluaciones y Administrador del Sistema, con auditoría y recálculo correcto.">
+          <h3>T-004 — Integrar la anulación de preguntas de OMR en la calificación</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Calificación OMR / Anulación de preguntas</p><p>Para Responsable de Evaluaciones y Administrador del Sistema.</p><button class="copy" type="button">Copiar tarjeta</button>
+        </article>
+      </div>
+      <div class="column progress"><h2>En progreso</h2><div class="empty">Sin tareas.</div></div>
+      <div class="column review"><h2>En revisión</h2><div class="empty">Sin tareas.</div></div>
+      <div class="column blocked"><h2>Bloqueada</h2><div class="empty">Sin tareas.</div></div>
+      <div class="column done"><h2>Completada</h2><div class="empty">Sin tareas.</div></div>
+    </section>
+    <footer>Cuando se agreguen o muevan tareas desde el tablero Markdown, esta vista debe actualizarse para mantener las tarjetas sincronizadas.</footer>
+  </main>
+  <script>
+    document.querySelectorAll('.copy').forEach(button => button.addEventListener('click', async () => {
+      const card = button.closest('.card');
+      const text = card.dataset.copy;
+      try { await navigator.clipboard.writeText(text); }
+      catch { const area=document.createElement('textarea'); area.value=text; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove(); }
+      const original = button.textContent; button.textContent='Copiado'; setTimeout(() => button.textContent=original, 1200);
+    }));
+  </script>
+</body>
+</html>
