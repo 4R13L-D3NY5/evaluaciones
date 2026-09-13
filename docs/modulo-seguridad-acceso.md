@@ -22,6 +22,9 @@ El sistema utiliza autenticación interna con sesión HTTP y autorización por r
 - `POST /api/auth/renew`: renueva la ventana de inactividad de la sesión autenticada.
 - `POST /api/auth/logout`: invalida la sesión.
 - `POST /api/auth/cambiar-contrasena`: completa el cambio obligatorio de la contraseña temporal.
+- `POST /api/auth/verificar-contrasena-actual`: confirma la contraseña actual antes de habilitar el formulario de cambio.
+
+En el primer ingreso, el cambio se ejecuta en dos pasos: primero se verifica la contraseña actual contra el hash almacenado en el servidor; solo después se habilitan la nueva contraseña y su confirmación. El endpoint de cambio repite la validación en el servidor para no depender del estado de la interfaz.
 
 La administración de usuarios se encuentra documentada en [módulo de usuarios, roles y alcance académico](modulo-usuarios-accesos.md). Las cuentas nuevas usan el CI como usuario y contraseña temporal; el primer ingreso exige definir una contraseña personal. Los alcances por sede y carrera se almacenan en relaciones separadas y se importan mediante columnas marcables del Excel.
 

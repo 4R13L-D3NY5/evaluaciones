@@ -3,6 +3,7 @@ package com.xpertiflow.evaluaciones.api.controller;
 import com.xpertiflow.evaluaciones.api.dto.auth.LoginRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.CambiarContrasenaRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.SesionUsuarioDto;
+import com.xpertiflow.evaluaciones.api.dto.auth.VerificarContrasenaActualRequestDto;
 import com.xpertiflow.evaluaciones.application.AutenticacionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -92,6 +93,14 @@ public class AutenticacionController {
             HttpServletRequest httpRequest) {
         service.cambiarContrasena(authentication, request.getContrasenaActual(), request.getContrasenaNueva());
         return ResponseEntity.ok(conEstadoSesion(service.obtenerSesion(authentication), httpRequest));
+    }
+
+    @PostMapping("/verificar-contrasena-actual")
+    public ResponseEntity<Void> verificarContrasenaActual(
+            @Valid @RequestBody VerificarContrasenaActualRequestDto request,
+            Authentication authentication) {
+        service.verificarContrasenaActual(authentication, request.getContrasenaActual());
+        return ResponseEntity.noContent().build();
     }
 
     private SesionUsuarioDto conEstadoSesion(SesionUsuarioDto sesion, HttpServletRequest request) {

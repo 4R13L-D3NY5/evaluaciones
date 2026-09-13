@@ -496,10 +496,11 @@ def _persistir_calificacion(
 ) -> None:
     respuestas = lectura["respuestas"]
     patron = {str(clave): valor for clave, valor in mapeo["patron"].items()}
-    total = len(patron)
-    aciertos = sum(1 for pregunta, correcta in patron.items() if respuestas.get(pregunta) == correcta)
-    blancos = sum(1 for pregunta in patron if not respuestas.get(pregunta))
-    dobles = sum(1 for pregunta in patron if len(respuestas.get(pregunta, "")) > 1)
+    anuladas = _cargar_anulaciones_activas(rol_examen_id, mapeo["variante"])
+    total = len([pregunta for pregunta in patron if int(pregunta) not in anuladas])
+    aciertos = sum(1 for pregunta, correcta in patron.items() if int(pregunta) not in anuladas and respuestas.get(pregunta) == correcta)
+    blancos = sum(1 for pregunta in patron if int(pregunta) not in anuladas and not respuestas.get(pregunta))
+    dobles = sum(1 for pregunta in patron if int(pregunta) not in anuladas and len(respuestas.get(pregunta, "")) > 1)
     fallos = max(0, total - aciertos - blancos)
     nota100 = round((aciertos / total) * 100, 2) if total else 0
     conexion = psycopg2.connect(host=config.DB_HOST, port=config.DB_PORT, dbname=config.DB_NAME,
@@ -529,14 +530,36 @@ def _persistir_calificacion(
         conexion.close()
 
 
-def _resumen_calificacion(lectura: dict[str, Any], mapeo: dict[str, Any]) -> dict[str, Any]:
+def _cargar_anulaciones_activas(rol_examen_id: str, letra_variante: str) -> set[int]:
+    """Obtiene las preguntas anuladas para respetarlas al reprocesar un escaneado."""
+    conexion = psycopg2.connect(
+        host=config.DB_HOST, port=config.DB_PORT, dbname=config.DB_NAME,
+        user=config.DB_USER, password=config.DB_PASSWORD
+    )
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                """SELECT numero_pregunta
+                     FROM sea_anulaciones_preguntas_omr
+                    WHERE rol_examen_id = %s
+                      AND UPPER(letra_variante) = UPPER(%s)
+                      AND activo = TRUE""",
+                (rol_examen_id, letra_variante),
+            )
+            return {int(numero) for (numero,) in cursor.fetchall()}
+    finally:
+        conexion.close()
+
+
+def _resumen_calificacion(rol_examen_id: str, lectura: dict[str, Any], mapeo: dict[str, Any]) -> dict[str, Any]:
     """Calcula el resumen y el estado de cada pregunta para revisión manual."""
     respuestas = lectura["respuestas"]
     patron = {str(clave): valor for clave, valor in mapeo["patron"].items()}
-    total = len(patron)
-    aciertos = sum(1 for pregunta, correcta in patron.items() if respuestas.get(pregunta) == correcta)
-    blancos = sum(1 for pregunta in patron if not respuestas.get(pregunta))
-    dobles = sum(1 for pregunta in patron if len(respuestas.get(pregunta, "")) > 1)
+    anuladas = _cargar_anulaciones_activas(rol_examen_id, mapeo["variante"])
+    total = len([pregunta for pregunta in patron if int(pregunta) not in anuladas])
+    aciertos = sum(1 for pregunta, correcta in patron.items() if int(pregunta) not in anuladas and respuestas.get(pregunta) == correcta)
+    blancos = sum(1 for pregunta in patron if int(pregunta) not in anuladas and not respuestas.get(pregunta))
+    dobles = sum(1 for pregunta in patron if int(pregunta) not in anuladas and len(respuestas.get(pregunta, "")) > 1)
     fallos = max(0, total - aciertos - blancos)
     nota100 = round((aciertos / total) * 100, 2) if total else 0
     detalles = []
@@ -544,7 +567,9 @@ def _resumen_calificacion(lectura: dict[str, Any], mapeo: dict[str, Any]) -> dic
         pregunta = str(detalle["pregunta"])
         respuesta = respuestas.get(pregunta, "")
         correcta = patron.get(pregunta, "")
-        if not respuesta:
+        if int(pregunta) in anuladas:
+            estado = "ANULADA"
+        elif not respuesta:
             estado = "EN_BLANCO"
         elif len(respuesta) > 1:
             estado = "DOBLE_MARCA"
@@ -599,7 +624,7 @@ def procesar_archivo(archivo: str, rol_examen_id: str, campus: str = "", impreso
         }
         if codigo:
             _persistir_calificacion(rol_examen_id, lectura, mapeos[codigo], archivo)
-            lectura.update(_resumen_calificacion(lectura, mapeos[codigo]))
+            lectura.update(_resumen_calificacion(rol_examen_id, lectura, mapeos[codigo]))
             lectura["estado"] = "CALIFICADO"
         else:
             lectura["codigoValidado"] = False

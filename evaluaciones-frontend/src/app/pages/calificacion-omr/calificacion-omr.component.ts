@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
-import { ConfiguracionOmr, OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
+import { AnulacionPreguntaOmr, ConfiguracionOmr, OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 if (typeof window !== 'undefined') {
@@ -17,9 +17,11 @@ export interface DetallePreguntaOmr {
   pregunta: number;
   patron: string;
   marcada: string;
-  estado: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA';
+  estado: 'CORRECTA' | 'INCORRECTA' | 'EN_BLANCO' | 'DOBLE_MARCA' | 'LEIDA' | 'SIN_PATRON' | 'ANULADA';
   puntos: number;
   densidades: number[];
+  anulada?: boolean;
+  motivoAnulacion?: string;
   ajustadaManualmente?: boolean;
 }
 
@@ -47,6 +49,11 @@ export interface EstudianteOmrItem {
   codigoOcr?: string[];
   grillaDetectada?: boolean;
   respuestasLeidas?: number;
+}
+
+interface PreguntaSeleccionadaAnulacionOmr {
+  variante: string;
+  pregunta: number;
 }
 
 /**
@@ -82,7 +89,7 @@ export interface EstudianteOmrItem {
             <sea-searchable-select
               [options]="rolExamenOpciones()"
               [value]="rolExamenSeleccionado()"
-              (valueChange)="rolExamenSeleccionado.set($event)"
+              (valueChange)="cambiarRolExamen($event)"
               [disabled]="cargandoRoles()"
               placeholder="Seleccione un rol de examen oficial"
               searchPlaceholder="Buscar por código o materia..."
@@ -133,6 +140,18 @@ export interface EstudianteOmrItem {
       @if (mensajeOmr()) {
         <div class="border border-blue-200 bg-blue-50 text-blue-900 rounded-xl px-4 py-3 text-xs font-bold">
           <i class="pi pi-info-circle mr-1"></i>{{ mensajeOmr() }}
+        </div>
+      }
+
+      @if (puedeGestionarAnulacionOmr() && estadoFlujo() === 'RESULTADOS') {
+        <div class="border border-rose-200 bg-rose-50 text-rose-900 rounded-xl px-4 py-3 text-xs">
+          <div class="flex items-start gap-2">
+            <i class="pi pi-ban mt-0.5 text-rose-700"></i>
+            <div>
+              <strong>Anulación de preguntas habilitada</strong>
+              <p class="mt-0.5">Una anulación se aplica a todos los estudiantes de la misma variante, queda auditada y recalcula sus notas. Anule solo preguntas con un motivo válido.</p>
+            </div>
+          </div>
         </div>
       }
 
@@ -691,11 +710,14 @@ export interface EstudianteOmrItem {
                           <th class="p-2 text-center">Marcada</th>
                           <th class="p-2 text-center">Estado</th>
                           <th class="p-2 text-right">Pts</th>
+                          @if (puedeGestionarAnulacionOmr()) {
+                            <th class="p-2 text-center">Acción</th>
+                          }
                         </tr>
                       </thead>
                       <tbody class="divide-y divide-border">
                         @for (item of est.detalles; track item.pregunta) {
-                          <tr [class]="item.estado === 'CORRECTA' ? 'hover:bg-emerald-50/30' : 'hover:bg-rose-50/30'">
+                          <tr [class]="item.estado === 'ANULADA' ? 'bg-rose-50/60' : (item.estado === 'CORRECTA' ? 'hover:bg-emerald-50/30' : 'hover:bg-rose-50/30')">
                             <td class="p-2 text-center font-bold font-mono text-muted-foreground">{{ item.pregunta }}</td>
                             <td class="p-2 text-center">
                               <span class="bg-blue-100 text-blue-900 font-black px-2 py-0.5 rounded text-[10px] font-mono">
@@ -703,7 +725,9 @@ export interface EstudianteOmrItem {
                               </span>
                             </td>
                             <td class="p-2 text-center font-bold">
-                              @if (item.estado === 'CORRECTA') {
+                              @if (item.estado === 'ANULADA') {
+                                <span class="text-rose-700 font-bold text-[10px]">No computa</span>
+                              } @else if (item.estado === 'CORRECTA') {
                                 <span class="text-emerald-700 font-mono font-black">{{ item.marcada }}</span>
                               } @else if (item.estado === 'INCORRECTA') {
                                 <span class="text-rose-700 font-mono font-black line-through">{{ item.marcada }}</span>
@@ -716,7 +740,11 @@ export interface EstudianteOmrItem {
                               }
                             </td>
                             <td class="p-2 text-center">
-                              @if (item.estado === 'CORRECTA') {
+                              @if (item.estado === 'ANULADA') {
+                                <span class="bg-rose-50 text-rose-800 border border-rose-300 font-bold px-2 py-0.5 rounded-full text-[9px]" [title]="item.motivoAnulacion || 'Pregunta anulada'">
+                                  <i class="pi pi-ban text-[8px]"></i> Anulada
+                                </span>
+                              } @else if (item.estado === 'CORRECTA') {
                                 <span class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold px-2 py-0.5 rounded-full text-[9px] inline-flex items-center gap-1">
                                   <i class="pi pi-check text-[8px]"></i> Correcta
                                 </span>
@@ -732,6 +760,10 @@ export interface EstudianteOmrItem {
                                 <span class="bg-blue-50 text-blue-800 border border-blue-300 font-bold px-2 py-0.5 rounded-full text-[9px]">
                                   Leída
                                 </span>
+                              } @else if (item.estado === 'SIN_PATRON') {
+                                <span class="bg-slate-50 text-slate-700 border border-slate-300 font-bold px-2 py-0.5 rounded-full text-[9px]">
+                                  Sin patrón
+                                </span>
                               } @else {
                                 <span class="bg-purple-50 text-purple-800 border border-purple-300 font-bold px-2 py-0.5 rounded-full text-[9px]">
                                   Doble Marca
@@ -741,6 +773,17 @@ export interface EstudianteOmrItem {
                             <td class="p-2 text-right font-mono font-bold text-foreground">
                               {{ item.puntos }}
                             </td>
+                            @if (puedeGestionarAnulacionOmr()) {
+                              <td class="p-2 text-center">
+                                @if (est.variante) {
+                                  <button type="button" (click)="gestionarAnulacionOmr(est, item)" class="h-7 w-7 rounded-lg border text-[10px] cursor-pointer" [class.border-rose-300]="item.anulada" [class.text-rose-700]="item.anulada" [class.border-border]="!item.anulada" [class.text-muted-foreground]="!item.anulada" [title]="item.anulada ? 'Reactivar pregunta para la variante ' + est.variante : 'Anular pregunta para la variante ' + est.variante">
+                                    <i class="pi" [class.pi-replay]="item.anulada" [class.pi-ban]="!item.anulada"></i>
+                                  </button>
+                                } @else {
+                                  <span class="text-[9px] text-muted-foreground" title="La variante aún no fue identificada">Sin variante</span>
+                                }
+                              </td>
+                            }
                           </tr>
                         }
                       </tbody>
@@ -754,6 +797,49 @@ export interface EstudianteOmrItem {
 
           </div>
 
+        </div>
+      }
+
+      @if (dialogAnulacionOmr(); as dialog) {
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div class="bg-card border border-border rounded-3xl max-w-lg w-full shadow-2xl">
+            <div class="flex items-start justify-between gap-4 p-6 border-b border-border">
+              <div>
+                <div class="flex items-center gap-2">
+                  <div class="h-10 w-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center border border-rose-200">
+                    <i class="pi pi-ban text-xl"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-lg font-black text-foreground">Anular pregunta OMR</h3>
+                    <p class="text-xs text-muted-foreground">Se aplicará a todos los estudiantes de la variante {{ dialog.variante }}.</p>
+                  </div>
+                </div>
+              </div>
+              <button (click)="cerrarDialogoAnulacionOmr()" class="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer" title="Cerrar">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+              <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-900">
+                <strong>Pregunta {{ dialog.pregunta }}</strong>
+                <p class="mt-1">La nota se recalculará excluyendo esta pregunta. La acción quedará registrada en la auditoría.</p>
+              </div>
+              <label class="space-y-1.5 block">
+                <span class="block text-[10px] uppercase tracking-wide font-black text-muted-foreground">Motivo de la anulación</span>
+                <textarea [ngModel]="motivoAnulacionOmr()" (ngModelChange)="motivoAnulacionOmr.set($event)" rows="4" maxlength="500" placeholder="Ej. Clave incorrecta o reactivo con error de impresión" class="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-medium text-foreground resize-y"></textarea>
+                <small class="block text-[10px] text-muted-foreground">Mínimo 5 caracteres. {{ motivoAnulacionOmr().length }}/500</small>
+              </label>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-2 p-6 border-t border-border">
+              <button (click)="cerrarDialogoAnulacionOmr()" [disabled]="guardandoAnulacionOmr()" class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer">Cancelar</button>
+              <button (click)="confirmarAnulacionOmr()" [disabled]="guardandoAnulacionOmr() || motivoAnulacionOmr().trim().length < 5" class="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer">
+                <i [class]="guardandoAnulacionOmr() ? 'pi pi-spin pi-spinner' : 'pi pi-ban'"></i>
+                Anular pregunta
+              </button>
+            </div>
+          </div>
         </div>
       }
 
@@ -1016,6 +1102,13 @@ export class CalificacionOmrComponent implements OnInit {
   public configuracionesOmr = signal<ConfiguracionOmr[]>([]);
   public impresoraOmr = signal<string>('');
 
+  // La anulación es por variante y pregunta: el backend la persiste, audita
+  // y recalcula todas las calificaciones de los estudiantes afectados.
+  public anulacionesOmr = signal<AnulacionPreguntaOmr[]>([]);
+  public dialogAnulacionOmr = signal<PreguntaSeleccionadaAnulacionOmr | null>(null);
+  public motivoAnulacionOmr = signal<string>('');
+  public guardandoAnulacionOmr = signal<boolean>(false);
+
   public totalPaginas = computed(() => {
     return this.paginasRenderizadas().length;
   });
@@ -1071,6 +1164,161 @@ export class CalificacionOmrComponent implements OnInit {
   public ngOnInit(): void {
     this._cargarRolesOficiales();
     this._cargarConfiguracionOmr();
+  }
+
+  public cambiarRolExamen(rolId: string): void {
+    this.rolExamenSeleccionado.set(rolId || '');
+    this.estudiantes.set([]);
+    this.calificacionEjecutada.set(false);
+    this.estadoFlujo.set('ALINEACION');
+    this._cargarAnulaciones(rolId);
+  }
+
+  public puedeGestionarAnulacionOmr(): boolean {
+    const rol = this.rolesExamen().find(item => item.id === this.rolExamenSeleccionado());
+    return !!rol && (rol.estadoFlujo === 'DEVUELTO' || rol.estadoFlujo === 'PENDIENTE_NOTAS');
+  }
+
+  public preguntaAnuladaOmr(variante: string, pregunta: number): boolean {
+    return this.anulacionesOmr().some(anulacion =>
+      anulacion.activo && anulacion.letraVariante.toUpperCase() === variante.toUpperCase() && anulacion.numeroPregunta === pregunta
+    );
+  }
+
+  public gestionarAnulacionOmr(estudiante: EstudianteOmrItem, detalle: DetallePreguntaOmr): void {
+    if (!this.puedeGestionarAnulacionOmr() || !estudiante.variante) return;
+    if (this.preguntaAnuladaOmr(estudiante.variante, detalle.pregunta)) {
+      if (!window.confirm(`¿Desea reactivar la pregunta ${detalle.pregunta} de la variante ${estudiante.variante}?`)) return;
+      this.guardandoAnulacionOmr.set(true);
+      const rolId = this.rolExamenSeleccionado();
+      this.omrProcesamientoService.reactivarPregunta(rolId, estudiante.variante, detalle.pregunta).subscribe({
+        next: () => {
+          this.anulacionesOmr.update(actual => actual.filter(item =>
+            !(item.activo && item.letraVariante.toUpperCase() === estudiante.variante.toUpperCase() && item.numeroPregunta === detalle.pregunta)
+          ));
+          this._recalcularVistaOmr();
+          this.mensajeOmr.set(`La pregunta ${detalle.pregunta} volvió a participar en la variante ${estudiante.variante}.`);
+        },
+        error: error => this.mostrarErrorAnulacionOmr(error, 'No se pudo reactivar la pregunta.'),
+        complete: () => this.guardandoAnulacionOmr.set(false)
+      });
+      return;
+    }
+    this.motivoAnulacionOmr.set('');
+    this.dialogAnulacionOmr.set({ variante: estudiante.variante, pregunta: detalle.pregunta });
+  }
+
+  public cerrarDialogoAnulacionOmr(): void {
+    if (!this.guardandoAnulacionOmr()) this.dialogAnulacionOmr.set(null);
+  }
+
+  public confirmarAnulacionOmr(): void {
+    const seleccion = this.dialogAnulacionOmr();
+    const motivo = this.motivoAnulacionOmr().trim();
+    const rolId = this.rolExamenSeleccionado();
+    if (!seleccion || !rolId || motivo.length < 5 || !this.puedeGestionarAnulacionOmr()) return;
+
+    this.guardandoAnulacionOmr.set(true);
+    this.omrProcesamientoService.anularPregunta(rolId, {
+      letraVariante: seleccion.variante,
+      numeroPregunta: seleccion.pregunta,
+      motivo
+    }).subscribe({
+      next: anulacion => {
+        this.anulacionesOmr.update(actual => [
+          ...actual.filter(item => !(item.activo && item.letraVariante.toUpperCase() === anulacion.letraVariante.toUpperCase() && item.numeroPregunta === anulacion.numeroPregunta)),
+          anulacion
+        ]);
+        this._recalcularVistaOmr();
+        this.dialogAnulacionOmr.set(null);
+        this.motivoAnulacionOmr.set('');
+        this.mensajeOmr.set(`Pregunta ${seleccion.pregunta} anulada para la variante ${seleccion.variante}. Las notas fueron recalculadas.`);
+      },
+      error: error => this.mostrarErrorAnulacionOmr(error, 'No se pudo anular la pregunta.'),
+      complete: () => this.guardandoAnulacionOmr.set(false)
+    });
+  }
+
+  private _cargarAnulaciones(rolId: string): void {
+    this.anulacionesOmr.set([]);
+    if (!rolId) return;
+    this.omrProcesamientoService.listarAnulaciones(rolId).subscribe({
+      next: anulaciones => this.anulacionesOmr.set(anulaciones.filter(item => item.activo)),
+      error: error => {
+        console.error('No se pudieron cargar las anulaciones OMR:', error);
+        this.mensajeOmr.set('No se pudieron cargar las anulaciones activas de esta evaluación.');
+      }
+    });
+  }
+
+  private mostrarErrorAnulacionOmr(error: any, mensaje: string): void {
+    console.error(mensaje, error);
+    this.mensajeOmr.set(error?.error?.error || error?.error?.message || mensaje);
+  }
+
+  private _recalcularVistaOmr(): void {
+    const anulaciones = this.anulacionesOmr();
+    if (this.estudiantes().length === 0) return;
+    this.estudiantes.set(this.estudiantes().map(estudiante => this._recalcularEstudianteOmr(estudiante, anulaciones)));
+  }
+
+  private _recalcularEstudianteOmr(estudiante: EstudianteOmrItem, anulaciones: AnulacionPreguntaOmr[]): EstudianteOmrItem {
+    const anulacionesVariante = new Map(anulaciones
+      .filter(item => item.activo && item.letraVariante.toUpperCase() === estudiante.variante.toUpperCase())
+      .map(item => [item.numeroPregunta, item]));
+    let aciertos = 0;
+    let fallos = 0;
+    let blancos = 0;
+    let doblesMarcas = 0;
+    const detalles = estudiante.detalles.map(detalle => {
+      const anulacion = anulacionesVariante.get(detalle.pregunta);
+      if (anulacion) {
+        return { ...detalle, estado: 'ANULADA' as const, anulada: true, motivoAnulacion: anulacion.motivo, puntos: 0 };
+      }
+      const marcada = (detalle.marcada || '').trim();
+      const patron = (detalle.patron || '').trim();
+      let estado: DetallePreguntaOmr['estado'];
+      let puntos = 0;
+      if (!marcada) {
+        estado = 'EN_BLANCO';
+        blancos++;
+      } else if (marcada.length > 1) {
+        estado = 'DOBLE_MARCA';
+        doblesMarcas++;
+        fallos++;
+      } else if (!patron || patron === '—') {
+        estado = 'SIN_PATRON';
+      } else if (marcada.toUpperCase() === patron.toUpperCase()) {
+        estado = 'CORRECTA';
+        aciertos++;
+      } else {
+        estado = 'INCORRECTA';
+        fallos++;
+      }
+      return { ...detalle, estado, anulada: false, motivoAnulacion: undefined, puntos };
+    });
+    const totalPreguntas = detalles.filter(detalle => detalle.estado !== 'ANULADA').length;
+    fallos = Math.max(0, totalPreguntas - aciertos - blancos);
+    const nota100 = totalPreguntas === 0 ? 0 : Math.round((aciertos / totalPreguntas) * 1000) / 10;
+    const nota60 = totalPreguntas === 0 ? 0 : Math.round((aciertos / totalPreguntas) * 600) / 100;
+    const puntosPorReactivo = totalPreguntas === 0 ? 0 : 60 / totalPreguntas;
+    const detallesConPuntos = detalles.map(detalle => ({
+      ...detalle,
+      puntos: detalle.estado === 'CORRECTA' ? Math.round(puntosPorReactivo * 100) / 100 : 0
+    }));
+    return {
+      ...estudiante,
+      totalPreguntas,
+      aciertos,
+      fallos,
+      blancos,
+      doblesMarcas,
+      nota100,
+      nota60,
+      aprobado: estudiante.estadoCalificacion !== 'REVISION_MANUAL' && nota100 >= 51,
+      estadoCalificacion: estudiante.estadoCalificacion === 'REVISION_MANUAL' ? 'REVISION_MANUAL' : (nota100 >= 51 ? 'APROBADO' : 'REPROBADO'),
+      detalles: detallesConPuntos
+    };
   }
 
   private configuracionOmrDefecto(): ConfiguracionOmr {
@@ -1236,6 +1484,7 @@ export class CalificacionOmrComponent implements OnInit {
         const primerRol = this.rolesExamen()[0];
         if (primerRol) {
           this.rolExamenSeleccionado.set(primerRol.id);
+          this._cargarAnulaciones(primerRol.id);
         }
       },
       error: () => this.mensajeOmr.set('No se pudieron cargar los roles de examen oficiales.'),
@@ -1425,6 +1674,7 @@ export class CalificacionOmrComponent implements OnInit {
           this._convertirLecturaOmr(lectura, paginas[indice] || '', indice + 1)
         );
         this.estudiantes.set(lecturas);
+        this._recalcularVistaOmr();
         this.estudianteActivoIdx.set(0);
         this.paginaProgreso.set(resultado.totalPaginas || lecturas.length || 1);
         this.calificacionEjecutada.set(true);
@@ -1446,15 +1696,26 @@ export class CalificacionOmrComponent implements OnInit {
     const respuestasLeidas = Object.values(respuestas).filter(respuesta => !!respuesta).length;
     const detalles: DetallePreguntaOmr[] = Array.from({ length: total }, (_, indice) => {
       const pregunta = indice + 1;
-      const marcada = respuestas[String(pregunta)] || '';
-      const estado = marcada.length > 1 ? 'DOBLE_MARCA' : marcada ? 'LEIDA' : 'EN_BLANCO';
+      const detalleLeido = lectura.detalles?.[indice];
+      const marcada = detalleLeido?.respuesta || respuestas[String(pregunta)] || '';
+      const patron = detalleLeido?.respuestaCorrecta || '—';
+      const anulacion = lectura.letraVariante && this.preguntaAnuladaOmr(lectura.letraVariante, pregunta)
+        ? this.anulacionesOmr().find(item => item.activo && item.letraVariante.toUpperCase() === lectura.letraVariante!.toUpperCase() && item.numeroPregunta === pregunta)
+        : undefined;
+      const estado: DetallePreguntaOmr['estado'] = anulacion
+        ? 'ANULADA'
+        : (detalleLeido?.estado === 'SIN_PATRON'
+          ? 'SIN_PATRON'
+          : (marcada.length > 1 ? 'DOBLE_MARCA' : marcada ? 'LEIDA' : 'EN_BLANCO'));
       return {
         pregunta,
-        patron: '—',
+        patron,
         marcada,
         estado,
         puntos: 0,
-        densidades: lectura.detalles?.[indice]?.densidades || []
+        densidades: detalleLeido?.densidades || [],
+        anulada: !!anulacion,
+        motivoAnulacion: anulacion?.motivo
       };
     });
     const codigoDetectado = this._obtenerCodigoDetectado(lectura);
@@ -1464,7 +1725,7 @@ export class CalificacionOmrComponent implements OnInit {
       nombre: lectura.estudianteNombre || 'PENDIENTE DE REVISIÓN MANUAL',
       carrera: rol?.carreraNombre || '',
       grupo: rol?.grupo || '',
-      variante: '',
+      variante: lectura.letraVariante || '',
       totalPreguntas: total,
       aciertos: lectura.aciertos || 0,
       fallos: lectura.fallos || 0,

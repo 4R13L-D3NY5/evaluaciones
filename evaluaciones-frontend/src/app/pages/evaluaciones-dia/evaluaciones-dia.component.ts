@@ -80,6 +80,8 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   }[];
 }
 
+type ColumnaOrdenEvaluaciones = 'materia' | 'docente' | 'parcial' | 'fechaHora' | 'modalidad' | 'etapa';
+
 interface SalaVirtualOperacion {
   id: string;
   rolExamenId: string;
@@ -378,12 +380,12 @@ interface CampusDisponible extends Campus {
             <table class="w-full text-left border-collapse text-xs">
               <thead>
                 <tr class="border-b border-border bg-muted/40 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                  <th class="p-3.5 min-w-[200px]">Materia / Grupo</th>
-                  <th class="p-3.5">Docente Titular</th>
-                  <th class="p-3.5 text-center">Parcial</th>
-                  <th class="p-3.5">Fecha / Hora</th>
-                  <th class="p-3.5 text-center">Modalidad</th>
-                  <th class="p-3.5 text-center min-w-[310px]">Flujo de Estados</th>
+                  <th class="p-3.5 min-w-[200px]" [attr.aria-sort]="atributoOrden('materia')"><button type="button" (click)="ordenarPor('materia')" [title]="tituloOrden('materia')" class="inline-flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">Materia / Grupo <i class="pi text-[10px]" [class]="iconoOrden('materia')"></i></button></th>
+                  <th class="p-3.5" [attr.aria-sort]="atributoOrden('docente')"><button type="button" (click)="ordenarPor('docente')" [title]="tituloOrden('docente')" class="inline-flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">Docente Titular <i class="pi text-[10px]" [class]="iconoOrden('docente')"></i></button></th>
+                  <th class="p-3.5 text-center" [attr.aria-sort]="atributoOrden('parcial')"><button type="button" (click)="ordenarPor('parcial')" [title]="tituloOrden('parcial')" class="inline-flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">Parcial <i class="pi text-[10px]" [class]="iconoOrden('parcial')"></i></button></th>
+                  <th class="p-3.5" [attr.aria-sort]="atributoOrden('fechaHora')"><button type="button" (click)="ordenarPor('fechaHora')" [title]="tituloOrden('fechaHora')" class="inline-flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">Fecha / Hora <i class="pi text-[10px]" [class]="iconoOrden('fechaHora')"></i></button></th>
+                  <th class="p-3.5 text-center" [attr.aria-sort]="atributoOrden('modalidad')"><button type="button" (click)="ordenarPor('modalidad')" [title]="tituloOrden('modalidad')" class="inline-flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">Modalidad <i class="pi text-[10px]" [class]="iconoOrden('modalidad')"></i></button></th>
+                  <th class="p-3.5 text-center min-w-[310px]" [attr.aria-sort]="atributoOrden('etapa')"><button type="button" (click)="ordenarPor('etapa')" [title]="tituloOrden('etapa')" class="inline-flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">Flujo de Estados <i class="pi text-[10px]" [class]="iconoOrden('etapa')"></i></button></th>
                   <th class="p-3.5 text-center min-w-[108px]">
                     <span class="inline-flex items-center gap-1.5"><i class="pi pi-id-card text-[11px] text-teal-600"></i>Marcas OMR</span>
                   </th>
@@ -2312,6 +2314,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public busquedaTexto = '';
   public filtrosActualizados = signal(0);
+  public columnaOrden = signal<ColumnaOrdenEvaluaciones>('fechaHora');
+  public direccionOrden = signal<'asc' | 'desc'>('asc');
   
   // Multi-Selección de Estados
   public estadosSeleccionados = signal<string[]>([]);
@@ -2573,21 +2577,79 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       );
     }
 
+    const columna = this.columnaOrden();
+    const factor = this.direccionOrden() === 'asc' ? 1 : -1;
     return [...list].sort((a, b) => {
-      const fecha = (a.fecha || '').localeCompare(b.fecha || '');
-      if (fecha !== 0) return fecha;
-      const hora = this.compararHoraEvaluacion(a, b);
-      if (hora !== 0) return hora;
-      const codigo = a.codigo.localeCompare(b.codigo, 'es', { numeric: true, sensitivity: 'base' });
-      if (codigo !== 0) return codigo;
-      const grupo = a.grupo.localeCompare(b.grupo, 'es', { numeric: true, sensitivity: 'base' });
-      if (grupo !== 0) return grupo;
-      const tipoOrden: Record<string, number> = { '1er Parcial': 1, '2do Parcial': 2, 'Final': 3, '2da Instancia': 4 };
-      const tipo = (tipoOrden[a.tipo] || 99) - (tipoOrden[b.tipo] || 99);
-      if (tipo !== 0) return tipo;
-      return (a.version || 1) - (b.version || 1);
+      const comparacion = this.compararPorColumna(a, b, columna);
+      return comparacion !== 0 ? comparacion * factor : this.compararOrdenPredeterminado(a, b);
     });
   });
+
+  public ordenarPor(columna: ColumnaOrdenEvaluaciones): void {
+    if (this.columnaOrden() === columna) {
+      this.direccionOrden.update(direccion => direccion === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    this.columnaOrden.set(columna);
+    this.direccionOrden.set('asc');
+  }
+
+  public atributoOrden(columna: ColumnaOrdenEvaluaciones): string {
+    if (this.columnaOrden() !== columna) return 'none';
+    return this.direccionOrden() === 'asc' ? 'ascending' : 'descending';
+  }
+
+  public tituloOrden(columna: ColumnaOrdenEvaluaciones): string {
+    const nombre = this.nombreColumnaOrden(columna);
+    if (this.columnaOrden() !== columna) return `Ordenar ${nombre} de forma ascendente`;
+    return `Ordenar ${nombre} de forma ${this.direccionOrden() === 'asc' ? 'descendente' : 'ascendente'}`;
+  }
+
+  public iconoOrden(columna: ColumnaOrdenEvaluaciones): string {
+    if (this.columnaOrden() !== columna) return 'pi text-[10px] pi-sort-alt text-muted-foreground';
+    return this.direccionOrden() === 'asc'
+      ? 'pi text-[10px] pi-sort-amount-up text-primary'
+      : 'pi text-[10px] pi-sort-amount-down text-primary';
+  }
+
+  private nombreColumnaOrden(columna: ColumnaOrdenEvaluaciones): string {
+    return ({ materia: 'materia y grupo', docente: 'docente', parcial: 'parcial', fechaHora: 'fecha y hora', modalidad: 'modalidad', etapa: 'flujo de estados' } as Record<ColumnaOrdenEvaluaciones, string>)[columna];
+  }
+
+  private compararPorColumna(a: EvaluacionItemUI, b: EvaluacionItemUI, columna: ColumnaOrdenEvaluaciones): number {
+    if (columna === 'fechaHora') {
+      const fecha = (a.fecha || '').localeCompare(b.fecha || '');
+      return fecha !== 0 ? fecha : this.compararHoraEvaluacion(a, b);
+    }
+    if (columna === 'materia') {
+      return `${a.codigo} ${a.materia} ${a.grupo}`.localeCompare(`${b.codigo} ${b.materia} ${b.grupo}`, 'es', { numeric: true, sensitivity: 'base' });
+    }
+    if (columna === 'docente') return (a.docenteNombre || '').localeCompare(b.docenteNombre || '', 'es', { sensitivity: 'base' });
+    if (columna === 'parcial') return this.valorTipoEvaluacion(a.tipo) - this.valorTipoEvaluacion(b.tipo);
+    if (columna === 'modalidad') return this.textoModalidad(a).localeCompare(this.textoModalidad(b), 'es', { sensitivity: 'base' });
+    return (a.etapa || '').localeCompare(b.etapa || '', 'es', { sensitivity: 'base' });
+  }
+
+  private compararOrdenPredeterminado(a: EvaluacionItemUI, b: EvaluacionItemUI): number {
+    const fecha = (a.fecha || '').localeCompare(b.fecha || '');
+    if (fecha !== 0) return fecha;
+    const hora = this.compararHoraEvaluacion(a, b);
+    if (hora !== 0) return hora;
+    const codigo = a.codigo.localeCompare(b.codigo, 'es', { numeric: true, sensitivity: 'base' });
+    if (codigo !== 0) return codigo;
+    const grupo = a.grupo.localeCompare(b.grupo, 'es', { numeric: true, sensitivity: 'base' });
+    if (grupo !== 0) return grupo;
+    const tipo = this.valorTipoEvaluacion(a.tipo) - this.valorTipoEvaluacion(b.tipo);
+    return tipo !== 0 ? tipo : (a.version || 1) - (b.version || 1);
+  }
+
+  private valorTipoEvaluacion(tipo: string): number {
+    return ({ '1er Parcial': 1, '2do Parcial': 2, Final: 3, '2da Instancia': 4 } as Record<string, number>)[tipo] || 99;
+  }
+
+  private textoModalidad(item: EvaluacionItemUI): string {
+    return item.modalidad || (item.conCartilla ? 'PRESENCIAL_CARTILLA' : 'PRESENCIAL_SIN_CARTILLA');
+  }
 
   private compararHoraEvaluacion(a: EvaluacionItemUI, b: EvaluacionItemUI): number {
     return this.valorHoraEvaluacion(a) - this.valorHoraEvaluacion(b);

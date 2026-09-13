@@ -40,9 +40,7 @@ public class AutenticacionService {
     @Transactional
     public void cambiarContrasena(Authentication authentication, String contrasenaActual, String contrasenaNueva) {
         UsuarioSistema usuario = obtenerUsuario(authentication);
-        if (!passwordEncoder.matches(contrasenaActual, usuario.getContrasenaHash())) {
-            throw new IllegalArgumentException("La contraseña actual no es correcta");
-        }
+        verificarContrasenaActual(usuario, contrasenaActual);
         if (contrasenaNueva == null || contrasenaNueva.length() < 8) {
             throw new IllegalArgumentException("La nueva contraseña debe tener al menos 8 caracteres");
         }
@@ -53,6 +51,17 @@ public class AutenticacionService {
         usuario.setDebeCambiarContrasena(false);
         usuario.setActualizadoEn(LocalDateTime.now());
         repository.save(usuario);
+    }
+
+    @Transactional(readOnly = true)
+    public void verificarContrasenaActual(Authentication authentication, String contrasenaActual) {
+        verificarContrasenaActual(obtenerUsuario(authentication), contrasenaActual);
+    }
+
+    private void verificarContrasenaActual(UsuarioSistema usuario, String contrasenaActual) {
+        if (contrasenaActual == null || !passwordEncoder.matches(contrasenaActual, usuario.getContrasenaHash())) {
+            throw new IllegalArgumentException("La contraseña actual no es correcta");
+        }
     }
 
     private UsuarioSistema obtenerUsuario(Authentication authentication) {
