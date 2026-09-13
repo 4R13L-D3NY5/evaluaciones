@@ -12,6 +12,7 @@ export interface MenuItem {
   badge?: string;
   description: string;
   roles: AppRole[];
+  soloRoles?: AppRole[];
 }
 
 @Component({
@@ -199,7 +200,7 @@ export class SidebarComponent implements OnInit {
   public readonly visibleMenuItems = computed(() => {
     const usuario = this.authService.usuario();
     if (!usuario) return [];
-    if (usuario.rol === 'ADMINISTRADOR_SISTEMA') return this.menuItems;
+    if (usuario.rol === 'ADMINISTRADOR_SISTEMA') return this.menuItems.filter(item => !item.soloRoles);
     return this.menuItems.filter(item => item.roles.includes(usuario.rol));
   });
 
@@ -209,7 +210,7 @@ export class SidebarComponent implements OnInit {
       route: '/dashboard',
       icon: 'pi pi-chart-pie',
       description: 'Métricas, KPIs y estadísticas generales de evaluaciones',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE', 'VICERRECTOR', 'DIRECTOR_CARRERA']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE', 'VICERRECTOR', 'DIRECTOR_CARRERA', 'VERIFICADOR']
     },
     {
       label: 'Plan de Estudios',
@@ -224,6 +225,14 @@ export class SidebarComponent implements OnInit {
       icon: 'pi pi-question-circle',
       description: 'Descarga de plantillas, validación y previsualización de preguntas',
       roles: ['DOCENTE']
+    },
+    {
+      label: 'Verificar exámenes',
+      route: '/verificar-examenes',
+      icon: 'pi pi-verified',
+      description: 'Revisión completa de exámenes validados antes de su generación',
+      roles: ['VERIFICADOR'],
+      soloRoles: ['VERIFICADOR']
     },
     {
       label: 'Lista de Evaluaciones por Día',

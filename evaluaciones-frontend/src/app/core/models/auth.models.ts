@@ -4,7 +4,8 @@ export type AppRole =
   | 'PERSONAL_EVALUACIONES'
   | 'DOCENTE'
   | 'VICERRECTOR'
-  | 'DIRECTOR_CARRERA';
+  | 'DIRECTOR_CARRERA'
+  | 'VERIFICADOR';
 
 export interface UsuarioSesion {
   usuario: string;

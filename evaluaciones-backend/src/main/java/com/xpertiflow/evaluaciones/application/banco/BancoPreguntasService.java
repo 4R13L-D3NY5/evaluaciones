@@ -6,6 +6,7 @@ import com.xpertiflow.evaluaciones.api.dto.banco.CargaBancoResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.ReactivoResponseDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaVerificacion;
 import com.xpertiflow.evaluaciones.domain.entity.Reactivo;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
@@ -13,6 +14,8 @@ import com.xpertiflow.evaluaciones.domain.enums.TipoParcial;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ReactivoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaVerificacionRepository;
 import com.xpertiflow.evaluaciones.security.BancoCifradoService;
 import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +48,8 @@ public class BancoPreguntasService {
     private final RolExamenService rolExamenService;
     private final ObjectMapper objectMapper;
     private final BancoCifradoService cifradoService;
+    private final VerificacionExamenRepository verificacionRepository;
+    private final AuditoriaVerificacionRepository auditoriaVerificacionRepository;
 
     private static final int TOTAL_REQUERIDO = 60;
     private static final int CUOTA_FACILES = 15;
@@ -110,7 +115,19 @@ public class BancoPreguntasService {
                 .estado(banco.getEstado())
                 .docenteAprobador(banco.getDocenteAprobador())
                 .fechaAprobacion(banco.getFechaAprobacion())
+                .estadoVerificacion(verificacionRepository.findByRolExamenId(banco.getRolExamenId()).map(v -> v.getEstado()).orElse(null))
+                .observacionesVerificacion(verificacionRepository.findByRolExamenId(banco.getRolExamenId()).map(v -> v.getObservacionesGenerales()).orElse(null))
+                .observacionesVerificacionPreguntas(verificacionRepository.findByRolExamenId(banco.getRolExamenId()).map(v -> leerObservacionesVerificacion(v.getObservacionesPreguntasJson())).orElse(Map.of()))
                 .build();
+    }
+
+    private Map<String, String> leerObservacionesVerificacion(String json) {
+        if (json == null || json.isBlank()) return Map.of();
+        try {
+            return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() { });
+        } catch (IOException exception) {
+            return Map.of();
+        }
     }
 
     @Transactional
@@ -335,6 +352,26 @@ public class BancoPreguntasService {
             banco.setDocenteAprobador(docenteOficial.trim());
             banco.setFechaAprobacion(LocalDateTime.now());
             bancoRepository.save(banco);
+
+            // Al sustituir el banco, cualquier aprobación previa deja de ser
+            // válida. La nueva revisión se asociará al banco recién cargado.
+            verificacionRepository.findByRolExamenId(rol.getId()).ifPresent(verificacion -> {
+                verificacion.setBancoPreguntasId(bancoId);
+                verificacion.setEstado("PENDIENTE");
+                verificacion.setObservacionesGenerales(null);
+                verificacion.setObservacionesPreguntasJson(null);
+                verificacion.setVerificadoPor(null);
+                verificacion.setFechaVerificacion(null);
+                verificacion.setActualizadoEn(LocalDateTime.now());
+                verificacionRepository.save(verificacion);
+                AuditoriaVerificacion auditoria = new AuditoriaVerificacion();
+                auditoria.setRolExamenId(rol.getId());
+                auditoria.setAccion("REINICIO_VERIFICACION_POR_REEMPLAZO");
+                auditoria.setRealizadoPor(usuarioAuditoria == null || usuarioAuditoria.isBlank() ? "SISTEMA" : usuarioAuditoria);
+                auditoria.setDetalle("El banco validado fue reemplazado; se requiere una nueva revisión");
+                auditoria.setFechaEvento(LocalDateTime.now());
+                auditoriaVerificacionRepository.save(auditoria);
+            });
 
             // Guardar reactivos
             for (Reactivo r : reactivos) {

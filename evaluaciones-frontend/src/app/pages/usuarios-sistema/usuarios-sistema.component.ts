@@ -279,6 +279,11 @@ interface RolCatalogo extends RolSistema {
                   <div class="check-grid campus-grid">@for (item of campusesDisponibles(); track claveCampus(item.sede.code, item.campus)) {<label class="check-item" [class.campus-disabled]="tieneCampus(item.sede.code, item.campus) && !campusHabilitado(item.sede.code, item.campus)"><input type="checkbox" [checked]="tieneCampus(item.sede.code, item.campus)" (change)="alternarCampus(item.sede, item.campus)"><span><strong>{{ item.campus.name }} ({{ item.sede.name }})</strong><small>@if (item.campus.code) {Código {{ item.campus.code }}} @else if (item.campus.campusId) {ID institucional {{ item.campus.campusId }}}</small></span>@if (tieneCampus(item.sede.code, item.campus)) {<button type="button" class="campus-status" [class.enabled]="campusHabilitado(item.sede.code, item.campus)" (click)="$event.preventDefault(); $event.stopPropagation(); alternarEstadoCampus(item.sede.code, item.campus)" [title]="campusHabilitado(item.sede.code, item.campus) ? 'Deshabilitar campus' : 'Habilitar campus'"><i [class]="campusHabilitado(item.sede.code, item.campus) ? 'pi pi-check-circle' : 'pi pi-ban'"></i>{{ campusHabilitado(item.sede.code, item.campus) ? 'Habilitado' : 'Deshabilitado' }}</button>}</label>}</div>
                   @if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}
                 </div>
+              } @else if (esVerificadorSeleccionado()) {
+                <div class="grid gap-5 md:grid-cols-2">
+                  <div><div class="section-title"><i class="pi pi-building"></i><span>Sedes completas</span><small>acceso a toda la sede</small></div><div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div></div>
+                  <div><div class="section-title"><i class="pi pi-graduation-cap"></i><span>Carreras específicas</span><small>acceso solo a esas carreras</small></div><div class="check-grid">@for (carrera of carreras; track carrera.careerCode) {<label class="check-item"><input type="checkbox" [checked]="tieneCarrera(carrera.careerCode)" (change)="alternarCarrera(carrera)"><span><strong>{{ carrera.careerCode }}</strong><small>{{ carrera.careerName }}</small></span></label>}</div></div>
+                </div>
               } @else if (esRolConAlcanceSimple()) {
                 <div><div class="section-title"><i class="pi pi-building"></i><span>Sedes asignadas</span><small>puedes marcar varias</small></div><div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div>@if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}</div>
               }
@@ -353,7 +358,7 @@ export class UsuariosSistemaComponent implements OnInit {
   private carrerasSeleccionadas = new Map<string, AlcanceAcademico>();
   private campusesSeleccionados = new Map<string, AlcanceCampus>();
 
-  private readonly rolesDeEvaluaciones = new Set(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']);
+  private readonly rolesDeEvaluaciones = new Set(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VERIFICADOR']);
   private readonly rolesInstitucionales = new Set(['ADMINISTRADOR_SISTEMA', 'DIRECTOR_CARRERA', 'DOCENTE', 'VICERRECTOR']);
 
   private readonly catalogoRolesBase: RolCatalogo[] = [
@@ -395,6 +400,19 @@ export class UsuariosSistemaComponent implements OnInit {
         'Procesar lecturas y observaciones OMR.'
       ],
       icono: 'pi pi-file-edit'
+    },
+    {
+      codigo: 'VERIFICADOR',
+      nombre: 'Verificador de exámenes',
+      descripcion: 'Revisa el formato y contenido de bancos validados antes de su generación.',
+      alcance: 'Sedes y carreras asignadas',
+      permisos: [
+        'Consultar exámenes validados dentro de su alcance.',
+        'Previsualizar todas las preguntas y la clave de respuestas.',
+        'Aprobar o devolver exámenes con observaciones.',
+        'No puede editar el banco de preguntas.'
+      ],
+      icono: 'pi pi-verified'
     },
     {
       codigo: 'DIRECTOR_CARRERA',
@@ -483,7 +501,7 @@ export class UsuariosSistemaComponent implements OnInit {
   public rolesPermitidos(): RolSistema[] {
     return this.auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
       ? this.rolesVisibles()
-      : this.rolesVisibles().filter(rol => rol.codigo !== 'ADMINISTRADOR_SISTEMA');
+      : this.rolesVisibles().filter(rol => !['ADMINISTRADOR_SISTEMA', 'VERIFICADOR'].includes(rol.codigo));
   }
 
   public cambiarVista(vista: 'usuarios' | 'sea' | 'roles'): void { this.vistaActual.set(vista); }
@@ -592,6 +610,8 @@ export class UsuariosSistemaComponent implements OnInit {
   public esRolConAlcanceSimple(): boolean {
     return !this.requiereAsignacionesAcademicas();
   }
+
+  public esVerificadorSeleccionado(): boolean { return this.form.rolCodigo === 'VERIFICADOR'; }
 
   public mostrarCarrerasAsignacion(): boolean {
     return this.requiereAsignacionesAcademicas() && !!this.sedeAsignacionCodigo;
@@ -739,7 +759,7 @@ export class UsuariosSistemaComponent implements OnInit {
       ['PLANTILLA DE USUARIOS SEA'],
       ['CI', 'Obligatorio. Será el usuario y la contraseña temporal de una cuenta nueva.'],
       ['NOMBRE_COMPLETO', 'Obligatorio. Conservar exactamente el orden recibido desde SEA.'],
-      ['ROL', 'Usar el código del rol asignado, por ejemplo DOCENTE o DIRECTOR_CARRERA.'],
+      ['ROL', 'Usar el código del rol asignado, por ejemplo DOCENTE, DIRECTOR_CARRERA o VERIFICADOR.'],
       ['SEDE [...] / CARRERA [...]', 'Marcar con X las columnas que correspondan. Se pueden marcar varias.'],
       ['CAMPUS', 'Solo para PERSONAL_EVALUACIONES: SEDE_CODIGO|CAMPUS_ID|CAMPUS_CODIGO|CAMPUS_NOMBRE|SI o NO. Separe varios campus con punto y coma.'],
       ['Nota', 'No elimines ni cambies los códigos entre corchetes; son los códigos oficiales del catálogo SEA.']

@@ -19,4 +19,10 @@ public class PrevisualizacionTypstRequestDto {
     @NotEmpty
     @Size(max = 200)
     private List<Map<String, Object>> preguntas;
+
+    /** Modo interno para la revisión completa de un banco ya validado. */
+    private Boolean modoVerificacion;
+
+    /** La clave se entrega únicamente en la previsualización del verificador. */
+    private Boolean incluirClave;
 }

@@ -82,7 +82,7 @@ public class UsuariosSistemaService {
     @Transactional(readOnly = true)
     public List<UsuarioSistemaResponseDto> listar(String contexto) {
         Set<String> rolesVisibles = "EVALUACIONES".equalsIgnoreCase(contexto)
-                ? Set.of("RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES")
+                ? Set.of("RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "VERIFICADOR")
                 : Set.of("ADMINISTRADOR_SISTEMA", "DIRECTOR_CARRERA", "DOCENTE", "VICERRECTOR");
         Map<String, AlcanceSea> alcancesSea = "EVALUACIONES".equalsIgnoreCase(contexto)
                 ? Map.of() : construirAlcancesSea();
@@ -605,7 +605,7 @@ public class UsuariosSistemaService {
             String[] textos = {
                     "CI: obligatorio; será el usuario y la contraseña temporal.",
                     "NOMBRE_COMPLETO: conservar exactamente el orden recibido desde SEA.",
-                    "ROL: usar ADMINISTRADOR_SISTEMA, RESPONSABLE_EVALUACIONES, PERSONAL_EVALUACIONES, DIRECTOR_CARRERA, DOCENTE o VICERRECTOR.",
+                    "ROL: usar ADMINISTRADOR_SISTEMA, RESPONSABLE_EVALUACIONES, PERSONAL_EVALUACIONES, VERIFICADOR, DIRECTOR_CARRERA, DOCENTE o VICERRECTOR.",
                     "Marcar con X las columnas SEDE [...] y CARRERA [...] que correspondan. Se pueden marcar varias.",
                     "Los códigos entre corchetes deben ser los códigos oficiales entregados por SEA.",
                     "Para PERSONAL_EVALUACIONES, CAMPUS acepta varios registros separados por punto y coma: SEDE_CODIGO|CAMPUS_ID|CAMPUS_CODIGO|CAMPUS_NOMBRE|SI o NO.",
@@ -855,6 +855,10 @@ public class UsuariosSistemaService {
         }
         if (!"ADMINISTRADOR_SISTEMA".equals(rolActor) && "ADMINISTRADOR_SISTEMA".equals(codigo.trim().toUpperCase(Locale.ROOT))) {
             throw new IllegalArgumentException("Solo el administrador puede asignar el rol Administrador del sistema");
+        }
+        if (!"ADMINISTRADOR_SISTEMA".equals(rolActor)
+                && "VERIFICADOR".equals(codigo.trim().toUpperCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("Solo el administrador puede asignar el rol Verificador");
         }
     }
 

@@ -3,6 +3,8 @@ package com.xpertiflow.evaluaciones.application.banco;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertiflow.evaluaciones.api.dto.banco.CargaBancoResponseDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
+import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaVerificacionRepository;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.Reactivo;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
@@ -50,6 +52,10 @@ class BancoPreguntasServiceTest {
     private RolExamenService rolExamenService;
     @Mock
     private BancoCifradoService cifradoService;
+    @Mock
+    private VerificacionExamenRepository verificacionRepository;
+    @Mock
+    private AuditoriaVerificacionRepository auditoriaVerificacionRepository;
 
     private BancoPreguntasService service;
     private RolExamen rol;
@@ -62,7 +68,9 @@ class BancoPreguntasServiceTest {
                 rolRepository,
                 rolExamenService,
                 new ObjectMapper(),
-                cifradoService);
+                cifradoService,
+                verificacionRepository,
+                auditoriaVerificacionRepository);
         lenient().when(cifradoService.cifrarJson(any(), anyString())).thenReturn(BancoEncryptedPayload.builder()
                 .ciphertext("ciphertext")
                 .nonce("nonce")

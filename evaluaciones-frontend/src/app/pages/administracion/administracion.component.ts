@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
-import { ConfiguracionEvaluaciones, ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
+import { ConfiguracionEvaluaciones, ConfiguracionEvaluacionesService, ConfiguracionVerificacion } from '../../core/services/configuracion-evaluaciones.service';
 import { UsuariosSistemaComponent } from '../usuarios-sistema/usuarios-sistema.component';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { CampusCarrerasService } from '../../core/services/campus-carreras.service';
@@ -595,6 +595,21 @@ export interface ParcialConfig {
                 </div>
               </div>
 
+              <div class="rounded-xl border border-purple-200 bg-purple-50/50 p-5 shadow-xs space-y-4">
+                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div><h4 class="text-xs font-black uppercase tracking-wider text-purple-950">Verificación previa a la generación</h4><p class="text-[10px] text-muted-foreground">Habilita la revisión de bancos validados por sede o por carrera. La regla de carrera tiene prioridad.</p></div>
+                  <span class="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-800">Deshabilitada por defecto</span>
+                </div>
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Sede<select [(ngModel)]="verificacionSedeCodigo" (ngModelChange)="actualizarNombreSedeVerificacion()" class="mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs font-bold"><option value="">Seleccionar sede</option>@for (sede of sedesCatalogo; track sede.branchOfficeId) {<option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>}</select></label>
+                  <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Carrera (opcional)<input [(ngModel)]="verificacionCarreraCodigo" placeholder="Vacío = toda la sede" class="mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs"></label>
+                  <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Nombre de carrera<input [(ngModel)]="verificacionCarreraNombre" placeholder="Nombre referencial" class="mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs"></label>
+                  <label class="flex items-end gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold"><input type="checkbox" [(ngModel)]="verificacionHabilitada" class="h-4 w-4 accent-purple-700"> Habilitar verificación</label>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-[10px] text-muted-foreground">Al activar una regla, los exámenes validados y aún no generados pasarán a revisión pendiente.</p><button type="button" (click)="guardarReglaVerificacion()" [disabled]="guardandoVerificacion() || !verificacionSedeCodigo" class="rounded-xl bg-purple-700 px-4 py-2 text-xs font-black text-white disabled:opacity-50"><i class="pi pi-save mr-1"></i>{{ guardandoVerificacion() ? 'Guardando...' : 'Guardar regla' }}</button></div>
+                @if (configuracionesVerificacion().length) {<div class="overflow-x-auto rounded-lg border border-border bg-card"><table class="w-full text-left text-[11px]"><thead class="bg-muted/50 font-extrabold uppercase text-muted-foreground"><tr><th class="p-2">Sede</th><th class="p-2">Carrera</th><th class="p-2">Estado</th><th class="p-2">Actualizado</th></tr></thead><tbody class="divide-y divide-border">@for (regla of configuracionesVerificacion(); track regla.id || regla.sedeCodigo + regla.carreraCodigo) {<tr><td class="p-2 font-bold">{{ regla.sedeNombre }} ({{ regla.sedeCodigo }})</td><td class="p-2">{{ regla.carreraNombre || 'Todas las carreras' }}<span class="block text-muted-foreground">{{ regla.carreraCodigo || 'GENERAL' }}</span></td><td class="p-2"><span [class]="regla.habilitada ? 'text-emerald-700' : 'text-slate-500'" class="font-black">{{ regla.habilitada ? 'HABILITADA' : 'DESHABILITADA' }}</span></td><td class="p-2 text-muted-foreground">{{ regla.actualizadoEn | date:'dd/MM/yyyy HH:mm' }}</td></tr>}</tbody></table></div>}
+              </div>
+
             </div>
           }
 
@@ -1004,6 +1019,9 @@ export class AdministracionEvaluacionesComponent {
   public tabActual = signal<'campus' | 'carreras' | 'usuarios' | 'configuracion' | 'tiempos'>('campus');
   public toastMessage = signal<string | null>(null);
   public sedesCatalogo: BranchOffice[] = [];
+  public readonly configuracionesVerificacion = signal<ConfiguracionVerificacion[]>([]);
+  public verificacionSedeCodigo = ''; public verificacionSedeNombre = ''; public verificacionCarreraCodigo = ''; public verificacionCarreraNombre = ''; public verificacionHabilitada = false;
+  public readonly guardandoVerificacion = signal(false);
   public campusCatalogo: CampusCatalogoItem[] = [];
   private carrerasOficialesPorSede = new Map<string, { id: number; nombre: string }[]>();
   public cargandoCatalogo = signal(true);
@@ -1023,6 +1041,20 @@ export class AdministracionEvaluacionesComponent {
     this.listaCarrerasCampus = [];
     this.listaUsuariosEvaluadores = [];
     this.cargarCatalogoAdministrativo();
+    this.cargarConfiguracionVerificacion();
+  }
+
+  private cargarConfiguracionVerificacion(): void {
+    this._configuracionService.listarVerificacion().subscribe({ next: reglas => this.configuracionesVerificacion.set(reglas), error: () => this._mostrarToast('No se pudieron cargar las reglas de verificación.') });
+  }
+
+  public actualizarNombreSedeVerificacion(): void {
+    this.verificacionSedeNombre = this.sedesCatalogo.find(sede => sede.code === this.verificacionSedeCodigo)?.name || this.verificacionSedeCodigo;
+  }
+
+  public guardarReglaVerificacion(): void {
+    this.actualizarNombreSedeVerificacion(); this.guardandoVerificacion.set(true);
+    this._configuracionService.guardarVerificacion({ sedeCodigo: this.verificacionSedeCodigo, sedeNombre: this.verificacionSedeNombre, carreraCodigo: this.verificacionCarreraCodigo || undefined, carreraNombre: this.verificacionCarreraNombre || undefined, habilitada: this.verificacionHabilitada }).subscribe({ next: reglas => { this.configuracionesVerificacion.set(reglas); this.guardandoVerificacion.set(false); this._mostrarToast('Regla de verificación guardada correctamente.'); }, error: () => { this.guardandoVerificacion.set(false); this._mostrarToast('No se pudo guardar la regla de verificación.'); } });
   }
 
   // TAB 1: Campus por Sede

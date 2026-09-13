@@ -585,6 +585,18 @@ export interface DiaCalendario {
             }
 
             <!-- Zona Drag and Drop con Input Interactivo -->
+            @if (bancoPersistido()?.estadoVerificacion === 'DEVUELTO') {
+              <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900">
+                <div class="font-black uppercase tracking-wide"><i class="pi pi-exclamation-triangle mr-2"></i>El examen fue devuelto por verificación</div>
+                @if (bancoPersistido()?.observacionesVerificacion) { <p class="mt-1">{{ bancoPersistido()?.observacionesVerificacion }}</p> }
+                @for (observacion of observacionesVerificacionPreguntas(); track observacion[0]) { <p class="mt-1"><strong>Pregunta {{ observacion[0] }}:</strong> {{ observacion[1] }}</p> }
+                <p class="mt-1 font-semibold">Corrige el archivo y reemplaza el banco mientras el rol siga habilitado para carga.</p>
+              </div>
+            } @else if (bancoPersistido()?.estadoVerificacion === 'PENDIENTE') {
+              <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><i class="pi pi-clock mr-2"></i>Banco validado. Está pendiente de revisión por el verificador antes de generar el examen.</div>
+            }
+
+            <!-- Zona Drag and Drop con Input Interactivo -->
             <div 
               (click)="triggerFileInput()"
               (dragover)="onDragOver($event)"
@@ -2821,6 +2833,7 @@ export class BancoPreguntasComponent implements OnInit {
   });
   public cargandoBanco = signal<boolean>(false);
   public bancoPersistido = signal<BancoPreguntasResponse | null>(null);
+  public observacionesVerificacionPreguntas = computed(() => Object.entries(this.bancoPersistido()?.observacionesVerificacionPreguntas || {}));
   public cargandoBancoPersistido = signal<boolean>(false);
   public dialogEliminarBancoPersistido = signal<boolean>(false);
   public confirmacionEliminarBancoPersistido = '';
