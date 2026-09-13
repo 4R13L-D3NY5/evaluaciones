@@ -90,7 +90,7 @@ public class RolExamenController {
     }
 
     @PostMapping("/{id}/restablecer")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
     @Operation(summary = "Restablecer un rol de examen posterior a VALIDADO a VALIDADO")
     public ResponseEntity<RolExamenResponseDto> restablecerAValidado(
             @PathVariable String id,

@@ -124,6 +124,10 @@ export class AuthService {
     );
   }
 
+  public verificarContrasenaActual(contrasenaActual: string): Observable<void> {
+    return this._http.post<void>('/api/auth/verificar-contrasena-actual', { contrasenaActual });
+  }
+
   public tieneRol(roles: AppRole[]): boolean {
     const usuario = this.usuario();
     return !!usuario && roles.includes(usuario.rol);

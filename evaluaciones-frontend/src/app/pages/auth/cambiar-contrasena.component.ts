@@ -17,9 +17,21 @@ import { AuthService } from '../../core/services/auth.service';
         <p class="intro">Por seguridad, debes reemplazar la contraseña temporal antes de ingresar al sistema.</p>
 
         <form (ngSubmit)="guardar()" #form="ngForm">
+          <div class="step-heading"><span>1</span><div><strong>Confirma tu contraseña actual</strong><small>Primero verificaremos que la hayas escrito correctamente.</small></div></div>
           <label>Contraseña actual
-            <input type="password" name="actual" [(ngModel)]="actual" autocomplete="current-password" required>
+            <input type="password" name="actual" [(ngModel)]="actual" (ngModelChange)="cambiarContrasenaActual($event)" autocomplete="current-password" required [disabled]="actualVerificada || verificandoActual()">
           </label>
+          @if (!actualVerificada) {
+            <button type="button" class="secondary-action" (click)="verificarActual()" [disabled]="!actual.trim() || verificandoActual()">
+              @if (verificandoActual()) { <i class="pi pi-spin pi-spinner"></i> Verificando... }
+              @else { Verificar contraseña actual <i class="pi pi-check"></i> }
+            </button>
+          } @else {
+            <div class="message success"><i class="pi pi-check-circle"></i>La contraseña actual fue confirmada correctamente.</div>
+          }
+
+          @if (actualVerificada) {
+          <div class="step-heading step-heading-next"><span>2</span><div><strong>Define tu nueva contraseña</strong><small>Completa las reglas y confirma el cambio.</small></div></div>
           <label>Nueva contraseña
             <input type="password" name="nueva" [(ngModel)]="nueva" minlength="8" maxlength="72" autocomplete="new-password" required>
           </label>
@@ -42,6 +54,9 @@ import { AuthService } from '../../core/services/auth.service';
             @if (guardando()) { <i class="pi pi-spin pi-spinner"></i> Guardando... }
             @else { Guardar nueva contraseña <i class="pi pi-arrow-right"></i> }
           </button>
+          } @else {
+            <p class="step-hint"><i class="pi pi-info-circle"></i> Verifica primero tu contraseña actual para habilitar el cambio.</p>
+          }
         </form>
         <p class="hint">Estas reglas también se verifican al guardar la contraseña.</p>
       </section>
@@ -59,6 +74,15 @@ import { AuthService } from '../../core/services/auth.service';
     label { display: grid; gap: .4rem; color: var(--text-color); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
     input { min-height: 2.8rem; padding: .7rem .8rem; border: 1px solid var(--surface-border); border-radius: .65rem; background: var(--surface-ground); color: var(--text-color); outline: none; font: inherit; }
     input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--sea-primary-ring); }
+    .step-heading { display: flex; align-items: flex-start; gap: .7rem; margin-top: .15rem; }
+    .step-heading span { display: grid; width: 1.65rem; height: 1.65rem; flex: 0 0 auto; place-items: center; border-radius: 999px; background: var(--primary-color); color: #fff; font-size: .72rem; font-weight: 900; }
+    .step-heading strong { display: block; color: var(--text-color); font-size: .78rem; }
+    .step-heading small { display: block; margin-top: .2rem; color: var(--text-color-secondary); font-size: .68rem; font-weight: 500; line-height: 1.4; }
+    .step-heading-next { margin-top: .3rem; padding-top: 1rem; border-top: 1px solid var(--surface-border); }
+    .secondary-action { margin-top: -.25rem; border: 1px solid var(--primary-color); background: transparent; color: var(--primary-color); }
+    .secondary-action:hover { background: var(--primary-color); color: #fff; }
+    .message.success { border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; }
+    .step-hint { display: flex; align-items: flex-start; gap: .45rem; margin: 0; padding: .7rem .8rem; border-radius: .6rem; background: var(--surface-ground); color: var(--text-color-secondary); font-size: .72rem; line-height: 1.4; }
     .password-rules { margin-top: -.35rem; padding: .8rem .9rem; border: 1px solid var(--surface-border); border-radius: .75rem; background: var(--surface-ground); }
     .rules-title { display: flex; align-items: center; gap: .45rem; margin: 0 0 .55rem; color: var(--text-color); font-size: .7rem; font-weight: 800; text-transform: none; letter-spacing: 0; }
     .rules-title i { color: var(--primary-color); }
@@ -83,15 +107,47 @@ export class CambiarContrasenaComponent {
   public actual = '';
   public nueva = '';
   public confirmacion = '';
+  public actualVerificada = false;
   public readonly error = signal<string | null>(null);
   public readonly guardando = signal(false);
+  public readonly verificandoActual = signal(false);
 
   public iconoRegla(cumple: boolean, invalida: boolean): string {
     return cumple ? 'pi pi-check-circle' : invalida ? 'pi pi-times-circle' : 'pi pi-circle';
   }
 
+  public cambiarContrasenaActual(valor: string): void {
+    this.actual = valor;
+    this.actualVerificada = false;
+    this.error.set(null);
+  }
+
+  public verificarActual(): void {
+    this.error.set(null);
+    if (!this.actual.trim()) {
+      this.error.set('Escribe tu contraseña actual para verificarla.');
+      return;
+    }
+    this.verificandoActual.set(true);
+    this.auth.verificarContrasenaActual(this.actual).subscribe({
+      next: () => {
+        this.verificandoActual.set(false);
+        this.actualVerificada = true;
+      },
+      error: error => {
+        this.verificandoActual.set(false);
+        this.actualVerificada = false;
+        this.error.set(error?.error?.message || 'La contraseña actual no es correcta.');
+      }
+    });
+  }
+
   public guardar(): void {
     this.error.set(null);
+    if (!this.actualVerificada) {
+      this.error.set('Primero verifica tu contraseña actual.');
+      return;
+    }
     if (this.nueva.length < 8 || this.nueva.length > 72) {
       this.error.set('La nueva contraseña debe tener entre 8 y 72 caracteres.');
       return;
