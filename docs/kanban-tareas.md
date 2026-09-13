@@ -84,17 +84,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Criterio de cierre: Completar la optimización funcional y visual del examen virtual, validar el flujo integral y dejar documentados los pendientes o ajustes finales.
 - Notas: Tarea creada desde el comando `=new`.
 
-#### T-008 — Traer a main la funcionalidad previamente subida de verificador_1
-
-- Prioridad: Alta
-- Área: Integración de ramas / Publicación
-- Responsable: Por definir
-- Creada: 2026-09-12
-- Fecha límite: Por definir
-- Dependencias: Rama `verificador_1` disponible en el repositorio remoto y cambios previamente guardados.
-- Criterio de cierre: Integrar en `main` la funcionalidad de `verificador_1`, resolver conflictos si aparecen, compilar y verificar que no se pierdan los cambios actuales de `main`.
-- Notas: Tarea creada desde el comando `=new`; requiere revisar primero la diferencia entre ambas ramas antes de integrar.
-
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
 - Prioridad: Media
@@ -173,17 +162,26 @@ _Sin tareas._
 
 ### Completada
 
-_Sin tareas._
+#### T-008 — Traer a main la funcionalidad previamente subida de verificador_1
+
+- Prioridad: Alta
+- Área: Integración de ramas / Publicación
+- Responsable: Por definir
+- Creada: 2026-09-12
+- Fecha límite: 2026-09-12
+- Dependencias: Rama `verficicador_v1` disponible en el repositorio remoto y cambios previamente guardados.
+- Criterio de cierre: Integrar en `main` la funcionalidad de `verificador_1`, resolver conflictos si aparecen, compilar y verificar que no se pierdan los cambios actuales de `main`.
+- Notas: Integrada sin conflictos desde `verficicador_v1`; la compilación del backend en Docker, la compilación del frontend y las pruebas del worker finalizaron correctamente. Merge registrado en `main`.
 
 ## Resumen
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 9 |
+| Pendientes | 8 |
 | En progreso | 0 |
 | En revisión | 3 |
 | Bloqueadas | 0 |
-| Completadas | 0 |
+| Completadas | 1 |
 
 ## Decisiones del módulo
 
