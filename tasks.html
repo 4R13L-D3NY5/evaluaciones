@@ -5,74 +5,509 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tareas del proyecto · Evaluaciones</title>
   <style>
-    :root { color-scheme: light; --ink:#172033; --muted:#64748b; --line:#dbe4f0; --bg:#f5f7fb; --primary:#4f46e5; --green:#059669; --amber:#d97706; --red:#e11d48; }
+    :root { color-scheme: light; --ink:#182238; --muted:#718096; --line:#e7ebf3; --bg:#f7f8fc; --surface:#ffffff; --primary:#5b55d9; --primary-soft:#f0efff; --green:#14966f; --amber:#c98224; --red:#d6536e; --shadow:0 18px 50px rgba(36, 48, 86, .08); }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color:var(--ink); background:var(--bg); }
-    main { max-width:1400px; margin:0 auto; padding:32px 22px 48px; }
-    header { display:flex; justify-content:space-between; gap:20px; align-items:end; margin-bottom:28px; }
-    h1 { margin:0; font-size:clamp(1.6rem, 3vw, 2.4rem); }
-    header p { margin:7px 0 0; color:var(--muted); }
-    .summary { display:flex; flex-wrap:wrap; gap:10px; }
-    .summary span { background:white; border:1px solid var(--line); border-radius:999px; padding:8px 13px; font-size:.86rem; font-weight:700; }
-    .board { display:grid; grid-template-columns:repeat(5, minmax(220px, 1fr)); gap:15px; align-items:start; }
-    .column { min-height:180px; background:#eef2f8; border:1px solid var(--line); border-radius:16px; padding:13px; }
-    .column h2 { margin:0 0 12px; font-size:1rem; }
-    .column.pending h2 { color:var(--primary); } .column.progress h2 { color:var(--amber); } .column.review h2 { color:#7c3aed; } .column.blocked h2 { color:var(--red); } .column.done h2 { color:var(--green); }
-    .card { background:white; border:1px solid var(--line); border-radius:13px; padding:14px; margin-bottom:11px; box-shadow:0 4px 12px #1720330b; }
+    body { margin:0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color:var(--ink); background:radial-gradient(circle at top left, #ffffff 0, var(--bg) 42%, #f1f3fa 100%); }
+    main { max-width:1480px; margin:0 auto; padding:36px 24px 52px; }
+    header { display:flex; justify-content:space-between; gap:28px; align-items:end; margin-bottom:22px; padding:30px; background:rgba(255,255,255,.82); border:1px solid rgba(231,235,243,.9); border-radius:24px; box-shadow:var(--shadow); }
+    .eyebrow { display:inline-flex; align-items:center; gap:8px; color:var(--primary); font-size:.68rem; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
+    .eyebrow::before { content:''; width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 0 4px #dff6ed; }
+    h1 { margin:10px 0 0; font-size:clamp(1.7rem, 3vw, 2.55rem); letter-spacing:-.04em; line-height:1.05; }
+    header p { max-width:620px; margin:10px 0 0; color:var(--muted); font-size:.92rem; line-height:1.5; }
+    .summary { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; max-width:510px; }
+    .summary span { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 12px; color:var(--muted); font-size:.76rem; font-weight:800; box-shadow:0 5px 14px rgba(36,48,86,.04); }
+    .summary span::first-letter { color:var(--ink); }
+    .toolbar { display:grid; grid-template-columns:minmax(220px,1.6fr) repeat(3, minmax(145px,1fr)) auto; gap:9px; align-items:end; margin:0 0 16px; padding:13px; background:rgba(255,255,255,.74); border:1px solid rgba(231,235,243,.9); border-radius:17px; box-shadow:0 8px 24px rgba(36,48,86,.04); }
+    .filter-control { display:grid; gap:5px; min-width:0; }
+    .filter-control span { padding-left:2px; color:var(--muted); font-size:.65rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+    .filter-control input, .filter-control select { width:100%; min-width:0; height:38px; border:1px solid var(--line); border-radius:10px; padding:0 10px; color:var(--ink); background:white; font:inherit; font-size:.76rem; outline:none; }
+    .filter-control input:focus, .filter-control select:focus { border-color:#aaa6f2; box-shadow:0 0 0 3px rgba(91,85,217,.12); }
+    .toolbar button, .card-actions button, .card-actions select { border:1px solid var(--line); border-radius:10px; padding:9px 11px; font:inherit; font-size:.76rem; font-weight:800; cursor:pointer; transition:all .18s ease; }
+    .toolbar button { color:var(--muted); background:rgba(255,255,255,.7); }
+    .icon-toolbar-button { display:inline-grid; place-items:center; width:38px; height:38px; padding:0 !important; align-self:end; }
+    .icon-toolbar-button svg, .icon-button svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
+    .toolbar button:hover, .card-actions button:hover { border-color:#c9c6fa; color:var(--primary); background:var(--primary-soft); }
+    .board { display:grid; grid-template-columns:repeat(5, minmax(220px, 1fr)); gap:16px; align-items:start; }
+    .column { --column-accent:var(--primary); min-height:220px; background:rgba(244,246,251,.78); border:1px solid var(--line); border-top:3px solid var(--column-accent); border-radius:18px; padding:15px; box-shadow:0 10px 28px rgba(36,48,86,.04); }
+    .column.pending { --column-accent:var(--primary); } .column.progress { --column-accent:var(--amber); } .column.review { --column-accent:#8263d9; } .column.blocked { --column-accent:var(--red); } .column.done { --column-accent:var(--green); }
+    .column-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 2px 14px; }
+    .column h2 { margin:0; color:var(--column-accent); font-size:.82rem; letter-spacing:.02em; }
+    .column-count { display:inline-flex; min-width:24px; height:24px; align-items:center; justify-content:center; border-radius:8px; background:color-mix(in srgb, var(--column-accent) 12%, white); color:var(--column-accent); font-size:.72rem; font-weight:900; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:15px; padding:13px; margin-bottom:9px; box-shadow:0 7px 18px rgba(36,48,86,.055); cursor:grab; touch-action:none; transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, opacity .18s ease; }
+    .card:hover { transform:translateY(-2px); border-color:#d5d4f8; box-shadow:0 14px 26px rgba(36,48,86,.1); }
+    .card:active { cursor:grabbing; }
+    .card.is-dragging { opacity:.45; transform:rotate(1deg); }
+    .dragging-active { user-select:none; }
     .card:last-child { margin-bottom:0; }
-    .card h3 { margin:0 0 10px; font-size:.94rem; line-height:1.35; }
-    .card p { margin:7px 0; color:var(--muted); font-size:.78rem; line-height:1.45; }
+    .card h3 { margin:0; font-size:.82rem; letter-spacing:-.01em; line-height:1.35; }
+    .card p { display:none; margin:7px 0; color:var(--muted); font-size:.76rem; line-height:1.48; }
     .card strong { color:var(--ink); }
-    .copy { width:100%; border:0; border-radius:9px; padding:9px 10px; margin-top:9px; color:white; background:var(--primary); font-weight:800; cursor:pointer; }
+    .card-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:11px; padding-top:10px; border-top:1px solid #f0f2f7; }
+    .icon-button { display:flex; align-items:center; justify-content:center; min-height:34px; padding:7px !important; }
+    .card-actions select, .card-actions .move, .drag-hint { display:none; }
+    .card-actions .move { border-color:var(--primary); color:white; background:var(--primary); box-shadow:0 5px 12px rgba(91,85,217,.2); }
+    .card-actions .move:hover { color:white; background:#4d47c7; border-color:#4d47c7; }
+    .card-actions .copy-command, .card-actions .copy, .card-actions .detail { width:100%; color:var(--primary); background:var(--primary-soft); }
+    .card-actions .copy-command:hover, .card-actions .copy:hover, .card-actions .detail:hover { color:white; background:var(--primary); }
+    .column.is-drag-over { border-color:var(--column-accent); background:color-mix(in srgb, var(--column-accent) 7%, white); box-shadow:0 0 0 3px color-mix(in srgb, var(--column-accent) 12%, transparent), 0 14px 28px rgba(36,48,86,.08); }
     .copy:hover { filter:brightness(.94); }
-    .empty { color:var(--muted); font-size:.82rem; font-style:italic; padding:8px 2px; }
-    footer { margin-top:18px; color:var(--muted); font-size:.78rem; }
+    .empty { color:#9aa5b8; font-size:.76rem; font-style:italic; padding:12px 2px; }
+    .card.is-filtered { display:none; }
+    .filter-empty { color:var(--primary); }
+    footer { margin-top:20px; padding:0 4px; color:var(--muted); font-size:.76rem; line-height:1.6; }
+    code { padding:2px 5px; border-radius:5px; color:var(--primary); background:var(--primary-soft); font-size:.92em; }
+    .modal { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:20px; background:rgba(25,34,56,.38); backdrop-filter:blur(5px); }
+    .modal[hidden] { display:none; }
+    .modal-panel { position:relative; width:min(620px, 100%); max-height:min(760px, 90vh); overflow:auto; padding:24px; border:1px solid rgba(255,255,255,.8); border-radius:22px; background:var(--surface); box-shadow:0 28px 80px rgba(24,34,56,.22); }
+    .modal-close { position:absolute; top:13px; right:15px; width:32px; height:32px; border:1px solid var(--line); border-radius:50%; color:var(--muted); background:white; font-size:1.1rem; cursor:pointer; }
+    .modal-close:hover { color:var(--primary); border-color:#c9c6fa; background:var(--primary-soft); }
+    .detail-card { margin:0; padding:0; border:0; box-shadow:none; cursor:default; }
+    .detail-card:hover { transform:none; box-shadow:none; border-color:transparent; }
+    .detail-card h3 { margin:0 42px 18px 0; font-size:1.15rem; line-height:1.35; }
+    .detail-card p { display:block; margin:11px 0; font-size:.86rem; line-height:1.55; }
+    .detail-card .card-actions { display:none; }
+    .detail-editor { display:grid; gap:16px; margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+    .editor-field { display:grid; gap:6px; }
+    .editor-field > span, .editor-label { color:var(--muted); font-size:.68rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+    .editor-field select, .tag-input-row input { width:100%; height:38px; border:1px solid var(--line); border-radius:10px; padding:0 10px; color:var(--ink); background:white; font:inherit; font-size:.8rem; outline:none; }
+    .editor-field select:focus, .tag-input-row input:focus { border-color:#aaa6f2; box-shadow:0 0 0 3px rgba(91,85,217,.12); }
+    .tag-editor { display:grid; gap:9px; }
+    .tag-list { display:flex; flex-wrap:wrap; gap:7px; min-height:26px; }
+    .tag-chip { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 9px; color:var(--primary); background:var(--primary-soft); font-size:.72rem; font-weight:800; }
+    .tag-chip button { display:grid; place-items:center; width:17px; height:17px; border:0; border-radius:50%; color:var(--primary); background:transparent; font:inherit; font-size:.9rem; line-height:1; cursor:pointer; }
+    .tag-chip button:hover { color:white; background:var(--primary); }
+    .tag-input-row { display:grid; grid-template-columns:1fr 38px; gap:7px; }
+    .tag-add, .editor-save { display:grid; place-items:center; width:38px; height:38px; padding:0 !important; border:1px solid var(--line); border-radius:10px; color:var(--primary); background:var(--primary-soft); cursor:pointer; }
+    .tag-add svg, .editor-save svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
+    .tag-suggestions { display:flex; flex-wrap:wrap; gap:6px; }
+    .tag-suggestion { border:1px solid var(--line); border-radius:999px; padding:6px 9px; color:var(--muted); background:white; font:inherit; font-size:.68rem; cursor:pointer; }
+    .tag-suggestion:hover { border-color:#c9c6fa; color:var(--primary); background:var(--primary-soft); }
+    .editor-footer { display:flex; align-items:center; justify-content:flex-end; gap:10px; }
+    .save-feedback { min-height:18px; color:var(--green); font-size:.72rem; font-weight:800; }
+    .modal-open { overflow:hidden; }
     @media (max-width:1100px) { .board { grid-template-columns:repeat(2, minmax(240px, 1fr)); } }
-    @media (max-width:620px) { main { padding:22px 13px 35px; } header { display:block; } .summary { margin-top:18px; } .board { grid-template-columns:1fr; } }
+    @media (max-width:1100px) { .toolbar { grid-template-columns:repeat(2, minmax(180px, 1fr)) auto; } }
+    @media (max-width:620px) { main { padding:22px 13px 35px; } header { display:block; padding:22px; } .summary { justify-content:flex-start; margin-top:20px; } .toolbar { grid-template-columns:1fr 1fr; } .filter-control:first-child { grid-column:1 / -1; } .icon-toolbar-button { width:100%; } .board { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
   <main>
     <header>
       <div>
+        <span class="eyebrow">Seguimiento del proyecto</span>
         <h1>Tablero de tareas</h1>
-        <p>Proyecto Sistema de Evaluaciones · vista rápida para copiar tarjetas</p>
+        <p>Proyecto Sistema de Evaluaciones · una vista clara para priorizar, mover y mantener el trabajo en marcha.</p>
       </div>
       <div class="summary" aria-label="Resumen">
-        <span>4 pendientes</span><span>0 en progreso</span><span>0 en revisión</span><span>0 bloqueadas</span><span>0 completadas</span>
+<span data-summary="pending">9 pendientes</span><span data-summary="progress">0 en progreso</span><span data-summary="review">3 en revisión</span><span data-summary="blocked">0 bloqueadas</span><span data-summary="done">0 completadas</span>
       </div>
     </header>
 
+    <div class="toolbar" aria-label="Filtros y organización de tareas">
+      <label class="filter-control"><span>Buscar</span><input id="task-search" type="search" placeholder="Título, ID o descripción" autocomplete="off"></label>
+      <label class="filter-control"><span>Prioridad</span><select id="priority-filter"><option value="all">Todas</option><option value="Crítica">Crítica</option><option value="Alta">Alta</option><option value="Media">Media</option></select></label>
+      <label class="filter-control"><span>Área</span><select id="area-filter"><option value="all">Todas las áreas</option></select></label>
+      <label class="filter-control"><span>Organizar</span><select id="sort-tasks"><option value="manual">Orden manual</option><option value="priority">Prioridad</option><option value="title">Título</option><option value="id">Identificador</option></select></label>
+      <button class="icon-toolbar-button" id="reset-board" type="button" title="Restablecer posiciones guardadas" aria-label="Restablecer posiciones guardadas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7v5h5"></path><path d="M5.4 12a7 7 0 1 0 2-5"></path></svg></button>
+    </div>
+
     <section class="board" aria-label="Tareas por estado">
-      <div class="column pending"><h2>Pendiente</h2>
-        <article class="card" data-copy="T-001 — Desplegar y validar en servidor la actualización de roles por Excel\nPrioridad: Alta\nÁrea: Rol de Exámenes / Importación Excel\nCriterio: Confirmar la actualización de programaciones existentes desde Excel y proteger estados posteriores.">
-          <h3>T-001 — Desplegar y validar en servidor la actualización de roles por Excel</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Rol de Exámenes / Importación Excel</p><p>La corrección ya fue verificada localmente.</p><button class="copy" type="button">Copiar tarjeta</button>
+      <div class="column pending"><div class="column-heading"><h2>Pendiente</h2><span class="column-count" data-column-count="pending">0</span></div>
+        <article class="card" data-id="T-001" data-status="pending" data-copy="T-001 — Desplegar y validar en servidor la actualización de roles por Excel\nPrioridad: Alta\nÁrea: Rol de Exámenes / Importación Excel\nCriterio: Confirmar la actualización de programaciones existentes desde Excel y proteger estados posteriores.">
+          <h3>T-001 — Desplegar y validar en servidor la actualización de roles por Excel</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Rol de Exámenes / Importación Excel</p><p>La corrección ya fue verificada localmente.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-001"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
         </article>
-        <article class="card" data-copy="T-002 — Revisar carga de exámenes sin cartilla por parte del docente\nPrioridad: Alta\nÁrea: Exámenes sin cartilla / Docentes\nCriterio: Reproducir la operación y documentar o corregir cualquier bloqueo.">
-          <h3>T-002 — Revisar carga de exámenes sin cartilla por parte del docente</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Exámenes sin cartilla / Docentes</p><button class="copy" type="button">Copiar tarjeta</button>
+        <article class="card" data-id="T-002" data-status="pending" data-copy="T-002 — Revisar carga de exámenes sin cartilla por parte del docente\nPrioridad: Alta\nÁrea: Exámenes sin cartilla / Docentes\nCriterio: Reproducir la operación y documentar o corregir cualquier bloqueo.">
+          <h3>T-002 — Revisar carga de exámenes sin cartilla por parte del docente</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Exámenes sin cartilla / Docentes</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-002"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
         </article>
-        <article class="card" data-copy="T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor\nPrioridad: Alta\nÁrea: Calificación OMR / Servidor\nRevisar HTTP 413 y Unexpected token '<'.">
-          <h3>T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Calificación OMR / Servidor</p><p>Revisar HTTP 413 y <em>Unexpected token '&lt;'</em>.</p><button class="copy" type="button">Copiar tarjeta</button>
+        <article class="card" data-id="T-003" data-status="pending" data-copy="T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor\nPrioridad: Alta\nÁrea: Calificación OMR / Servidor\nRevisar HTTP 413 y Unexpected token '<'.">
+          <h3>T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Calificación OMR / Servidor</p><p>Revisar HTTP 413 y <em>Unexpected token '&lt;'</em>.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-003"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
         </article>
-        <article class="card" data-copy="T-004 — Integrar la anulación de preguntas de OMR en la calificación\nPrioridad: Alta\nÁrea: Calificación OMR / Anulación de preguntas\nPermitirlo para Responsable de Evaluaciones y Administrador del Sistema, con auditoría y recálculo correcto.">
-          <h3>T-004 — Integrar la anulación de preguntas de OMR en la calificación</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Calificación OMR / Anulación de preguntas</p><p>Para Responsable de Evaluaciones y Administrador del Sistema.</p><button class="copy" type="button">Copiar tarjeta</button>
+        <article class="card" data-id="T-005" data-status="pending" data-copy="T-005 — Continuar y concluir el módulo de respaldos y contingencia\nPrioridad: Crítica\nÁrea: Respaldos / Continuidad operativa\nPlan: Diagnóstico, snapshot, copia externa, verificación, integridad y restauración aislada sin afectar producción.">
+          <h3>T-005 — Continuar y concluir el módulo de respaldos y contingencia</h3><p><strong>Prioridad:</strong> Crítica</p><p><strong>Área:</strong> Respaldos / Continuidad operativa</p><p>Validar restauración aislada, integridad, Vault, auditoría y procedimiento operativo.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-005"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
+        </article>
+        <article class="card" data-id="T-007" data-status="pending" data-copy="T-007 — Optimizar y concluir el examen tipo virtual\nPrioridad: Alta\nÁrea: Examen Virtual\nCriterio: Completar la optimización funcional y visual, validar el flujo integral y documentar los ajustes finales.">
+          <h3>T-007 — Optimizar y concluir el examen tipo virtual</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Examen Virtual</p><p>Revisar generación, publicación, acceso del estudiante, respuestas, calificación y cierre.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-007"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
+        </article>
+        <article class="card" data-id="T-008" data-status="pending" data-copy="T-008 — Traer a main la funcionalidad previamente subida de verificador_1\nPrioridad: Alta\nÁrea: Integración de ramas / Publicación\nCriterio: Integrar la funcionalidad, resolver conflictos, compilar y conservar los cambios actuales de main.">
+          <h3>T-008 — Traer a main la funcionalidad previamente subida de verificador_1</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Integración de ramas / Publicación</p><p>Revisar diferencias, integrar, compilar y verificar que no se pierdan cambios.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-008"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
+        </article>
+        <article class="card" data-id="T-009" data-status="pending" data-copy="T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora\nPrioridad: Media\nÁrea: Auditoría y Bitácora\nCriterio: Completar la implementación funcional y visual, validar el registro de acciones y respetar los permisos de consulta.">
+          <h3>T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora</h3><p><strong>Prioridad:</strong> Media</p><p><strong>Área:</strong> Auditoría y Bitácora</p><p>Completar registro, consulta, filtros, detalle de eventos y permisos.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-009"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
+        </article>
+        <article class="card" data-id="T-010" data-status="pending" data-copy="T-010 — Optimizar el módulo de Reportes y priorizar los reportes de mayor aporte\nPrioridad: Media\nÁrea: Reportes / Indicadores y toma de decisiones\nCriterio: Identificar y priorizar reportes, definir indicadores, filtros, detalle, exportaciones y permisos, y optimizar el conjunto priorizado.">
+          <h3>T-010 — Optimizar el módulo de Reportes y priorizar los reportes de mayor aporte</h3><p><strong>Prioridad:</strong> Media</p><p><strong>Área:</strong> Reportes / Indicadores y toma de decisiones</p><p>Analizar utilidad para dirección, responsables, docentes y operación.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-010"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
+        </article>
+        <article class="card" data-id="T-011" data-status="pending" data-copy="T-011 — Generar endpoints de consulta para estudiantes según su matrícula\nPrioridad: Alta\nÁrea: Integración institucional / Portal del estudiante\nCriterio: Consultar rol, examen asignado, marcajes y patrón de variante; analizar información adicional como notas con seguridad y trazabilidad.">
+          <h3>T-011 — Generar endpoints de consulta para estudiantes según su matrícula</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Integración institucional / Portal del estudiante</p><p>Definir autenticación, datos compartibles, notas, permisos y trazabilidad.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-011"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
         </article>
       </div>
-      <div class="column progress"><h2>En progreso</h2><div class="empty">Sin tareas.</div></div>
-      <div class="column review"><h2>En revisión</h2><div class="empty">Sin tareas.</div></div>
-      <div class="column blocked"><h2>Bloqueada</h2><div class="empty">Sin tareas.</div></div>
-      <div class="column done"><h2>Completada</h2><div class="empty">Sin tareas.</div></div>
+      <div class="column progress"><div class="column-heading"><h2>En progreso</h2><span class="column-count" data-column-count="progress">0</span></div><div class="empty">Sin tareas.</div></div>
+      <div class="column review"><div class="column-heading"><h2>En revisión</h2><span class="column-count" data-column-count="review">0</span></div>
+        <article class="card" data-id="T-004" data-status="review" data-copy="T-004 — Integrar la anulación de preguntas de OMR en la calificación\nPrioridad: Alta\nÁrea: Calificación OMR / Anulación de preguntas\nPermitirlo para Responsable de Evaluaciones y Administrador del Sistema, con auditoría y recálculo correcto.">
+          <h3>T-004 — Integrar la anulación de preguntas de OMR en la calificación</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Calificación OMR / Anulación de preguntas</p><p>Implementado; pendiente de validación funcional.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-004"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
+        </article>
+        <article class="card" data-id="T-006" data-status="review" data-copy="T-006 — Mostrar si el docente ya cargó el banco del grupo aunque no exista fecha de rol\nPrioridad: Alta\nÁrea: Banco de Preguntas / Plan de Estudios\nCriterio: Permitir consultar el estado de carga del banco por grupo y docente, aunque el director no haya registrado una fecha en el rol.">
+          <h3>T-006 — Mostrar si el docente ya cargó el banco del grupo aunque no exista fecha de rol</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Banco de Preguntas / Plan de Estudios</p><p>Implementado; falta validar con datos reales.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-006"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
+        </article>
+        <article class="card" data-id="T-012" data-status="review" data-copy="T-012 — Confirmar la contraseña actual antes de habilitar el cambio\nPrioridad: Alta\nÁrea: Seguridad y autenticación / Cambio de contraseña\nCriterio: Verificar primero la contraseña actual en el servidor y habilitar la nueva contraseña solo cuando sea correcta.">
+          <h3>T-012 — Confirmar la contraseña actual antes de habilitar el cambio</h3><p><strong>Prioridad:</strong> Alta</p><p><strong>Área:</strong> Seguridad y autenticación / Cambio de contraseña</p><p>Implementado localmente; frontend compilado y backend construido en Docker. Pendiente de validación funcional.</p><div class="card-actions"><select class="move-select" aria-label="Nuevo estado de T-012"><option value="pending">Pendiente</option><option value="progress">En progreso</option><option value="review">En revisión</option><option value="blocked">Bloqueada</option><option value="done">Completada</option></select><button class="move" type="button">Mover</button><button class="copy-command" type="button">Copiar comando =move</button><button class="copy" type="button">Copiar tarjeta</button></div>
+        </article>
+      </div>
+      <div class="column blocked"><div class="column-heading"><h2>Bloqueada</h2><span class="column-count" data-column-count="blocked">0</span></div><div class="empty">Sin tareas.</div></div>
+      <div class="column done"><div class="column-heading"><h2>Completada</h2><span class="column-count" data-column-count="done">0</span></div><div class="empty">Sin tareas.</div></div>
     </section>
-    <footer>Cuando se agreguen o muevan tareas desde el tablero Markdown, esta vista debe actualizarse para mantener las tarjetas sincronizadas.</footer>
+    <footer>Arrastra una tarjeta para cambiarla de columna. Los movimientos se guardan en este navegador; para reflejarlos en <code>docs/kanban-tareas.md</code>, indícame el identificador y el nuevo estado.</footer>
   </main>
+  <div id="detail-modal" class="modal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+      <button class="modal-close" type="button" aria-label="Cerrar detalle">×</button>
+      <div id="detail-content"></div>
+    </section>
+  </div>
   <script>
-    document.querySelectorAll('.copy').forEach(button => button.addEventListener('click', async () => {
-      const card = button.closest('.card');
-      const text = card.dataset.copy;
-      try { await navigator.clipboard.writeText(text); }
-      catch { const area=document.createElement('textarea'); area.value=text; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove(); }
-      const original = button.textContent; button.textContent='Copiado'; setTimeout(() => button.textContent=original, 1200);
-    }));
+    const columns = { pending:'Pendiente', progress:'En progreso', review:'En revisión', blocked:'Bloqueada', done:'Completada' };
+    const storageKey = 'evaluaciones-kanban-status-v1';
+    const metadataStorageKey = 'evaluaciones-kanban-metadata-v1';
+    const board = document.querySelector('.board');
+    let cardArrastrada = null;
+    const recommendedTags = ['Frontend', 'Backend', 'Servidor', 'Base de datos', 'Seguridad', 'Integración', 'Validación', 'Documentación', 'Reportes', 'Exámenes', 'OMR', 'UX/UI'];
+
+    function savedMetadata() {
+      try { return JSON.parse(localStorage.getItem(metadataStorageKey) || '{}'); } catch { return {}; }
+    }
+
+    const taskMetadata = savedMetadata();
+
+    function copyText(text, button) {
+      const finish = () => { const original = button.textContent; button.textContent='Copiado'; setTimeout(() => button.textContent=original, 1200); };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(finish).catch(() => {
+          const area=document.createElement('textarea'); area.value=text; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove(); finish();
+        });
+        return;
+      }
+      {
+        const area=document.createElement('textarea'); area.value=text; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove(); finish();
+      }
+    }
+
+    function savedStatuses() {
+      try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
+    }
+
+    function persistStatuses() {
+      const statuses = {};
+      document.querySelectorAll('.card[data-id]').forEach(card => { statuses[card.dataset.id] = card.dataset.status; });
+      localStorage.setItem(storageKey, JSON.stringify(statuses));
+    }
+
+    function refreshEmpty(column, filterActive = false) {
+      const cards = [...column.querySelectorAll('.card')];
+      const visibleCards = cards.filter(card => !card.classList.contains('is-filtered'));
+      const hasCards = filterActive ? visibleCards.length > 0 : cards.length > 0;
+      const empty = column.querySelector('.empty');
+      if (hasCards && empty) empty.remove();
+      if (!hasCards) {
+        const message = empty || document.createElement('div');
+        message.className = 'empty';
+        message.classList.toggle('filter-empty', filterActive && cards.length > 0);
+        message.textContent = filterActive && cards.length > 0 ? 'Sin coincidencias.' : 'Sin tareas.';
+        if (!empty) column.appendChild(message);
+      }
+    }
+
+    function updateSummary() {
+      Object.keys(columns).forEach(status => {
+        const count = document.querySelectorAll(`.card[data-status="${status}"]`).length;
+        const noun = status === 'pending' ? 'pendientes' : status === 'blocked' ? 'bloqueadas' : status === 'done' ? 'completadas' : status === 'progress' ? 'en progreso' : 'en revisión';
+        const summary = document.querySelector(`[data-summary="${status}"]`);
+        const columnCount = document.querySelector(`[data-column-count="${status}"]`);
+        if (summary) summary.textContent = `${count} ${noun}`;
+        if (columnCount) columnCount.textContent = count;
+      });
+    }
+
+    function cardMetadata(card) {
+      const fields = [...card.querySelectorAll('p')].map(field => field.textContent.trim());
+      const saved = taskMetadata[card.dataset.id] || {};
+      const priority = saved.priority || fields[0]?.replace(/^Prioridad:\s*/i, '').trim() || '';
+      const tags = Array.isArray(saved.tags) ? saved.tags : [];
+      return {
+        priority,
+        area: fields[1]?.replace(/^Área:\s*/i, '').trim() || '',
+        tags,
+        text: `${card.dataset.id || ''} ${card.textContent} ${card.dataset.copy || ''} ${tags.join(' ')}`.toLocaleLowerCase('es')
+      };
+    }
+
+    function persistMetadata() {
+      localStorage.setItem(metadataStorageKey, JSON.stringify(taskMetadata));
+    }
+
+    function initializeMetadata() {
+      document.querySelectorAll('.card[data-id]').forEach(card => {
+        const data = cardMetadata(card);
+        taskMetadata[card.dataset.id] = { priority:data.priority, tags:data.tags };
+      });
+      persistMetadata();
+    }
+
+    function populateAreaFilter() {
+      const areaFilter = document.getElementById('area-filter');
+      if (!areaFilter) return;
+      const areas = [...new Set([...document.querySelectorAll('.card')].map(card => cardMetadata(card).area).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+      areas.forEach(area => {
+        const option = document.createElement('option');
+        option.value = area;
+        option.textContent = area;
+        areaFilter.appendChild(option);
+      });
+    }
+
+    const priorityOrder = { 'Crítica': 0, 'Alta': 1, 'Media': 2, 'Baja': 3 };
+
+    function sortCards(cards, mode) {
+      if (mode === 'manual') return cards;
+      return cards.sort((first, second) => {
+        const firstData = cardMetadata(first);
+        const secondData = cardMetadata(second);
+        if (mode === 'priority') return (priorityOrder[firstData.priority] ?? 99) - (priorityOrder[secondData.priority] ?? 99) || first.dataset.id.localeCompare(second.dataset.id);
+        if (mode === 'title') return first.querySelector('h3').textContent.localeCompare(second.querySelector('h3').textContent, 'es');
+        return first.dataset.id.localeCompare(second.dataset.id, 'es', { numeric: true });
+      });
+    }
+
+    function applyFilters() {
+      const query = document.getElementById('task-search')?.value.trim().toLocaleLowerCase('es') || '';
+      const priority = document.getElementById('priority-filter')?.value || 'all';
+      const area = document.getElementById('area-filter')?.value || 'all';
+      const sort = document.getElementById('sort-tasks')?.value || 'manual';
+      const filterActive = Boolean(query || priority !== 'all' || area !== 'all');
+      document.querySelectorAll('.card').forEach(card => {
+        const data = cardMetadata(card);
+        const matches = (!query || data.text.includes(query)) && (priority === 'all' || data.priority === priority) && (area === 'all' || data.area === area);
+        card.classList.toggle('is-filtered', !matches);
+      });
+      Object.keys(columns).forEach(status => {
+        const column = board.querySelector(`.column.${status}`);
+        if (!column) return;
+        sortCards([...column.querySelectorAll('.card')], sort).forEach(card => column.appendChild(card));
+        refreshEmpty(column, filterActive);
+      });
+      updateSummary();
+    }
+
+    function moveCard(card, status, save = true) {
+      const target = board.querySelector(`.column.${status}`);
+      if (!target) return;
+      card.dataset.status = status;
+      target.appendChild(card);
+      const select = card.querySelector('.move-select');
+      if (select) select.value = status;
+      board.querySelectorAll('.column').forEach(refreshEmpty);
+      updateSummary();
+      if (save) persistStatuses();
+    }
+
+    function estadoDeColumna(column) {
+      return Object.keys(columns).find(status => column.classList.contains(status));
+    }
+
+    function limpiarArrastre(card) {
+      card.classList.remove('is-dragging');
+      document.body.classList.remove('dragging-active');
+      cardArrastrada = null;
+      board.querySelectorAll('.column').forEach(item => item.classList.remove('is-drag-over'));
+    }
+
+    function resaltarColumna(event) {
+      const elemento = document.elementFromPoint(event.clientX, event.clientY);
+      const column = elemento?.closest('.column');
+      board.querySelectorAll('.column').forEach(item => item.classList.toggle('is-drag-over', item === column));
+      return column;
+    }
+
+    function copyCardText(card) {
+      const data = cardMetadata(card);
+      const title = card.querySelector('h3')?.textContent.trim() || '';
+      const description = [...card.querySelectorAll('p')].slice(2).map(item => item.textContent.trim()).filter(Boolean).join('\n');
+      const tags = data.tags.length ? `Etiquetas: ${data.tags.join(', ')}` : '';
+      return [`${card.dataset.id} — ${title}`, `Prioridad: ${data.priority}`, `Área: ${data.area}`, tags, description].filter(Boolean).join('\n');
+    }
+
+    document.querySelectorAll('.card').forEach(card => {
+      const actions = card.querySelector('.card-actions');
+      const copyButton = card.querySelector('.copy');
+      const detailButton = document.createElement('button');
+      detailButton.className = 'detail';
+      detailButton.type = 'button';
+      detailButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M11 8v6"></path><path d="M8 11h6"></path></svg>';
+      detailButton.title = 'Ver detalle';
+      detailButton.setAttribute('aria-label', 'Ver detalle');
+      detailButton.classList.add('icon-button');
+      copyButton?.classList.add('icon-button');
+      if (copyButton) {
+        copyButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>';
+        copyButton.title = 'Copiar tarjeta';
+        copyButton.setAttribute('aria-label', 'Copiar tarjeta');
+      }
+      actions?.replaceChildren(copyButton || document.createElement('button'), detailButton);
+      card.draggable = false;
+      card.title = 'Arrastra esta tarjeta a otra columna para cambiar su estado';
+      card.addEventListener('pointerdown', event => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (event.button !== 0 || target?.closest('button, select, a')) return;
+        cardArrastrada = card;
+        card.dataset.pointerStartX = String(event.clientX);
+        card.dataset.pointerStartY = String(event.clientY);
+        card.setPointerCapture?.(event.pointerId);
+      });
+      card.addEventListener('pointermove', event => {
+        if (cardArrastrada !== card) return;
+        const startX = Number(card.dataset.pointerStartX || event.clientX);
+        const startY = Number(card.dataset.pointerStartY || event.clientY);
+        const distancia = Math.hypot(event.clientX - startX, event.clientY - startY);
+        if (!card.classList.contains('is-dragging') && distancia < 6) return;
+        event.preventDefault();
+        card.classList.add('is-dragging');
+        document.body.classList.add('dragging-active');
+        resaltarColumna(event);
+      });
+      card.addEventListener('pointerup', event => {
+        if (cardArrastrada !== card) return;
+        const estabaArrastrando = card.classList.contains('is-dragging');
+        const column = resaltarColumna(event);
+        if (estabaArrastrando) {
+          const status = column && estadoDeColumna(column);
+          if (status) {
+            moveCard(card, status);
+            applyFilters();
+          }
+        }
+        card.releasePointerCapture?.(event.pointerId);
+        delete card.dataset.pointerStartX;
+        delete card.dataset.pointerStartY;
+        limpiarArrastre(card);
+      });
+      card.addEventListener('pointercancel', () => {
+        if (cardArrastrada === card) limpiarArrastre(card);
+      });
+      copyButton?.addEventListener('click', () => copyText(copyCardText(card), copyButton));
+      detailButton.addEventListener('click', () => abrirDetalle(card));
+    });
+
+    const detailModal = document.getElementById('detail-modal');
+    const detailContent = document.getElementById('detail-content');
+
+    function abrirDetalle(card) {
+      const detail = card.cloneNode(true);
+      const title = detail.querySelector('h3');
+      if (title) title.id = 'detail-title';
+      detail.querySelector('.card-actions')?.remove();
+      detail.classList.add('detail-card');
+      const data = cardMetadata(card);
+      const editor = document.createElement('div');
+      editor.className = 'detail-editor';
+      editor.innerHTML = `
+        <label class="editor-field"><span>Prioridad</span><select id="detail-priority" aria-label="Prioridad de la tarea"><option>Crítica</option><option>Alta</option><option>Media</option><option>Baja</option></select></label>
+        <div class="tag-editor">
+          <span class="editor-label">Etiquetas</span>
+          <div class="tag-list" id="detail-tags"></div>
+          <div class="tag-input-row"><input id="tag-input" type="text" maxlength="30" placeholder="Escribe una etiqueta" autocomplete="off"><button class="tag-add" type="button" title="Agregar etiqueta" aria-label="Agregar etiqueta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></button></div>
+          <div class="tag-suggestions" aria-label="Etiquetas recomendadas"></div>
+        </div>
+        <div class="editor-footer"><span class="save-feedback" aria-live="polite"></span><button class="editor-save" type="button" title="Guardar cambios" aria-label="Guardar cambios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"></path><path d="M8 4v6h8V4"></path><path d="M8 20v-6h8v6"></path></svg></button></div>`;
+      const priorityInput = editor.querySelector('#detail-priority');
+      const tagInput = editor.querySelector('#tag-input');
+      const tagList = editor.querySelector('#detail-tags');
+      const suggestions = editor.querySelector('.tag-suggestions');
+      const saveFeedback = editor.querySelector('.save-feedback');
+      let tags = [...data.tags];
+      priorityInput.value = data.priority || 'Media';
+
+      const renderTags = () => {
+        tagList.replaceChildren(...tags.map(tag => {
+          const chip = document.createElement('span');
+          chip.className = 'tag-chip';
+          chip.textContent = tag;
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.textContent = '×';
+          remove.title = `Quitar etiqueta ${tag}`;
+          remove.setAttribute('aria-label', `Quitar etiqueta ${tag}`);
+          remove.addEventListener('click', () => { tags = tags.filter(item => item !== tag); renderTags(); });
+          chip.appendChild(remove);
+          return chip;
+        }));
+      };
+
+      const addTag = value => {
+        const tag = value.trim().replace(/\s+/g, ' ');
+        if (!tag || tags.some(item => item.toLocaleLowerCase('es') === tag.toLocaleLowerCase('es'))) return;
+        tags.push(tag);
+        tagInput.value = '';
+        renderTags();
+      };
+
+      recommendedTags.forEach(tag => {
+        const suggestion = document.createElement('button');
+        suggestion.className = 'tag-suggestion';
+        suggestion.type = 'button';
+        suggestion.textContent = `+ ${tag}`;
+        suggestion.addEventListener('click', () => addTag(tag));
+        suggestions.appendChild(suggestion);
+      });
+      editor.querySelector('.tag-add').addEventListener('click', () => addTag(tagInput.value));
+      tagInput.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); addTag(tagInput.value); } });
+      editor.querySelector('.editor-save').addEventListener('click', () => {
+        taskMetadata[card.dataset.id] = { priority:priorityInput.value, tags:[...tags] };
+        persistMetadata();
+        const priorityParagraph = card.querySelectorAll('p')[0];
+        if (priorityParagraph) priorityParagraph.innerHTML = `<strong>Prioridad:</strong> ${priorityInput.value}`;
+        const detailPriorityParagraph = detail.querySelectorAll('p')[0];
+        if (detailPriorityParagraph) detailPriorityParagraph.innerHTML = `<strong>Prioridad:</strong> ${priorityInput.value}`;
+        applyFilters();
+        saveFeedback.textContent = 'Guardado';
+        setTimeout(() => { saveFeedback.textContent = ''; }, 1400);
+      });
+      renderTags();
+      detailContent.replaceChildren(detail, editor);
+      detailModal.hidden = false;
+      document.body.classList.add('modal-open');
+    }
+
+    function cerrarDetalle() {
+      detailModal.hidden = true;
+      detailContent.replaceChildren();
+      document.body.classList.remove('modal-open');
+    }
+
+    detailModal.querySelector('.modal-close')?.addEventListener('click', cerrarDetalle);
+    detailModal.addEventListener('click', event => { if (event.target === detailModal) cerrarDetalle(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !detailModal.hidden) cerrarDetalle(); });
+
+    const defaultStatuses = {};
+    document.querySelectorAll('.card[data-id]').forEach(card => { defaultStatuses[card.dataset.id] = card.dataset.status; });
+    const stored = savedStatuses();
+    document.querySelectorAll('.card[data-id]').forEach(card => moveCard(card, columns[stored[card.dataset.id]] ? stored[card.dataset.id] : card.dataset.status, false));
+    initializeMetadata();
+    populateAreaFilter();
+    document.getElementById('task-search')?.addEventListener('input', applyFilters);
+    document.getElementById('priority-filter')?.addEventListener('change', applyFilters);
+    document.getElementById('area-filter')?.addEventListener('change', applyFilters);
+    document.getElementById('sort-tasks')?.addEventListener('change', applyFilters);
+    applyFilters();
+    persistStatuses();
+    document.getElementById('reset-board')?.addEventListener('click', () => {
+      localStorage.removeItem(storageKey);
+      document.querySelectorAll('.card[data-id]').forEach(card => moveCard(card, defaultStatuses[card.dataset.id] || 'pending', false));
+      document.getElementById('task-search').value = '';
+      document.getElementById('priority-filter').value = 'all';
+      document.getElementById('area-filter').value = 'all';
+      document.getElementById('sort-tasks').value = 'manual';
+      applyFilters();
+      persistStatuses();
+    });
   </script>
 </body>
 </html>
