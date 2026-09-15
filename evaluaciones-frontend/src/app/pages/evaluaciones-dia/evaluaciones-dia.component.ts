@@ -527,19 +527,35 @@ interface CampusDisponible extends Campus {
                       <div class="inline-flex items-center gap-1.5">
                         @if (puedeMostrarDocumento(item)) {
                         <div class="relative inline-flex group/documento">
-                          <button
-                            (click)="abrirPdfExamen(item)"
-                            title="Abrir examen PDF"
-                            aria-label="Abrir examen PDF"
-                            class="h-7 w-7 rounded-lg text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 flex items-center justify-center transition-colors cursor-pointer">
-                            <i class="pi pi-file-pdf text-xs"></i>
-                          </button>
-                          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/documento:flex flex-col items-center z-50 pointer-events-none">
-                            <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
-                              Examen PDF oficial
-                            </span>
-                            <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
-                          </div>
+                          @if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+                            <button
+                              (click)="abrirPdfExamen(item)"
+                              title="Descargar examen oficial sin cartilla"
+                              aria-label="Descargar examen oficial sin cartilla"
+                              class="h-7 w-7 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 flex items-center justify-center transition-colors cursor-pointer">
+                              <i class="pi pi-file-word text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/documento:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                                Examen oficial (.doc/.docx)
+                              </span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          } @else {
+                            <button
+                              (click)="abrirPdfExamen(item)"
+                              title="Abrir examen PDF"
+                              aria-label="Abrir examen PDF"
+                              class="h-7 w-7 rounded-lg text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 flex items-center justify-center transition-colors cursor-pointer">
+                              <i class="pi pi-file-pdf text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/documento:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                                Examen PDF oficial
+                              </span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          }
                         </div>
                         }
                         @if (puedeMostrarPatronCalificado(item)) {
@@ -4834,9 +4850,32 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this._mostrarToast('No hay exámenes generados disponibles.', 'error');
   }
 
+  public descargarDocumentoSinCartillaDirecto(item: EvaluacionItemUI): void {
+    this._sinCartillaService.descargarDocumento(item.id).subscribe({
+      next: archivo => {
+        const url = window.URL.createObjectURL(archivo);
+        const enlace = window.document.createElement('a');
+        enlace.href = url;
+        enlace.download = `${item.codigo}_examen_sin_cartilla.docx`;
+        enlace.click();
+        enlace.remove();
+        window.setTimeout(() => window.URL.revokeObjectURL(url), 1500);
+        this._mostrarToast(`${item.codigo}: archivo oficial del examen descargado.`);
+      },
+      error: err => {
+        this._mostrarToast(err?.error?.error || err?.error?.message || 'No se pudo descargar el archivo oficial del examen.', 'error');
+      }
+    });
+  }
+
   public abrirPdfExamen(item: EvaluacionItemUI): void {
     if (!this.puedeMostrarDocumento(item)) {
       this._mostrarToast('El examen PDF estará disponible después de la generación.', 'error');
+      return;
+    }
+
+    if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+      this.descargarDocumentoSinCartillaDirecto(item);
       return;
     }
 

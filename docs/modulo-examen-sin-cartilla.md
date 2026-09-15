@@ -24,7 +24,7 @@ Permitir que un examen presencial sin cartilla se gestione desde la carga del do
 - Para calificar se exige una nota entre 0 y 60 para cada estudiante oficial del grupo.
 - No se aceptan estudiantes que no pertenezcan a la nómina oficial devuelta por el SEA.
 - No se aceptan códigos de estudiante duplicados dentro de una misma carga.
-- El servidor valida que el docente sea el asignado al examen y que el examen pertenezca a su alcance académico. Administrador y responsable mantienen acceso de supervisión.
+- El servidor valida que el docente sea el asignado al examen y que el examen pertenezca a su alcance académico. Administrador y responsable mantienen acceso de supervisión, y el personal de evaluaciones puede consultar, descargar e imprimir exámenes dentro de su alcance autorizado de sedes, campus y carreras.
 - El usuario y la fecha de registro se toman de la sesión autenticada; no se confía en el usuario enviado por el navegador.
 - Mientras el rol está `PENDIENTE_NOTAS`, el docente puede editar y guardar las notas. En `CALIFICADO` el reporte queda disponible en modo consulta.
 - La impresión permanece bloqueada mientras existan notas faltantes o inválidas.

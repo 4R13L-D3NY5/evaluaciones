@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -310,10 +311,30 @@ public class AccesoAcademicoService {
                             && coincideCampus(item, rol.getCampus()));
         }
         if ("PERSONAL_EVALUACIONES".equals(rolUsuario)) {
-            return usuario.getCampuses().stream().anyMatch(item ->
-                    item.isHabilitado()
-                            && coincide(item.getSedeCodigo(), rol.getSedeCodigo())
-                            && coincideCampus(item, rol.getCampus()));
+            boolean sedeOCampusValido;
+            if (!usuario.getCampuses().isEmpty()) {
+                sedeOCampusValido = usuario.getCampuses().stream().anyMatch(item ->
+                        item.isHabilitado()
+                                && coincide(item.getSedeCodigo(), rol.getSedeCodigo())
+                                && coincideCampus(item, rol.getCampus()));
+            } else if (!usuario.getSedes().isEmpty()) {
+                sedeOCampusValido = usuario.getSedes().stream()
+                        .anyMatch(item -> coincide(item.getCodigo(), rol.getSedeCodigo()));
+            } else {
+                return false;
+            }
+            if (!sedeOCampusValido) return false;
+
+            if (!usuario.getCarreras().isEmpty()) {
+                return usuario.getCarreras().stream()
+                        .anyMatch(item -> coincide(item.getCodigo(), rol.getCarreraCodigo()));
+            }
+            if (!usuario.getAsignaciones().isEmpty()) {
+                return usuario.getAsignaciones().stream()
+                        .anyMatch(item -> coincide(item.getSedeCodigo(), rol.getSedeCodigo())
+                                && (item.isTodaSede() || coincide(item.getCarreraCodigo(), rol.getCarreraCodigo())));
+            }
+            return true;
         }
         if ("VICERRECTOR".equals(rolUsuario)) {
             return !usuario.getSedes().isEmpty() && usuario.getSedes().stream()
@@ -362,8 +383,22 @@ public class AccesoAcademicoService {
                     .filter(codigo -> !codigo.isBlank())
                     .collect(Collectors.toSet());
         }
+        if ("PERSONAL_EVALUACIONES".equals(usuario.getRolCodigo())) {
+            Set<String> sedes = usuario.getSedes().stream()
+                    .map(item -> normalizar(item.getCodigo()))
+                    .filter(codigo -> !codigo.isBlank())
+                    .collect(Collectors.toSet());
+            if (sedes.isEmpty() && !usuario.getCampuses().isEmpty()) {
+                sedes = usuario.getCampuses().stream()
+                        .filter(AlcanceCampus::isHabilitado)
+                        .map(item -> normalizar(item.getSedeCodigo()))
+                        .filter(codigo -> !codigo.isBlank())
+                        .collect(Collectors.toSet());
+            }
+            return sedes;
+        }
         if (usuario.getSedes().isEmpty()) {
-            return Set.of("PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "VICERRECTOR", "VERIFICADOR").contains(usuario.getRolCodigo())
+            return Set.of("DIRECTOR_CARRERA", "VICERRECTOR", "VERIFICADOR").contains(usuario.getRolCodigo())
                     ? Set.of() : null;
         }
         return usuario.getSedes().stream()
@@ -376,7 +411,6 @@ public class AccesoAcademicoService {
         if (!estaAutenticado(authentication)) return Set.of();
         if (tieneRol(authentication, "ADMINISTRADOR_SISTEMA")
                 || tieneRol(authentication, "RESPONSABLE_EVALUACIONES")
-                || tieneRol(authentication, "PERSONAL_EVALUACIONES")
                 || tieneRol(authentication, "VICERRECTOR")) {
             return null;
         }
@@ -397,8 +431,24 @@ public class AccesoAcademicoService {
                     .filter(codigo -> !codigo.isBlank())
                     .collect(Collectors.toSet());
         }
+        if ("PERSONAL_EVALUACIONES".equals(usuario.getRolCodigo())) {
+            if (usuario.getCarreras().isEmpty() && usuario.getAsignaciones().isEmpty()) {
+                return null;
+            }
+            Set<String> carreras = new LinkedHashSet<>();
+            usuario.getCarreras().stream()
+                    .map(item -> normalizar(item.getCodigo()))
+                    .filter(codigo -> !codigo.isBlank())
+                    .forEach(carreras::add);
+            usuario.getAsignaciones().stream()
+                    .filter(item -> !item.isTodaSede())
+                    .map(item -> normalizar(item.getCarreraCodigo()))
+                    .filter(codigo -> !codigo.isBlank())
+                    .forEach(carreras::add);
+            return carreras;
+        }
         if (usuario.getCarreras().isEmpty()) {
-            return Set.of("PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "VERIFICADOR").contains(usuario.getRolCodigo())
+            return Set.of("DIRECTOR_CARRERA", "VERIFICADOR").contains(usuario.getRolCodigo())
                     ? Set.of() : null;
         }
         return usuario.getCarreras().stream()
