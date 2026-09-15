@@ -96,6 +96,7 @@ public class AutenticacionService {
                 .filter(carrera -> !carrera.isBlank())
                 .toList());
         usuario.getAsignaciones().stream()
+                .filter(asignacion -> !asignacion.isTodaSede())
                 .map(asignacion -> asignacion.getCarreraCodigo().trim())
                 .filter(carrera -> !carrera.isBlank())
                 .forEach(carreras::add);

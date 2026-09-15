@@ -23,6 +23,8 @@ export interface VerificacionExamenLista {
   docenteNombre: string;
   estadoVerificacion: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | string;
   observacionesGenerales?: string;
+  verificadoPor?: string;
+  fechaVerificacion?: string;
 }
 
 export interface VerificacionOpcion { letra: string; texto: string; correcta: boolean; }
@@ -43,6 +45,25 @@ export interface VerificacionPregunta {
 
 export interface VerificacionExamenDetalle extends VerificacionExamenLista {
   preguntas: VerificacionPregunta[];
+  historialDevoluciones: VerificacionHistorialDevolucion[];
+}
+
+export type VerificacionExamenFiltros = Record<string, string | undefined>;
+
+export interface VerificacionHistorialPregunta {
+  numeroPregunta: number;
+  observacion: string;
+  preguntaEnviada?: VerificacionPregunta;
+  preguntaCorregida?: VerificacionPregunta | null;
+}
+
+export interface VerificacionHistorialDevolucion {
+  id: number;
+  bancoPreguntasId: string;
+  fechaDevolucion: string;
+  verificadoPor?: string;
+  observacionesGenerales?: string;
+  preguntasObservadas: VerificacionHistorialPregunta[];
 }
 
 export interface VerificacionDecision {
@@ -67,7 +88,7 @@ export class VerificacionExamenService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api/verificacion-examenes';
 
-  listar(filtros: Record<string, string | undefined> = {}): Observable<VerificacionExamenLista[]> {
+  listar(filtros: VerificacionExamenFiltros = {}): Observable<VerificacionExamenLista[]> {
     let params = new HttpParams().set('orden', filtros['orden'] || 'FECHA_EXAMEN_ASC');
     Object.entries(filtros).forEach(([key, value]) => {
       if (key !== 'orden' && value) params = params.set(key, value);
@@ -77,6 +98,10 @@ export class VerificacionExamenService {
 
   obtener(rolExamenId: string): Observable<VerificacionExamenDetalle> {
     return this.http.get<VerificacionExamenDetalle>(`${this.baseUrl}/${rolExamenId}`).pipe(catchError(this.error));
+  }
+
+  obtenerAprobado(rolExamenId: string): Observable<VerificacionExamenDetalle> {
+    return this.http.get<VerificacionExamenDetalle>(`${this.baseUrl}/${rolExamenId}/aprobado`).pipe(catchError(this.error));
   }
 
   previsualizar(rolExamenId: string): Observable<GeneracionTypstResultado> {

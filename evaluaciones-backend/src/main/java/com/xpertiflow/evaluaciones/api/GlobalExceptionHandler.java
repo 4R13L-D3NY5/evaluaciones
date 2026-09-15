@@ -1,6 +1,7 @@
 package com.xpertiflow.evaluaciones.api;
 
 import com.xpertiflow.evaluaciones.application.VerificacionRequeridaException;
+import com.xpertiflow.evaluaciones.application.VentanaTemporalException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -20,6 +21,15 @@ public class GlobalExceptionHandler {
         body.put("timestamp", LocalDateTime.now());
         body.put("error", ex.getMessage());
         body.put("codigo", "VERIFICACION_REQUERIDA");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(VentanaTemporalException.class)
+    public ResponseEntity<Map<String, Object>> handleVentanaTemporal(VentanaTemporalException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("error", ex.getMessage());
+        body.put("codigo", "VENTANA_TEMPORAL_NO_HABILITADA");
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 

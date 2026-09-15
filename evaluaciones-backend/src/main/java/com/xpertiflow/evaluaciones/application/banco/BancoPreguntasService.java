@@ -5,6 +5,7 @@ import com.xpertiflow.evaluaciones.api.dto.banco.BancoPreguntasResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.CargaBancoResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.ReactivoResponseDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
+import com.xpertiflow.evaluaciones.application.HistorialVerificacionService;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaVerificacion;
 import com.xpertiflow.evaluaciones.domain.entity.Reactivo;
@@ -50,6 +51,7 @@ public class BancoPreguntasService {
     private final BancoCifradoService cifradoService;
     private final VerificacionExamenRepository verificacionRepository;
     private final AuditoriaVerificacionRepository auditoriaVerificacionRepository;
+    private final HistorialVerificacionService historialVerificacionService;
 
     private static final int TOTAL_REQUERIDO = 60;
     private static final int CUOTA_FACILES = 15;
@@ -319,6 +321,13 @@ public class BancoPreguntasService {
                     ? bancoRepository.findByRolExamenIdOrderByFechaAprobacionDesc(rol.getId())
                     : bancoRepository.findByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
                             rol.getMateriaCodigo(), rol.getGrupo(), rol.getTipoParcial().getValor());
+            if (vincularRol && !bancosAnteriores.isEmpty()) {
+                verificacionRepository.findByRolExamenId(rol.getId()).ifPresent(verificacion ->
+                        bancosAnteriores.stream()
+                                .filter(banco -> banco.getId().equals(verificacion.getBancoPreguntasId()))
+                                .findFirst()
+                                .ifPresent(banco -> historialVerificacionService.archivarDevolucion(verificacion, banco)));
+            }
             if (!bancosAnteriores.isEmpty()) {
                 bancoRepository.deleteAll(bancosAnteriores);
             }

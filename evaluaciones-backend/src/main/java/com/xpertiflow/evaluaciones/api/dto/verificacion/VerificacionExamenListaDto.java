@@ -25,4 +25,6 @@ public class VerificacionExamenListaDto {
     private String docenteNombre;
     private String estadoVerificacion;
     private String observacionesGenerales;
+    private String verificadoPor;
+    private LocalDateTime fechaVerificacion;
 }

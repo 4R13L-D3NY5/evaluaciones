@@ -65,6 +65,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class UsuariosSistemaService {
 
+    private static final String CARRERA_TODA_SEDE = "__TODA_SEDE__";
+
     private static final Pattern CODIGO_EN_CABECERA = Pattern.compile("(?:\\[|:|_|-)\\s*([A-Za-z0-9.]+)");
     private static final Set<String> MARCAS_ACTIVAS = Set.of("X", "SI", "S", "1", "TRUE", "VERDADERO", "✓", "✔", "☑");
 
@@ -83,7 +85,7 @@ public class UsuariosSistemaService {
     public List<UsuarioSistemaResponseDto> listar(String contexto) {
         Set<String> rolesVisibles = "EVALUACIONES".equalsIgnoreCase(contexto)
                 ? Set.of("RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "VERIFICADOR")
-                : Set.of("ADMINISTRADOR_SISTEMA", "DIRECTOR_CARRERA", "DOCENTE", "VICERRECTOR");
+                : Set.of("ADMINISTRADOR_SISTEMA", "RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "DOCENTE", "VICERRECTOR", "VERIFICADOR");
         Map<String, AlcanceSea> alcancesSea = "EVALUACIONES".equalsIgnoreCase(contexto)
                 ? Map.of() : construirAlcancesSea();
         return usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
@@ -657,18 +659,22 @@ public class UsuariosSistemaService {
         if (!asignaciones.isEmpty()) {
             for (AsignacionAcademicaDto item : asignaciones) {
                 if (item == null || item.sedeCodigo() == null || item.sedeCodigo().isBlank()
-                        || item.carreraCodigo() == null || item.carreraCodigo().isBlank()) continue;
+                        || (!item.todaSede() && (item.carreraCodigo() == null || item.carreraCodigo().isBlank()))) continue;
+                boolean todaSede = item.todaSede();
                 usuario.getAsignaciones().add(new AsignacionAcademica(
                         item.sedeCodigo().trim(), nombre(item.sedeNombre()),
-                        item.carreraCodigo().trim(), nombre(item.carreraNombre()),
+                        todaSede ? CARRERA_TODA_SEDE : item.carreraCodigo().trim(),
+                        todaSede ? "Toda la sede" : nombre(item.carreraNombre()),
                         item.asignaturaCodigo() == null ? "" : item.asignaturaCodigo().trim(),
-                        nombre(item.asignaturaNombre())));
+                        nombre(item.asignaturaNombre()), todaSede));
             }
             // Se mantienen las colecciones anteriores como índices de compatibilidad
             // para los módulos que todavía consultan sedes/carreras por separado.
             usuario.getAsignaciones().forEach(item -> {
                 usuario.getSedes().add(new AlcanceSede(item.getSedeCodigo(), item.getSedeNombre()));
-                usuario.getCarreras().add(new AlcanceCarrera(item.getCarreraCodigo(), item.getCarreraNombre()));
+                if (!item.isTodaSede()) {
+                    usuario.getCarreras().add(new AlcanceCarrera(item.getCarreraCodigo(), item.getCarreraNombre()));
+                }
             });
         } else {
             if (request.getSedes() != null) {
@@ -715,9 +721,10 @@ public class UsuariosSistemaService {
                 .map(item -> new AsignacionAcademicaDto(
                         item.getSedeCodigo(), item.getSedeNombre(),
                         item.getCarreraCodigo(), item.getCarreraNombre(),
-                        item.getAsignaturaCodigo(), item.getAsignaturaNombre()))
+                        item.getAsignaturaCodigo(), item.getAsignaturaNombre(), item.isTodaSede()))
                 .toList();
-        if (asignaciones.isEmpty() && !sedes.isEmpty() && !carreras.isEmpty()) {
+        if (asignaciones.isEmpty() && !sedes.isEmpty() && !carreras.isEmpty()
+                && !"VERIFICADOR".equalsIgnoreCase(usuario.getRolCodigo())) {
             // Compatibilidad con cuentas creadas antes de V30: en ese momento se
             // persistían sedes y carreras por separado, sin la relación concreta.
             asignaciones = sedes.stream()
@@ -834,7 +841,7 @@ public class UsuariosSistemaService {
         request.setAsignaciones(usuario.getAsignaciones().stream()
                 .map(item -> new AsignacionAcademicaDto(item.getSedeCodigo(), item.getSedeNombre(),
                         item.getCarreraCodigo(), item.getCarreraNombre(), item.getAsignaturaCodigo(),
-                        item.getAsignaturaNombre()))
+                        item.getAsignaturaNombre(), item.isTodaSede()))
                 .toList());
     }
 

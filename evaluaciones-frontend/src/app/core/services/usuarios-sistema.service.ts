@@ -14,6 +14,7 @@ export interface AsignacionAcademica {
   carreraNombre: string;
   asignaturaCodigo?: string;
   asignaturaNombre?: string;
+  todaSede?: boolean;
 }
 
 export interface HorarioDocente {

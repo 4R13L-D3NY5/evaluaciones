@@ -50,12 +50,14 @@ class RolExamenServiceTest {
     private AccesoAcademicoService accesoAcademicoService;
     @Mock
     private VerificacionPoliticaService verificacionPoliticaService;
+    @Mock
+    private PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
 
     private RolExamenService service;
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService);
     }
 
     @Test

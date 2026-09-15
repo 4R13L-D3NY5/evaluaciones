@@ -25,5 +25,8 @@ public class VerificacionExamenDetalleDto {
     private String docenteNombre;
     private String estadoVerificacion;
     private String observacionesGenerales;
+    private String verificadoPor;
+    private LocalDateTime fechaVerificacion;
     private List<VerificacionPreguntaDto> preguntas = new ArrayList<>();
+    private List<VerificacionHistorialDevolucionDto> historialDevoluciones = new ArrayList<>();
 }

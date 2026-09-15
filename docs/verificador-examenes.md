@@ -11,7 +11,8 @@ La rama `verficicador_v1` incorpora el rol `VERIFICADOR` para revisar bancos de 
 3. El verificador consulta los exámenes en estado `VALIDADO`, dentro de sus sedes/carreras asignadas.
 4. La previsualización contiene todas las preguntas del banco, agrupadas por tipo, conserva el orden original dentro de cada grupo y muestra el número original entre paréntesis, además de una clave separada.
 5. El verificador aprueba o devuelve el banco. Una devolución exige observación general o por pregunta y se muestra al docente.
-6. Si el docente reemplaza el banco antes de generar, la revisión anterior se reinicia a `PENDIENTE` para el nuevo banco.
+6. Antes de reemplazar un banco devuelto, el sistema conserva el banco anterior cifrado junto con las observaciones, la fecha y el verificador.
+7. Cuando llega el nuevo banco, la revisión se reinicia a `PENDIENTE`. El detalle muestra el historial de las preguntas observadas, compara la versión devuelta con la actualizada y enfoca la lista de revisión en esas preguntas. El verificador puede ampliar la vista al examen completo.
 
 ## Seguridad y datos
 
@@ -20,7 +21,9 @@ La rama `verficicador_v1` incorpora el rol `VERIFICADOR` para revisar bancos de 
 - La verificación está deshabilitada por defecto. Al habilitarla, el bloqueo se aplica retroactivamente a exámenes validados que todavía no fueron generados.
 - El bloqueo se comprueba al solicitar la generación y al realizar la transición manual a `GENERADO`, con respuesta HTTP 409.
 - Los bancos cifrados, las variantes y los PDF ya generados no se modifican.
-- La migración `V37__verificacion_examenes.sql` crea el catálogo del rol, configuraciones, decisiones y auditoría.
+- El banco anterior permanece cifrado en el historial; las preguntas no se duplican en texto abierto.
+- La consulta del historial está protegida por el mismo rol y alcance académico que el detalle del examen.
+- La migración `V37__verificacion_examenes.sql` crea el catálogo del rol, configuraciones, decisiones y auditoría. `V39__historial_devoluciones_verificacion.sql` conserva los bancos devueltos para el seguimiento de correcciones.
 
 ## API principal
 
@@ -30,6 +33,8 @@ La rama `verficicador_v1` incorpora el rol `VERIFICADOR` para revisar bancos de 
 - `POST /api/verificacion-examenes/{rolExamenId}/decision`
 - `GET /api/configuracion-evaluaciones/verificacion`
 - `PUT /api/configuracion-evaluaciones/verificacion`
+
+El detalle del examen incluye `historialDevoluciones`, con las observaciones por pregunta y las versiones enviada/corregida. El historial comienza a conservarse desde la migración V39; las devoluciones anteriores cuyos bancos ya fueron reemplazados no se pueden reconstruir retroactivamente.
 
 ## Verificación local
 

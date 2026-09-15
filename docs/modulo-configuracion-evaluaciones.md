@@ -47,6 +47,17 @@ La pestaña **Configuración de Tiempos** guarda estos valores iniciales:
 
 La duración virtual y la cuenta regresiva se aplican al servicio de examen virtual. Los demás valores quedan persistidos como política operativa para que las validaciones de disponibilidad y cambios de estado puedan consultarlos desde una única configuración.
 
+## Aplicación para el personal de evaluaciones
+
+Para `PERSONAL_EVALUACIONES`, estos parámetros también se respetan en la operación diaria:
+
+- La lista de evaluaciones solo muestra los roles cuando llegan a la ventana de liberación configurada.
+- La transición a `GENERADO` se habilita desde la anticipación definida para generar el examen.
+- La transición a `ENTREGADO` se habilita desde los minutos configurados antes del examen.
+- El patrón oficial permanece protegido hasta cumplir las horas posteriores configuradas.
+
+Las comprobaciones se realizan con la hora del servidor y se aplican en el backend. Si una operación se intenta antes de tiempo, se rechaza con HTTP `409` y el código `VENTANA_TEMPORAL_NO_HABILITADA`; la interfaz muestra también la fecha y hora desde la que estará disponible. Administrador y Responsable de Evaluaciones conservan sus permisos operativos actuales.
+
 ## Persistencia y API
 
 La configuración se almacena como un registro único en `sea_configuracion_evaluaciones`. La estructura por parcial se guarda en `estructura_preguntas_json`; los tiempos se almacenan en columnas separadas para facilitar auditoría y consultas.

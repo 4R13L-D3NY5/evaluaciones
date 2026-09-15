@@ -46,6 +46,7 @@ public class RolExamenService {
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AccesoAcademicoService accesoAcademicoService;
     private final VerificacionPoliticaService verificacionPoliticaService;
+    private final PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
 
     private static final long CACHE_GRUPOS_SEA_MILLIS = 60_000L;
     private volatile List<GroupItemDto> gruposSeaCache = List.of();
@@ -112,9 +113,12 @@ public class RolExamenService {
                     .toList();
         }
 
-        return mapearRolesConDocenteOficial(authentication == null
+        List<RolExamen> rolesVisibles = authentication == null
                 ? roles
-                : accesoAcademicoService.filtrarRolesParaUsuario(roles, authentication));
+                : accesoAcademicoService.filtrarRolesParaUsuario(roles, authentication);
+        rolesVisibles = politicaTiempoEvaluacionesService
+                .filtrarListaParaPersonal(rolesVisibles, authentication);
+        return mapearRolesConDocenteOficial(rolesVisibles);
     }
 
     @Transactional(readOnly = true)
@@ -657,6 +661,9 @@ public class RolExamenService {
         }
         if (destino == EstadoFlujo.GENERADO) {
             verificacionPoliticaService.exigirVerificado(rol);
+        }
+        if (destino == EstadoFlujo.ENTREGADO) {
+            politicaTiempoEvaluacionesService.exigirEntregaHabilitada(rol, authentication);
         }
         if (!transicionVirtualFinal && !transicionSinCartillaAImpreso && !permitidos.contains(destino)) {
             throw new RuntimeException(

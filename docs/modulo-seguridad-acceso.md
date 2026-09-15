@@ -14,6 +14,7 @@ El sistema utiliza autenticación interna con sesión HTTP y autorización por r
 | `DOCENTE` | Bancos de preguntas y salas virtuales propias; sin acceso al Plan de Estudios ni a la Lista de Evaluaciones. |
 | `VICERRECTOR` | Lectura y reportes de sedes asignadas. |
 | `DIRECTOR_CARRERA` | Gestión y consulta del rol de exámenes de las carreras asignadas. |
+| `VERIFICADOR` | Revisión, previsualización y aprobación o devolución de bancos validados dentro del alcance asignado. |
 
 ## Endpoints
 

@@ -7,6 +7,7 @@ import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
 import com.xpertiflow.evaluaciones.application.VerificacionPoliticaService;
+import com.xpertiflow.evaluaciones.application.PoliticaTiempoEvaluacionesService;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
@@ -55,6 +56,8 @@ class GeneracionTypstServiceTest {
     private UnitepcGatewayClient unitepcGatewayClient;
     @Mock
     private VerificacionPoliticaService verificacionPoliticaService;
+    @Mock
+    private PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
 
     private GeneracionTypstService service;
 
@@ -74,7 +77,8 @@ class GeneracionTypstServiceTest {
                 configuracionEvaluacionesService,
                 properties,
                 unitepcGatewayClient,
-                verificacionPoliticaService);
+                verificacionPoliticaService,
+                politicaTiempoEvaluacionesService);
     }
 
     @Test

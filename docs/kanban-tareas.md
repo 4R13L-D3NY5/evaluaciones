@@ -117,6 +117,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Criterio de cierre: Diseñar y generar endpoints seguros para que cada estudiante consulte por su matrícula el rol de exámenes que le corresponde, el examen asignado, sus marcajes y el patrón de la variante; además, analizar y documentar qué información adicional puede compartirse, incluyendo si corresponde publicar notas.
 - Notas: No exponer bancos de preguntas, claves de respuestas ni información de otros estudiantes. La publicación de notas debe considerar estados de liberación, permisos y trazabilidad.
 
+#### T-015 — Corregir la asignación de carreras o sedes al crear usuario verificador
+
+- Prioridad: Alta
+- Área: Usuarios y accesos / Verificadores
+- Responsable: Por definir
+- Creada: 2026-09-13
+- Fecha límite: Por definir
+- Dependencias: Revisar el formulario de usuarios, la persistencia de alcances y la validación de acceso del rol `VERIFICADOR`.
+- Criterio de cierre: Crear o editar un usuario verificador y guardar correctamente las sedes completas y las carreras específicas seleccionadas, asegurando que el verificador solo consulte los exámenes de su alcance.
+- Notas: Tarea creada desde el comando `=new`.
+
 ### En progreso
 
 _Sin tareas._
@@ -133,6 +144,17 @@ _Sin tareas._
 - Dependencias: Validar el primer ingreso con contraseña correcta e incorrecta.
 - Criterio de cierre: Verificar primero la contraseña actual en el servidor, habilitar la nueva contraseña únicamente cuando sea correcta y conservar la validación final al guardar.
 - Notas: Implementado localmente; frontend compilado y backend construido en Docker. Pendiente de validación funcional con una cuenta real.
+
+#### T-014 — Aplicar los parámetros cronológicos al personal de evaluaciones
+
+- Prioridad: Alta
+- Área: Administración de Evaluaciones / Lista de Evaluaciones
+- Responsable: Por definir
+- Creada: 2026-09-12
+- Fecha límite: Por definir
+- Dependencias: Validación funcional con una cuenta `PERSONAL_EVALUACIONES` y roles en distintas ventanas horarias.
+- Criterio de cierre: Respetar en lista, generación, entrega y consulta del patrón los parámetros configurados, usando la hora del servidor y manteniendo los permisos actuales de Administrador y Responsable.
+- Notas: Implementado localmente; frontend compilado y backend construido en Docker. Pruebas automatizadas específicas aprobadas; pendiente validación funcional con una cuenta real y despliegue al servidor.
 
 #### T-004 — Integrar la anulación de preguntas de OMR en la calificación
 
@@ -173,15 +195,26 @@ _Sin tareas._
 - Criterio de cierre: Integrar en `main` la funcionalidad de `verificador_1`, resolver conflictos si aparecen, compilar y verificar que no se pierdan los cambios actuales de `main`.
 - Notas: Integrada sin conflictos desde `verficicador_v1`; la compilación del backend en Docker, la compilación del frontend y las pruebas del worker finalizaron correctamente. Merge registrado en `main`.
 
+#### T-013 — Actualizar el catálogo de usuarios con los nuevos roles integrados
+
+- Prioridad: Alta
+- Área: Usuarios y accesos / Roles y permisos
+- Responsable: Por definir
+- Creada: 2026-09-13
+- Fecha límite: 2026-09-13
+- Dependencias: Confirmar los nombres definitivos, permisos y alcance académico de los roles integrados en `main`.
+- Criterio de cierre: Mostrar en el apartado de Usuarios y accesos todos los roles integrados, especialmente `VERIFICADOR`, con su descripción, alcance y permisos coherentes con el backend.
+- Notas: Completada en `main`: `VERIFICADOR` quedó visible y administrable en el contexto institucional; se alinearon el filtro del backend, el formulario, el catálogo visual y la documentación. Frontend compilado y backend construido en Docker.
+
 ## Resumen
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 8 |
+| Pendientes | 9 |
 | En progreso | 0 |
-| En revisión | 3 |
+| En revisión | 4 |
 | Bloqueadas | 0 |
-| Completadas | 1 |
+| Completadas | 2 |
 
 ## Decisiones del módulo
 

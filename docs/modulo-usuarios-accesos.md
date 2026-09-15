@@ -14,8 +14,9 @@ Administrar las cuentas internas del sistema de evaluaciones mientras se prepara
 | `DIRECTOR_CARRERA` | Consulta y gestiona el rol de exámenes de las relaciones sede-carrera asignadas. |
 | `DOCENTE` | Accede únicamente a sus asignaturas asignadas por sede y carrera; no accede al Plan de Estudios ni a la Lista de Evaluaciones. |
 | `VICERRECTOR` | Consulta por sede las vistas académicas y reportes de las sedes asignadas. |
+| `VERIFICADOR` | Revisa, previsualiza y aprueba o devuelve bancos de preguntas validados dentro de las sedes y carreras asignadas. |
 
-La administración se separa en dos contextos. **Administración de Evaluaciones** lista únicamente los roles RESPONSABLE_EVALUACIONES y PERSONAL_EVALUACIONES; **Usuarios y accesos** lista ADMINISTRADOR_SISTEMA, DIRECTOR_CARRERA, DOCENTE y VICERRECTOR. El alcance académico del personal de evaluaciones se configura mediante sedes y campus asociados. En la Lista de Evaluaciones, el selector se presenta como campus para este rol y el backend aplica la misma restricción. Los códigos y nombres se conservan tal como los entrega el servicio SEA; el sistema no sustituye el formato del nombre completo recibido.
+La operación se presenta en dos contextos según la necesidad: **Administración de Evaluaciones** mantiene la gestión operativa de RESPONSABLE_EVALUACIONES y PERSONAL_EVALUACIONES, mientras **Usuarios y accesos** muestra y permite administrar el catálogo completo de roles institucionales: ADMINISTRADOR_SISTEMA, RESPONSABLE_EVALUACIONES, PERSONAL_EVALUACIONES, DIRECTOR_CARRERA, DOCENTE, VICERRECTOR y VERIFICADOR. El alcance académico del personal de evaluaciones se configura mediante sedes y campus asociados, y el del VERIFICADOR mediante sedes y carreras. En la Lista de Evaluaciones, el selector se presenta como campus para el personal de evaluaciones y el backend aplica la misma restricción. Los códigos y nombres se conservan tal como los entrega el servicio SEA; el sistema no sustituye el formato del nombre completo recibido.
 
 ## Acceso operativo del docente
 

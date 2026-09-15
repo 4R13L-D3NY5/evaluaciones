@@ -36,14 +36,26 @@ public class AsignacionAcademica {
     @Column(name = "asignatura_nombre", nullable = false, length = 180)
     private String asignaturaNombre = "";
 
+    @Column(name = "toda_sede", nullable = false)
+    private boolean todaSede = false;
+
     public AsignacionAcademica(String sedeCodigo, String sedeNombre,
                                String carreraCodigo, String carreraNombre,
                                String asignaturaCodigo, String asignaturaNombre) {
+        this(sedeCodigo, sedeNombre, carreraCodigo, carreraNombre,
+                asignaturaCodigo, asignaturaNombre, false);
+    }
+
+    public AsignacionAcademica(String sedeCodigo, String sedeNombre,
+                               String carreraCodigo, String carreraNombre,
+                               String asignaturaCodigo, String asignaturaNombre,
+                               boolean todaSede) {
         this.sedeCodigo = sedeCodigo;
         this.sedeNombre = sedeNombre;
         this.carreraCodigo = carreraCodigo;
         this.carreraNombre = carreraNombre;
         this.asignaturaCodigo = asignaturaCodigo == null ? "" : asignaturaCodigo;
         this.asignaturaNombre = asignaturaNombre == null ? "" : asignaturaNombre;
+        this.todaSede = todaSede;
     }
 }

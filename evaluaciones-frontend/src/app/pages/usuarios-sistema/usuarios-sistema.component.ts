@@ -16,6 +16,8 @@ interface RolCatalogo extends RolSistema {
   icono: string;
 }
 
+const CARRERA_TODA_SEDE = '__TODA_SEDE__';
+
 @Component({
   selector: 'sea-usuarios-sistema',
   standalone: true,
@@ -280,9 +282,26 @@ interface RolCatalogo extends RolSistema {
                   @if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}
                 </div>
               } @else if (esVerificadorSeleccionado()) {
-                <div class="grid gap-5 md:grid-cols-2">
-                  <div><div class="section-title"><i class="pi pi-building"></i><span>Sedes completas</span><small>acceso a toda la sede</small></div><div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div></div>
-                  <div><div class="section-title"><i class="pi pi-graduation-cap"></i><span>Carreras específicas</span><small>acceso solo a esas carreras</small></div><div class="check-grid">@for (carrera of carreras; track carrera.careerCode) {<label class="check-item"><input type="checkbox" [checked]="tieneCarrera(carrera.careerCode)" (change)="alternarCarrera(carrera)"><span><strong>{{ carrera.careerCode }}</strong><small>{{ carrera.careerName }}</small></span></label>}</div></div>
+                <div class="assignment-panel">
+                  <div class="section-title"><i class="pi pi-list"></i><span>Alcance del verificador</span><small>una fila por sede o carrera</small></div>
+                  <p class="assignment-help">Agrega cada alcance a la lista. Puedes habilitar una sede completa o limitarla a una carrera específica.</p>
+                  <div class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                    <label class="form-label">Sede<select class="field-input" name="sedeVerificador" [(ngModel)]="sedeVerificadorCodigo" (ngModelChange)="cambiarSedeVerificador($event)" [disabled]="guardando()"><option value="">Seleccionar sede...</option>@for (sede of sedes; track sede.code) {<option [value]="sede.code">{{ sede.code }} · {{ sede.name }}</option>}</select></label>
+                    <label class="flex min-h-10 items-center gap-2 rounded-xl border border-border bg-muted/30 px-3 text-xs font-bold"><input type="checkbox" name="todaSedeVerificador" [(ngModel)]="todaSedeVerificador" [disabled]="guardando()"> Toda la sede</label>
+                  </div>
+                  @if (sedeVerificadorCodigo && !todaSedeVerificador) {
+                    <label class="form-label mt-3">Carrera específica<select class="field-input" name="carreraVerificador" [(ngModel)]="carreraVerificadorCodigo" [disabled]="guardando() || cargandoCarrerasVerificador"><option value="">{{ cargandoCarrerasVerificador ? 'Cargando carreras...' : 'Seleccionar carrera...' }}</option>@for (carrera of carrerasVerificador; track carrera.careerCode) {<option [value]="carrera.careerCode">{{ carrera.careerCode }} · {{ carrera.careerName }}</option>}</select></label>
+                  }
+                  @if (!sedeVerificadorCodigo) { <p class="assignment-empty">Selecciona una sede para agregar un alcance.</p> }
+                  <button type="button" class="secondary-button mt-3" (click)="agregarAlcanceVerificador()" [disabled]="guardando() || !puedeAgregarAlcanceVerificador()"><i class="pi pi-plus"></i> Agregar a la lista</button>
+                  @if (alcancesVerificadorSeleccionados.length) {
+                    <div class="assignment-list mt-3">
+                      @for (alcance of alcancesVerificadorSeleccionados; track claveAsignacion(alcance)) {
+                        <div class="assignment-row"><div><strong>{{ alcance.sedeCodigo }} · {{ alcance.todaSede ? 'Toda la sede' : alcance.carreraCodigo }}</strong><small>{{ alcance.sedeNombre }}@if (!alcance.todaSede) { · {{ alcance.carreraNombre }}}</small></div><button type="button" class="icon-button" title="Quitar alcance" (click)="quitarAlcanceVerificador(alcance)"><i class="pi pi-times"></i></button></div>
+                      }
+                    </div>
+                  } @else { <p class="assignment-empty">Aún no hay alcances agregados a la lista.</p> }
+                  @if (!sedes.length) {<p class="empty-note mt-2">No se pudieron cargar las sedes desde SEA.</p>}
                 </div>
               } @else if (esRolConAlcanceSimple()) {
                 <div><div class="section-title"><i class="pi pi-building"></i><span>Sedes asignadas</span><small>puedes marcar varias</small></div><div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div>@if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}</div>
@@ -351,6 +370,12 @@ export class UsuariosSistemaComponent implements OnInit {
   public cargandoCarreras = false;
   public cargandoAsignaturas = false;
   public asignacionesSeleccionadas: AsignacionAcademica[] = [];
+  public alcancesVerificadorSeleccionados: AsignacionAcademica[] = [];
+  public sedeVerificadorCodigo = '';
+  public carreraVerificadorCodigo = '';
+  public carrerasVerificador: Career[] = [];
+  public cargandoCarrerasVerificador = false;
+  public todaSedeVerificador = false;
   public campusesPorSede = new Map<string, Campus[]>();
   public usuarioEditando: UsuarioSistema | null = null;
   public form: UsuarioSistemaRequest = this.formularioVacio();
@@ -359,7 +384,7 @@ export class UsuariosSistemaComponent implements OnInit {
   private campusesSeleccionados = new Map<string, AlcanceCampus>();
 
   private readonly rolesDeEvaluaciones = new Set(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VERIFICADOR']);
-  private readonly rolesInstitucionales = new Set(['ADMINISTRADOR_SISTEMA', 'DIRECTOR_CARRERA', 'DOCENTE', 'VICERRECTOR']);
+  private readonly rolesInstitucionales = new Set(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'DOCENTE', 'VICERRECTOR', 'VERIFICADOR']);
 
   private readonly catalogoRolesBase: RolCatalogo[] = [
     {
@@ -511,12 +536,12 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public abrirNuevo(): void {
-    this.usuarioEditando = null; this.form = this.formularioVacio(); this.sedesSeleccionadas.clear(); this.carrerasSeleccionadas.clear(); this.campusesSeleccionados.clear(); this.limpiarConstructorAsignaciones(); this.error.set(null); this.formularioAbierto.set(true);
+    this.usuarioEditando = null; this.form = this.formularioVacio(); this.sedesSeleccionadas.clear(); this.carrerasSeleccionadas.clear(); this.campusesSeleccionados.clear(); this.asignacionesSeleccionadas = []; this.alcancesVerificadorSeleccionados = []; this.limpiarConstructorAsignaciones(); this.limpiarConstructorVerificador(); this.error.set(null); this.formularioAbierto.set(true);
   }
 
   public editar(usuario: UsuarioSistema): void {
     const campuses = [...(usuario.campuses || [])];
-    this.usuarioEditando = usuario; this.form = { ci: usuario.ci, nombreCompleto: usuario.nombreCompleto, rolCodigo: usuario.rol, activo: usuario.activo, sedes: [...usuario.sedes], carreras: [...usuario.carreras], campuses, asignaciones: [...(usuario.asignaciones || [])] }; this.sedesSeleccionadas = new Map(usuario.sedes.map(item => [item.codigo, item])); this.carrerasSeleccionadas = new Map(usuario.carreras.map(item => [item.codigo, item])); this.campusesSeleccionados = new Map(campuses.map(item => [this.claveCampus(item.sedeCodigo, item), item])); this.asignacionesSeleccionadas = [...(usuario.asignaciones || [])]; this.limpiarSeleccionAsignacion(); this.error.set(null); this.formularioAbierto.set(true);
+    this.usuarioEditando = usuario; this.form = { ci: usuario.ci, nombreCompleto: usuario.nombreCompleto, rolCodigo: usuario.rol, activo: usuario.activo, sedes: [...usuario.sedes], carreras: [...usuario.carreras], campuses, asignaciones: [...(usuario.asignaciones || [])] }; this.sedesSeleccionadas = new Map(usuario.sedes.map(item => [item.codigo, item])); this.carrerasSeleccionadas = new Map(usuario.carreras.map(item => [item.codigo, item])); this.campusesSeleccionados = new Map(campuses.map(item => [this.claveCampus(item.sedeCodigo, item), item])); this.asignacionesSeleccionadas = [...(usuario.asignaciones || [])]; this.alcancesVerificadorSeleccionados = usuario.rol === 'VERIFICADOR' ? [...(usuario.asignaciones || [])] : []; this.limpiarSeleccionAsignacion(); this.limpiarConstructorVerificador(); this.error.set(null); this.formularioAbierto.set(true);
     this.sedesParaCampus().forEach(sede => this.cargarCampusSede(sede));
   }
 
@@ -597,6 +622,8 @@ export class UsuariosSistemaComponent implements OnInit {
     // Las asignaciones pertenecen al tipo de rol; nunca se arrastran al cambiar
     // entre docente, director u otro perfil.
     this.asignacionesSeleccionadas = [];
+    this.alcancesVerificadorSeleccionados = [];
+    this.limpiarConstructorVerificador();
     this.campusesSeleccionados.clear();
     if (rol === 'PERSONAL_EVALUACIONES') this.sedesSeleccionadas.clear();
   }
@@ -612,6 +639,47 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public esVerificadorSeleccionado(): boolean { return this.form.rolCodigo === 'VERIFICADOR'; }
+
+  public cambiarSedeVerificador(codigo: string): void {
+    this.sedeVerificadorCodigo = codigo || '';
+    this.carreraVerificadorCodigo = '';
+    this.carrerasVerificador = [];
+    if (!this.sedeVerificadorCodigo || this.todaSedeVerificador) return;
+    this.cargandoCarrerasVerificador = true;
+    this.gateway.getCareers(this.sedeVerificadorCodigo).pipe(catchError(() => of([] as Career[]))).subscribe(carreras => {
+      this.carrerasVerificador = [...carreras].sort((a, b) => a.careerCode.localeCompare(b.careerCode));
+      this.cargandoCarrerasVerificador = false;
+    });
+  }
+
+  public puedeAgregarAlcanceVerificador(): boolean {
+    return !!this.sedeVerificadorCodigo && (this.todaSedeVerificador || !!this.carreraVerificadorCodigo);
+  }
+
+  public agregarAlcanceVerificador(): void {
+    if (!this.puedeAgregarAlcanceVerificador()) return;
+    const sede = this.sedes.find(item => item.code === this.sedeVerificadorCodigo);
+    const carrera = this.carrerasVerificador.find(item => item.careerCode === this.carreraVerificadorCodigo);
+    if (!sede || (!this.todaSedeVerificador && !carrera)) return;
+    const nuevo: AsignacionAcademica = {
+      sedeCodigo: sede.code,
+      sedeNombre: sede.name,
+      carreraCodigo: this.todaSedeVerificador ? CARRERA_TODA_SEDE : carrera!.careerCode,
+      carreraNombre: this.todaSedeVerificador ? 'Toda la sede' : carrera!.careerName,
+      asignaturaCodigo: '',
+      asignaturaNombre: '',
+      todaSede: this.todaSedeVerificador
+    };
+    if (!this.alcancesVerificadorSeleccionados.some(item => this.claveAsignacion(item) === this.claveAsignacion(nuevo))) {
+      this.alcancesVerificadorSeleccionados = [...this.alcancesVerificadorSeleccionados, nuevo];
+    }
+    this.carreraVerificadorCodigo = '';
+  }
+
+  public quitarAlcanceVerificador(alcance: AsignacionAcademica): void {
+    const clave = this.claveAsignacion(alcance);
+    this.alcancesVerificadorSeleccionados = this.alcancesVerificadorSeleccionados.filter(item => this.claveAsignacion(item) !== clave);
+  }
 
   public mostrarCarrerasAsignacion(): boolean {
     return this.requiereAsignacionesAcademicas() && !!this.sedeAsignacionCodigo;
@@ -678,13 +746,15 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public claveAsignacion(asignacion: AsignacionAcademica): string {
-    return `${asignacion.sedeCodigo}|${asignacion.carreraCodigo}|${asignacion.asignaturaCodigo || ''}`;
+    return `${asignacion.sedeCodigo}|${asignacion.todaSede ? CARRERA_TODA_SEDE : asignacion.carreraCodigo}|${asignacion.asignaturaCodigo || ''}`;
   }
 
   public guardar(): void {
     this.error.set(null); this.guardando.set(true);
-    const asignaciones = this.requiereAsignacionesAcademicas() ? [...this.asignacionesSeleccionadas] : [];
-    const usaRelacionesNuevas = this.requiereAsignacionesAcademicas() && asignaciones.length > 0;
+    const asignaciones = this.esVerificadorSeleccionado()
+      ? [...this.alcancesVerificadorSeleccionados]
+      : this.requiereAsignacionesAcademicas() ? [...this.asignacionesSeleccionadas] : [];
+    const usaRelacionesNuevas = (this.requiereAsignacionesAcademicas() || this.esVerificadorSeleccionado()) && asignaciones.length > 0;
     const sedes = this.esPersonalEvaluacionesSeleccionado()
       ? this.sedesDesdeCampuses()
       : usaRelacionesNuevas
@@ -781,7 +851,7 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public resumenAlcance(usuario: UsuarioSistema): string { const asignaciones = usuario.asignaciones?.length || 0; if (asignaciones) return `${asignaciones} asignación${asignaciones === 1 ? '' : 'es'}`; const campuses = usuario.campuses?.length || 0; if (campuses) { const habilitados = usuario.campuses.filter(item => item.habilitado).length; return `${usuario.sedes?.length || 0} sede${(usuario.sedes?.length || 0) === 1 ? '' : 's'} · ${campuses} campus · ${habilitados} habilitado${habilitados === 1 ? '' : 's'}`; } if (usuario.alcanceDesdeSea) { const sedes = usuario.sedesSea?.length || 0; const carreras = usuario.carrerasSea?.length || 0; return `${sedes} sede${sedes === 1 ? '' : 's'} · ${carreras} carrera${carreras === 1 ? '' : 's'} · ${usuario.gruposSea || 0} grupo${usuario.gruposSea === 1 ? '' : 's'} SEA`; } const sedes = usuario.sedes?.length || 0; const carreras = usuario.carreras?.length || 0; return `${sedes} sede${sedes === 1 ? '' : 's'} · ${carreras} carrera${carreras === 1 ? '' : 's'}`; }
-  public nombresAlcance(usuario: UsuarioSistema): string { if (usuario.asignaciones?.length) return usuario.asignaciones.map(item => `${item.sedeCodigo}/${item.carreraCodigo}${item.asignaturaCodigo ? '/' + item.asignaturaCodigo : ''}`).join(' · '); if (usuario.campuses?.length) return usuario.campuses.map(item => `${item.sedeCodigo}/${item.campusCodigo || item.campusNombre} · ${item.habilitado ? 'Habilitado' : 'Deshabilitado'}`).join(' · '); if (usuario.alcanceDesdeSea) return [...(usuario.sedesSea || []).map(item => `${item.codigo} · ${item.nombre}`), ...(usuario.carrerasSea || []).map(item => `${item.codigo} · ${item.nombre}`)].join(' · ') || 'Sin alcance informado por SEA'; return [...(usuario.sedes || []).map(item => item.codigo), ...(usuario.carreras || []).map(item => item.codigo)].join(' · ') || 'Sin alcance específico registrado'; }
+  public nombresAlcance(usuario: UsuarioSistema): string { if (usuario.asignaciones?.length) return usuario.asignaciones.map(item => item.todaSede ? `${item.sedeCodigo} · Toda la sede` : `${item.sedeCodigo}/${item.carreraCodigo}${item.asignaturaCodigo ? '/' + item.asignaturaCodigo : ''}`).join(' · '); if (usuario.campuses?.length) return usuario.campuses.map(item => `${item.sedeCodigo}/${item.campusCodigo || item.campusNombre} · ${item.habilitado ? 'Habilitado' : 'Deshabilitado'}`).join(' · '); if (usuario.alcanceDesdeSea) return [...(usuario.sedesSea || []).map(item => `${item.codigo} · ${item.nombre}`), ...(usuario.carrerasSea || []).map(item => `${item.codigo} · ${item.nombre}`)].join(' · ') || 'Sin alcance informado por SEA'; return [...(usuario.sedes || []).map(item => item.codigo), ...(usuario.carreras || []).map(item => item.codigo)].join(' · ') || 'Sin alcance específico registrado'; }
 
   private formularioVacio(): UsuarioSistemaRequest { return { ci: '', nombreCompleto: '', rolCodigo: this.contexto === 'EVALUACIONES' ? 'PERSONAL_EVALUACIONES' : 'DOCENTE', activo: true, sedes: [], carreras: [], campuses: [], asignaciones: [] }; }
   private cargarUsuarios(): void { this.service.listar(this.contexto).subscribe({ next: usuarios => this.usuarios.set(usuarios), error: error => this.mostrarError(error) }); }
@@ -789,6 +859,7 @@ export class UsuariosSistemaComponent implements OnInit {
   private esRolDeAsignaciones(rol: string): boolean { return rol === 'DIRECTOR_CARRERA' || rol === 'DOCENTE'; }
   private limpiarSeleccionAsignacion(): void { this.sedeAsignacionCodigo = ''; this.carreraAsignacionCodigo = ''; this.asignaturaAsignacionCodigo = ''; this.carrerasAsignacion = []; this.asignaturasAsignacion = []; this.cargandoCarreras = false; this.cargandoAsignaturas = false; }
   private limpiarConstructorAsignaciones(): void { this.limpiarSeleccionAsignacion(); }
+  private limpiarConstructorVerificador(): void { this.sedeVerificadorCodigo = ''; this.carreraVerificadorCodigo = ''; this.carrerasVerificador = []; this.cargandoCarrerasVerificador = false; this.todaSedeVerificador = false; }
   private sedesDesdeCampuses(): AlcanceAcademico[] {
     const unicas = new Map<string, AlcanceAcademico>();
     this.campusesSeleccionados.forEach(item => {
@@ -801,7 +872,7 @@ export class UsuariosSistemaComponent implements OnInit {
     asignaciones.forEach(item => {
       const codigo = tipo === 'sede' ? item.sedeCodigo : item.carreraCodigo;
       const nombre = tipo === 'sede' ? item.sedeNombre : item.carreraNombre;
-      if (codigo) unicos.set(codigo, { codigo, nombre });
+      if (codigo && !(tipo === 'carrera' && item.todaSede)) unicos.set(codigo, { codigo, nombre });
     });
     return [...unicos.values()];
   }

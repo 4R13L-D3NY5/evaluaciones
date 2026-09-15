@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/verificacion-examenes")
@@ -31,14 +32,23 @@ public class VerificacionExamenController {
             @RequestParam(required = false) String tipoParcial,
             @RequestParam(required = false) String modalidad,
             @RequestParam(required = false) String estado,
+            @RequestParam(required = false) LocalDate fechaDesde,
+            @RequestParam(required = false) LocalDate fechaHasta,
             Authentication authentication) {
-        return ResponseEntity.ok(service.listar(orden, sedeCodigo, carreraCodigo, tipoParcial, modalidad, estado, authentication));
+        return ResponseEntity.ok(service.listar(orden, sedeCodigo, carreraCodigo, tipoParcial, modalidad,
+                estado, fechaDesde, fechaHasta, authentication));
     }
 
     @GetMapping("/{rolExamenId}")
     public ResponseEntity<VerificacionExamenDetalleDto> obtener(
             @PathVariable String rolExamenId, Authentication authentication) {
         return ResponseEntity.ok(service.obtenerDetalle(rolExamenId, authentication));
+    }
+
+    @GetMapping("/{rolExamenId}/aprobado")
+    public ResponseEntity<VerificacionExamenDetalleDto> obtenerAprobado(
+            @PathVariable String rolExamenId, Authentication authentication) {
+        return ResponseEntity.ok(service.obtenerDetalleAprobado(rolExamenId, authentication));
     }
 
     @PostMapping("/{rolExamenId}/previsualizacion")

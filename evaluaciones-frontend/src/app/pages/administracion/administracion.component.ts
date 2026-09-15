@@ -600,14 +600,14 @@ export interface ParcialConfig {
                   <div><h4 class="text-xs font-black uppercase tracking-wider text-purple-950">Verificación previa a la generación</h4><p class="text-[10px] text-muted-foreground">Habilita la revisión de bancos validados por sede o por carrera. La regla de carrera tiene prioridad.</p></div>
                   <span class="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-800">Deshabilitada por defecto</span>
                 </div>
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
-                  <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Sede<select [(ngModel)]="verificacionSedeCodigo" (ngModelChange)="actualizarNombreSedeVerificacion()" class="mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs font-bold"><option value="">Seleccionar sede</option>@for (sede of sedesCatalogo; track sede.branchOfficeId) {<option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>}</select></label>
-                  <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Carrera (opcional)<input [(ngModel)]="verificacionCarreraCodigo" placeholder="Vacío = toda la sede" class="mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs"></label>
-                  <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Nombre de carrera<input [(ngModel)]="verificacionCarreraNombre" placeholder="Nombre referencial" class="mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs"></label>
-                  <label class="flex items-end gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold"><input type="checkbox" [(ngModel)]="verificacionHabilitada" class="h-4 w-4 accent-purple-700"> Habilitar verificación</label>
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Sede<select [(ngModel)]="verificacionSedeCodigo" (ngModelChange)="cambiarSedeVerificacion($event)" [disabled]="guardandoVerificacion()" class="mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs font-bold"><option value="">Seleccionar sede</option>@for (sede of sedesCatalogo; track sede.branchOfficeId) {<option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>}</select></label>
+                  <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Carrera (opcional)<select [(ngModel)]="verificacionCarreraCodigo" (ngModelChange)="actualizarNombreCarreraVerificacion()" [disabled]="!verificacionSedeCodigo || cargandoCarrerasVerificacion || guardandoVerificacion()" class="mt-1 w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs"><option value="">{{ cargandoCarrerasVerificacion ? 'Cargando carreras desde SEA...' : verificacionSedeCodigo ? 'Toda la sede (todas las carreras)' : 'Selecciona una sede primero' }}</option>@for (carrera of carrerasVerificacion; track carrera.careerCode) {<option [value]="carrera.careerCode">{{ carrera.careerCode }} · {{ carrera.careerName }}</option>}</select></label>
+                  <label class="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold md:mt-[18px]"><input type="checkbox" [(ngModel)]="verificacionHabilitada" [disabled]="guardandoVerificacion()" class="h-4 w-4 accent-purple-700"> Habilitar verificación</label>
                 </div>
+                @if (errorCarrerasVerificacion) { <p class="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] font-semibold text-amber-900"><i class="pi pi-exclamation-triangle mr-1"></i>{{ errorCarrerasVerificacion }}</p> }
                 <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-[10px] text-muted-foreground">Al activar una regla, los exámenes validados y aún no generados pasarán a revisión pendiente.</p><button type="button" (click)="guardarReglaVerificacion()" [disabled]="guardandoVerificacion() || !verificacionSedeCodigo" class="rounded-xl bg-purple-700 px-4 py-2 text-xs font-black text-white disabled:opacity-50"><i class="pi pi-save mr-1"></i>{{ guardandoVerificacion() ? 'Guardando...' : 'Guardar regla' }}</button></div>
-                @if (configuracionesVerificacion().length) {<div class="overflow-x-auto rounded-lg border border-border bg-card"><table class="w-full text-left text-[11px]"><thead class="bg-muted/50 font-extrabold uppercase text-muted-foreground"><tr><th class="p-2">Sede</th><th class="p-2">Carrera</th><th class="p-2">Estado</th><th class="p-2">Actualizado</th></tr></thead><tbody class="divide-y divide-border">@for (regla of configuracionesVerificacion(); track regla.id || regla.sedeCodigo + regla.carreraCodigo) {<tr><td class="p-2 font-bold">{{ regla.sedeNombre }} ({{ regla.sedeCodigo }})</td><td class="p-2">{{ regla.carreraNombre || 'Todas las carreras' }}<span class="block text-muted-foreground">{{ regla.carreraCodigo || 'GENERAL' }}</span></td><td class="p-2"><span [class]="regla.habilitada ? 'text-emerald-700' : 'text-slate-500'" class="font-black">{{ regla.habilitada ? 'HABILITADA' : 'DESHABILITADA' }}</span></td><td class="p-2 text-muted-foreground">{{ regla.actualizadoEn | date:'dd/MM/yyyy HH:mm' }}</td></tr>}</tbody></table></div>}
+                @if (configuracionesVerificacion().length) {<div class="overflow-x-auto rounded-lg border border-border bg-card"><table class="w-full text-left text-[11px]"><thead class="bg-muted/50 font-extrabold uppercase text-muted-foreground"><tr><th class="p-2">Sede</th><th class="p-2">Carrera</th><th class="p-2">Estado</th><th class="p-2">Actualizado</th><th class="p-2 text-right">Acción</th></tr></thead><tbody class="divide-y divide-border">@for (regla of configuracionesVerificacion(); track regla.id || regla.sedeCodigo + regla.carreraCodigo) {<tr><td class="p-2 font-bold">{{ regla.sedeNombre }} ({{ regla.sedeCodigo }})</td><td class="p-2">{{ regla.carreraNombre || 'Todas las carreras' }}<span class="block text-muted-foreground">{{ regla.carreraCodigo || 'GENERAL' }}</span></td><td class="p-2"><span [class]="regla.habilitada ? 'text-emerald-700' : 'text-slate-500'" class="font-black">{{ regla.habilitada ? 'HABILITADA' : 'DESHABILITADA' }}</span></td><td class="p-2 text-muted-foreground">{{ regla.actualizadoEn | date:'dd/MM/yyyy HH:mm' }}</td><td class="p-2 text-right"><button type="button" (click)="cambiarEstadoReglaVerificacion(regla)" [disabled]="guardandoVerificacion()" [class]="regla.habilitada ? 'border-rose-200 text-rose-700 hover:bg-rose-50' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'" class="rounded-lg border bg-card px-3 py-1.5 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-50"><i [class]="regla.habilitada ? 'pi pi-ban mr-1' : 'pi pi-check-circle mr-1'"></i>{{ guardandoVerificacion() ? 'Guardando...' : regla.habilitada ? 'Inactivar regla' : 'Reactivar regla' }}</button></td></tr>}</tbody></table></div>}
               </div>
 
             </div>
@@ -1021,9 +1021,13 @@ export class AdministracionEvaluacionesComponent {
   public sedesCatalogo: BranchOffice[] = [];
   public readonly configuracionesVerificacion = signal<ConfiguracionVerificacion[]>([]);
   public verificacionSedeCodigo = ''; public verificacionSedeNombre = ''; public verificacionCarreraCodigo = ''; public verificacionCarreraNombre = ''; public verificacionHabilitada = false;
+  public carrerasVerificacion: Career[] = [];
+  public cargandoCarrerasVerificacion = false;
+  public errorCarrerasVerificacion: string | null = null;
   public readonly guardandoVerificacion = signal(false);
   public campusCatalogo: CampusCatalogoItem[] = [];
   private carrerasOficialesPorSede = new Map<string, { id: number; nombre: string }[]>();
+  private solicitudCarrerasVerificacion = 0;
   public cargandoCatalogo = signal(true);
   public errorCatalogo = signal<string | null>(null);
   private catalogoVersion = signal(0);
@@ -1052,9 +1056,68 @@ export class AdministracionEvaluacionesComponent {
     this.verificacionSedeNombre = this.sedesCatalogo.find(sede => sede.code === this.verificacionSedeCodigo)?.name || this.verificacionSedeCodigo;
   }
 
+  public cambiarSedeVerificacion(codigo: string): void {
+    this.verificacionSedeCodigo = codigo || '';
+    this.actualizarNombreSedeVerificacion();
+    this.verificacionCarreraCodigo = '';
+    this.verificacionCarreraNombre = '';
+    this.carrerasVerificacion = [];
+    this.errorCarrerasVerificacion = null;
+    const solicitud = ++this.solicitudCarrerasVerificacion;
+    if (!this.verificacionSedeCodigo) {
+      this.cargandoCarrerasVerificacion = false;
+      return;
+    }
+
+    this.cargandoCarrerasVerificacion = true;
+    this._gateway.getCareers(this.verificacionSedeCodigo).subscribe({
+      next: carreras => {
+        if (solicitud !== this.solicitudCarrerasVerificacion) return;
+        this.carrerasVerificacion = carreras || [];
+        this.cargandoCarrerasVerificacion = false;
+        if (!this.carrerasVerificacion.length) this.errorCarrerasVerificacion = 'SEA no devolvió carreras para esta sede. Puedes configurar toda la sede mientras se revisa el catálogo.';
+      },
+      error: () => {
+        if (solicitud !== this.solicitudCarrerasVerificacion) return;
+        this.carrerasVerificacion = [];
+        this.cargandoCarrerasVerificacion = false;
+        this.errorCarrerasVerificacion = 'No se pudieron cargar las carreras de esta sede desde SEA. Intenta seleccionar nuevamente la sede.';
+      }
+    });
+  }
+
+  public actualizarNombreCarreraVerificacion(): void {
+    this.verificacionCarreraNombre = this.carrerasVerificacion.find(carrera => carrera.careerCode === this.verificacionCarreraCodigo)?.careerName || '';
+  }
+
   public guardarReglaVerificacion(): void {
     this.actualizarNombreSedeVerificacion(); this.guardandoVerificacion.set(true);
     this._configuracionService.guardarVerificacion({ sedeCodigo: this.verificacionSedeCodigo, sedeNombre: this.verificacionSedeNombre, carreraCodigo: this.verificacionCarreraCodigo || undefined, carreraNombre: this.verificacionCarreraNombre || undefined, habilitada: this.verificacionHabilitada }).subscribe({ next: reglas => { this.configuracionesVerificacion.set(reglas); this.guardandoVerificacion.set(false); this._mostrarToast('Regla de verificación guardada correctamente.'); }, error: () => { this.guardandoVerificacion.set(false); this._mostrarToast('No se pudo guardar la regla de verificación.'); } });
+  }
+
+  public cambiarEstadoReglaVerificacion(regla: ConfiguracionVerificacion): void {
+    const habilitada = !regla.habilitada;
+    this.guardandoVerificacion.set(true);
+    this._configuracionService.guardarVerificacion({
+      sedeCodigo: regla.sedeCodigo,
+      sedeNombre: regla.sedeNombre,
+      carreraCodigo: regla.carreraCodigo || undefined,
+      carreraNombre: regla.carreraNombre || undefined,
+      habilitada
+    }).subscribe({
+      next: reglas => {
+        this.configuracionesVerificacion.set(reglas);
+        this.guardandoVerificacion.set(false);
+        if (this.verificacionSedeCodigo === regla.sedeCodigo && (this.verificacionCarreraCodigo || '') === (regla.carreraCodigo || '')) {
+          this.verificacionHabilitada = habilitada;
+        }
+        this._mostrarToast(habilitada ? 'Regla de verificación reactivada.' : 'Regla deshabilitada; se conserva en el listado.');
+      },
+      error: () => {
+        this.guardandoVerificacion.set(false);
+        this._mostrarToast('No se pudo cambiar el estado de la regla de verificación.');
+      }
+    });
   }
 
   // TAB 1: Campus por Sede
