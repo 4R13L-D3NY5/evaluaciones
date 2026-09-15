@@ -526,13 +526,13 @@ interface InstanciaImportacionItem {
               <div class="rounded-xl border border-orange-200 bg-orange-50 p-3 text-[11px] text-orange-950 space-y-2">
                 <div class="flex items-center gap-2 font-black text-orange-900">
                   <i class="pi pi-calendar-times"></i>
-                  <span>Programaciones omitidas</span>
+                  <span>Programaciones existentes</span>
                   <span class="ml-auto rounded-full bg-white/70 px-2 py-0.5 font-mono text-[10px]">
                     {{ excelAdvertenciasProgramacion().length }}
                   </span>
                 </div>
                 <p class="text-[10px] leading-relaxed text-orange-900/80">
-                  Estos grupos ya tienen una programación registrada. No se subirán nuevas versiones desde este Excel; cualquier cambio debe registrarse manualmente.
+                  Las programaciones en estado PROGRAMADO o VALIDADO se actualizarán con la fecha y horario del Excel. Las que ya avanzaron en el flujo se conservarán sin cambios.
                 </p>
                 <div class="max-h-40 space-y-1.5 overflow-y-auto pr-1">
                   @for (advertencia of excelAdvertenciasProgramacion(); track advertencia.fila + '-' + advertencia.tipo + '-' + advertencia.grupo) {
@@ -1686,13 +1686,17 @@ export class RolExamenesComponent implements OnInit {
         const advertenciasHorario: AdvertenciaHorarioImportacion[] = [];
         const advertenciasProgramacion: AdvertenciaProgramacionImportacion[] = [];
         const clavesExactasDelArchivo = new Set<string>();
-        const programacionesExistentesPorClave = new Map<string, RolExamenItem>();
-        for (const existente of this.examenes()) {
-          const clave = this._claveVersion(existente.seaGroupId, existente.tipo);
-          if (!programacionesExistentesPorClave.has(clave)) {
-            programacionesExistentesPorClave.set(clave, existente);
+          const programacionesExistentesPorClave = new Map<string, RolExamenItem>();
+          for (const existente of this.examenes()) {
+            if (existente.estado === 'SUSPENDIDO') {
+              continue;
+            }
+            const clave = this._claveVersion(existente.seaGroupId, existente.tipo);
+            const registrada = programacionesExistentesPorClave.get(clave);
+            if (!registrada || (existente.version || 0) > (registrada.version || 0)) {
+              programacionesExistentesPorClave.set(clave, existente);
+            }
           }
-        }
 
         // La plantilla oficial tiene cinco hojas y la hoja de roles empieza en la fila 12.
         // Se usan letras absolutas de Excel y se convierten al índice entregado por
@@ -1848,7 +1852,9 @@ export class RolExamenesComponent implements OnInit {
               continue;
             }
             const programacionExistente = programacionesExistentesPorClave.get(claveVersion);
-            if (programacionExistente) {
+            const puedeActualizarProgramacion = programacionExistente
+              && (programacionExistente.estado === 'PROGRAMADO' || programacionExistente.estado === 'VALIDADO');
+            if (programacionExistente && !puedeActualizarProgramacion) {
               rolesOmitidosPorProgramacion++;
               const fechaRegistrada = programacionExistente.fechaDisplay || programacionExistente.fecha || 'fecha registrada';
               advertenciasProgramacion.push({
@@ -1856,13 +1862,24 @@ export class RolExamenesComponent implements OnInit {
                 materia: materia.courseName || materia.courseCode,
                 grupo: grupo.code,
                 tipo: examen.tipo,
-                mensaje: `Este grupo ya cuenta con una programación registrada para ${examen.tipo} (${fechaRegistrada}). La fila no se subirá desde el Excel; cualquier cambio debe registrarse manualmente.`
+                mensaje: `La programación existente (${fechaRegistrada}) está en estado ${programacionExistente.estado}. No se modificará desde el Excel porque el examen ya avanzó en el flujo.`
               });
               continue;
             }
 
-            const version = 1;
-            const id = this._crearRolId(grupo.groupId, examen.tipo, examen.fecha.iso, version);
+            if (programacionExistente) {
+              const fechaRegistrada = programacionExistente.fechaDisplay || programacionExistente.fecha || 'fecha registrada';
+              advertenciasProgramacion.push({
+                fila: filaExcel,
+                materia: materia.courseName || materia.courseCode,
+                grupo: grupo.code,
+                tipo: examen.tipo,
+                mensaje: `Se actualizará la programación existente (${fechaRegistrada}) porque está en estado ${programacionExistente.estado}. La nueva fecha y horario del Excel reemplazarán los datos programados.`
+              });
+            }
+
+            const version = programacionExistente?.version || 1;
+            const id = programacionExistente?.id || this._crearRolId(grupo.groupId, examen.tipo, examen.fecha.iso, version);
 
           const horario = examen.hora || (schedule ? `${schedule.startTime} - ${schedule.endTime}` : 'Por definir');
             const celdaHoraTieneContenido = examen.valorHora !== null
@@ -1893,9 +1910,9 @@ export class RolExamenesComponent implements OnInit {
               docenteCI: grupo.teacherIdentityNumber || '',
               tipo: examen.tipo,
               version,
-              estado: 'PROGRAMADO',
-              modalidad: 'PRESENCIAL_CARTILLA',
-              conCartilla: true,
+              estado: programacionExistente?.estado || 'PROGRAMADO',
+              modalidad: programacionExistente?.modalidad || 'PRESENCIAL_CARTILLA',
+              conCartilla: programacionExistente?.conCartilla ?? true,
               semana: 1,
               dia: this._nombreDiaDeFecha(examen.fecha.iso),
               fecha: examen.fecha.iso,
@@ -1917,7 +1934,7 @@ export class RolExamenesComponent implements OnInit {
         this.excelErroresImportacion.set(errores);
         this.excelAdvertenciasHorario.set(advertenciasHorario);
         this.excelAdvertenciasProgramacion.set(advertenciasProgramacion);
-        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} registros listos, ${advertenciasProgramacion.length} programaciones omitidas y ${errores.length} observaciones.`);
+        this._mostrarToast(`Archivo '${file.name}' leído: ${items.length} registros listos, ${advertenciasProgramacion.length} programaciones existentes y ${errores.length} observaciones.`);
       } catch (err) {
         console.error('Error al procesar archivo Excel:', err);
         this.excelAdvertenciasHorario.set([]);
@@ -1933,25 +1950,40 @@ export class RolExamenesComponent implements OnInit {
     if (importados.length === 0) return;
 
     this.cargando.set(true);
-    const crear$ = from(importados).pipe(
-      mergeMap(item => this._rolService.crear(this._toRequest(item, true)).pipe(
+    const idsActualizables = new Set(
+      this.examenes()
+        .filter(item => item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
+        .map(item => item.id)
+    );
+    const guardar$ = from(importados).pipe(
+      mergeMap(item => {
+        const request = this._toRequest(item, true);
+        const operacion = idsActualizables.has(item.id)
+          ? this._rolService.actualizar(item.id, request)
+          : this._rolService.crear(request);
+        return operacion.pipe(
         map(rol => ({ rol, error: null as unknown })),
         catchError(error => of({ rol: null as RolExamenResponse | null, error }))
-      ), 6),
+        );
+      }, 6),
       toArray()
     );
 
-    crear$.subscribe({
+    guardar$.subscribe({
       next: resultados => {
-        const creados = resultados.filter(resultado => resultado.rol).map(resultado => resultado.rol!);
+        const procesados = resultados.filter(resultado => resultado.rol).map(resultado => resultado.rol!);
+        const actualizados = procesados.filter(rol => idsActualizables.has(rol.id)).length;
+        const creados = procesados.length - actualizados;
         const fallidos = resultados.filter(resultado => resultado.error);
         this.cargando.set(false);
         this.cerrarModalSubirExcel();
         this._cargarRolesOficiales();
         if (fallidos.length > 0) {
-          this._mostrarToast(`${creados.length} exámenes registrados y ${fallidos.length} rechazados por el servidor.`);
+          this._mostrarToast(`${creados} exámenes creados, ${actualizados} actualizados y ${fallidos.length} rechazados por el servidor.`);
+        } else if (actualizados > 0) {
+          this._mostrarToast(`${creados} exámenes creados y ${actualizados} actualizados correctamente en PostgreSQL.`);
         } else {
-          this._mostrarToast(`${creados.length} exámenes registrados correctamente en PostgreSQL.`);
+          this._mostrarToast(`${creados} exámenes registrados correctamente en PostgreSQL.`);
         }
       },
       error: err => {

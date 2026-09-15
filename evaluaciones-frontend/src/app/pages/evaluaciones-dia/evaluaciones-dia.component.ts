@@ -469,7 +469,7 @@ interface CampusDisponible extends Campus {
                           <div class="relative group/tooltip">
                             <button 
                               [class]="getPasoBotonClass(item, st.key)"
-                              [disabled]="esConsultaAcademica() || pasoBloqueadoPorCartillas(item, st.key) || validacionPorBancoBloqueada(item, st.key)"
+                              [disabled]="esConsultaAcademica() || pasoBloqueadoPorCartillas(item, st.key) || validacionPorBancoBloqueada(item, st.key) || politicaTemporalBloqueada(item, st.key)"
                               (click)="clickPasoEstado(item, st.key)"
                               class="h-7 w-7 rounded-lg transition-all flex items-center justify-center cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
                               <i [class]="getPasoIcon(item, st)" class="text-xs"></i>
@@ -3008,6 +3008,49 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       .includes(item.etapa);
   }
 
+  /**
+   * Anticipa en la interfaz las ventanas que el backend ya valida para
+   * PERSONAL_EVALUACIONES. La hora oficial continúa siendo la del servidor.
+   */
+  public politicaTemporalBloqueada(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): boolean {
+    if (!this.esPersonalEvaluaciones() || !['Generado', 'Entregado'].includes(pasoKey)) return false;
+    const inicio = this.inicioExamenLocal(item);
+    if (!inicio) return true;
+    const configuracion = this._configuracionEvaluaciones.configuracion();
+    const ahora = new Date();
+    if (pasoKey === 'Generado') {
+      const habilitadoDesde = new Date(inicio.getTime() - (configuracion.horasAntesGeneracion || 0) * 60 * 60 * 1000);
+      return ahora < habilitadoDesde;
+    }
+    const habilitadoDesde = new Date(inicio.getTime() - (configuracion.minutosAntesEntrega || 0) * 60 * 1000);
+    return ahora < habilitadoDesde;
+  }
+
+  public mensajePoliticaTemporal(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): string {
+    const inicio = this.inicioExamenLocal(item);
+    if (!inicio) return 'No se puede aplicar la ventana cronológica porque el examen no tiene fecha y hora válidas.';
+    const configuracion = this._configuracionEvaluaciones.configuracion();
+    const habilitadoDesde = pasoKey === 'Generado'
+      ? new Date(inicio.getTime() - (configuracion.horasAntesGeneracion || 0) * 60 * 60 * 1000)
+      : new Date(inicio.getTime() - (configuracion.minutosAntesEntrega || 0) * 60 * 1000);
+    const fecha = new Intl.DateTimeFormat('es-BO', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    }).format(habilitadoDesde);
+    return pasoKey === 'Generado'
+      ? `La generación se habilita desde ${fecha}, según el parámetro de anticipación configurado.`
+      : `La entrega se habilita desde ${fecha}, según el parámetro de anticipación configurado.`;
+  }
+
+  private inicioExamenLocal(item: EvaluacionItemUI): Date | null {
+    const fecha = String(item.fecha || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const hora = String(item.horario || item.hora || '').match(/(\d{1,2}):(\d{2})/);
+    if (!fecha || !hora) return null;
+    const resultado = new Date(
+      Number(fecha[1]), Number(fecha[2]) - 1, Number(fecha[3]), Number(hora[1]), Number(hora[2]), 0, 0
+    );
+    return Number.isNaN(resultado.getTime()) ? null : resultado;
+  }
+
   public puedeMostrarNotasDocente(item: EvaluacionItemUI): boolean {
     return !this.esConsultaAcademica() && item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
       && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
@@ -3325,6 +3368,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
     }
 
+    if (this.politicaTemporalBloqueada(item, pasoKey)) {
+      return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-orange-300 cursor-not-allowed';
+    }
+
     if (this.pasoBloqueadoPorCartillas(item, pasoKey)) {
       return 'bg-amber-50 text-amber-700 border border-amber-300 border-dashed cursor-not-allowed';
     }
@@ -3372,6 +3419,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       if (this.validacionPorBancoBloqueada(item, st.key)) {
         return 'Este estado se asigna automáticamente cuando el docente carga y se valida el banco de preguntas';
       }
+      if (this.politicaTemporalBloqueada(item, st.key)) {
+        return this.mensajePoliticaTemporal(item, st.key);
+      }
       if (this.pasoBloqueadoPorCartillas(item, st.key)) {
         return 'Confirma primero la impresión de las marcas OMR y de la lista de estudiantes';
       }
@@ -3403,6 +3453,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
     if (this.pasoBloqueadoPorCartillas(item, pasoKey)) {
       this._mostrarToast('Antes de pasar a Entregado, confirma la impresión de las marcas OMR y de la lista de estudiantes.', 'warning');
+      return;
+    }
+
+    if (this.politicaTemporalBloqueada(item, pasoKey)) {
+      this._mostrarToast(this.mensajePoliticaTemporal(item, pasoKey), 'warning');
       return;
     }
 
@@ -3443,7 +3498,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
           this.evaluaciones.update(items => items.map(actual => actual.id === item.id ? actualizado : actual));
           this._mostrarToast(`${item.codigo}: Estado avanzado a '${this.etiquetaPaso(actualizado, actualizado.etapa)}'.`);
         },
-        error: err => this._mostrarToast(err?.error?.message || 'No se pudo actualizar el estado oficial del examen.', 'error')
+        error: err => this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo actualizar el estado oficial del examen.', 'error')
       });
     }
   }

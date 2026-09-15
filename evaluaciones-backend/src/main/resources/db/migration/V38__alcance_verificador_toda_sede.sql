@@ -1,0 +1,2 @@
+ALTER TABLE sea_usuario_asignaciones
+    ADD COLUMN IF NOT EXISTS toda_sede BOOLEAN NOT NULL DEFAULT FALSE;

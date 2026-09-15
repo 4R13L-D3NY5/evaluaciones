@@ -719,7 +719,12 @@ def _seccion_typst(titulo: str, instruccion: str, generation_config: dict[str, A
 '''
 
 
-def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None = None, generation_config: dict[str, Any] | None = None) -> str:
+def _cuestionario_typst(
+    preguntas: list[dict[str, Any]],
+    image_dir: str | None = None,
+    generation_config: dict[str, Any] | None = None,
+    mostrar_numero_original: bool = False,
+) -> str:
     """Construye el cuestionario sin datos de estudiante ni etiquetas de variante."""
     generation_config = generation_config or normalizar_configuracion_generacion(None)
     typ_code = ""
@@ -765,7 +770,10 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
                     for letra in "ABCDE"
                     if str(p.get(f"opcion_{letra.lower()}") or "").strip()
                 ]
-            lineas_tarjeta = [str(p.get("enunciado") or "RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:")]
+            encabezado_emparejamiento = str(p.get("enunciado") or "RELACIONE EL CONCEPTO CON SU DEFINICION CORRECTA:")
+            if mostrar_numero_original:
+                encabezado_emparejamiento = f"({p.get('numero_orden', '?')}) {encabezado_emparejamiento}"
+            lineas_tarjeta = [encabezado_emparejamiento]
             lineas_tarjeta.extend(
                 f"{letra}) {_limpiar_prefijo_opcion(texto)}" for letra, texto, _ in opciones_referencia
             )
@@ -782,9 +790,10 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
             continue
 
         if tipo == "CASO_CLINICO_TRONCO":
+            etiqueta_caso = f" (orig. {p.get('numero_orden', '?')})" if mostrar_numero_original else ""
             typ_code += f'''
 #rect(width: 100%, stroke: 0.5pt + black, fill: rgb("#f8fafc"), inset: 3.5pt)[
-  [#text(weight: "bold")[CASO CLINICO O PROBLEMA:]]\\
+  [#text(weight: "bold")[CASO CLINICO O PROBLEMA{etiqueta_caso}:]]\\
   [{_typst_content(str(p.get("enunciado") or "Resuelva el caso planteado y responda cada pregunta del grupo."))}]
 ]
 #v(1em)
@@ -802,7 +811,8 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
         if tipo == "VERDADERO_O_FALSO_COMPLEJAS":
             afirmaciones = parsear_opciones(p.get("opciones_json", "[]"))[:4]
             typ_code += f'\n#block(breakable: false, spacing: {generation_config["separacionPreguntas"]})[\n'
-            typ_code += f'  #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}#linebreak()\n'
+            etiqueta = f"{num} (orig. {p.get('numero_orden', num)})" if mostrar_numero_original else str(num)
+            typ_code += f'  #box[#text(weight: "bold")[{etiqueta}. #raw("___", block: false)]] #h(0.25em){enunciado}#linebreak()\n'
             typ_code += imagen_code
             typ_code += '  #v(0.15em)\n'
             typ_code += f'  #block(inset: (left: {config.INDENTACION_INCISOS}))[\n'
@@ -824,9 +834,10 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
         } else parsear_opciones(
             p.get("opciones_json", "[]")
         )
+        etiqueta = f"{num} (orig. {p.get('numero_orden', num)})" if mostrar_numero_original else str(num)
         typ_code += f'''
 #block(breakable: false, spacing: {generation_config['separacionPreguntas']})[
-  #box[#text(weight: "bold")[{num}. #raw("___", block: false)]] #h(0.25em){enunciado}\\
+  #box[#text(weight: "bold")[{etiqueta}. #raw("___", block: false)]] #h(0.25em){enunciado}\\
 {imagen_code}'''
         if opciones:
             typ_code += f'''  #v(0.15em)
@@ -839,6 +850,27 @@ def _cuestionario_typst(preguntas: list[dict[str, Any]], image_dir: str | None =
         typ_code += "]\n"
 
     return typ_code
+
+
+def _clave_respuestas_typst(preguntas: list[dict[str, Any]]) -> str:
+    """Renderiza la clave separada de la vista destinada al estudiante."""
+    lineas = [
+        '#pagebreak()',
+        '#align(center)[#text(size: 14pt, weight: "bold")[CLAVE DE RESPUESTAS]]',
+        '#v(0.8em)',
+    ]
+    numero = 0
+    for pregunta in preguntas:
+        if _es_macro(pregunta):
+            continue
+        numero += 1
+        respuesta = _extraer_respuesta_correcta(
+            parsear_opciones(pregunta.get("opciones_json", "[]")),
+            pregunta.get("respuesta_correcta"),
+        )
+        original = pregunta.get("numero_orden", numero)
+        lineas.append(f'#text(weight: "bold")[{numero} (orig. {original})] #h(0.5em) {respuesta}\\')
+    return "\n".join(lineas) + "\n"
 
 
 def _pagina_con_pie(estudiante: dict[str, Any], generation_config: dict[str, Any] | None = None) -> str:
@@ -876,6 +908,8 @@ def _generar_typst(
     image_dir: str | None = None,
     total_preguntas: int | None = None,
     generation_config: dict[str, Any] | None = None,
+    modo_verificacion: bool = False,
+    incluir_clave: bool = False,
 ) -> str:
     """Genera un documento individual compatible para pruebas y compatibilidad."""
     generation_config = generation_config or normalizar_configuracion_generacion(None, rol)
@@ -890,7 +924,8 @@ def _generar_typst(
 #set par(leading: {generation_config['leading']}, spacing: {generation_config['leading']})
 {_pagina_con_pie(estudiante, generation_config)}
 {_cabecera_institucional(rol, estudiante, total_preguntas, generation_config)}
-{_cuestionario_typst(preguntas, image_dir, generation_config)}
+{_cuestionario_typst(preguntas, image_dir, generation_config, mostrar_numero_original=modo_verificacion)}
+{_clave_respuestas_typst(preguntas) if modo_verificacion and incluir_clave else ''}
 '''
 
 
@@ -949,6 +984,8 @@ def generar_variante(
     generar_pdf: bool = True,
     modo_previsualizacion: bool = False,
     configuracion: dict[str, Any] | None = None,
+    modo_verificacion: bool = False,
+    incluir_clave: bool = False,
 ) -> dict[str, Any]:
     generation_config = normalizar_configuracion_generacion(configuracion, rol)
     if letra in config.SEED_POR_VARIANTE:
@@ -1032,6 +1069,8 @@ def generar_variante(
             work_dir,
             total_preguntas=total_respondibles if modo_previsualizacion else None,
             generation_config=generation_config,
+            modo_verificacion=modo_verificacion,
+            incluir_clave=incluir_clave,
         )
         with open(typ_path, "w", encoding="utf-8") as f:
             f.write(typ_code)

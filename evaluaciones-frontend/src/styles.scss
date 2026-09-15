@@ -5,6 +5,16 @@
 @import "primeicons/primeicons.css";
 @import "primeng/resources/themes/lara-light-indigo/theme.css";
 @import "primeng/resources/primeng.min.css";
+@import "katex/dist/katex.min.css";
+
+.sea-math-display {
+  overflow-x: auto;
+  padding: 0.2rem 0;
+}
+
+.sea-math-inline {
+  white-space: normal;
+}
 
 :root {
   --primary-color: #4f39f6;

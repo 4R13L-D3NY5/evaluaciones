@@ -38,6 +38,7 @@ import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +71,8 @@ public class GeneracionTypstService {
     private final ConfiguracionEvaluacionesService configuracionEvaluacionesService;
     private final AppProperties appProperties;
     private final UnitepcGatewayClient unitepcGatewayClient;
+    private final com.xpertiflow.evaluaciones.application.VerificacionPoliticaService verificacionPoliticaService;
+    private final com.xpertiflow.evaluaciones.application.PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
 
     private final Map<String, GeneracionTypstResultadoDto> estados = new ConcurrentHashMap<>();
     private static final Set<EstadoFlujo> ESTADOS_CON_DOCUMENTO = Set.of(
@@ -82,11 +85,19 @@ public class GeneracionTypstService {
     );
 
     public GeneracionTypstResultadoDto solicitarGeneracion(GeneracionTypstRequestDto request) {
+        return solicitarGeneracion(request, null);
+    }
+
+    public GeneracionTypstResultadoDto solicitarGeneracion(GeneracionTypstRequestDto request,
+                                                            Authentication authentication) {
         RolExamen rol = rolRepository.findById(request.getRolExamenId())
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + request.getRolExamenId()));
 
         BancoPreguntas banco = bancoRepository.findById(request.getBancoPreguntasId())
                 .orElseThrow(() -> new RuntimeException("Banco de preguntas no encontrado: " + request.getBancoPreguntasId()));
+
+        verificacionPoliticaService.exigirVerificado(rol);
+        politicaTiempoEvaluacionesService.exigirGeneracionHabilitada(rol, authentication);
 
         String jobId = request.getJobId();
         if (jobId == null || jobId.isBlank()) {
@@ -161,6 +172,8 @@ public class GeneracionTypstService {
         mensaje.put("jobId", jobId);
         mensaje.put("rolExamenId", request.getRolExamenId());
         mensaje.put("modoPrevisualizacion", true);
+        mensaje.put("modoVerificacion", Boolean.TRUE.equals(request.getModoVerificacion()));
+        mensaje.put("incluirClave", Boolean.TRUE.equals(request.getIncluirClave()));
         mensaje.put("preguntasPreview", request.getPreguntas());
         mensaje.put("outputBasePath", outputBase);
         mensaje.put("configuracionGeneracion", configuracionParaWorker(

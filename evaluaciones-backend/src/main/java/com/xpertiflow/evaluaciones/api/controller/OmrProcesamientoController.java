@@ -88,8 +88,9 @@ public class OmrProcesamientoController {
     @GetMapping("/{rolExamenId}/patron-calificado")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     @Operation(summary = "Consultar el patrón de respuestas después de devolver el examen")
-    public ResponseEntity<PatronCalificadoResponseDto> consultarPatronCalificado(@PathVariable String rolExamenId) {
-        return ResponseEntity.ok(omrProcesamientoService.consultarPatronCalificado(rolExamenId));
+    public ResponseEntity<PatronCalificadoResponseDto> consultarPatronCalificado(@PathVariable String rolExamenId,
+                                                                                    Authentication authentication) {
+        return ResponseEntity.ok(omrProcesamientoService.consultarPatronCalificado(rolExamenId, authentication));
     }
 
     @GetMapping(value = "/{rolExamenId}/patron-calificado/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
@@ -100,7 +101,7 @@ public class OmrProcesamientoController {
                                                             HttpServletRequest request) {
         byte[] pdf = omrProcesamientoService.generarPatronCalificadoPdf(rolExamenId,
                 authentication == null ? null : authentication.getName(),
-                request == null ? null : request.getRemoteAddr());
+                request == null ? null : request.getRemoteAddr(), authentication);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename=patron-oficial-" + rolExamenId + ".pdf")

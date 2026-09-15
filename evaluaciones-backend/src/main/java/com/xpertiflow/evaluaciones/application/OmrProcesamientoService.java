@@ -70,6 +70,7 @@ public class OmrProcesamientoService {
     private final LoteCartillasOmrRepository loteCartillasRepository;
     private final BancoCifradoService cifradoService;
     private final PatronOmrPdfService patronOmrPdfService;
+    private final PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
     private final Map<String, JsonNode> resultados = new ConcurrentHashMap<>();
 
     public JsonNode solicitar(String rolExamenId, MultipartFile archivo) {
@@ -371,8 +372,15 @@ public class OmrProcesamientoService {
      */
     @Transactional(readOnly = true)
     public PatronCalificadoResponseDto consultarPatronCalificado(String rolExamenId) {
+        return consultarPatronCalificado(rolExamenId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PatronCalificadoResponseDto consultarPatronCalificado(String rolExamenId,
+                                                                  Authentication authentication) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        politicaTiempoEvaluacionesService.exigirPatronHabilitado(rol, authentication);
         if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO")
                 .contains(rol.getEstadoFlujo().name())) {
             throw new IllegalStateException("El patrón solo puede consultarse después de devolver el examen y habilitar la revisión de notas.");
@@ -426,10 +434,16 @@ public class OmrProcesamientoService {
      */
     @Transactional
     public byte[] generarPatronCalificadoPdf(String rolExamenId, String usuario, String ipOrigen) {
+        return generarPatronCalificadoPdf(rolExamenId, usuario, ipOrigen, null);
+    }
+
+    @Transactional
+    public byte[] generarPatronCalificadoPdf(String rolExamenId, String usuario, String ipOrigen,
+                                              Authentication authentication) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
         try {
-            byte[] pdf = patronOmrPdfService.generar(rol, consultarPatronCalificado(rolExamenId));
+            byte[] pdf = patronOmrPdfService.generar(rol, consultarPatronCalificado(rolExamenId, authentication));
             auditoriaRepository.save(AuditoriaEvaluacion.builder()
                     .rolExamen(rol)
                     .etapaOrigen(rol.getEstadoFlujo().getValor())

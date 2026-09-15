@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
-import { UsuariosSistemaService, UsuarioSistema, RolSistema, AlcanceAcademico, AlcanceCampus, AsignacionAcademica, UsuarioSistemaRequest, ImportacionUsuariosResponse, CredencialTemporal, AnalisisDocentesSeaResponse, DocenteSeaAnalisis, SincronizacionDocentesSeaResponse } from '../../core/services/usuarios-sistema.service';
+import { UsuariosSistemaService, UsuarioSistema, RolSistema, AlcanceAcademico, AlcanceCampus, AsignacionAcademica, UsuarioSistemaRequest, ImportacionUsuariosResponse, CredencialTemporal, AnalisisDocentesSeaResponse, DocenteSeaAnalisis, SincronizacionDocentesSeaResponse, CargaAcademicaDocente } from '../../core/services/usuarios-sistema.service';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import { BranchOffice, Campus, Career, Course } from '../../core/models/unitepc-gateway.models';
@@ -15,6 +15,8 @@ interface RolCatalogo extends RolSistema {
   permisos: string[];
   icono: string;
 }
+
+const CARRERA_TODA_SEDE = '__TODA_SEDE__';
 
 @Component({
   selector: 'sea-usuarios-sistema',
@@ -198,7 +200,7 @@ interface RolCatalogo extends RolSistema {
                   <td class="px-4 py-3 align-top"><span class="role-pill">{{ usuario.rolNombre }}</span></td>
                   <td class="px-4 py-3 align-top"><span class="block font-semibold text-foreground">{{ resumenAlcance(usuario) }}</span><span class="mt-1 block max-w-xs text-[10px] text-muted-foreground">{{ nombresAlcance(usuario) }}</span>@if (usuario.alcanceDesdeSea) { <span class="mt-1 block text-[10px] font-semibold text-sky-700">Alcance consultado en SEA · no persistido localmente</span> }</td>
                   <td class="px-4 py-3 align-top"><span [class]="usuario.activo ? 'status-pill active' : 'status-pill inactive'">{{ usuario.activo ? 'ACTIVO' : 'INACTIVO' }}</span>@if (usuario.debeCambiarContrasena) { <span class="mt-1 block text-[10px] font-bold text-amber-700">Cambiar clave</span> }</td>
-                  <td class="px-4 py-3 text-right align-top"><div class="flex justify-end gap-1"><button class="icon-button" title="Editar" (click)="editar(usuario)"><i class="pi pi-pencil"></i></button><button class="icon-button warning" title="Restablecer contraseña" (click)="restablecer(usuario)"><i class="pi pi-key"></i></button></div></td>
+                  <td class="px-4 py-3 text-right align-top"><div class="flex justify-end gap-1">@if (usuario.rol === 'DOCENTE') {<button class="icon-button" title="Ver materias y grupos" (click)="verCargaAcademica(usuario)"><i class="pi pi-book"></i></button>}<button class="icon-button" title="Editar" (click)="editar(usuario)"><i class="pi pi-pencil"></i></button><button class="icon-button warning" title="Restablecer contraseña" (click)="restablecer(usuario)"><i class="pi pi-key"></i></button></div></td>
                 </tr>
               } @empty {
                 <tr><td colspan="6" class="px-4 py-12 text-center text-muted-foreground"><i class="pi pi-users mb-2 block text-2xl"></i>No hay usuarios que coincidan con los filtros.</td></tr>
@@ -207,6 +209,35 @@ interface RolCatalogo extends RolSistema {
           </table>
         </div>
       </div>
+      }
+
+      @if (cargaAcademicaAbierta()) {
+        <div class="modal-backdrop" (click)="cerrarCargaAcademica()">
+          <div class="modal-card max-w-6xl" (click)="$event.stopPropagation()">
+            <div class="flex items-start justify-between border-b border-border px-6 py-5">
+              <div>
+                <p class="eyebrow">Fuente oficial SEA · Gestión {{ gestionCargaAcademica }}</p>
+                <h2 class="text-xl font-black">Carga académica del docente</h2>
+                @if (usuarioCargaAcademica(); as docente) {<p class="mt-1 text-xs text-muted-foreground">{{ docente.nombreCompleto }} · CI {{ docente.ci }}</p>}
+              </div>
+              <button class="icon-button" (click)="cerrarCargaAcademica()"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="space-y-4 p-6">
+              <div class="flex flex-col gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800 sm:flex-row sm:items-end sm:justify-between">
+                <div><strong>Materias y grupos oficiales</strong><p class="mt-1">La consulta se realiza directamente en SEA y no modifica las asignaciones guardadas.</p></div>
+                <label class="form-label min-w-36">Gestión<input class="field-input" [(ngModel)]="gestionCargaAcademica" (keyup.enter)="recargarCargaAcademica()"></label>
+              </div>
+              @if (cargandoCargaAcademica()) {<div class="message info"><i class="pi pi-spin pi-spinner"></i><span>Consultando materias, grupos y horarios...</span></div>}
+              @else if (errorCargaAcademica()) {<div class="message error"><i class="pi pi-exclamation-circle"></i><span>{{ errorCargaAcademica() }}</span></div>}
+              @else if (!cargaAcademica().length) {<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-8 text-center text-xs text-amber-800"><i class="pi pi-info-circle mb-2 block text-xl"></i>No se encontraron materias o grupos para este docente en la gestión indicada.</div>}
+              @else {
+                <div class="grid gap-3 sm:grid-cols-3"><div class="metric-card"><span>Grupos</span><strong>{{ cargaAcademica().length }}</strong><small>asignaciones oficiales</small></div><div class="metric-card"><span>Materias</span><strong>{{ materiasCargaAcademica() }}</strong><small>códigos únicos</small></div><div class="metric-card"><span>Horarios</span><strong>{{ horariosCargaAcademica() }}</strong><small>registros oficiales</small></div></div>
+                <div class="overflow-x-auto rounded-xl border border-border"><table class="min-w-full text-left text-xs"><thead><tr class="border-b border-border bg-muted/60 text-[10px] uppercase tracking-wider text-muted-foreground"><th class="px-3 py-3">Sede</th><th class="px-3 py-3">Carrera</th><th class="px-3 py-3">Asignatura</th><th class="px-3 py-3">Grupo</th><th class="px-3 py-3">Tipo</th><th class="px-3 py-3">Horario y aula</th></tr></thead><tbody>@for (item of cargaAcademica(); track claveCargaAcademica(item)) {<tr class="border-b border-border/70 last:border-0 hover:bg-muted/30"><td class="px-3 py-3 align-top"><strong>{{ item.sedeCodigo }}</strong><small class="mt-1 block text-muted-foreground">{{ item.sedeNombre }}</small></td><td class="px-3 py-3 align-top"><strong>{{ item.carreraCodigo }}</strong><small class="mt-1 block max-w-48 text-muted-foreground">{{ item.carreraNombre }}</small></td><td class="px-3 py-3 align-top"><strong class="text-primary">{{ item.asignaturaCodigo }}</strong><small class="mt-1 block max-w-56 text-muted-foreground">{{ item.asignaturaNombre }}</small></td><td class="px-3 py-3 align-top"><span class="role-pill">{{ item.grupo }}</span></td><td class="px-3 py-3 align-top">{{ item.tipoClase || '—' }}</td><td class="px-3 py-3 align-top">@for (horario of item.horarios; track horario.dia + horario.horaInicio + horario.aula) {<span class="mb-1 block">{{ horario.dia || 'Día no definido' }} · {{ horario.horaInicio || '—' }}–{{ horario.horaFin || '—' }}</span><small class="block text-muted-foreground">{{ horario.aula || 'Aula no definida' }}@if (horario.campus) { · {{ horario.campus }}}</small>} @empty {<span class="text-muted-foreground">Sin horario registrado</span>}</td></tr>}</tbody></table></div>
+              }
+              <div class="flex justify-end border-t border-border pt-4"><button class="secondary-button" (click)="cerrarCargaAcademica()">Cerrar</button></div>
+            </div>
+          </div>
+        </div>
       }
 
       @if (formularioAbierto()) {
@@ -249,6 +280,28 @@ interface RolCatalogo extends RolSistema {
                   @if (!campusesDisponibles().length && sedes.length) {<p class="assignment-empty">No hay campus disponibles en SEA.</p>}
                   <div class="check-grid campus-grid">@for (item of campusesDisponibles(); track claveCampus(item.sede.code, item.campus)) {<label class="check-item" [class.campus-disabled]="tieneCampus(item.sede.code, item.campus) && !campusHabilitado(item.sede.code, item.campus)"><input type="checkbox" [checked]="tieneCampus(item.sede.code, item.campus)" (change)="alternarCampus(item.sede, item.campus)"><span><strong>{{ item.campus.name }} ({{ item.sede.name }})</strong><small>@if (item.campus.code) {Código {{ item.campus.code }}} @else if (item.campus.campusId) {ID institucional {{ item.campus.campusId }}}</small></span>@if (tieneCampus(item.sede.code, item.campus)) {<button type="button" class="campus-status" [class.enabled]="campusHabilitado(item.sede.code, item.campus)" (click)="$event.preventDefault(); $event.stopPropagation(); alternarEstadoCampus(item.sede.code, item.campus)" [title]="campusHabilitado(item.sede.code, item.campus) ? 'Deshabilitar campus' : 'Habilitar campus'"><i [class]="campusHabilitado(item.sede.code, item.campus) ? 'pi pi-check-circle' : 'pi pi-ban'"></i>{{ campusHabilitado(item.sede.code, item.campus) ? 'Habilitado' : 'Deshabilitado' }}</button>}</label>}</div>
                   @if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}
+                </div>
+              } @else if (esVerificadorSeleccionado()) {
+                <div class="assignment-panel">
+                  <div class="section-title"><i class="pi pi-list"></i><span>Alcance del verificador</span><small>una fila por sede o carrera</small></div>
+                  <p class="assignment-help">Agrega cada alcance a la lista. Puedes habilitar una sede completa o limitarla a una carrera específica.</p>
+                  <div class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                    <label class="form-label">Sede<select class="field-input" name="sedeVerificador" [(ngModel)]="sedeVerificadorCodigo" (ngModelChange)="cambiarSedeVerificador($event)" [disabled]="guardando()"><option value="">Seleccionar sede...</option>@for (sede of sedes; track sede.code) {<option [value]="sede.code">{{ sede.code }} · {{ sede.name }}</option>}</select></label>
+                    <label class="flex min-h-10 items-center gap-2 rounded-xl border border-border bg-muted/30 px-3 text-xs font-bold"><input type="checkbox" name="todaSedeVerificador" [(ngModel)]="todaSedeVerificador" [disabled]="guardando()"> Toda la sede</label>
+                  </div>
+                  @if (sedeVerificadorCodigo && !todaSedeVerificador) {
+                    <label class="form-label mt-3">Carrera específica<select class="field-input" name="carreraVerificador" [(ngModel)]="carreraVerificadorCodigo" [disabled]="guardando() || cargandoCarrerasVerificador"><option value="">{{ cargandoCarrerasVerificador ? 'Cargando carreras...' : 'Seleccionar carrera...' }}</option>@for (carrera of carrerasVerificador; track carrera.careerCode) {<option [value]="carrera.careerCode">{{ carrera.careerCode }} · {{ carrera.careerName }}</option>}</select></label>
+                  }
+                  @if (!sedeVerificadorCodigo) { <p class="assignment-empty">Selecciona una sede para agregar un alcance.</p> }
+                  <button type="button" class="secondary-button mt-3" (click)="agregarAlcanceVerificador()" [disabled]="guardando() || !puedeAgregarAlcanceVerificador()"><i class="pi pi-plus"></i> Agregar a la lista</button>
+                  @if (alcancesVerificadorSeleccionados.length) {
+                    <div class="assignment-list mt-3">
+                      @for (alcance of alcancesVerificadorSeleccionados; track claveAsignacion(alcance)) {
+                        <div class="assignment-row"><div><strong>{{ alcance.sedeCodigo }} · {{ alcance.todaSede ? 'Toda la sede' : alcance.carreraCodigo }}</strong><small>{{ alcance.sedeNombre }}@if (!alcance.todaSede) { · {{ alcance.carreraNombre }}}</small></div><button type="button" class="icon-button" title="Quitar alcance" (click)="quitarAlcanceVerificador(alcance)"><i class="pi pi-times"></i></button></div>
+                      }
+                    </div>
+                  } @else { <p class="assignment-empty">Aún no hay alcances agregados a la lista.</p> }
+                  @if (!sedes.length) {<p class="empty-note mt-2">No se pudieron cargar las sedes desde SEA.</p>}
                 </div>
               } @else if (esRolConAlcanceSimple()) {
                 <div><div class="section-title"><i class="pi pi-building"></i><span>Sedes asignadas</span><small>puedes marcar varias</small></div><div class="check-grid">@for (sede of sedes; track sede.code) {<label class="check-item"><input type="checkbox" [checked]="tieneSede(sede.code)" (change)="alternarSede(sede)"><span><strong>{{ sede.code }}</strong><small>{{ sede.name }}</small></span></label>}</div>@if (!sedes.length) {<p class="empty-note">No se pudieron cargar las sedes desde SEA.</p>}</div>
@@ -299,6 +352,12 @@ export class UsuariosSistemaComponent implements OnInit {
   public readonly busqueda = signal('');
   public readonly filtroRol = signal('');
   public readonly filtroEstado = signal<'TODOS' | 'ACTIVOS' | 'INACTIVOS'>('TODOS');
+  public readonly cargaAcademicaAbierta = signal(false);
+  public readonly usuarioCargaAcademica = signal<UsuarioSistema | null>(null);
+  public readonly cargaAcademica = signal<CargaAcademicaDocente[]>([]);
+  public readonly cargandoCargaAcademica = signal(false);
+  public readonly errorCargaAcademica = signal<string | null>(null);
+  public gestionCargaAcademica = '2-2026';
   public gestionSea = '2-2026';
   public readonly filtroDocenteSea = signal('');
   public sedes: BranchOffice[] = [];
@@ -311,6 +370,12 @@ export class UsuariosSistemaComponent implements OnInit {
   public cargandoCarreras = false;
   public cargandoAsignaturas = false;
   public asignacionesSeleccionadas: AsignacionAcademica[] = [];
+  public alcancesVerificadorSeleccionados: AsignacionAcademica[] = [];
+  public sedeVerificadorCodigo = '';
+  public carreraVerificadorCodigo = '';
+  public carrerasVerificador: Career[] = [];
+  public cargandoCarrerasVerificador = false;
+  public todaSedeVerificador = false;
   public campusesPorSede = new Map<string, Campus[]>();
   public usuarioEditando: UsuarioSistema | null = null;
   public form: UsuarioSistemaRequest = this.formularioVacio();
@@ -318,8 +383,8 @@ export class UsuariosSistemaComponent implements OnInit {
   private carrerasSeleccionadas = new Map<string, AlcanceAcademico>();
   private campusesSeleccionados = new Map<string, AlcanceCampus>();
 
-  private readonly rolesDeEvaluaciones = new Set(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES']);
-  private readonly rolesInstitucionales = new Set(['ADMINISTRADOR_SISTEMA', 'DIRECTOR_CARRERA', 'DOCENTE', 'VICERRECTOR']);
+  private readonly rolesDeEvaluaciones = new Set(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VERIFICADOR']);
+  private readonly rolesInstitucionales = new Set(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'DOCENTE', 'VICERRECTOR', 'VERIFICADOR']);
 
   private readonly catalogoRolesBase: RolCatalogo[] = [
     {
@@ -360,6 +425,19 @@ export class UsuariosSistemaComponent implements OnInit {
         'Procesar lecturas y observaciones OMR.'
       ],
       icono: 'pi pi-file-edit'
+    },
+    {
+      codigo: 'VERIFICADOR',
+      nombre: 'Verificador de exámenes',
+      descripcion: 'Revisa el formato y contenido de bancos validados antes de su generación.',
+      alcance: 'Sedes y carreras asignadas',
+      permisos: [
+        'Consultar exámenes validados dentro de su alcance.',
+        'Previsualizar todas las preguntas y la clave de respuestas.',
+        'Aprobar o devolver exámenes con observaciones.',
+        'No puede editar el banco de preguntas.'
+      ],
+      icono: 'pi pi-verified'
     },
     {
       codigo: 'DIRECTOR_CARRERA',
@@ -448,7 +526,7 @@ export class UsuariosSistemaComponent implements OnInit {
   public rolesPermitidos(): RolSistema[] {
     return this.auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
       ? this.rolesVisibles()
-      : this.rolesVisibles().filter(rol => rol.codigo !== 'ADMINISTRADOR_SISTEMA');
+      : this.rolesVisibles().filter(rol => !['ADMINISTRADOR_SISTEMA', 'VERIFICADOR'].includes(rol.codigo));
   }
 
   public cambiarVista(vista: 'usuarios' | 'sea' | 'roles'): void { this.vistaActual.set(vista); }
@@ -458,16 +536,40 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public abrirNuevo(): void {
-    this.usuarioEditando = null; this.form = this.formularioVacio(); this.sedesSeleccionadas.clear(); this.carrerasSeleccionadas.clear(); this.campusesSeleccionados.clear(); this.limpiarConstructorAsignaciones(); this.error.set(null); this.formularioAbierto.set(true);
+    this.usuarioEditando = null; this.form = this.formularioVacio(); this.sedesSeleccionadas.clear(); this.carrerasSeleccionadas.clear(); this.campusesSeleccionados.clear(); this.asignacionesSeleccionadas = []; this.alcancesVerificadorSeleccionados = []; this.limpiarConstructorAsignaciones(); this.limpiarConstructorVerificador(); this.error.set(null); this.formularioAbierto.set(true);
   }
 
   public editar(usuario: UsuarioSistema): void {
     const campuses = [...(usuario.campuses || [])];
-    this.usuarioEditando = usuario; this.form = { ci: usuario.ci, nombreCompleto: usuario.nombreCompleto, rolCodigo: usuario.rol, activo: usuario.activo, sedes: [...usuario.sedes], carreras: [...usuario.carreras], campuses, asignaciones: [...(usuario.asignaciones || [])] }; this.sedesSeleccionadas = new Map(usuario.sedes.map(item => [item.codigo, item])); this.carrerasSeleccionadas = new Map(usuario.carreras.map(item => [item.codigo, item])); this.campusesSeleccionados = new Map(campuses.map(item => [this.claveCampus(item.sedeCodigo, item), item])); this.asignacionesSeleccionadas = [...(usuario.asignaciones || [])]; this.limpiarSeleccionAsignacion(); this.error.set(null); this.formularioAbierto.set(true);
+    this.usuarioEditando = usuario; this.form = { ci: usuario.ci, nombreCompleto: usuario.nombreCompleto, rolCodigo: usuario.rol, activo: usuario.activo, sedes: [...usuario.sedes], carreras: [...usuario.carreras], campuses, asignaciones: [...(usuario.asignaciones || [])] }; this.sedesSeleccionadas = new Map(usuario.sedes.map(item => [item.codigo, item])); this.carrerasSeleccionadas = new Map(usuario.carreras.map(item => [item.codigo, item])); this.campusesSeleccionados = new Map(campuses.map(item => [this.claveCampus(item.sedeCodigo, item), item])); this.asignacionesSeleccionadas = [...(usuario.asignaciones || [])]; this.alcancesVerificadorSeleccionados = usuario.rol === 'VERIFICADOR' ? [...(usuario.asignaciones || [])] : []; this.limpiarSeleccionAsignacion(); this.limpiarConstructorVerificador(); this.error.set(null); this.formularioAbierto.set(true);
     this.sedesParaCampus().forEach(sede => this.cargarCampusSede(sede));
   }
 
   public cerrarFormulario(): void { if (!this.guardando()) this.formularioAbierto.set(false); }
+
+  public verCargaAcademica(usuario: UsuarioSistema): void {
+    this.usuarioCargaAcademica.set(usuario);
+    this.cargaAcademica.set([]);
+    this.errorCargaAcademica.set(null);
+    this.cargaAcademicaAbierta.set(true);
+    this.recargarCargaAcademica();
+  }
+
+  public recargarCargaAcademica(): void {
+    const usuario = this.usuarioCargaAcademica();
+    if (!usuario) return;
+    this.cargandoCargaAcademica.set(true);
+    this.errorCargaAcademica.set(null);
+    this.service.cargaAcademicaDocente(usuario.id, this.gestionCargaAcademica.trim() || '2-2026').subscribe({
+      next: carga => { this.cargaAcademica.set(carga); this.cargandoCargaAcademica.set(false); },
+      error: error => { this.cargaAcademica.set([]); this.cargandoCargaAcademica.set(false); this.errorCargaAcademica.set(error?.error?.error || error?.error?.message || 'No se pudo consultar la carga académica en SEA.'); }
+    });
+  }
+
+  public cerrarCargaAcademica(): void { if (!this.cargandoCargaAcademica()) this.cargaAcademicaAbierta.set(false); }
+  public materiasCargaAcademica(): number { return new Set(this.cargaAcademica().map(item => item.asignaturaCodigo || item.asignaturaNombre)).size; }
+  public horariosCargaAcademica(): number { return this.cargaAcademica().reduce((total, item) => total + item.horarios.length, 0); }
+  public claveCargaAcademica(item: CargaAcademicaDocente): string { return `${item.sedeCodigo}|${item.carreraCodigo}|${item.asignaturaCodigo}|${item.grupo}`; }
 
   public tieneSede(codigo: string): boolean { return this.sedesSeleccionadas.has(codigo); }
   public tieneCarrera(codigo: string): boolean { return this.carrerasSeleccionadas.has(codigo); }
@@ -520,6 +622,8 @@ export class UsuariosSistemaComponent implements OnInit {
     // Las asignaciones pertenecen al tipo de rol; nunca se arrastran al cambiar
     // entre docente, director u otro perfil.
     this.asignacionesSeleccionadas = [];
+    this.alcancesVerificadorSeleccionados = [];
+    this.limpiarConstructorVerificador();
     this.campusesSeleccionados.clear();
     if (rol === 'PERSONAL_EVALUACIONES') this.sedesSeleccionadas.clear();
   }
@@ -532,6 +636,49 @@ export class UsuariosSistemaComponent implements OnInit {
 
   public esRolConAlcanceSimple(): boolean {
     return !this.requiereAsignacionesAcademicas();
+  }
+
+  public esVerificadorSeleccionado(): boolean { return this.form.rolCodigo === 'VERIFICADOR'; }
+
+  public cambiarSedeVerificador(codigo: string): void {
+    this.sedeVerificadorCodigo = codigo || '';
+    this.carreraVerificadorCodigo = '';
+    this.carrerasVerificador = [];
+    if (!this.sedeVerificadorCodigo || this.todaSedeVerificador) return;
+    this.cargandoCarrerasVerificador = true;
+    this.gateway.getCareers(this.sedeVerificadorCodigo).pipe(catchError(() => of([] as Career[]))).subscribe(carreras => {
+      this.carrerasVerificador = [...carreras].sort((a, b) => a.careerCode.localeCompare(b.careerCode));
+      this.cargandoCarrerasVerificador = false;
+    });
+  }
+
+  public puedeAgregarAlcanceVerificador(): boolean {
+    return !!this.sedeVerificadorCodigo && (this.todaSedeVerificador || !!this.carreraVerificadorCodigo);
+  }
+
+  public agregarAlcanceVerificador(): void {
+    if (!this.puedeAgregarAlcanceVerificador()) return;
+    const sede = this.sedes.find(item => item.code === this.sedeVerificadorCodigo);
+    const carrera = this.carrerasVerificador.find(item => item.careerCode === this.carreraVerificadorCodigo);
+    if (!sede || (!this.todaSedeVerificador && !carrera)) return;
+    const nuevo: AsignacionAcademica = {
+      sedeCodigo: sede.code,
+      sedeNombre: sede.name,
+      carreraCodigo: this.todaSedeVerificador ? CARRERA_TODA_SEDE : carrera!.careerCode,
+      carreraNombre: this.todaSedeVerificador ? 'Toda la sede' : carrera!.careerName,
+      asignaturaCodigo: '',
+      asignaturaNombre: '',
+      todaSede: this.todaSedeVerificador
+    };
+    if (!this.alcancesVerificadorSeleccionados.some(item => this.claveAsignacion(item) === this.claveAsignacion(nuevo))) {
+      this.alcancesVerificadorSeleccionados = [...this.alcancesVerificadorSeleccionados, nuevo];
+    }
+    this.carreraVerificadorCodigo = '';
+  }
+
+  public quitarAlcanceVerificador(alcance: AsignacionAcademica): void {
+    const clave = this.claveAsignacion(alcance);
+    this.alcancesVerificadorSeleccionados = this.alcancesVerificadorSeleccionados.filter(item => this.claveAsignacion(item) !== clave);
   }
 
   public mostrarCarrerasAsignacion(): boolean {
@@ -599,13 +746,15 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public claveAsignacion(asignacion: AsignacionAcademica): string {
-    return `${asignacion.sedeCodigo}|${asignacion.carreraCodigo}|${asignacion.asignaturaCodigo || ''}`;
+    return `${asignacion.sedeCodigo}|${asignacion.todaSede ? CARRERA_TODA_SEDE : asignacion.carreraCodigo}|${asignacion.asignaturaCodigo || ''}`;
   }
 
   public guardar(): void {
     this.error.set(null); this.guardando.set(true);
-    const asignaciones = this.requiereAsignacionesAcademicas() ? [...this.asignacionesSeleccionadas] : [];
-    const usaRelacionesNuevas = this.requiereAsignacionesAcademicas() && asignaciones.length > 0;
+    const asignaciones = this.esVerificadorSeleccionado()
+      ? [...this.alcancesVerificadorSeleccionados]
+      : this.requiereAsignacionesAcademicas() ? [...this.asignacionesSeleccionadas] : [];
+    const usaRelacionesNuevas = (this.requiereAsignacionesAcademicas() || this.esVerificadorSeleccionado()) && asignaciones.length > 0;
     const sedes = this.esPersonalEvaluacionesSeleccionado()
       ? this.sedesDesdeCampuses()
       : usaRelacionesNuevas
@@ -680,7 +829,7 @@ export class UsuariosSistemaComponent implements OnInit {
       ['PLANTILLA DE USUARIOS SEA'],
       ['CI', 'Obligatorio. Será el usuario y la contraseña temporal de una cuenta nueva.'],
       ['NOMBRE_COMPLETO', 'Obligatorio. Conservar exactamente el orden recibido desde SEA.'],
-      ['ROL', 'Usar el código del rol asignado, por ejemplo DOCENTE o DIRECTOR_CARRERA.'],
+      ['ROL', 'Usar el código del rol asignado, por ejemplo DOCENTE, DIRECTOR_CARRERA o VERIFICADOR.'],
       ['SEDE [...] / CARRERA [...]', 'Marcar con X las columnas que correspondan. Se pueden marcar varias.'],
       ['CAMPUS', 'Solo para PERSONAL_EVALUACIONES: SEDE_CODIGO|CAMPUS_ID|CAMPUS_CODIGO|CAMPUS_NOMBRE|SI o NO. Separe varios campus con punto y coma.'],
       ['Nota', 'No elimines ni cambies los códigos entre corchetes; son los códigos oficiales del catálogo SEA.']
@@ -702,7 +851,7 @@ export class UsuariosSistemaComponent implements OnInit {
   }
 
   public resumenAlcance(usuario: UsuarioSistema): string { const asignaciones = usuario.asignaciones?.length || 0; if (asignaciones) return `${asignaciones} asignación${asignaciones === 1 ? '' : 'es'}`; const campuses = usuario.campuses?.length || 0; if (campuses) { const habilitados = usuario.campuses.filter(item => item.habilitado).length; return `${usuario.sedes?.length || 0} sede${(usuario.sedes?.length || 0) === 1 ? '' : 's'} · ${campuses} campus · ${habilitados} habilitado${habilitados === 1 ? '' : 's'}`; } if (usuario.alcanceDesdeSea) { const sedes = usuario.sedesSea?.length || 0; const carreras = usuario.carrerasSea?.length || 0; return `${sedes} sede${sedes === 1 ? '' : 's'} · ${carreras} carrera${carreras === 1 ? '' : 's'} · ${usuario.gruposSea || 0} grupo${usuario.gruposSea === 1 ? '' : 's'} SEA`; } const sedes = usuario.sedes?.length || 0; const carreras = usuario.carreras?.length || 0; return `${sedes} sede${sedes === 1 ? '' : 's'} · ${carreras} carrera${carreras === 1 ? '' : 's'}`; }
-  public nombresAlcance(usuario: UsuarioSistema): string { if (usuario.asignaciones?.length) return usuario.asignaciones.map(item => `${item.sedeCodigo}/${item.carreraCodigo}${item.asignaturaCodigo ? '/' + item.asignaturaCodigo : ''}`).join(' · '); if (usuario.campuses?.length) return usuario.campuses.map(item => `${item.sedeCodigo}/${item.campusCodigo || item.campusNombre} · ${item.habilitado ? 'Habilitado' : 'Deshabilitado'}`).join(' · '); if (usuario.alcanceDesdeSea) return [...(usuario.sedesSea || []).map(item => `${item.codigo} · ${item.nombre}`), ...(usuario.carrerasSea || []).map(item => `${item.codigo} · ${item.nombre}`)].join(' · ') || 'Sin alcance informado por SEA'; return [...(usuario.sedes || []).map(item => item.codigo), ...(usuario.carreras || []).map(item => item.codigo)].join(' · ') || 'Sin alcance específico registrado'; }
+  public nombresAlcance(usuario: UsuarioSistema): string { if (usuario.asignaciones?.length) return usuario.asignaciones.map(item => item.todaSede ? `${item.sedeCodigo} · Toda la sede` : `${item.sedeCodigo}/${item.carreraCodigo}${item.asignaturaCodigo ? '/' + item.asignaturaCodigo : ''}`).join(' · '); if (usuario.campuses?.length) return usuario.campuses.map(item => `${item.sedeCodigo}/${item.campusCodigo || item.campusNombre} · ${item.habilitado ? 'Habilitado' : 'Deshabilitado'}`).join(' · '); if (usuario.alcanceDesdeSea) return [...(usuario.sedesSea || []).map(item => `${item.codigo} · ${item.nombre}`), ...(usuario.carrerasSea || []).map(item => `${item.codigo} · ${item.nombre}`)].join(' · ') || 'Sin alcance informado por SEA'; return [...(usuario.sedes || []).map(item => item.codigo), ...(usuario.carreras || []).map(item => item.codigo)].join(' · ') || 'Sin alcance específico registrado'; }
 
   private formularioVacio(): UsuarioSistemaRequest { return { ci: '', nombreCompleto: '', rolCodigo: this.contexto === 'EVALUACIONES' ? 'PERSONAL_EVALUACIONES' : 'DOCENTE', activo: true, sedes: [], carreras: [], campuses: [], asignaciones: [] }; }
   private cargarUsuarios(): void { this.service.listar(this.contexto).subscribe({ next: usuarios => this.usuarios.set(usuarios), error: error => this.mostrarError(error) }); }
@@ -710,6 +859,7 @@ export class UsuariosSistemaComponent implements OnInit {
   private esRolDeAsignaciones(rol: string): boolean { return rol === 'DIRECTOR_CARRERA' || rol === 'DOCENTE'; }
   private limpiarSeleccionAsignacion(): void { this.sedeAsignacionCodigo = ''; this.carreraAsignacionCodigo = ''; this.asignaturaAsignacionCodigo = ''; this.carrerasAsignacion = []; this.asignaturasAsignacion = []; this.cargandoCarreras = false; this.cargandoAsignaturas = false; }
   private limpiarConstructorAsignaciones(): void { this.limpiarSeleccionAsignacion(); }
+  private limpiarConstructorVerificador(): void { this.sedeVerificadorCodigo = ''; this.carreraVerificadorCodigo = ''; this.carrerasVerificador = []; this.cargandoCarrerasVerificador = false; this.todaSedeVerificador = false; }
   private sedesDesdeCampuses(): AlcanceAcademico[] {
     const unicas = new Map<string, AlcanceAcademico>();
     this.campusesSeleccionados.forEach(item => {
@@ -722,7 +872,7 @@ export class UsuariosSistemaComponent implements OnInit {
     asignaciones.forEach(item => {
       const codigo = tipo === 'sede' ? item.sedeCodigo : item.carreraCodigo;
       const nombre = tipo === 'sede' ? item.sedeNombre : item.carreraNombre;
-      if (codigo) unicos.set(codigo, { codigo, nombre });
+      if (codigo && !(tipo === 'carrera' && item.todaSede)) unicos.set(codigo, { codigo, nombre });
     });
     return [...unicos.values()];
   }

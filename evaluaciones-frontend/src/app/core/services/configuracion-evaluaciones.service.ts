@@ -21,6 +21,17 @@ export interface ConfiguracionEvaluaciones {
   actualizadoPor?: string;
 }
 
+export interface ConfiguracionVerificacion {
+  id?: number;
+  sedeCodigo: string;
+  sedeNombre: string;
+  carreraCodigo?: string;
+  carreraNombre?: string;
+  habilitada: boolean;
+  actualizadoEn?: string;
+  actualizadoPor?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -67,5 +78,13 @@ export class ConfiguracionEvaluacionesService {
         return throwError(() => error);
       })
     );
+  }
+
+  public listarVerificacion(): Observable<ConfiguracionVerificacion[]> {
+    return this._http.get<ConfiguracionVerificacion[]>(`${this._baseUrl}/verificacion`);
+  }
+
+  public guardarVerificacion(configuracion: ConfiguracionVerificacion): Observable<ConfiguracionVerificacion[]> {
+    return this._http.put<ConfiguracionVerificacion[]>(`${this._baseUrl}/verificacion`, configuracion);
   }
 }

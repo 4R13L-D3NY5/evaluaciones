@@ -64,6 +64,7 @@ public class RolExamenMapper {
         entity.setModalidad(dto.getModalidad());
         entity.setConCartilla(dto.getModalidad() == com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen.PRESENCIAL_CARTILLA);
         entity.setFecha(dto.getFecha());
+        entity.setFechaDisplay(dto.getFecha() != null ? formatearFecha(dto.getFecha()) : entity.getFechaDisplay());
         entity.setHorario(dto.getHorario() != null ? dto.getHorario() : "08:15 - 09:45");
         entity.setAula(dto.getAula() != null ? dto.getAula() : "Aula 204");
         entity.setCampus(dto.getCampus() != null ? dto.getCampus() : "Campus Colonial");

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,10 +25,11 @@ public class GeneracionTypstController {
     private final GeneracionTypstService generacionTypstService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#request.rolExamenId, authentication)")
     @Operation(summary = "Solicitar generación de exámenes")
-    public ResponseEntity<GeneracionTypstResultadoDto> solicitar(@Valid @RequestBody GeneracionTypstRequestDto request) {
-        return ResponseEntity.ok(generacionTypstService.solicitarGeneracion(request));
+    public ResponseEntity<GeneracionTypstResultadoDto> solicitar(@Valid @RequestBody GeneracionTypstRequestDto request,
+                                                                  Authentication authentication) {
+        return ResponseEntity.ok(generacionTypstService.solicitarGeneracion(request, authentication));
     }
 
     @PostMapping("/previsualizacion")
@@ -60,7 +62,7 @@ public class GeneracionTypstController {
     }
 
     @GetMapping("/{jobId}/resultado")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE','VERIFICADOR')")
     @Operation(summary = "Consultar estado/resultado de una generación")
     public ResponseEntity<GeneracionTypstResultadoDto> consultar(@PathVariable String jobId) {
         GeneracionTypstResultadoDto estado = generacionTypstService.consultarEstado(jobId);

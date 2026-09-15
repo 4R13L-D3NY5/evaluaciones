@@ -8,6 +8,13 @@ public record AsignacionAcademicaDto(
         @NotBlank String carreraCodigo,
         @NotBlank String carreraNombre,
         String asignaturaCodigo,
-        String asignaturaNombre
+        String asignaturaNombre,
+        boolean todaSede
 ) {
+    public AsignacionAcademicaDto(String sedeCodigo, String sedeNombre,
+                                  String carreraCodigo, String carreraNombre,
+                                  String asignaturaCodigo, String asignaturaNombre) {
+        this(sedeCodigo, sedeNombre, carreraCodigo, carreraNombre,
+                asignaturaCodigo, asignaturaNombre, false);
+    }
 }

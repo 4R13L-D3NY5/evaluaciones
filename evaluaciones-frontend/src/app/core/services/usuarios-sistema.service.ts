@@ -14,6 +14,28 @@ export interface AsignacionAcademica {
   carreraNombre: string;
   asignaturaCodigo?: string;
   asignaturaNombre?: string;
+  todaSede?: boolean;
+}
+
+export interface HorarioDocente {
+  dia: string;
+  horaInicio: string;
+  horaFin: string;
+  aula: string;
+  campus: string;
+}
+
+export interface CargaAcademicaDocente {
+  gestion: string;
+  sedeCodigo: string;
+  sedeNombre: string;
+  carreraCodigo: string;
+  carreraNombre: string;
+  asignaturaCodigo: string;
+  asignaturaNombre: string;
+  grupo: string;
+  tipoClase: string;
+  horarios: HorarioDocente[];
 }
 
 export interface AlcanceCampus {
@@ -139,6 +161,10 @@ export class UsuariosSistemaService {
 
   analizarDocentesSea(gestion = '2-2026'): Observable<AnalisisDocentesSeaResponse> {
     return this.http.get<AnalisisDocentesSeaResponse>(`${this.baseUrl}/docentes-sea`, { params: { gestion } });
+  }
+
+  cargaAcademicaDocente(id: number, gestion = '2-2026'): Observable<CargaAcademicaDocente[]> {
+    return this.http.get<CargaAcademicaDocente[]>(`${this.baseUrl}/${id}/carga-academica`, { params: { gestion } });
   }
 
   sincronizarDocentesSea(cis: string[] = [], desactivarAusentes = false, gestion = '2-2026'): Observable<SincronizacionDocentesSeaResponse> {

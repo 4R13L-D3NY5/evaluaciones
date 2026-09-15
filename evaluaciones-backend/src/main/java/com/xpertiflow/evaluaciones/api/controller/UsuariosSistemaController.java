@@ -2,6 +2,7 @@ package com.xpertiflow.evaluaciones.api.controller;
 
 import com.xpertiflow.evaluaciones.api.dto.auth.CredencialTemporalDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.AnalisisDocentesSeaResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.auth.CargaAcademicaDocenteDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.ImportacionUsuariosResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.RolSistemaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.SincronizacionDocentesSeaRequestDto;
@@ -62,6 +63,14 @@ public class UsuariosSistemaController {
     public ResponseEntity<AnalisisDocentesSeaResponseDto> analizarDocentesSea(
             @RequestParam(defaultValue = "2-2026") String gestion) {
         return ResponseEntity.ok(service.analizarDocentesSea(gestion));
+    }
+
+    @GetMapping("/{id}/carga-academica")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    public ResponseEntity<List<CargaAcademicaDocenteDto>> cargaAcademicaDocente(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "2-2026") String gestion) {
+        return ResponseEntity.ok(service.cargaAcademicaDocente(id, gestion));
     }
 
     @PostMapping("/docentes-sea/sincronizar")

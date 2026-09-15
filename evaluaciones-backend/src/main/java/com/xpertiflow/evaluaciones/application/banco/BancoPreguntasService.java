@@ -5,7 +5,9 @@ import com.xpertiflow.evaluaciones.api.dto.banco.BancoPreguntasResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.CargaBancoResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.ReactivoResponseDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
+import com.xpertiflow.evaluaciones.application.HistorialVerificacionService;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaVerificacion;
 import com.xpertiflow.evaluaciones.domain.entity.Reactivo;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
@@ -13,6 +15,8 @@ import com.xpertiflow.evaluaciones.domain.enums.TipoParcial;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ReactivoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaVerificacionRepository;
 import com.xpertiflow.evaluaciones.security.BancoCifradoService;
 import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +35,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -43,6 +49,9 @@ public class BancoPreguntasService {
     private final RolExamenService rolExamenService;
     private final ObjectMapper objectMapper;
     private final BancoCifradoService cifradoService;
+    private final VerificacionExamenRepository verificacionRepository;
+    private final AuditoriaVerificacionRepository auditoriaVerificacionRepository;
+    private final HistorialVerificacionService historialVerificacionService;
 
     private static final int TOTAL_REQUERIDO = 60;
     private static final int CUOTA_FACILES = 15;
@@ -56,6 +65,10 @@ public class BancoPreguntasService {
     private static final Set<String> MIME_IMAGENES_PERMITIDOS = Set.of(
             "image/png", "image/jpeg", "image/webp", "image/gif");
     private static final Set<String> ERRORES_FORMULA = Set.of("#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#N/A");
+    private static final Set<String> COMANDOS_FORMULA_TYPST_PERMITIDOS = Set.of(
+            "times", "cdot", "rightarrow", "to", "pm", "equiv");
+    private static final Pattern COMANDO_FORMULA_TYPST = Pattern.compile("\\\\([A-Za-z]+)\\b");
+    private static final Pattern BARRA_FORMULA_TYPST_INVALIDA = Pattern.compile("\\\\(?![A-Za-z])");
 
     public BancoPreguntasResponseDto obtenerPorRolExamenId(String rolExamenId) {
         BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId)
@@ -104,7 +117,19 @@ public class BancoPreguntasService {
                 .estado(banco.getEstado())
                 .docenteAprobador(banco.getDocenteAprobador())
                 .fechaAprobacion(banco.getFechaAprobacion())
+                .estadoVerificacion(verificacionRepository.findByRolExamenId(banco.getRolExamenId()).map(v -> v.getEstado()).orElse(null))
+                .observacionesVerificacion(verificacionRepository.findByRolExamenId(banco.getRolExamenId()).map(v -> v.getObservacionesGenerales()).orElse(null))
+                .observacionesVerificacionPreguntas(verificacionRepository.findByRolExamenId(banco.getRolExamenId()).map(v -> leerObservacionesVerificacion(v.getObservacionesPreguntasJson())).orElse(Map.of()))
                 .build();
+    }
+
+    private Map<String, String> leerObservacionesVerificacion(String json) {
+        if (json == null || json.isBlank()) return Map.of();
+        try {
+            return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() { });
+        } catch (IOException exception) {
+            return Map.of();
+        }
     }
 
     @Transactional
@@ -296,6 +321,13 @@ public class BancoPreguntasService {
                     ? bancoRepository.findByRolExamenIdOrderByFechaAprobacionDesc(rol.getId())
                     : bancoRepository.findByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
                             rol.getMateriaCodigo(), rol.getGrupo(), rol.getTipoParcial().getValor());
+            if (vincularRol && !bancosAnteriores.isEmpty()) {
+                verificacionRepository.findByRolExamenId(rol.getId()).ifPresent(verificacion ->
+                        bancosAnteriores.stream()
+                                .filter(banco -> banco.getId().equals(verificacion.getBancoPreguntasId()))
+                                .findFirst()
+                                .ifPresent(banco -> historialVerificacionService.archivarDevolucion(verificacion, banco)));
+            }
             if (!bancosAnteriores.isEmpty()) {
                 bancoRepository.deleteAll(bancosAnteriores);
             }
@@ -329,6 +361,26 @@ public class BancoPreguntasService {
             banco.setDocenteAprobador(docenteOficial.trim());
             banco.setFechaAprobacion(LocalDateTime.now());
             bancoRepository.save(banco);
+
+            // Al sustituir el banco, cualquier aprobación previa deja de ser
+            // válida. La nueva revisión se asociará al banco recién cargado.
+            verificacionRepository.findByRolExamenId(rol.getId()).ifPresent(verificacion -> {
+                verificacion.setBancoPreguntasId(bancoId);
+                verificacion.setEstado("PENDIENTE");
+                verificacion.setObservacionesGenerales(null);
+                verificacion.setObservacionesPreguntasJson(null);
+                verificacion.setVerificadoPor(null);
+                verificacion.setFechaVerificacion(null);
+                verificacion.setActualizadoEn(LocalDateTime.now());
+                verificacionRepository.save(verificacion);
+                AuditoriaVerificacion auditoria = new AuditoriaVerificacion();
+                auditoria.setRolExamenId(rol.getId());
+                auditoria.setAccion("REINICIO_VERIFICACION_POR_REEMPLAZO");
+                auditoria.setRealizadoPor(usuarioAuditoria == null || usuarioAuditoria.isBlank() ? "SISTEMA" : usuarioAuditoria);
+                auditoria.setDetalle("El banco validado fue reemplazado; se requiere una nueva revisión");
+                auditoria.setFechaEvento(LocalDateTime.now());
+                auditoriaVerificacionRepository.save(auditoria);
+            });
 
             // Guardar reactivos
             for (Reactivo r : reactivos) {
@@ -675,6 +727,21 @@ public class BancoPreguntasService {
                 errores.add("Fila " + (rowNum + 1) + ": " + campo
                         + " contiene una expresión matemática incompatible con la previsualización Typst;"
                         + " no anides signos $ y verifica paréntesis, corchetes y llaves");
+                return;
+            }
+            Matcher comando = COMANDO_FORMULA_TYPST.matcher(bloque);
+            while (comando.find()) {
+                String nombre = comando.group(1).toLowerCase(Locale.ROOT);
+                if (!COMANDOS_FORMULA_TYPST_PERMITIDOS.contains(nombre)) {
+                    errores.add("Fila " + (rowNum + 1) + ": " + campo
+                            + " contiene el comando de fórmula \\" + comando.group(1)
+                            + " no compatible con la previsualización Typst");
+                    return;
+                }
+            }
+            if (BARRA_FORMULA_TYPST_INVALIDA.matcher(bloque).find()) {
+                errores.add("Fila " + (rowNum + 1) + ": " + campo
+                        + " contiene una barra invertida sin un comando de fórmula válido para Typst");
                 return;
             }
             cursor = cierre + 1;

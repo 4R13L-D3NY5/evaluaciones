@@ -54,6 +54,8 @@ export interface PrevisualizacionTypstRequest {
   jobId?: string;
   rolExamenId: string;
   preguntas: Array<Record<string, unknown>>;
+  modoVerificacion?: boolean;
+  incluirClave?: boolean;
 }
 
 export interface GeneracionColaItem {

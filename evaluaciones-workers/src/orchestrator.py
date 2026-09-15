@@ -100,6 +100,8 @@ def _normalizar_reactivo_previsualizacion(item: dict[str, Any], indice: int) -> 
         "nivel_dificultad": nivel,
         "dificultad": {1: "Fácil", 2: "Medio", 3: "Difícil"}[nivel],
         "opciones_json": opciones,
+        "respuesta_correcta": item.get("respuesta_correcta"),
+        "peso_puntos": item.get("peso_puntos"),
     }
 
 
@@ -124,6 +126,8 @@ def procesar_previsualizacion(payload: dict[str, Any]) -> dict[str, Any]:
         payload.get("outputBasePath", "/app/storage/generados/previsualizaciones"),
         generar_pdf=True,
         modo_previsualizacion=True,
+        modo_verificacion=bool(payload.get("modoVerificacion")),
+        incluir_clave=bool(payload.get("incluirClave")),
         configuracion=payload.get("configuracionGeneracion"),
     )
     return {

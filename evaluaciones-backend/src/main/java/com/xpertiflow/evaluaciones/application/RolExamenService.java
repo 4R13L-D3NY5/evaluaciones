@@ -45,6 +45,8 @@ public class RolExamenService {
     private final RolExamenMapper mapper;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AccesoAcademicoService accesoAcademicoService;
+    private final VerificacionPoliticaService verificacionPoliticaService;
+    private final PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
 
     private static final long CACHE_GRUPOS_SEA_MILLIS = 60_000L;
     private volatile List<GroupItemDto> gruposSeaCache = List.of();
@@ -111,9 +113,12 @@ public class RolExamenService {
                     .toList();
         }
 
-        return mapearRolesConDocenteOficial(authentication == null
+        List<RolExamen> rolesVisibles = authentication == null
                 ? roles
-                : accesoAcademicoService.filtrarRolesParaUsuario(roles, authentication));
+                : accesoAcademicoService.filtrarRolesParaUsuario(roles, authentication);
+        rolesVisibles = politicaTiempoEvaluacionesService
+                .filtrarListaParaPersonal(rolesVisibles, authentication);
+        return mapearRolesConDocenteOficial(rolesVisibles);
     }
 
     @Transactional(readOnly = true)
@@ -143,9 +148,21 @@ public class RolExamenService {
         GroupItemDto grupoOficial = resolverGrupoOficialDesdeSea(previsualizacion);
         aplicarDocenteOficial(previsualizacion, grupoOficial);
         dto.setSeaGroupId(previsualizacion.getSeaGroupId());
-        if (dto.isImportacion() && existeProgramacionParaImportacion(dto)) {
-            throw new IllegalArgumentException("El grupo " + dto.getGrupo() + " ya cuenta con una programación para "
-                    + dto.getTipoParcial() + ". Los cambios deben registrarse manualmente.");
+        if (dto.isImportacion()) {
+            Optional<RolExamen> programacionExistente = buscarProgramacionVigente(dto);
+            if (programacionExistente.isPresent()) {
+                RolExamen rolExistente = programacionExistente.get();
+                if (rolExistente.getEstadoFlujo() == EstadoFlujo.PROGRAMADO
+                        || rolExistente.getEstadoFlujo() == EstadoFlujo.VALIDADO) {
+                    // La importación actualiza el registro vigente y conserva su
+                    // estado, banco asociado, hash y trazabilidad.
+                    dto.setId(rolExistente.getId());
+                    return actualizar(rolExistente.getId(), dto, authentication);
+                }
+                throw new IllegalArgumentException("El grupo " + dto.getGrupo() + " ya tiene una programación para "
+                        + dto.getTipoParcial() + " en estado " + rolExistente.getEstadoFlujo()
+                        + ". La importación no puede modificar un examen que ya avanzó en el flujo.");
+            }
         }
         int version = siguienteVersion(dto);
         dto.setVersion(version);
@@ -472,19 +489,19 @@ public class RolExamenService {
         return ultimo.map(rol -> rol.getVersion() == null ? 1 : rol.getVersion() + 1).orElse(1);
     }
 
-    /**
-     * La importación masiva no crea versiones alternativas de un grupo/parcial
-     * ya programado. La creación manual conserva el comportamiento anterior y
-     * sigue permitiendo registrar una nueva versión cuando corresponda.
-     */
-    private boolean existeProgramacionParaImportacion(RolExamenRequestDto dto) {
+    private Optional<RolExamen> buscarProgramacionVigente(RolExamenRequestDto dto) {
         if (dto.getSeaGroupId() != null && !dto.getSeaGroupId().isBlank()
-                && rolExamenRepository.findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
-                dto.getSeaGroupId(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO).isPresent()) {
-            return true;
+                ) {
+            Optional<RolExamen> porSea = rolExamenRepository
+                    .findTopBySeaGroupIdAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                            dto.getSeaGroupId(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO);
+            if (porSea.isPresent()) {
+                return porSea;
+            }
         }
-        return rolExamenRepository.findTopByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
-                dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO).isPresent();
+        return rolExamenRepository
+                .findTopByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
+                        dto.getMateriaCodigo(), dto.getGrupo(), dto.getTipoParcial(), EstadoFlujo.SUSPENDIDO);
     }
 
     private String construirId(RolExamenRequestDto dto, int version) {
@@ -641,6 +658,12 @@ public class RolExamenService {
         Set<EstadoFlujo> permitidos = TRANSICIONES_VALIDAS.getOrDefault(origen, Set.of());
         if (rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA && destino == EstadoFlujo.GENERADO) {
             throw new RuntimeException("Los exámenes sin cartilla no requieren generación de variantes ni PDF.");
+        }
+        if (destino == EstadoFlujo.GENERADO) {
+            verificacionPoliticaService.exigirVerificado(rol);
+        }
+        if (destino == EstadoFlujo.ENTREGADO) {
+            politicaTiempoEvaluacionesService.exigirEntregaHabilitada(rol, authentication);
         }
         if (!transicionVirtualFinal && !transicionSinCartillaAImpreso && !permitidos.contains(destino)) {
             throw new RuntimeException(
