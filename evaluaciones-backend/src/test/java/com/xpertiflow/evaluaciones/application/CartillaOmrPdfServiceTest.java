@@ -69,6 +69,59 @@ class CartillaOmrPdfServiceTest {
     }
 
     @Test
+    void conservaUnicodeYNombreCompletoEnMarcasYNomina() throws IOException {
+        String nombreConStigma = "PROENϚA DE OLIVEIRA ALCIONE BENTO";
+        String nombreConDiacriticos = "AMÂNCIO AMARAL GABRIELLE";
+        RolExamen rol = RolExamen.builder()
+                .sedeNombre("GUAYARAMERÍN")
+                .carreraNombre("LICENCIATURA EN MEDICINA")
+                .materiaCodigo("MED-225")
+                .materiaNombre("PSICOLOGÍA MÉDICA")
+                .grupo("TA-01")
+                .tipoParcial(TipoParcial.PRIMER_PARCIAL)
+                .fecha(LocalDate.of(2026, 9, 16))
+                .fechaDisplay("16/09/2026")
+                .build();
+
+        CartillaOmr stigma = cartillaDePrueba(1, "1201111", nombreConStigma);
+        CartillaOmr diacriticos = cartillaDePrueba(2, "1201086", nombreConDiacriticos);
+        List<CartillaOmr> cartillas = List.of(stigma, diacriticos);
+        CartillaOmrPdfService servicio = new CartillaOmrPdfService();
+        byte[] marcas = servicio.generarBytes(rol, cartillas);
+        byte[] lista = servicio.generarListaBytes(rol, cartillas);
+        if (Boolean.getBoolean("pdf.qa")) {
+            Files.write(Path.of("target/qa-nombre-unicode-marcas.pdf"), marcas);
+            Files.write(Path.of("target/qa-nombre-unicode-lista.pdf"), lista);
+        }
+
+        try (PDDocument documento = PDDocument.load(marcas)) {
+            assertEquals(2, documento.getNumberOfPages());
+            String texto = new PDFTextStripper().getText(documento);
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains(nombreConStigma),
+                    "Las marcas deben conservar U+03DA y el nombre completo");
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains(nombreConDiacriticos),
+                    "Las marcas deben conservar los diacríticos oficiales");
+        }
+        try (PDDocument documento = PDDocument.load(lista)) {
+            String texto = new PDFTextStripper().getText(documento);
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains(nombreConStigma),
+                    "La nómina debe conservar U+03DA y el nombre completo, sin truncarlo");
+            org.junit.jupiter.api.Assertions.assertTrue(texto.contains(nombreConDiacriticos),
+                    "La nómina debe conservar los diacríticos oficiales");
+        }
+    }
+
+    private CartillaOmr cartillaDePrueba(int orden, String codigo, String nombreCompleto) {
+        CartillaOmr cartilla = new CartillaOmr();
+        cartilla.setNumeroOrden(orden);
+        cartilla.setCodigoMateria("MED-225");
+        cartilla.setGrupo("TA-01");
+        cartilla.setCodigoEstudiante(codigo);
+        cartilla.setNombreCompleto(nombreCompleto);
+        return cartilla;
+    }
+
+    @Test
     void generaPatronOficialImprimiblePorVariante() throws IOException {
         RolExamen rol = RolExamen.builder()
                 .carreraNombre("LICENCIATURA EN INGENIERIA DE SISTEMAS")

@@ -6,7 +6,7 @@ import { EvaluacionesStorageService } from '../../core/services/evaluaciones-sto
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
-import { BancoPreguntasContexto, BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
+import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import { AuthService } from '../../core/services/auth.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
@@ -353,34 +353,10 @@ export interface DiaCalendario {
                 <span>Este rol de examen ya está en <strong>{{ rol.estadoFlujo }}</strong>. Para reemplazar o volver a registrar el banco, primero debes restablecerlo a <strong>VALIDADO</strong> desde Evaluaciones del día, indicando el motivo.</span>
                 </div>
               }
-            } @else if (contextoBancoDisponible()) {
-              <div class="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950">
-                <i class="pi pi-exclamation-triangle mt-0.5"></i>
-                <div>
-                  <strong class="block">Grupo sin fecha programada todavía</strong>
-                  <span>Puedes cargar y validar el banco de preguntas. Se guardará como pendiente de rol y se asociará automáticamente cuando se registre la fecha del examen.</span>
-                </div>
-              </div>
-              @if (cargandoBancoPersistido()) {
-                <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700">
-                  <i class="pi pi-spin pi-spinner"></i><span>Consultando banco de preguntas guardado...</span>
-                </div>
-              } @else {
-                @if (bancoPersistido(); as banco) {
-                  <div class="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-950">
-                    <i class="pi pi-check-circle text-emerald-700"></i>
-                    <span><strong>Banco pendiente de rol:</strong> {{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · Validado</span>
-                  </div>
-                } @else {
-                  <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                    <i class="pi pi-info-circle"></i><span>Este grupo todavía no tiene banco de preguntas cargado para {{ parcialActivo() }}.</span>
-                  </div>
-                }
-              }
             }
           </div>
           
-          @if (contextoBancoDisponible()) {
+          @if (rolExamenActivo()) {
             @if (esSinCartillaActivo()) {
             <!-- Flujo específico: examen presencial sin cartilla -->
             <div class="bg-card border border-emerald-200 rounded-2xl p-6 shadow-xs space-y-5">
@@ -432,8 +408,8 @@ export interface DiaCalendario {
                 <p class="text-xs text-muted-foreground">Sube el archivo .xlsx completado con las preguntas oficiales</p>
               </div>
 
-              <!-- Botones de Acción: Forzar Previsualización PDF antes de Descargar o Previsualizar Encriptado -->
-              @if (esBancoTotalmenteValido() && rolPuedeCargarBanco()) {
+              <!-- La previsualización PDF es el único paso previo al guardado. -->
+              @if (esBancoTotalmenteValido() && rolPuedeCargarBanco() && !bancoRegistrado()) {
                 <div class="flex flex-wrap items-center gap-2.5 animate-fade-in">
                   @if (rolExamenActivo()) {
                   
@@ -449,73 +425,6 @@ export interface DiaCalendario {
                     }
                   </button>
 
-                  @if (esAdministradorSistema()) {
-                    <!-- BOTÓN 2: PREVISUALIZAR ENCRIPTADO (.PKG) (SOLO ADMINISTRADOR) -->
-                    @if (pdfPrevisualizadoYConforme()) {
-                      <button 
-                        (click)="abrirModalPrevisualizacionPkg()"
-                        title="Inspeccionar el contenido cifrado y payload de seguridad del paquete .pkg"
-                        class="bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-purple-900 dark:text-purple-200 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-purple-300 dark:border-purple-700 transition-all hover:scale-105 cursor-pointer">
-                        <i class="pi pi-eye text-xs text-purple-600"></i>
-                        <span>Previsualizar Encriptado</span>
-                      </button>
-                    } @else {
-                      <button 
-                        disabled
-                        title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
-                        class="bg-muted text-muted-foreground/60 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border/60 cursor-not-allowed opacity-60">
-                        <i class="pi pi-lock text-xs"></i>
-                        <span>Previsualizar Encriptado</span>
-                      </button>
-                    }
-
-                    <!-- BOTÓN 3: DESCARGAR COPIA .PKG (SOLO ADMINISTRADOR) -->
-                    @if (pdfPrevisualizadoYConforme()) {
-                      <button 
-                        (click)="generarYDescargarPaqueteEncriptado()"
-                        title="Descargar una copia de respaldo cifrada en formato .pkg"
-                        class="bg-muted hover:bg-border text-foreground font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border transition-all hover:scale-105 cursor-pointer">
-                        <i class="pi pi-shield text-xs text-purple-700"></i>
-                        <span>Descargar .pkg</span>
-                      </button>
-                    } @else {
-                      <button 
-                        disabled
-                        title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
-                        class="bg-muted text-muted-foreground/60 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 border border-border/60 cursor-not-allowed opacity-60">
-                        <i class="pi pi-lock text-xs"></i>
-                        <span>Descargar .pkg</span>
-                      </button>
-                    }
-
-                    <!-- BOTÓN 4: ENVIAR A OFICINA DE EVALUACIONES (SOLO ADMINISTRADOR) -->
-                    @if (pdfPrevisualizadoYConforme()) {
-                      <button 
-                        (click)="abrirModalEnvioEvaluaciones()"
-                        class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-black text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/20 transition-all hover:scale-105 cursor-pointer">
-                        <i class="pi pi-send text-sm"></i>
-                        <span>Enviar a Oficina de Evaluaciones</span>
-                      </button>
-                    } @else {
-                      <button 
-                        disabled
-                        title="Debes previsualizar el PDF del examen primero para desbloquear esta opción"
-                        class="bg-muted text-muted-foreground/60 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 border border-border/60 cursor-not-allowed opacity-60">
-                        <i class="pi pi-lock text-xs"></i>
-                        <span>Enviar a Evaluaciones</span>
-                      </button>
-                    }
-                  }
-                  }
-
-                  @if (!rolExamenActivo() && contextoBancoDisponible() && esBancoTotalmenteValido()) {
-                    <button
-                      (click)="aprobarDiagramacionPdf()"
-                      [disabled]="cargandoBanco()"
-                      class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all hover:scale-105 cursor-pointer disabled:opacity-50">
-                      <i class="pi pi-database text-sm"></i>
-                      <span>{{ cargandoBanco() ? 'Guardando...' : 'Guardar banco pendiente de rol' }}</span>
-                    </button>
                   }
 
                 </div>
@@ -539,7 +448,7 @@ export interface DiaCalendario {
                       </span>
                     </div>
                     <p class="text-xs text-amber-900/90 dark:text-amber-300/90 font-medium leading-relaxed">
-                      El banco de preguntas ha cumplido las cuotas mínimas. Por normativa institucional, <strong>debes abrir "Previsualizar Examen (Paso 1 Obligatorio)" y recorrer el PDF completo hasta su última página</strong> para verificar la diagramación oficial, fórmulas matemáticas/químicas y enunciados antes de desbloquear la descarga del paquete encriptado (.pkg), la remisión oficial o el registro del banco.
+                      El banco de preguntas ha cumplido las cuotas mínimas. Por normativa institucional, <strong>debes abrir "Previsualizar Examen (Paso 1 Obligatorio)" y recorrer el PDF completo hasta su última página</strong> para verificar la diagramación oficial, fórmulas matemáticas/químicas y enunciados antes de habilitar la aprobación y el registro del banco.
                     </p>
                   </div>
                 </div>
@@ -559,9 +468,6 @@ export interface DiaCalendario {
                     </div>
                     <p class="text-xs text-emerald-900/90 dark:text-emerald-300/90 font-medium leading-relaxed">
                       Has verificado la diagramación oficial del examen en PDF. La revisión quedó registrada correctamente.
-                      @if (esAdministradorSistema()) {
-                        Las opciones para <strong>previsualizar el paquete encriptado</strong>, <strong>descargar la copia de respaldo .pkg</strong> y <strong>enviar la evaluación a la oficina de evaluaciones</strong> están disponibles para el administrador.
-                      }
                     </p>
                   </div>
                 </div>
@@ -880,8 +786,8 @@ export interface DiaCalendario {
             <div class="flex items-start gap-3 rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-4 text-xs text-muted-foreground">
               <i class="pi pi-arrow-up-right mt-0.5 text-purple-700"></i>
               <div>
-                <strong class="block text-foreground">Selecciona una asignatura y un grupo para continuar</strong>
-                <span>El cargador y la validación aparecerán cuando exista un contexto académico compatible.</span>
+                <strong class="block text-foreground">Selecciona un rol de examen para continuar</strong>
+                <span>El cargador y la validación aparecerán cuando exista una programación oficial compatible con la asignatura, grupo y parcial.</span>
               </div>
             </div>
           }
@@ -1759,7 +1665,7 @@ export interface DiaCalendario {
                 </button>
 
                 <button 
-                  [disabled]="!documentoRecorridoCompleto() || !rolExamenActivo() || !archivoExcelSeleccionado() || cargandoBanco() || pdfPreviewPages().length === 0"
+                  [disabled]="!pdfPrevisualizadoYConforme() || !documentoRecorridoCompleto() || !rolExamenActivo() || !archivoExcelSeleccionado() || cargandoBanco() || pdfPreviewPages().length === 0"
                   (click)="aprobarDiagramacionPdf()"
                   class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                   <i class="pi pi-check-circle text-sm"></i>
@@ -2528,34 +2434,6 @@ export class BancoPreguntasComponent implements OnInit {
     return rolSeleccionado || null;
   });
 
-  public contextoBancoDisponible = computed(() => {
-    return !!this.sedeSeleccionada()
-      && !!this.carreraSeleccionada()
-      && !!this.asignaturaSeleccionada()
-      && !!this.grupoSeleccionado()
-      && !!this._mapParcialBackend(this.parcialActivo());
-  });
-
-  public contextoBanco = computed<BancoPreguntasContexto | null>(() => {
-    const sede = this.sedeSeleccionada();
-    const carrera = this.carreraSeleccionada();
-    const asignatura = this.asignaturaSeleccionada();
-    const grupo = this.grupos().find(item => item.code === this.grupoSeleccionado());
-    if (!sede || !carrera || !asignatura || !grupo || !this.contextoBancoDisponible()) return null;
-    return {
-      materiaCodigo: asignatura.courseCode,
-      materiaNombre: asignatura.courseName,
-      grupo: grupo.code,
-      tipoParcial: this._mapParcialBackend(this.parcialActivo()),
-      sedeCodigo: sede.code,
-      carreraCodigo: carrera.careerCode,
-      branchOfficeId: sede.branchOfficeId,
-      careerId: carrera.careerId,
-      syllabusCourseId: asignatura.syllabusCourseId,
-      seaGroupId: grupo.groupId
-    };
-  });
-
   public docenteOficialActivo = computed(() => {
     const rol = this.rolExamenActivo();
     return {
@@ -2567,7 +2445,7 @@ export class BancoPreguntasComponent implements OnInit {
 
   public rolPuedeCargarBanco = computed(() => {
     const rol = this.rolExamenActivo();
-    if (!rol) return this.contextoBancoDisponible();
+    if (!rol) return false;
     const estado = rol.estadoFlujo;
     return estado === 'PROGRAMADO' || estado === 'VALIDADO';
   });
@@ -2833,6 +2711,7 @@ export class BancoPreguntasComponent implements OnInit {
   });
   public cargandoBanco = signal<boolean>(false);
   public bancoPersistido = signal<BancoPreguntasResponse | null>(null);
+  public bancoRegistrado = signal<boolean>(false);
   public observacionesVerificacionPreguntas = computed(() => Object.entries(this.bancoPersistido()?.observacionesVerificacionPreguntas || {}));
   public cargandoBancoPersistido = signal<boolean>(false);
   public dialogEliminarBancoPersistido = signal<boolean>(false);
@@ -3414,24 +3293,11 @@ export class BancoPreguntasComponent implements OnInit {
 
   private _cargarBancoPersistido(): void {
     const rol = this.rolExamenActivo();
-    const contexto = this.contextoBanco();
     this.bancoPersistido.set(null);
+    this.bancoRegistrado.set(false);
     this.documentoSinCartilla.set(null);
     this.archivoSinCartillaSeleccionado.set(null);
     this.cargandoBancoPersistido.set(false);
-    if (!rol && !contexto) return;
-
-    if (!rol && contexto) {
-      this.cargandoBancoPersistido.set(true);
-      this._bancoService.obtenerPorContexto(contexto).pipe(
-        catchError(() => of(null))
-      ).subscribe(banco => {
-        this.bancoPersistido.set(banco);
-        this.cargandoBancoPersistido.set(false);
-      });
-      return;
-    }
-
     if (!rol) return;
 
     if (rol.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
@@ -3448,6 +3314,7 @@ export class BancoPreguntasComponent implements OnInit {
       catchError(() => of(null))
     ).subscribe(banco => {
       this.bancoPersistido.set(banco);
+      this.bancoRegistrado.set(!!banco);
       this.cargandoBancoPersistido.set(false);
     });
   }
@@ -3741,6 +3608,7 @@ export class BancoPreguntasComponent implements OnInit {
     this.archivoExcelSeleccionado.set(file);
     this.nombreArchivoCargado.set(file.name);
     this.preguntasCargadas.set([]);
+    this.bancoRegistrado.set(false);
     this.pdfPrevisualizadoYConforme.set(false);
     try {
       if (!file.name.toLowerCase().endsWith('.xlsx')) {
@@ -4959,6 +4827,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     // Comprobar si el scroll llegó al final o está a menos de 80px del final.
     if (element.scrollTop + element.clientHeight >= element.scrollHeight - 80) {
       this.documentoRecorridoCompleto.set(true);
+      this.pdfPrevisualizadoYConforme.set(true);
     }
   }
 
@@ -4973,6 +4842,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     }
     if (element.scrollHeight <= element.clientHeight + 2) {
       this.documentoRecorridoCompleto.set(true);
+      this.pdfPrevisualizadoYConforme.set(true);
     }
   }
 
@@ -5061,10 +4931,9 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
 
   public aprobarDiagramacionPdf(): void {
     const rol = this.rolExamenActivo();
-    const contexto = this.contextoBanco();
     const file = this.archivoExcelSeleccionado();
-    if (!rol && !contexto) {
-      this._mostrarToast('Selecciona una asignatura y un grupo oficiales antes de guardar el banco.', 'error');
+    if (!rol) {
+      this._mostrarToast('Selecciona un rol de examen oficial antes de guardar el banco.', 'error');
       return;
     }
     if (rol && !this.rolPuedeCargarBanco()) {
@@ -5079,11 +4948,13 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas 15/30/15.', 'error');
       return;
     }
+    if (!this.pdfPrevisualizadoYConforme() || !this.documentoRecorridoCompleto() || this.pdfPreviewPages().length === 0) {
+      this._mostrarToast('Debes previsualizar el examen completo y llegar a la última página antes de guardar el banco.', 'error');
+      return;
+    }
 
     this.cargandoBanco.set(true);
-    const carga$ = rol
-      ? this._bancoService.cargarPorRol(rol.id, file)
-      : this._bancoService.cargarPorContexto(contexto!, file);
+    const carga$ = this._bancoService.cargarPorRol(rol.id, file);
     carga$.subscribe({
       next: resultado => {
         this.cargandoBanco.set(false);
@@ -5092,15 +4963,13 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
           return;
         }
 
-        this.pdfPrevisualizadoYConforme.set(!!rol);
+        this.bancoRegistrado.set(true);
+        this.pdfPrevisualizadoYConforme.set(true);
         this.dialogPrevisualizacionPdf.set(false);
         const sede = this.sedeSeleccionada();
         const carrera = this.carreraSeleccionada();
         if (rol && sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
-        if (!rol) this._cargarBancoPersistido();
-        this._mostrarToast(rol
-          ? `Banco ${resultado.bancoPreguntasId} validado y registrado en PostgreSQL.`
-          : `Banco ${resultado.bancoPreguntasId} validado y guardado como pendiente de rol.`);
+        this._mostrarToast(`Banco ${resultado.bancoPreguntasId} validado y registrado en PostgreSQL.`);
       },
       error: err => {
         this.cargandoBanco.set(false);
@@ -5133,6 +5002,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     this._bancoService.eliminarPorRol(rol.id, 'ELIMINAR').subscribe({
       next: () => {
         this.bancoPersistido.set(null);
+        this.bancoRegistrado.set(false);
         this.archivoExcelSeleccionado.set(null);
         this.nombreArchivoCargado.set(null);
         this.preguntasCargadas.set([]);
