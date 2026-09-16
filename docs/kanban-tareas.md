@@ -167,16 +167,16 @@ _Sin tareas._
 - Criterio de cierre: Permitir que los roles Responsable de Evaluaciones y Administrador del Sistema anulen preguntas desde el flujo de calificación, conservando la trazabilidad y recalculando correctamente los resultados.
 - Notas: Integrado en la pantalla dedicada de Calificación OMR. La persistencia, autorización, auditoría y recálculo del backend existente se reutilizan. Ver [documentación del módulo](modulo-anulacion-preguntas-omr.md).
 
-#### T-006 — Mostrar si el docente ya cargó el banco del grupo aunque no exista fecha de rol
+#### T-006 — Regla histórica de banco sin fecha de rol (revertida)
 
 - Prioridad: Alta
 - Área: Banco de Preguntas / Plan de Estudios
 - Responsable: Por definir
 - Creada: 2026-09-12
 - Fecha límite: Por definir
-- Dependencias: Validación funcional con un banco pendiente de rol y un grupo sin fecha programada.
-- Criterio de cierre: Permitir consultar el estado de carga del banco de preguntas por grupo y docente, aunque el director todavía no haya registrado una fecha en el rol de examen.
-- Notas: Implementado; falta validar visualmente con datos reales. La ausencia de fecha se muestra como advertencia y no oculta el banco cargado.
+- Dependencias: Regla histórica reemplazada; la validación actual exige un rol oficial con fecha programada.
+- Criterio de cierre: Mantener la carga bloqueada hasta que exista un rol oficial con fecha programada y consultar el banco únicamente por `rolExamenId`.
+- Notas: Esta regla fue revertida por generar falsos positivos entre docentes del mismo grupo. La carga requiere ahora un rol oficial y el banco se consulta únicamente por `rolExamenId`; los registros históricos sin rol no se eliminan automáticamente.
 
 ### Bloqueada
 

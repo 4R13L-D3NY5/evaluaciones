@@ -25,10 +25,10 @@ El parcial seleccionado informa:
 - estado del rol de examen;
 - disponibilidad del banco de preguntas.
 
-Si el docente cargó un banco antes de que el director registre la fecha del rol,
-el banco también se consulta por el contexto oficial de materia, grupo y parcial.
-En ese caso se muestra **Banco cargado — Sin fecha de rol** como advertencia de
-programación pendiente, sin ocultar el avance del docente.
+La disponibilidad del banco se consulta únicamente para roles de examen oficiales
+registrados. Si todavía no existe un rol con fecha programada, la vista muestra
+**Sin examen** y no presenta un banco cargado para ese grupo, aunque existan
+registros históricos pendientes de rol.
 
 ## Regla del indicador OK
 
@@ -49,7 +49,6 @@ Cuando todavía no existe el examen se muestra **Sin examen**. Si existe el exam
 - `GET /api/catalogo-academico/grupos?term={gestion}&branchOfficeId={uuid}&careerId={uuid}`
 - `GET /api/roles-examen?sedeCodigo={codigo}&carreraCodigo={codigo}`
 - `GET /api/bancos-preguntas/{rolExamenId}`
-- `GET /api/bancos-preguntas/contexto` (bancos cargados antes de crear el rol)
 
 El filtro **Plan Curricular** utiliza únicamente el campo `planCurricular` que
 entrega el catálogo SEA. Si la respuesta oficial no contiene ese dato, el

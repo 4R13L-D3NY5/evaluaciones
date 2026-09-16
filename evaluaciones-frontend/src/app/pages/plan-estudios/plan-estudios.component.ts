@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EvaluacionesStorageService, PlanEstudioItem, PlanEstudioSemestre, PlanExamenResumen } from '../../core/services/evaluaciones-storage.service';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
-import { BancoPreguntasContexto, BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
+import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { AuthService } from '../../core/services/auth.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
@@ -698,32 +698,21 @@ export class PlanEstudiosComponent implements OnInit {
         const consultasBanco = rolesConBanco.map(rol => this.bancoService.obtenerPorRol(rol.id).pipe(
           catchError(() => of(null))
         ));
-        const consultasPendientes = sede && carrera
-          ? this.crearConsultasBancosPendientes(cursos, grupos, sede, carrera, codigoSede, codigoCarrera)
-          : [];
         const consultaRoles$ = consultasBanco.length > 0
           ? forkJoin(consultasBanco)
           : of([] as Array<BancoPreguntasResponse | null>);
-        const consultaPendientes$ = consultasPendientes.length > 0
-          ? forkJoin(consultasPendientes.map(item => item.consulta))
-          : of([] as Array<BancoPreguntasResponse | null>);
 
-        forkJoin({ bancosRoles: consultaRoles$, bancosPendientes: consultaPendientes$ }).subscribe({
-          next: ({ bancosRoles, bancosPendientes }) => {
+        consultaRoles$.subscribe({
+          next: bancosRoles => {
             const bancosPorRol = new Map<string, BancoPreguntasResponse>();
             bancosRoles.forEach((banco, indice) => {
               if (banco) bancosPorRol.set(rolesConBanco[indice].id, banco);
             });
-            const bancosPorContexto = new Map<string, BancoPreguntasResponse>();
-            bancosPendientes.forEach((banco, indice) => {
-              const consulta = consultasPendientes[indice];
-              if (banco && consulta) bancosPorContexto.set(this.claveBancoContexto(consulta.contexto), banco);
-            });
-            this.planSemestres.set(this.construirPlan(cursos, grupos, rolesDeLaGestion, bancosPorRol, bancosPorContexto));
+            this.planSemestres.set(this.construirPlan(cursos, grupos, rolesDeLaGestion, bancosPorRol));
             this.cargandoPlan.set(false);
           },
           error: () => {
-            this.planSemestres.set(this.construirPlan(cursos, grupos, rolesDeLaGestion, new Map(), new Map()));
+            this.planSemestres.set(this.construirPlan(cursos, grupos, rolesDeLaGestion, new Map()));
             this.cargandoPlan.set(false);
             this.errorCarga.set('Se cargó el plan, pero no fue posible consultar el detalle de los bancos de preguntas.');
           }
@@ -737,73 +726,11 @@ export class PlanEstudiosComponent implements OnInit {
     });
   }
 
-  private crearConsultasBancosPendientes(
-    cursos: Course[],
-    grupos: GroupItem[],
-    sede: BranchOffice,
-    carrera: Career,
-    codigoSede: string,
-    codigoCarrera: string
-  ): Array<{ contexto: BancoPreguntasContexto; consulta: Observable<BancoPreguntasResponse | null> }> {
-    const consultas: Array<{ contexto: BancoPreguntasContexto; consulta: Observable<BancoPreguntasResponse | null> }> = [];
-    const clavesConsultadas = new Set<string>();
-
-    for (const curso of cursos) {
-      const gruposDelCurso = grupos.filter(grupo =>
-        this.normalizarTexto(grupo.syllabusCourseId) === this.normalizarTexto(curso.syllabusCourseId)
-        && !!grupo.code
-      );
-      for (const grupo of gruposDelCurso) {
-        for (const parcial of this.parcialesConfig) {
-          const contexto: BancoPreguntasContexto = {
-            materiaCodigo: curso.courseCode,
-            materiaNombre: curso.courseName,
-            grupo: grupo.code,
-            tipoParcial: this.tipoParcialBackend(parcial.clave),
-            sedeCodigo: codigoSede,
-            carreraCodigo: codigoCarrera,
-            branchOfficeId: sede.branchOfficeId,
-            careerId: carrera.careerId,
-            syllabusCourseId: curso.syllabusCourseId,
-            seaGroupId: grupo.groupId
-          };
-          const clave = this.claveBancoContexto(contexto);
-          if (clavesConsultadas.has(clave)) continue;
-          clavesConsultadas.add(clave);
-          consultas.push({
-            contexto,
-            consulta: this.bancoService.obtenerPorContexto(contexto).pipe(catchError(() => of(null)))
-          });
-        }
-      }
-    }
-
-    return consultas;
-  }
-
-  private claveBancoContexto(
-    contexto: Pick<BancoPreguntasContexto, 'materiaCodigo' | 'grupo' | 'tipoParcial'>
-  ): string {
-    return [contexto.materiaCodigo, contexto.grupo, contexto.tipoParcial]
-      .map(valor => this.normalizarTexto(valor))
-      .join('::');
-  }
-
-  private tipoParcialBackend(clave: PlanParcialClave): string {
-    switch (clave) {
-      case '1P': return '1er Parcial';
-      case '2P': return '2do Parcial';
-      case 'FINAL': return 'Final';
-      case '2DA_INSTANCIA': return '2da Instancia';
-    }
-  }
-
   private construirPlan(
     cursos: Course[],
     grupos: GroupItem[],
     roles: RolExamenResponse[],
-    bancosPorRol: Map<string, BancoPreguntasResponse>,
-    bancosPorContexto: Map<string, BancoPreguntasResponse> = new Map()
+    bancosPorRol: Map<string, BancoPreguntasResponse>
   ): PlanEstudioSemestre[] {
     const rolesPorCurso = new Map<string, RolExamenResponse[]>();
     for (const rol of roles) {
@@ -837,7 +764,7 @@ export class PlanEstudiosComponent implements OnInit {
       if (gruposUnicos.length > 0) {
         for (const grupo of gruposUnicos) {
           const rolesDelGrupo = rolesCurso.filter(rol => this.rolPerteneceAlGrupo(rol, grupo));
-          items.push(this.crearItemPlan(curso, [grupo], rolesDelGrupo, id++, bancosPorRol, bancosPorContexto));
+          items.push(this.crearItemPlan(curso, [grupo], rolesDelGrupo, id++, bancosPorRol));
         }
         continue;
       }
@@ -850,12 +777,12 @@ export class PlanEstudiosComponent implements OnInit {
       if (codigosGrupo.length > 0) {
         for (const codigoGrupo of codigosGrupo) {
           const rolesDelGrupo = rolesCurso.filter(rol => this.normalizarTexto(rol.grupo) === this.normalizarTexto(codigoGrupo));
-          items.push(this.crearItemPlan(curso, [], rolesDelGrupo, id++, bancosPorRol, bancosPorContexto));
+          items.push(this.crearItemPlan(curso, [], rolesDelGrupo, id++, bancosPorRol));
         }
       } else {
         // Las asignaturas vacantes siguen visibles para que puedan ser
         // identificadas y asignadas posteriormente.
-        items.push(this.crearItemPlan(curso, [], rolesCurso, id++, bancosPorRol, bancosPorContexto));
+        items.push(this.crearItemPlan(curso, [], rolesCurso, id++, bancosPorRol));
       }
     }
 
@@ -887,8 +814,7 @@ export class PlanEstudiosComponent implements OnInit {
     grupos: GroupItem[],
     roles: RolExamenResponse[],
     id: number,
-    bancosPorRol: Map<string, BancoPreguntasResponse> = new Map(),
-    bancosPorContexto: Map<string, BancoPreguntasResponse> = new Map()
+    bancosPorRol: Map<string, BancoPreguntasResponse> = new Map()
   ): PlanEstudioItem {
     const rolPrincipal = roles[0];
     const grupoPrincipal = grupos[0];
@@ -910,15 +836,7 @@ export class PlanEstudiosComponent implements OnInit {
     for (const parcial of this.parcialesConfig) {
       const rolesDelParcial = roles.filter(item => this.normalizarParcial(item.tipoParcial) === parcial.clave);
       const rol = rolesDelParcial[0];
-      const grupoCodigo = gruposUnicos[0]?.code || rolesDelParcial[0]?.grupo || '';
-      const bancoPendiente = grupoCodigo
-        ? bancosPorContexto.get(this.claveBancoContexto({
-            materiaCodigo: curso.courseCode,
-            grupo: grupoCodigo,
-            tipoParcial: this.tipoParcialBackend(parcial.clave)
-          }))
-        : undefined;
-      const banco = (rol ? bancosPorRol.get(rol.id) : undefined) || bancoPendiente;
+      const banco = rol ? bancosPorRol.get(rol.id) : undefined;
       const facil = banco?.facilesCount || 0;
       const medio = banco?.mediasCount || 0;
       const dificil = banco?.dificilesCount || 0;

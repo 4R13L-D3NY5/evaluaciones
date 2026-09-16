@@ -6,12 +6,12 @@ Documento vivo del módulo **Gestión y Validación de Evaluaciones**. Estas reg
 
 1. El usuario selecciona sede, carrera, asignatura, grupo y parcial.
 2. Si existe un rol oficial que coincida con materia, grupo y parcial, se usa su estado para controlar la sustitución.
-3. Si todavía no existe una fecha/rol, la carga se permite como **banco pendiente de rol** y se muestra una advertencia; no se bloquea el cargador.
+3. Si todavía no existe un rol oficial con fecha programada, la carga se bloquea y se solicita registrar primero el rol de examen.
 4. El archivo se analiza primero en el navegador para mostrar observaciones por fila.
 5. El backend repite las validaciones antes de guardar cualquier dato.
 6. Solo un banco sin errores puede registrarse; la operación se realiza dentro de una transacción.
 7. Al registrar correctamente con rol, el banco queda en `VALIDADO` y el rol se actualiza a `VALIDADO`.
-8. Al registrar sin rol, el banco queda cifrado y asociado a materia, grupo y parcial con `rol_examen_id` nulo. Cuando se crea posteriormente el rol correspondiente, el sistema lo vincula y actualiza el rol a `VALIDADO`.
+8. No se registran bancos sin rol. Todo banco persistido debe quedar asociado al `rol_examen_id` oficial que autorizó la carga.
 
 ## 2. Archivo y hoja
 
@@ -77,13 +77,13 @@ No se permite que dos opciones de una misma fila tengan el mismo texto normaliza
 
 ## 7. Persistencia y seguridad
 
-Al aprobarse se guarda el banco, sus reactivos, el JSON de contenido, el nombre del archivo, el hash SHA-256, el usuario aprobador y la fecha. El `rol_examen_id` puede quedar temporalmente nulo cuando aún no existe fecha programada; en ese caso el registro se identifica por materia, grupo y parcial y se vincula al crear el rol. Si una validación falla, no se guardan banco ni reactivos.
+Al aprobarse se guarda el banco, sus reactivos, el JSON de contenido, el nombre del archivo, el hash SHA-256, el usuario aprobador y la fecha. El `rol_examen_id` es obligatorio y corresponde al rol oficial seleccionado; si no existe rol compatible, no se guarda ningún banco ni reactivo. Si una validación falla, tampoco se guardan datos.
 
 En **Lista de Evaluaciones** y en **Gestión y Validación de Evaluaciones** se muestra el indicador `Banco de preguntas cargado` cuando existe un banco persistido para el rol; si no existe, se muestra `Sin banco`. El indicador se consulta por `rolExamenId` en backend, por lo que no depende de datos ficticios ni de `localStorage`. La eliminación exige escribir `ELIMINAR`, solo está disponible en estados `PROGRAMADO` o `VALIDADO`, elimina también los reactivos asociados y devuelve el rol a `PROGRAMADO`. Esta eliminación se realiza únicamente desde **Banco de Preguntas**; la lista de evaluaciones no la ofrece. La operación queda registrada en la bitácora.
 
 Para los exámenes virtuales, la lista ofrece la acción de sala virtual/restablecimiento. Desde allí se puede abrir la sala y restablecerla cuando corresponda, sin mezclar esta operación con la eliminación del banco.
 
-La carga anticipada usa `POST /api/bancos-preguntas/upload` con el contexto de sede, carrera, asignatura, grupo y parcial. El endpoint valida el grupo oficial y el alcance del usuario, pero no exige que exista una fecha. La consulta de estos registros se realiza mediante `GET /api/bancos-preguntas/contexto`; ambos endpoints trabajan únicamente con bancos cuyo `rol_examen_id` todavía es nulo. Al crear el rol, el backend vincula el banco pendiente correspondiente.
+La carga usa únicamente `POST /api/bancos-preguntas/{rolExamenId}/upload`. El backend verifica que el rol exista, corresponda al alcance académico del usuario y se encuentre en un estado que permita cargar o reemplazar el banco. No existe una carga ni una consulta por materia, grupo y parcial sin rol.
 
 ## 8. Checklist de pruebas
 
@@ -102,8 +102,8 @@ La carga anticipada usa `POST /api/bancos-preguntas/upload` con el contexto de s
 - Enunciados duplicados, fórmulas con error, `$` sin cerrar, comandos Typst no compatibles y comandos admitidos como `\equiv` dentro de expresiones matemáticas.
 - Totales 59, 60 y 61; cuotas 14/31/15 (inválido por faltar fáciles) y 15/30/15 (válido). Un total de 61 o más es válido si también cumple todos los mínimos.
 - Rol en cada estado del flujo y segundo registro del mismo archivo.
-- Carga válida con grupo sin rol/fecha: debe mostrar advertencia, guardar el banco pendiente y permitir seleccionar el archivo.
-- Creación posterior del rol: debe vincular el banco pendiente, actualizar el rol a `VALIDADO` y mostrar el banco en Plan de Estudios.
+- Grupo sin rol/fecha: debe bloquear el cargador, no enviar el archivo y solicitar el registro del rol oficial.
+- Intento directo de carga sin `rolExamenId`: debe ser rechazado por la API y no persistir banco ni reactivos.
 - Indicador correcto con banco existente/ausente en ambas pantallas y eliminación rechazada sin confirmación `ELIMINAR`.
 - Eliminación bloqueada desde `GENERADO` en adelante y eliminación correcta de banco/reactivos en `VALIDADO`.
 

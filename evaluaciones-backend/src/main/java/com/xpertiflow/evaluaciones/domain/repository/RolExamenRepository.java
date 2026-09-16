@@ -21,12 +21,6 @@ public interface RolExamenRepository extends JpaRepository<RolExamen, String> {
 
     List<RolExamen> findByMateriaCodigoAndGrupo(String materiaCodigo, String grupo);
 
-    Optional<RolExamen> findFirstByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujo(
-            String materiaCodigo, String grupo, com.xpertiflow.evaluaciones.domain.enums.TipoParcial tipoParcial, EstadoFlujo estadoFlujo);
-
-    Optional<RolExamen> findFirstByMateriaCodigoAndGrupoAndTipoParcialOrderByCreadoEnDesc(
-            String materiaCodigo, String grupo, com.xpertiflow.evaluaciones.domain.enums.TipoParcial tipoParcial);
-
     /**
      * Busca la última programación vigente del grupo y parcial.
      * SUSPENDIDO representa una baja lógica y no debe bloquear una nueva importación.

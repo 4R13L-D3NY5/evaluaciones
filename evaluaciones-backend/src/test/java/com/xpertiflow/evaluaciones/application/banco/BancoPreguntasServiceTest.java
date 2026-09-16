@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -151,30 +152,13 @@ class BancoPreguntasServiceTest {
     }
 
     @Test
-    void cargaValidaBancoSinRolYLoDejaPendienteDeVinculacion() throws Exception {
-        MockMultipartFile archivo = crearExcel(60);
-        when(rolRepository.findFirstByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujo(
-                "PRD-314", "TA-01", TipoParcial.PRIMER_PARCIAL, EstadoFlujo.PROGRAMADO))
-                .thenReturn(Optional.empty());
-        when(rolRepository.findFirstByMateriaCodigoAndGrupoAndTipoParcialOrderByCreadoEnDesc(
-                "PRD-314", "TA-01", TipoParcial.PRIMER_PARCIAL))
-                .thenReturn(Optional.empty());
+    void cargaRechazaUnRolDeExamenInexistente() {
+        when(rolRepository.findById("ROL-INEXISTENTE")).thenReturn(Optional.empty());
 
-        CargaBancoResponseDto respuesta = service.cargarDesdeExcelPorParametros(
-                "PRD-314", "Prótesis Dental", "TA-01", "1er Parcial", archivo,
-                "Docente SEA", null);
-
-        assertThat(respuesta.isExito()).isTrue();
-        assertThat(respuesta.getRolExamenId()).isNull();
-        assertThat(respuesta.getNuevoEstado()).isEqualTo("PENDIENTE_DE_ROL");
-        assertThat(respuesta.getMensaje()).contains("pendiente de asociar");
-        verify(rolExamenService, never()).validarPorBanco(anyString(), anyString(), anyString());
-
-        ArgumentCaptor<BancoPreguntas> banco = ArgumentCaptor.forClass(BancoPreguntas.class);
-        verify(bancoRepository).save(banco.capture());
-        assertThat(banco.getValue().getRolExamenId()).isNull();
-        assertThat(banco.getValue().getMateriaCodigo()).isEqualTo("PRD-314");
-        assertThat(banco.getValue().getGrupo()).isEqualTo("TA-01");
+        assertThatThrownBy(() -> service.cargarDesdeExcel(
+                "ROL-INEXISTENTE", crearExcel(60), "Docente Oficial"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Rol de examen no encontrado");
     }
 
     @Test

@@ -76,14 +76,6 @@ public class BancoPreguntasService {
         return toResponseDto(banco);
     }
 
-    public BancoPreguntasResponseDto obtenerPorContexto(String materiaCodigo, String grupo, String tipoParcial) {
-        BancoPreguntas banco = bancoRepository
-                .findTopByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
-                        materiaCodigo, grupo, tipoParcial)
-                .orElseThrow(() -> new RuntimeException("No existe banco pendiente de rol para la materia, grupo y parcial seleccionados"));
-        return toResponseDto(banco);
-    }
-
     private BancoPreguntasResponseDto toResponseDto(BancoPreguntas banco) {
         List<Reactivo> reactivosPersistidos = reactivoRepository
                 .findByBancoIdOrderByNumeroOrdenAsc(banco.getId());
@@ -146,69 +138,18 @@ public class BancoPreguntasService {
     }
 
     @Transactional
-    public CargaBancoResponseDto cargarDesdeExcelPorParametros(
-            String materiaCodigo, String grupo, String tipoParcialValor, MultipartFile file, String docenteAprobador) {
-        return cargarDesdeExcelPorParametros(materiaCodigo, null, grupo, tipoParcialValor, file, docenteAprobador, null);
-    }
-
-    @Transactional
-    public CargaBancoResponseDto cargarDesdeExcelPorParametros(
-            String materiaCodigo, String grupo, String tipoParcialValor, MultipartFile file,
-            String docenteAprobador, String usuarioAuditoria) {
-        return cargarDesdeExcelPorParametros(
-                materiaCodigo, null, grupo, tipoParcialValor, file, docenteAprobador, usuarioAuditoria);
-    }
-
-    @Transactional
-    public CargaBancoResponseDto cargarDesdeExcelPorParametros(
-            String materiaCodigo, String materiaNombre, String grupo, String tipoParcialValor, MultipartFile file,
-            String docenteAprobador, String usuarioAuditoria) {
-        TipoParcial tipoParcial = TipoParcial.fromValor(tipoParcialValor);
-
-        // Si existe un rol, se conserva el flujo tradicional. Si todavía no
-        // existe una fecha/rol, el banco queda pendiente de vinculación y se
-        // puede asociar automáticamente cuando se cree la programación.
-        Optional<RolExamen> rolOpt = rolRepository.findFirstByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujo(
-                        materiaCodigo, grupo, tipoParcial, EstadoFlujo.PROGRAMADO);
-
-        if (rolOpt.isEmpty()) {
-            rolOpt = rolRepository.findFirstByMateriaCodigoAndGrupoAndTipoParcialOrderByCreadoEnDesc(
-                    materiaCodigo, grupo, tipoParcial);
-        }
-
-        if (rolOpt.isPresent()) {
-            return cargarDesdeExcelConRol(rolOpt.get(), file, docenteAprobador, usuarioAuditoria);
-        }
-
-        RolExamen contexto = RolExamen.builder()
-                .materiaCodigo(materiaCodigo)
-                .materiaNombre(materiaNombre == null || materiaNombre.isBlank() ? materiaCodigo : materiaNombre)
-                .grupo(grupo)
-                .tipoParcial(tipoParcial)
-                .estadoFlujo(EstadoFlujo.PROGRAMADO)
-                .build();
-        return cargarDesdeExcelSinRol(contexto, file, docenteAprobador, usuarioAuditoria);
-    }
-
-    @Transactional
     public CargaBancoResponseDto cargarDesdeExcelConRol(RolExamen rol, MultipartFile file, String docenteAprobador) {
         return cargarDesdeExcelConRol(rol, file, docenteAprobador, null);
     }
 
     @Transactional
     public CargaBancoResponseDto cargarDesdeExcelConRol(RolExamen rol, MultipartFile file,
-                                                        String docenteAprobador, String usuarioAuditoria) {
-        return cargarDesdeExcelInterno(rol, file, docenteAprobador, usuarioAuditoria, true);
-    }
-
-    private CargaBancoResponseDto cargarDesdeExcelSinRol(RolExamen contexto, MultipartFile file,
                                                          String docenteAprobador, String usuarioAuditoria) {
-        return cargarDesdeExcelInterno(contexto, file, docenteAprobador, usuarioAuditoria, false);
+        return cargarDesdeExcelInterno(rol, file, docenteAprobador, usuarioAuditoria);
     }
 
     private CargaBancoResponseDto cargarDesdeExcelInterno(RolExamen rol, MultipartFile file,
-                                                         String docenteAprobador, String usuarioAuditoria,
-                                                         boolean vincularRol) {
+                                                          String docenteAprobador, String usuarioAuditoria) {
 
         List<String> errores = new ArrayList<>();
         List<Reactivo> reactivos = new ArrayList<>();
@@ -216,7 +157,7 @@ public class BancoPreguntasService {
         // La carga o sustitución solo es válida antes de que se generen los
         // cuadernillos. Esta comprobación debe ejecutarse antes de procesar o
         // persistir contenido para impedir cargas parciales en estados finales.
-        if (vincularRol && rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO
+        if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO
                 && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
             return respuestaFallida(rol, List.of(
                     "El banco solo se puede cargar o reemplazar antes de GENERADO; estado actual: "
@@ -300,28 +241,19 @@ public class BancoPreguntasService {
             String paqueteJson = objectMapper.writeValueAsString(reactivos);
             String hash = calcularSha256(paqueteJson);
 
-            boolean hashDuplicado = vincularRol
-                    ? bancoRepository.existsByRolExamenIdAndHashSha256Integridad(rol.getId(), hash)
-                    : bancoRepository.existsByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullAndHashSha256Integridad(
-                            rol.getMateriaCodigo(), rol.getGrupo(), rol.getTipoParcial().getValor(), hash);
-            if (hashDuplicado) {
+            if (bancoRepository.existsByRolExamenIdAndHashSha256Integridad(rol.getId(), hash)) {
                 return respuestaFallida(rol, List.of("El mismo banco ya fue registrado para este rol de examen (hash SHA-256 duplicado)."));
             }
 
-            String docenteOficial = vincularRol
-                    ? rolExamenService.resolverNombreDocenteOficial(rol)
-                    : docenteAprobador;
+            String docenteOficial = rolExamenService.resolverNombreDocenteOficial(rol);
             if (docenteOficial == null || docenteOficial.isBlank()) {
                 throw new RuntimeException("No se encontró un docente oficial en los servicios institucionales para este rol de examen");
             }
 
             // Una carga posterior a VALIDADO reemplaza el banco vigente para
             // que no queden dos bancos activos asociados al mismo rol.
-            List<BancoPreguntas> bancosAnteriores = vincularRol
-                    ? bancoRepository.findByRolExamenIdOrderByFechaAprobacionDesc(rol.getId())
-                    : bancoRepository.findByMateriaCodigoAndGrupoAndTipoParcialAndRolExamenIdIsNullOrderByFechaAprobacionDesc(
-                            rol.getMateriaCodigo(), rol.getGrupo(), rol.getTipoParcial().getValor());
-            if (vincularRol && !bancosAnteriores.isEmpty()) {
+            List<BancoPreguntas> bancosAnteriores = bancoRepository.findByRolExamenIdOrderByFechaAprobacionDesc(rol.getId());
+            if (!bancosAnteriores.isEmpty()) {
                 verificacionRepository.findByRolExamenId(rol.getId()).ifPresent(verificacion ->
                         bancosAnteriores.stream()
                                 .filter(banco -> banco.getId().equals(verificacion.getBancoPreguntasId()))
@@ -339,7 +271,7 @@ public class BancoPreguntasService {
             BancoEncryptedPayload paqueteCifrado = cifradoService.cifrarJson(reactivos, contexto);
             BancoPreguntas banco = new BancoPreguntas();
             banco.setId(bancoId);
-            banco.setRolExamenId(vincularRol ? rol.getId() : null);
+            banco.setRolExamenId(rol.getId());
             banco.setMateriaCodigo(rol.getMateriaCodigo());
             banco.setMateriaNombre(rol.getMateriaNombre());
             banco.setGrupo(rol.getGrupo());
@@ -394,18 +326,14 @@ public class BancoPreguntasService {
                 reactivoRepository.save(r);
             }
 
-            if (vincularRol) {
-                rolExamenService.validarPorBanco(rol.getId(), hash, usuarioAuditoria);
-            }
+            rolExamenService.validarPorBanco(rol.getId(), hash, usuarioAuditoria);
 
             return CargaBancoResponseDto.builder()
                     .exito(true)
-                    .mensaje(vincularRol
-                            ? "Banco de preguntas validado y almacenado correctamente"
-                            : "Banco de preguntas validado y almacenado. Queda pendiente de asociar a la programación del examen.")
+                    .mensaje("Banco de preguntas validado y almacenado correctamente")
                     .bancoPreguntasId(bancoId)
-                    .rolExamenId(vincularRol ? rol.getId() : null)
-                    .nuevoEstado(vincularRol ? EstadoFlujo.VALIDADO.getValor() : "PENDIENTE_DE_ROL")
+                    .rolExamenId(rol.getId())
+                    .nuevoEstado(EstadoFlujo.VALIDADO.getValor())
                     .totalReactivos(totalPreguntas)
                     .facilesCount(faciles)
                     .mediasCount(medias)

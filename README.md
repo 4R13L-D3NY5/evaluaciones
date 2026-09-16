@@ -959,7 +959,6 @@ Las rutas operativas requieren sesión y permiso apropiado, salvo las rutas púb
 | GET | /api/roles-examen/{id}/auditoria | Bitácora |
 | GET | /api/bancos-preguntas/{rolExamenId} | Consultar banco |
 | POST | /api/bancos-preguntas/{rolExamenId}/upload | Cargar banco |
-| POST | /api/bancos-preguntas/upload | Carga autorizada |
 | DELETE | /api/bancos-preguntas/{rolExamenId} | Eliminar según estado y permiso |
 
 ### Generación Typst

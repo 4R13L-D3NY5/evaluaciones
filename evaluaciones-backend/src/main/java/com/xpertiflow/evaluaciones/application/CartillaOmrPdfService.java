@@ -6,15 +6,18 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -36,6 +39,8 @@ public class CartillaOmrPdfService {
     // origen en la esquina superior izquierda.
     private static final float PAGE_WIDTH = 595f;
     private static final float PAGE_HEIGHT = 841f;
+    private static final String FUENTE_REGULAR = "/fonts/NotoSans-Regular.ttf";
+    private static final String FUENTE_NEGRITA = "/fonts/NotoSans-Bold.ttf";
     // Campo oficial "Carrera:" de la cartilla preimpresa. Se ubica en la
     // franja superior, junto a la etiqueta, no en la casilla de identificación.
     private static final float CARRERA_X = 200f;
@@ -61,6 +66,8 @@ public class CartillaOmrPdfService {
     private static final Color COLOR_FONDO_CABECERA = new Color(247, 248, 253);
     private static final Color COLOR_FILA_ALTERNADA = new Color(250, 251, 254);
 
+    private record FuentesPdf(PDType0Font regular, PDType0Font bold) {}
+
     public void generar(Path archivo, RolExamen rol, List<CartillaOmr> cartillas) throws IOException {
         Files.createDirectories(archivo.getParent());
         Files.write(archivo, generarBytes(rol, cartillas));
@@ -69,12 +76,13 @@ public class CartillaOmrPdfService {
     public byte[] generarBytes(RolExamen rol, List<CartillaOmr> cartillas) throws IOException {
         try (ByteArrayOutputStream salida = new ByteArrayOutputStream();
              PDDocument documento = new PDDocument()) {
+            FuentesPdf fuentes = cargarFuentes(documento);
             for (CartillaOmr cartilla : cartillas) {
                 PDPage pagina = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
                 documento.addPage(pagina);
 
                 try (PDPageContentStream contenido = new PDPageContentStream(documento, pagina)) {
-                    dibujarDatos(contenido, rol, cartilla);
+                    dibujarDatos(contenido, rol, cartilla, fuentes);
                 }
             }
             documento.save(salida);
@@ -85,13 +93,29 @@ public class CartillaOmrPdfService {
     public byte[] generarListaBytes(RolExamen rol, List<CartillaOmr> cartillas) throws IOException {
         try (ByteArrayOutputStream salida = new ByteArrayOutputStream();
              PDDocument documento = new PDDocument()) {
-            dibujarPaginasLista(documento, rol, cartillas);
+            FuentesPdf fuentes = cargarFuentes(documento);
+            dibujarPaginasLista(documento, rol, cartillas, fuentes);
             documento.save(salida);
             return salida.toByteArray();
         }
     }
 
-    private void dibujarPaginasLista(PDDocument documento, RolExamen rol, List<CartillaOmr> cartillas)
+    private FuentesPdf cargarFuentes(PDDocument documento) throws IOException {
+        return new FuentesPdf(cargarFuente(documento, FUENTE_REGULAR), cargarFuente(documento, FUENTE_NEGRITA));
+    }
+
+    private PDType0Font cargarFuente(PDDocument documento, String recurso) throws IOException {
+        InputStream fuente = CartillaOmrPdfService.class.getResourceAsStream(recurso);
+        if (fuente == null) {
+            throw new IOException("No se encontró la fuente PDF requerida: " + recurso);
+        }
+        try (fuente) {
+            return PDType0Font.load(documento, fuente);
+        }
+    }
+
+    private void dibujarPaginasLista(PDDocument documento, RolExamen rol, List<CartillaOmr> cartillas,
+                                     FuentesPdf fuentes)
             throws IOException {
         List<CartillaOmr> ordenadas = new ArrayList<>(cartillas);
         ordenadas.sort(Comparator.comparing(CartillaOmr::getNumeroOrden,
@@ -101,9 +125,9 @@ public class CartillaOmrPdfService {
             PDPage pagina = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
             documento.addPage(pagina);
             try (PDPageContentStream contenido = new PDPageContentStream(documento, pagina)) {
-                dibujarCabeceraLista(documento, contenido, rol, 0);
+                dibujarCabeceraLista(documento, contenido, rol, 0, fuentes);
                 textoDesdeArriba(contenido, "No hay estudiantes oficiales para este grupo.",
-                        MARGEN_NOMINA, 150f, PDType1Font.HELVETICA, 10f);
+                        MARGEN_NOMINA, 150f, fuentes.regular(), 10f);
             }
             return;
         }
@@ -113,29 +137,29 @@ public class CartillaOmrPdfService {
             PDPage pagina = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
             documento.addPage(pagina);
             try (PDPageContentStream contenido = new PDPageContentStream(documento, pagina)) {
-                dibujarCabeceraLista(documento, contenido, rol, ordenadas.size());
-                dibujarTablaLista(contenido, ordenadas.subList(inicio, fin));
+                dibujarCabeceraLista(documento, contenido, rol, ordenadas.size(), fuentes);
+                dibujarTablaLista(contenido, ordenadas.subList(inicio, fin), fuentes);
                 textoDesdeArriba(contenido,
                         "Lista oficial · Página " + (inicio / ESTUDIANTES_POR_PAGINA_NOMINA + 1)
                                 + " de " + (int) Math.ceil(ordenadas.size() / (double) ESTUDIANTES_POR_PAGINA_NOMINA),
-                        MARGEN_NOMINA, 812f, PDType1Font.HELVETICA, 7f);
+                        MARGEN_NOMINA, 812f, fuentes.regular(), 7f);
             }
         }
     }
 
     private void dibujarCabeceraLista(PDDocument documento, PDPageContentStream contenido, RolExamen rol,
-                                      int totalEstudiantes)
+                                      int totalEstudiantes, FuentesPdf fuentes)
             throws IOException {
         dibujarLogo(documento, contenido);
         textoDesdeArriba(contenido, "LISTA DE ESTUDIANTES", 185f, 27f,
-                PDType1Font.HELVETICA_BOLD, 15f);
+                fuentes.bold(), 15f);
         textoDesdeArriba(contenido, "NÓMINA OFICIAL · CONTROL DE ENTREGA",
-                185f, 40f, PDType1Font.HELVETICA, 7.5f);
+                185f, 40f, fuentes.regular(), 7.5f);
         contenido.setNonStrokingColor(COLOR_SECUNDARIO);
         contenido.addRect(MARGEN_NOMINA, PAGE_HEIGHT - 49f, PAGE_WIDTH - (MARGEN_NOMINA * 2f), 2.5f);
         contenido.fill();
         textoDesdeArriba(contenido, "CONTROL DE ENTREGA",
-                PAGE_WIDTH - 166f, 30f, PDType1Font.HELVETICA_BOLD, 8f);
+                PAGE_WIDTH - 166f, 30f, fuentes.bold(), 8f);
 
         float cajaX = MARGEN_NOMINA;
         float cajaY = 57f;
@@ -160,18 +184,18 @@ public class CartillaOmrPdfService {
                 ? normalizar(rol.getFechaDisplay()) : String.valueOf(rol.getFecha());
 
         textoDesdeArriba(contenido, "SEDE: " + sede, cajaX + 14f, 72f,
-                PDType1Font.HELVETICA_BOLD, 8.2f);
+                fuentes.bold(), 8.2f);
         textoDesdeArriba(contenido, "CARRERA: " + carrera, cajaX + 205f, 72f,
-                PDType1Font.HELVETICA_BOLD, 8.2f);
+                fuentes.bold(), 8.2f);
         textoDesdeArriba(contenido, "MATERIA: " + materia, cajaX + 14f, 91f,
-                PDType1Font.HELVETICA_BOLD, 8.2f);
+                fuentes.bold(), 8.2f);
         textoDesdeArriba(contenido,
                 "GRUPO: " + normalizar(rol.getGrupo()) + "   EVALUACIÓN: " + evaluacion + "   FECHA: " + fecha,
-                cajaX + 14f, 110f, PDType1Font.HELVETICA_BOLD, 8.2f);
+                cajaX + 14f, 110f, fuentes.bold(), 8.2f);
         textoDesdeArriba(contenido, "TOTAL: " + totalEstudiantes + " estudiantes",
-                cajaX + 14f, 128f, PDType1Font.HELVETICA, 8f);
+                cajaX + 14f, 128f, fuentes.regular(), 8f);
         textoDesdeArriba(contenido, "Generado: " + FECHA_HORA_NOMINA.format(LocalDateTime.now()),
-                PAGE_WIDTH - 180f, 128f, PDType1Font.HELVETICA, 7f);
+                PAGE_WIDTH - 180f, 128f, fuentes.regular(), 7f);
     }
 
     private void dibujarLogo(PDDocument documento, PDPageContentStream contenido) throws IOException {
@@ -201,7 +225,8 @@ public class CartillaOmrPdfService {
         return rutas;
     }
 
-    private void dibujarTablaLista(PDPageContentStream contenido, List<CartillaOmr> cartillas)
+    private void dibujarTablaLista(PDPageContentStream contenido, List<CartillaOmr> cartillas,
+                                   FuentesPdf fuentes)
             throws IOException {
         float tablaTop = 143f;
         float anchoTotal = PAGE_WIDTH - (MARGEN_NOMINA * 2f);
@@ -242,56 +267,56 @@ public class CartillaOmrPdfService {
         contenido.stroke();
 
         textoDesdeArribaBlanco(contenido, "N°", x + 10f, tablaTop + 16f,
-                PDType1Font.HELVETICA_BOLD, 7.5f);
+                fuentes.bold(), 7.5f);
         textoDesdeArribaBlanco(contenido, "CÓDIGO", codigoX + 8f, tablaTop + 16f,
-                PDType1Font.HELVETICA_BOLD, 7.5f);
+                fuentes.bold(), 7.5f);
         textoDesdeArribaBlanco(contenido, "ESTUDIANTE", estudianteX + 8f, tablaTop + 16f,
-                PDType1Font.HELVETICA_BOLD, 7.5f);
+                fuentes.bold(), 7.5f);
         textoDesdeArribaBlanco(contenido, "FIRMA DEL ESTUDIANTE", firmaX + 8f, tablaTop + 16f,
-                PDType1Font.HELVETICA_BOLD, 7.5f);
+                fuentes.bold(), 7.5f);
         textoDesdeArribaBlanco(contenido, "OBSERVACIONES", observacionesX + 6f, tablaTop + 16f,
-                PDType1Font.HELVETICA_BOLD, 7.5f);
+                fuentes.bold(), 7.5f);
 
         for (int indice = 0; indice < cartillas.size(); indice++) {
             CartillaOmr cartilla = cartillas.get(indice);
             float y = tablaTop + ALTO_FILA_NOMINA * (indice + 1) + 15f;
             textoDesdeArriba(contenido, String.valueOf(cartilla.getNumeroOrden()), x + 10f, y,
-                    PDType1Font.HELVETICA, 7.5f);
+                    fuentes.regular(), 7.5f);
             textoDesdeArriba(contenido, limitar(normalizar(cartilla.getCodigoEstudiante()), 12), codigoX + 8f, y,
-                    PDType1Font.HELVETICA_BOLD, 7.5f);
-            textoDesdeArriba(contenido, limitar(normalizar(cartilla.getNombreCompleto()), 32), estudianteX + 8f, y,
-                    PDType1Font.HELVETICA, 7.5f);
+                    fuentes.bold(), 7.5f);
+            textoAjustado(contenido, cartilla.getNombreCompleto(), estudianteX + 8f, y,
+                    fuentes.regular(), 7.5f, firmaX - estudianteX - 16f);
             textoDesdeArriba(contenido, "________________", firmaX + 8f, y,
-                    PDType1Font.HELVETICA, 6.5f);
+                    fuentes.regular(), 6.5f);
         }
     }
 
-    private void dibujarDatos(PDPageContentStream contenido, RolExamen rol, CartillaOmr cartilla) throws IOException {
+    private void dibujarDatos(PDPageContentStream contenido, RolExamen rol, CartillaOmr cartilla,
+                              FuentesPdf fuentes) throws IOException {
         // Casilla superior izquierda: N°, materia y grupo en líneas separadas.
         // La etiqueta "CARRERA:" ya pertenece a la cartilla preimpresa; aquí
         // solo se agrega el nombre oficial del rol en el espacio superior.
         textoDesdeArriba(contenido, limitar(rol.getCarreraNombre(), 42),
-                CARRERA_X, CARRERA_Y, PDType1Font.HELVETICA_BOLD, CARRERA_TAMANO);
+                CARRERA_X, CARRERA_Y, fuentes.bold(), CARRERA_TAMANO);
         textoDesdeArriba(contenido, "N° " + cartilla.getNumeroOrden(),
-                DATOS_X + 5f, DATOS_Y + 8f, PDType1Font.HELVETICA_BOLD, 7.2f);
+                DATOS_X + 5f, DATOS_Y + 8f, fuentes.bold(), 7.2f);
         textoDesdeArriba(contenido, cartilla.getCodigoMateria(),
-                DATOS_X + 5f, DATOS_Y + 15f, PDType1Font.HELVETICA_BOLD, 7.2f);
+                DATOS_X + 5f, DATOS_Y + 15f, fuentes.bold(), 7.2f);
         textoDesdeArriba(contenido, "GRUPO " + cartilla.getGrupo(),
-                DATOS_X + 5f, DATOS_Y + 22f, PDType1Font.HELVETICA_BOLD, 7.2f);
+                DATOS_X + 5f, DATOS_Y + 22f, fuentes.bold(), 7.2f);
 
         // Casilla superior derecha: únicamente el código del estudiante.
         textoDesdeArriba(contenido, cartilla.getCodigoEstudiante(),
-                CODIGO_X + 19f, DATOS_Y + 18f, PDType1Font.HELVETICA_BOLD, 22f);
+                CODIGO_X + 19f, DATOS_Y + 18f, fuentes.bold(), 22f);
 
         // Casilla inferior: únicamente el nombre completo del estudiante.
-        // Se usa peso normal para reducir el ancho y evitar que nombres largos
-        // se salgan de la casilla al imprimir.
-        textoDesdeArriba(contenido, limitar(cartilla.getNombreCompleto(), 34),
-                NOMBRE_X + 5f, NOMBRE_Y + 17f, PDType1Font.HELVETICA, NOMBRE_TAMANO);
+        // Se conserva el nombre completo y se reduce solo el tamaño si hace falta.
+        textoAjustado(contenido, cartilla.getNombreCompleto(), NOMBRE_X + 5f, NOMBRE_Y + 17f,
+                fuentes.regular(), NOMBRE_TAMANO, PAGE_WIDTH - NOMBRE_X - 20f);
     }
 
     private void textoDesdeArriba(PDPageContentStream contenido, String valor, float x, float yDesdeArriba,
-                                  PDType1Font fuente, float tamanio) throws IOException {
+                                  PDFont fuente, float tamanio) throws IOException {
         contenido.beginText();
         contenido.setNonStrokingColor(Color.BLACK);
         contenido.setFont(fuente, tamanio);
@@ -301,7 +326,7 @@ public class CartillaOmrPdfService {
     }
 
     private void textoDesdeArribaBlanco(PDPageContentStream contenido, String valor, float x, float yDesdeArriba,
-                                        PDType1Font fuente, float tamanio) throws IOException {
+                                        PDFont fuente, float tamanio) throws IOException {
         contenido.beginText();
         contenido.setNonStrokingColor(Color.WHITE);
         contenido.setFont(fuente, tamanio);
@@ -310,17 +335,22 @@ public class CartillaOmrPdfService {
         contenido.endText();
     }
 
+    private void textoAjustado(PDPageContentStream contenido, String valor, float x, float yDesdeArriba,
+                               PDFont fuente, float tamanioBase, float anchoMaximo) throws IOException {
+        String texto = normalizar(valor);
+        float anchoTexto = fuente.getStringWidth(texto) / 1000f * tamanioBase;
+        float tamanio = anchoTexto <= anchoMaximo ? tamanioBase : tamanioBase * anchoMaximo / anchoTexto;
+        textoDesdeArriba(contenido, texto, x, yDesdeArriba, fuente, Math.max(5.2f, tamanio));
+    }
+
     private String limitar(String valor, int longitud) {
         String limpio = valor == null ? "" : valor.trim();
         return limpio.length() <= longitud ? limpio : limpio.substring(0, longitud - 1) + ".";
     }
 
     private String normalizar(String valor) {
-        return valor == null ? "" : valor
-                .replace("á", "a").replace("é", "e").replace("í", "i")
-                .replace("ó", "o").replace("ú", "u")
-                .replace("Á", "A").replace("É", "E").replace("Í", "I")
-                .replace("Ó", "O").replace("Ú", "U")
-                .replace("ñ", "n").replace("Ñ", "N");
+        if (valor == null) return "";
+        String espaciosNormalizados = valor.replaceAll("\\s+", " ").trim();
+        return Normalizer.normalize(espaciosNormalizados, Normalizer.Form.NFC);
     }
 }
