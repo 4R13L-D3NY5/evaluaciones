@@ -3564,13 +3564,22 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.imprimiendoPatronCalificado.set(false);
         this._mostrarToast('Patrón oficial generado. Puedes imprimirlo desde la ventana del PDF.');
       },
-      error: err => {
+      error: async err => {
         ventana?.close();
         this.imprimiendoPatronCalificado.set(false);
-        this._mostrarToast(
-          err?.error?.message || err?.error?.error || err?.message || 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido devuelto.',
-          'error'
-        );
+        let mensaje = 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido devuelto.';
+        if (err?.error instanceof Blob) {
+          try {
+            const raw = await err.error.text();
+            const parsed = JSON.parse(raw);
+            mensaje = parsed.message || parsed.error || mensaje;
+          } catch {
+            mensaje = err.message || mensaje;
+          }
+        } else {
+          mensaje = err?.error?.message || err?.error?.error || err?.message || mensaje;
+        }
+        this._mostrarToast(mensaje, 'error');
       }
     });
   }
@@ -3645,9 +3654,21 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.descargandoDocumentoSinCartilla.set(false);
         this.archivoSinCartillaDescargado.set(true);
       },
-      error: err => {
+      error: async err => {
         this.descargandoDocumentoSinCartilla.set(false);
-        this._mostrarToast(err?.error?.error || err?.error?.message || 'No se pudo descargar el archivo del examen.', 'error');
+        let mensaje = 'No se pudo descargar el archivo del examen.';
+        if (err?.error instanceof Blob) {
+          try {
+            const raw = await err.error.text();
+            const parsed = JSON.parse(raw);
+            mensaje = parsed.error || parsed.message || mensaje;
+          } catch {
+            mensaje = err.message || mensaje;
+          }
+        } else {
+          mensaje = err?.error?.error || err?.error?.message || err?.message || mensaje;
+        }
+        this._mostrarToast(mensaje, 'error');
       }
     });
   }

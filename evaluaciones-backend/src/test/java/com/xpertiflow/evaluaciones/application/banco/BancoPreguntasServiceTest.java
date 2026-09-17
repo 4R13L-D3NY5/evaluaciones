@@ -290,6 +290,50 @@ class BancoPreguntasServiceTest {
     }
 
     @Test
+    void aceptaVerdaderoOFalsoConOpcionesEnBlancoYRespuestaVOF() throws Exception {
+        MockMultipartFile archivo = crearExcel(60, new String[]{"Verdadero o Falso Simple"});
+        try (XSSFWorkbook workbook = new XSSFWorkbook(archivo.getInputStream());
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Row row = workbook.getSheet("Banco").getRow(1);
+            row.getCell(3).setCellValue(""); // Opción A en blanco
+            row.getCell(4).setCellValue(""); // Opción B en blanco
+            row.getCell(8).setCellValue("V"); // Respuesta correcta "V"
+            workbook.write(output);
+            archivo = new MockMultipartFile(
+                    "file", "vf-blanco-v.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    output.toByteArray());
+        }
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        java.util.concurrent.atomic.AtomicReference<String> respuestaCorrecta = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<String> opcionesJson = new java.util.concurrent.atomic.AtomicReference<>();
+        when(cifradoService.cifrarJson(any(), anyString())).thenAnswer(invocation -> {
+            List<Reactivo> lista = invocation.getArgument(0);
+            Reactivo primero = lista.get(0);
+            respuestaCorrecta.set(primero.getRespuestaCorrecta());
+            opcionesJson.set(primero.getOpcionesJson());
+            return BancoEncryptedPayload.builder()
+                    .ciphertext("ciphertext")
+                    .nonce("nonce")
+                    .wrappedDataKey("vault:v1:wrapped")
+                    .keyReference("sea-banco-kek")
+                    .keyVersion("1")
+                    .algorithm(BancoCifradoService.ALGORITHM)
+                    .build();
+        });
+
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(
+                rol.getId(), archivo, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isTrue();
+        assertThat(respuesta.getErroresValidacion()).isEmpty();
+        assertThat(respuestaCorrecta.get()).isEqualTo("A");
+        assertThat(opcionesJson.get()).contains("Verdadero");
+        assertThat(opcionesJson.get()).contains("Falso");
+    }
+
+    @Test
     void rechazaFormulaTypstConDelimitadoresAnidadosAntesDePersistir() throws Exception {
         MockMultipartFile archivo = crearExcel(60);
         try (XSSFWorkbook workbook = new XSSFWorkbook(archivo.getInputStream());

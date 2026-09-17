@@ -454,7 +454,18 @@ public class BancoPreguntasService {
         for (String letra : letras) {
             String texto = valor(row, columnas, "opcion_" + letra.toLowerCase(Locale.ROOT), evaluador);
             textosOpciones.put(letra, texto);
-            validarTexto("opción " + letra, texto, rowNum, 2000, errores);
+        }
+        if ("VERDADERO_O_FALSO_SIMPLE".equals(tipoNormalizado)) {
+            if (textosOpciones.get("A").isBlank()) textosOpciones.put("A", "Verdadero");
+            if (textosOpciones.get("B").isBlank()) textosOpciones.put("B", "Falso");
+        } else if ("RESPUESTA_PREMISAS_ABCD".equals(tipoNormalizado)) {
+            if (textosOpciones.get("A").isBlank()) textosOpciones.put("A", "A. Si la primera es verdadera");
+            if (textosOpciones.get("B").isBlank()) textosOpciones.put("B", "B. Si la segunda es verdadera");
+            if (textosOpciones.get("C").isBlank()) textosOpciones.put("C", "C. Si ambas son verdaderas");
+            if (textosOpciones.get("D").isBlank()) textosOpciones.put("D", "D. Si ninguna es verdadera");
+        }
+        for (String letra : letras) {
+            validarTexto("opción " + letra, textosOpciones.get(letra), rowNum, 2000, errores);
         }
         validarOpciones(tipoNormalizado, textosOpciones, rowNum, errores);
 
@@ -470,7 +481,7 @@ public class BancoPreguntasService {
         boolean respuestaDescriptivaVfCompleja = "VERDADERO_O_FALSO_COMPLEJAS".equals(tipoNormalizado)
                 && respuestaOriginal.trim().matches("(?i)[A-E]\\s*[:.)-]\\s*.+");
         if (!sinRespuestaDirecta && !respuestaOriginal.isBlank()
-                && !respuestaOriginal.trim().matches("(?i)[A-E]|VERDADERO|FALSO")
+                && !respuestaOriginal.trim().matches("(?i)[A-E]|VERDADERO|FALSO|V|F")
                 && !respuestaDescriptivaVfCompleja) {
             errores.add("Fila " + (rowNum + 1) + ": respuesta correcta inválida; debe ser un único inciso A-E");
         }
@@ -886,8 +897,8 @@ public class BancoPreguntasService {
     private String normalizarRespuestaCorrecta(String respuesta, String tipo) {
         String valor = respuesta == null ? "" : respuesta.trim().toUpperCase(Locale.ROOT);
         if ("VERDADERO_O_FALSO_SIMPLE".equals(tipo)) {
-            if ("VERDADERO".equals(valor)) return "A";
-            if ("FALSO".equals(valor)) return "B";
+            if ("VERDADERO".equals(valor) || "V".equals(valor)) return "A";
+            if ("FALSO".equals(valor) || "F".equals(valor)) return "B";
         }
         if ("VERDADERO_O_FALSO_COMPLEJAS".equals(tipo)
                 && valor.matches("[A-E]\\s*[:.)-]\\s*.+")) {

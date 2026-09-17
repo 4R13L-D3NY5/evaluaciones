@@ -199,6 +199,17 @@ public class CartillaOmrPdfService {
     }
 
     private void dibujarLogo(PDDocument documento, PDPageContentStream contenido) throws IOException {
+        try (var is = getClass().getResourceAsStream("/assets/logo_unitepc_clean.png")) {
+            if (is != null) {
+                byte[] bytes = is.readAllBytes();
+                PDImageXObject logo = PDImageXObject.createFromByteArray(documento, bytes, "logo");
+                float ancho = 142f;
+                float alto = ancho * logo.getHeight() / logo.getWidth();
+                contenido.drawImage(logo, MARGEN_NOMINA, PAGE_HEIGHT - 12f - alto, ancho, alto);
+                return;
+            }
+        } catch (Exception ignored) {
+        }
         for (Path ruta : rutasLogo()) {
             if (!Files.isRegularFile(ruta)) continue;
             try {
@@ -218,6 +229,8 @@ public class CartillaOmrPdfService {
         String configurada = System.getenv("PDF_LOGO_PATH");
         if (configurada != null && !configurada.isBlank()) rutas.add(Path.of(configurada));
         rutas.add(Path.of("/app/assets/logo_unitepc_clean.png"));
+        rutas.add(Path.of("assets/logo_unitepc_clean.png"));
+        rutas.add(Path.of("logo_unitepc_clean.png"));
         rutas.add(Path.of("bases/logo_unitepc_clean.png"));
         rutas.add(Path.of("../bases/logo_unitepc_clean.png"));
         rutas.add(Path.of("evaluaciones-frontend/src/assets/logo_unitepc_clean.png"));
@@ -321,7 +334,7 @@ public class CartillaOmrPdfService {
         contenido.setNonStrokingColor(Color.BLACK);
         contenido.setFont(fuente, tamanio);
         contenido.newLineAtOffset(x, PAGE_HEIGHT - yDesdeArriba);
-        contenido.showText(normalizar(valor));
+        contenido.showText(limpiarParaFuente(valor, fuente));
         contenido.endText();
     }
 
@@ -331,13 +344,13 @@ public class CartillaOmrPdfService {
         contenido.setNonStrokingColor(Color.WHITE);
         contenido.setFont(fuente, tamanio);
         contenido.newLineAtOffset(x, PAGE_HEIGHT - yDesdeArriba);
-        contenido.showText(normalizar(valor));
+        contenido.showText(limpiarParaFuente(valor, fuente));
         contenido.endText();
     }
 
     private void textoAjustado(PDPageContentStream contenido, String valor, float x, float yDesdeArriba,
                                PDFont fuente, float tamanioBase, float anchoMaximo) throws IOException {
-        String texto = normalizar(valor);
+        String texto = limpiarParaFuente(valor, fuente);
         float anchoTexto = fuente.getStringWidth(texto) / 1000f * tamanioBase;
         float tamanio = anchoTexto <= anchoMaximo ? tamanioBase : tamanioBase * anchoMaximo / anchoTexto;
         textoDesdeArriba(contenido, texto, x, yDesdeArriba, fuente, Math.max(5.2f, tamanio));
@@ -346,6 +359,28 @@ public class CartillaOmrPdfService {
     private String limitar(String valor, int longitud) {
         String limpio = valor == null ? "" : valor.trim();
         return limpio.length() <= longitud ? limpio : limpio.substring(0, longitud - 1) + ".";
+    }
+
+    private String limpiarParaFuente(String valor, PDFont fuente) {
+        String normalizado = normalizar(valor);
+        if (normalizado.isEmpty() || fuente == null) {
+            return normalizado;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < normalizado.length(); i++) {
+            int codePoint = normalizado.codePointAt(i);
+            String caracter = new String(Character.toChars(codePoint));
+            try {
+                fuente.encode(caracter);
+                sb.append(caracter);
+            } catch (Exception ignored) {
+                sb.append("?");
+            }
+            if (Character.isSupplementaryCodePoint(codePoint)) {
+                i++;
+            }
+        }
+        return sb.toString();
     }
 
     private String normalizar(String valor) {

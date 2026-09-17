@@ -450,7 +450,7 @@ public class OmrProcesamientoService {
                     .etapaDestino(rol.getEstadoFlujo().getValor())
                     .accion("IMPRESION_PATRON_CALIFICADO")
                     .usuario(usuarioValido(usuario))
-                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                    .ipOrigen(recortarIp(ipOrigen))
                     .detallesJson("{\"variantes\":\"oficiales\"}")
                     .build());
             return pdf;
@@ -837,6 +837,12 @@ public class OmrProcesamientoService {
 
     private String usuarioValido(String usuario) {
         return usuario == null || usuario.isBlank() ? "SISTEMA" : usuario.trim();
+    }
+
+    private String recortarIp(String ip) {
+        if (ip == null || ip.isBlank()) return "127.0.0.1";
+        String limpia = ip.trim();
+        return limpia.length() <= 45 ? limpia : limpia.substring(0, 45);
     }
 
     private CalificacionOmrResponseDto mapearCalificacion(CalificacionOmr calificacion) {

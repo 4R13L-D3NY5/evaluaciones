@@ -14,10 +14,11 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +44,11 @@ public class PatronOmrPdfService {
     private static final String FUENTE_NEGRITA = "/fonts/NotoSans-Bold.ttf";
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    private record FuentesPdf(PDType0Font regular, PDType0Font negrita) {}
+    private record FuentesPdf(PDType0Font regular, PDType0Font negrita) {
+        public PDType0Font bold() {
+            return negrita;
+        }
+    }
 
     public byte[] generar(RolExamen rol, PatronCalificadoResponseDto patron) throws IOException {
         try (ByteArrayOutputStream salida = new ByteArrayOutputStream();
@@ -86,12 +91,6 @@ public class PatronOmrPdfService {
         }
     }
 
-    private PDPageContentStream abrirPagina(PDDocument documento) throws IOException {
-        PDPage pagina = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
-        documento.addPage(pagina);
-        return new PDPageContentStream(documento, pagina);
-    }
-
     private FuentesPdf cargarFuentes(PDDocument documento) throws IOException {
         return new FuentesPdf(cargarFuente(documento, FUENTE_REGULAR), cargarFuente(documento, FUENTE_NEGRITA));
     }
@@ -104,6 +103,12 @@ public class PatronOmrPdfService {
         try (fuente) {
             return PDType0Font.load(documento, fuente);
         }
+    }
+
+    private PDPageContentStream abrirPagina(PDDocument documento) throws IOException {
+        PDPage pagina = new PDPage(new PDRectangle(PAGE_WIDTH, PAGE_HEIGHT));
+        documento.addPage(pagina);
+        return new PDPageContentStream(documento, pagina);
     }
 
     private float dibujarCabecera(PDDocument documento, PDPageContentStream contenido,
@@ -207,6 +212,17 @@ public class PatronOmrPdfService {
     }
 
     private void dibujarLogo(PDDocument documento, PDPageContentStream contenido) throws IOException {
+        try (var is = getClass().getResourceAsStream("/assets/logo_unitepc_clean.png")) {
+            if (is != null) {
+                byte[] bytes = is.readAllBytes();
+                PDImageXObject logo = PDImageXObject.createFromByteArray(documento, bytes, "logo");
+                float ancho = 126f;
+                float alto = ancho * logo.getHeight() / logo.getWidth();
+                contenido.drawImage(logo, PAGE_WIDTH - MARGIN - ancho, PAGE_HEIGHT - 13f - alto, ancho, alto);
+                return;
+            }
+        } catch (Exception ignored) {
+        }
         for (Path ruta : rutasLogo()) {
             if (!Files.isRegularFile(ruta)) continue;
             try {
@@ -215,7 +231,7 @@ public class PatronOmrPdfService {
                 float alto = ancho * logo.getHeight() / logo.getWidth();
                 contenido.drawImage(logo, PAGE_WIDTH - MARGIN - ancho, PAGE_HEIGHT - 13f - alto, ancho, alto);
                 return;
-            } catch (IOException ignored) {
+            } catch (Exception ignored) {
                 // El logo es decorativo; no debe impedir la impresión de la planilla.
             }
         }
@@ -226,6 +242,8 @@ public class PatronOmrPdfService {
         String configurada = System.getenv("PDF_LOGO_PATH");
         if (configurada != null && !configurada.isBlank()) rutas.add(Path.of(configurada));
         rutas.add(Path.of("/app/assets/logo_unitepc_clean.png"));
+        rutas.add(Path.of("assets/logo_unitepc_clean.png"));
+        rutas.add(Path.of("logo_unitepc_clean.png"));
         rutas.add(Path.of("bases/logo_unitepc_clean.png"));
         rutas.add(Path.of("../bases/logo_unitepc_clean.png"));
         rutas.add(Path.of("evaluaciones-frontend/src/assets/logo_unitepc_clean.png"));
@@ -283,8 +301,28 @@ public class PatronOmrPdfService {
         contenido.setNonStrokingColor(color);
         contenido.setFont(fuente, tamano);
         contenido.newLineAtOffset(x, PAGE_HEIGHT - y);
-        contenido.showText(seguro(valor));
+        contenido.showText(limpiarParaFuente(valor, fuente));
         contenido.endText();
+    }
+
+    private String limpiarParaFuente(String valor, PDFont fuente) {
+        if (valor == null || valor.isBlank()) return "-";
+        String normalizado = Normalizer.normalize(valor.replaceAll("[\\r\\n]+", " ").trim(), Normalizer.Form.NFC);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < normalizado.length(); i++) {
+            int codePoint = normalizado.codePointAt(i);
+            String caracter = new String(Character.toChars(codePoint));
+            try {
+                fuente.encode(caracter);
+                sb.append(caracter);
+            } catch (Exception ignored) {
+                sb.append("?");
+            }
+            if (Character.isSupplementaryCodePoint(codePoint)) {
+                i++;
+            }
+        }
+        return sb.toString();
     }
 
     private String seguro(String valor) {
