@@ -6,12 +6,14 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.nio.file.Files;
@@ -37,11 +39,16 @@ public class PatronOmrPdfService {
     private static final float ALTO_BLOQUE_VARIANTE = 109f;
     private static final float ALTO_LISTA_LINEA = 13f;
     private static final float ALTO_FIRMA = 72f;
+    private static final String FUENTE_REGULAR = "/fonts/NotoSans-Regular.ttf";
+    private static final String FUENTE_NEGRITA = "/fonts/NotoSans-Bold.ttf";
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    private record FuentesPdf(PDType0Font regular, PDType0Font negrita) {}
 
     public byte[] generar(RolExamen rol, PatronCalificadoResponseDto patron) throws IOException {
         try (ByteArrayOutputStream salida = new ByteArrayOutputStream();
              PDDocument documento = new PDDocument()) {
+            FuentesPdf fuentes = cargarFuentes(documento);
             List<PatronCalificadoResponseDto.VariantePatronDto> variantes = patron.getVariantes() == null
                     ? List.of() : patron.getVariantes();
             PDPageContentStream contenido = null;
@@ -56,21 +63,21 @@ public class PatronOmrPdfService {
                         if (contenido != null) contenido.close();
                         contenido = abrirPagina(documento);
                         cursor = documento.getNumberOfPages() == 1
-                                ? dibujarCabecera(documento, contenido, rol, true)
-                                : dibujarCabecera(documento, contenido, rol, false);
+                                ? dibujarCabecera(documento, contenido, rol, true, fuentes)
+                                : dibujarCabecera(documento, contenido, rol, false, fuentes);
                     }
-                    dibujarVariante(contenido, variante, estudiantes, cursor);
+                    dibujarVariante(contenido, variante, estudiantes, cursor, fuentes);
                     cursor += altoBloque;
                 }
 
                 if (contenido == null || cursor + ALTO_FIRMA + 30f > PAGE_HEIGHT - MARGIN) {
                     if (contenido != null) contenido.close();
                     contenido = abrirPagina(documento);
-                    cursor = dibujarCabecera(documento, contenido, rol, false);
+                    cursor = dibujarCabecera(documento, contenido, rol, false, fuentes);
                 }
-                dibujarFirmas(contenido, rol, cursor + 10f);
+                dibujarFirmas(contenido, rol, cursor + 10f, fuentes);
                 texto(contenido, "Planilla oficial para firma y sello del docente",
-                        MARGIN, PAGE_HEIGHT - 15f, PDType1Font.HELVETICA, 7, java.awt.Color.GRAY);
+                        MARGIN, PAGE_HEIGHT - 15f, fuentes.regular(), 7, java.awt.Color.GRAY);
             } finally {
                 if (contenido != null) contenido.close();
             }
@@ -85,14 +92,28 @@ public class PatronOmrPdfService {
         return new PDPageContentStream(documento, pagina);
     }
 
+    private FuentesPdf cargarFuentes(PDDocument documento) throws IOException {
+        return new FuentesPdf(cargarFuente(documento, FUENTE_REGULAR), cargarFuente(documento, FUENTE_NEGRITA));
+    }
+
+    private PDType0Font cargarFuente(PDDocument documento, String recurso) throws IOException {
+        InputStream fuente = PatronOmrPdfService.class.getResourceAsStream(recurso);
+        if (fuente == null) {
+            throw new IOException("No se encontró la fuente PDF requerida: " + recurso);
+        }
+        try (fuente) {
+            return PDType0Font.load(documento, fuente);
+        }
+    }
+
     private float dibujarCabecera(PDDocument documento, PDPageContentStream contenido,
-                                  RolExamen rol, boolean completa) throws IOException {
+                                  RolExamen rol, boolean completa, FuentesPdf fuentes) throws IOException {
         texto(contenido, "UNIVERSIDAD TÉCNICA PRIVADA COSMOS", MARGIN, 30,
-                PDType1Font.HELVETICA_BOLD, 13, new java.awt.Color(55, 43, 125));
+                fuentes.negrita(), 13, new java.awt.Color(55, 43, 125));
         texto(contenido, completa
                         ? "PATRÓN OFICIAL DE RESPUESTAS · PARA FIRMA Y SELLO"
                         : "PATRÓN OFICIAL DE RESPUESTAS · CONTINUACIÓN",
-                MARGIN, 48, PDType1Font.HELVETICA_BOLD, 9, java.awt.Color.DARK_GRAY);
+                MARGIN, 48, fuentes.negrita(), 9, java.awt.Color.DARK_GRAY);
         dibujarLogo(documento, contenido);
 
         contenido.setStrokingColor(new java.awt.Color(55, 43, 125));
@@ -104,27 +125,27 @@ public class PatronOmrPdfService {
         if (!completa) return 78f;
 
         texto(contenido, "Materia: " + seguro(rol.getMateriaCodigo()) + " - " + seguro(rol.getMateriaNombre()),
-                MARGIN, 76, PDType1Font.HELVETICA_BOLD, 8, java.awt.Color.BLACK);
+                MARGIN, 76, fuentes.negrita(), 8, java.awt.Color.BLACK);
         texto(contenido, "Carrera: " + seguro(rol.getCarreraNombre()),
-                MARGIN, 90, PDType1Font.HELVETICA, 8, java.awt.Color.BLACK);
+                MARGIN, 90, fuentes.regular(), 8, java.awt.Color.BLACK);
         texto(contenido, "Grupo: " + seguro(rol.getGrupo()) + "   Parcial: "
                         + (rol.getTipoParcial() == null ? "-" : seguro(rol.getTipoParcial().getValor()))
                         + "   Fecha: " + (rol.getFechaDisplay() == null ? seguro(String.valueOf(rol.getFecha())) : seguro(rol.getFechaDisplay())),
-                MARGIN, 104, PDType1Font.HELVETICA, 8, java.awt.Color.BLACK);
+                MARGIN, 104, fuentes.regular(), 8, java.awt.Color.BLACK);
         return 116f;
     }
 
     private void dibujarVariante(PDPageContentStream contenido,
                                  PatronCalificadoResponseDto.VariantePatronDto variante,
                                  List<PatronCalificadoResponseDto.EstudiantePatronDto> estudiantes,
-                                 float top) throws IOException {
+                                 float top, FuentesPdf fuentes) throws IOException {
         texto(contenido, "VARIANTE " + seguro(variante.getLetra()) + " · "
                         + (variante.getTotalPreguntas() == null ? 0 : variante.getTotalPreguntas())
                         + " preguntas · Generado: " + FECHA_HORA.format(LocalDateTime.now()),
-                MARGIN, top + 12, PDType1Font.HELVETICA_BOLD, 8, new java.awt.Color(55, 43, 125));
-        float altoTabla = dibujarTabla(contenido, variante, top + 22);
+                MARGIN, top + 12, fuentes.negrita(), 8, new java.awt.Color(55, 43, 125));
+        float altoTabla = dibujarTabla(contenido, variante, top + 22, fuentes);
         if (!estudiantes.isEmpty()) {
-            dibujarListaEstudiantes(contenido, estudiantes, top + 22 + altoTabla + 8);
+            dibujarListaEstudiantes(contenido, estudiantes, top + 22 + altoTabla + 8, fuentes);
         }
     }
 
@@ -137,7 +158,8 @@ public class PatronOmrPdfService {
     private void dibujarListaEstudiantes(
             PDPageContentStream contenido,
             List<PatronCalificadoResponseDto.EstudiantePatronDto> estudiantes,
-            float top) throws IOException {
+            float top,
+            FuentesPdf fuentes) throws IOException {
         int columnas = 2;
         int filas = (int) Math.ceil(estudiantes.size() / (double) columnas);
         float rowHeight = ALTO_LISTA_LINEA;
@@ -151,7 +173,7 @@ public class PatronOmrPdfService {
         contenido.fillAndStroke();
 
         texto(contenido, "ESTUDIANTES ASIGNADOS A LA VARIANTE (" + estudiantes.size() + ")",
-                MARGIN + 7, top + 13, PDType1Font.HELVETICA_BOLD, 7, new java.awt.Color(55, 43, 125));
+                MARGIN + 7, top + 13, fuentes.negrita(), 7, new java.awt.Color(55, 43, 125));
 
         for (int indice = 0; indice < estudiantes.size(); indice++) {
             PatronCalificadoResponseDto.EstudiantePatronDto estudiante = estudiantes.get(indice);
@@ -162,11 +184,12 @@ public class PatronOmrPdfService {
             String codigo = seguro(estudiante.getCodigoEstudiante());
             String nombre = seguro(estudiante.getNombreCompleto());
             texto(contenido, limitar(codigo + " · " + nombre, 54),
-                    x, y, PDType1Font.HELVETICA, 6.8f, java.awt.Color.DARK_GRAY);
+                    x, y, fuentes.regular(), 6.8f, java.awt.Color.DARK_GRAY);
         }
     }
 
-    private void dibujarFirmas(PDPageContentStream contenido, RolExamen rol, float top) throws IOException {
+    private void dibujarFirmas(PDPageContentStream contenido, RolExamen rol, float top,
+                               FuentesPdf fuentes) throws IOException {
         float ancho = CONTENT_WIDTH;
         float alto = 72f;
         float yBottom = PAGE_HEIGHT - top - alto;
@@ -176,11 +199,11 @@ public class PatronOmrPdfService {
         contenido.stroke();
 
         texto(contenido, "FIRMA DEL DOCENTE", MARGIN + 10, top + 17,
-                PDType1Font.HELVETICA_BOLD, 8, new java.awt.Color(55, 43, 125));
+                fuentes.negrita(), 8, new java.awt.Color(55, 43, 125));
         texto(contenido, seguro(rol.getDocenteNombre()), MARGIN + 10, top + 32,
-                PDType1Font.HELVETICA, 8, java.awt.Color.DARK_GRAY);
+                fuentes.regular(), 8, java.awt.Color.DARK_GRAY);
         texto(contenido, "Firma y sello: ________________________", MARGIN + 10, top + 58,
-                PDType1Font.HELVETICA, 8, java.awt.Color.BLACK);
+                fuentes.regular(), 8, java.awt.Color.BLACK);
     }
 
     private void dibujarLogo(PDDocument documento, PDPageContentStream contenido) throws IOException {
@@ -212,7 +235,8 @@ public class PatronOmrPdfService {
 
     private float dibujarTabla(PDPageContentStream contenido,
                                PatronCalificadoResponseDto.VariantePatronDto variante,
-                               float top) throws IOException {
+                               float top,
+                               FuentesPdf fuentes) throws IOException {
         int total = variante.getTotalPreguntas() == null ? 0 : variante.getTotalPreguntas();
         Map<String, String> respuestas = variante.getRespuestas() == null ? Map.of() : variante.getRespuestas();
         int columnas = 15;
@@ -246,15 +270,15 @@ public class PatronOmrPdfService {
             int fila = indice / columnas;
             float x = MARGIN + columna * cellWidth;
             float y = top + fila * rowHeight + 18;
-            texto(contenido, pregunta + ".", x + 3, y, PDType1Font.HELVETICA_BOLD, 7, java.awt.Color.DARK_GRAY);
+            texto(contenido, pregunta + ".", x + 3, y, fuentes.negrita(), 7, java.awt.Color.DARK_GRAY);
             texto(contenido, seguro(respuestas.getOrDefault(String.valueOf(pregunta), "—")),
-                    x + cellWidth - 9, y, PDType1Font.HELVETICA_BOLD, 9, new java.awt.Color(55, 43, 125));
+                    x + cellWidth - 9, y, fuentes.negrita(), 9, new java.awt.Color(55, 43, 125));
         }
         return filas * rowHeight;
     }
 
     private void texto(PDPageContentStream contenido, String valor, float x, float y,
-                       PDType1Font fuente, float tamano, java.awt.Color color) throws IOException {
+                       PDFont fuente, float tamano, java.awt.Color color) throws IOException {
         contenido.beginText();
         contenido.setNonStrokingColor(color);
         contenido.setFont(fuente, tamano);
