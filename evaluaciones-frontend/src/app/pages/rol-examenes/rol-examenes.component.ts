@@ -198,6 +198,8 @@ interface InstanciaImportacionItem {
             </label>
             <input 
               type="date" 
+              min="2020-01-01"
+              max="2099-12-31"
               [ngModel]="filtroFechaDesde()"
               (ngModelChange)="filtroFechaDesde.set($event)"
               class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
@@ -211,6 +213,8 @@ interface InstanciaImportacionItem {
             <div class="flex items-center gap-1.5">
               <input 
                 type="date" 
+                min="2020-01-01"
+                max="2099-12-31"
                 [ngModel]="filtroFechaHasta()"
                 (ngModelChange)="filtroFechaHasta.set($event)"
                 class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
@@ -835,6 +839,8 @@ interface InstanciaImportacionItem {
                   <label class="block font-bold text-muted-foreground mb-1">Fecha del Examen *</label>
                   <input 
                     type="date" 
+                    min="2020-01-01"
+                    max="2099-12-31"
                     [(ngModel)]="formFecha" 
                     class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
                 </div>
