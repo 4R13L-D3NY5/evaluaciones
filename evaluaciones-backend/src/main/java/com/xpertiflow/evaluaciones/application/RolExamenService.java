@@ -518,6 +518,27 @@ public class RolExamenService {
     }
 
     @Transactional
+    public void eliminarProgramados(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+
+        List<RolExamen> roles = ids.stream()
+                .distinct()
+                .map(id -> rolExamenRepository.findById(id)
+                        .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id)))
+                .toList();
+
+        roles.forEach(rol -> {
+            if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO) {
+                throw new RuntimeException("Solo se pueden vaciar roles de examen en estado PROGRAMADO");
+            }
+        });
+
+        roles.forEach(rolExamenRepository::delete);
+    }
+
+    @Transactional
     public RolExamen validarPorBanco(String id, String hash, String usuario) {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));

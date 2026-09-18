@@ -8,6 +8,7 @@ import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.servi
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { AnulacionPreguntaOmr, ConfiguracionOmr, OmrLecturaResponse, OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
@@ -92,7 +93,7 @@ interface PreguntaSeleccionadaAnulacionOmr {
               (valueChange)="cambiarRolExamen($event)"
               [disabled]="cargandoRoles()"
               placeholder="Seleccione un rol de examen oficial"
-              searchPlaceholder="Buscar por código o materia..."
+              searchPlaceholder="Buscar por sede, carrera, asignatura, grupo o examen..."
               noResultsText="No se encontraron roles de examen oficiales." />
           </div>
 
@@ -138,8 +139,16 @@ interface PreguntaSeleccionadaAnulacionOmr {
       </div>
 
       @if (mensajeOmr()) {
-        <div class="border border-blue-200 bg-blue-50 text-blue-900 rounded-xl px-4 py-3 text-xs font-bold">
-          <i class="pi pi-info-circle mr-1"></i>{{ mensajeOmr() }}
+        <div [class]="mensajeOmrEsError()
+          ? 'border border-rose-200 bg-rose-50 text-rose-900 rounded-xl px-4 py-3 text-xs font-bold flex items-start justify-between gap-2 shadow-xs'
+          : 'border border-blue-200 bg-blue-50 text-blue-900 rounded-xl px-4 py-3 text-xs font-bold flex items-start justify-between gap-2 shadow-xs'">
+          <div class="flex items-start gap-2">
+            <i [class]="mensajeOmrEsError() ? 'pi pi-exclamation-triangle mt-0.5 shrink-0' : 'pi pi-info-circle mt-0.5 shrink-0'"></i>
+            <span>{{ mensajeOmr() }}</span>
+          </div>
+          <button type="button" (click)="mensajeOmr.set('')" class="text-xs hover:opacity-75 cursor-pointer ml-2 shrink-0 p-1" title="Cerrar aviso">
+            <i class="pi pi-times"></i>
+          </button>
         </div>
       }
 
@@ -216,22 +225,40 @@ interface PreguntaSeleccionadaAnulacionOmr {
             </div>
 
             <!-- Botones de Acción de Carga y Ejecución -->
-            <div class="flex flex-wrap items-center gap-3 shrink-0">
-              <button 
-                (click)="fileInput.click()"
-                class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-3 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 cursor-pointer">
-                <i class="pi pi-folder-open text-purple-700"></i>
-                <span>Cambiar / Subir PDF</span>
-              </button>
+            <div class="flex flex-col items-end gap-2 shrink-0">
+              <div class="flex flex-wrap items-center gap-3">
+                <button 
+                  (click)="fileInput.click()"
+                  class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-3 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                  <i class="pi pi-folder-open text-purple-700"></i>
+                  <span>Cambiar / Subir PDF</span>
+                </button>
 
-              <button 
-                (click)="ejecutarProcesamientoOmrEnVivo()"
-                [disabled]="procesandoOmr() || cargandoPdf() || !archivoSeleccionado() || totalPaginas() === 0"
-                class="bg-gradient-to-r from-purple-700 via-indigo-600 to-blue-600 hover:from-purple-800 hover:to-blue-700 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/25 transition-transform hover:scale-105 cursor-pointer">
-                <i class="pi pi-bolt text-amber-300"></i>
-                <span>Ejecutar Calificación OMR ({{ totalPaginas() }} Páginas)</span>
-              </button>
+                <button 
+                  (click)="ejecutarProcesamientoOmrEnVivo()"
+                  [disabled]="procesandoOmr() || cargandoPdf() || !archivoSeleccionado() || totalPaginas() === 0"
+                  class="bg-gradient-to-r from-purple-700 via-indigo-600 to-blue-600 hover:from-purple-800 hover:to-blue-700 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-500/25 transition-transform hover:scale-105 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                  <i class="pi pi-bolt text-amber-300"></i>
+                  <span>Ejecutar Calificación OMR ({{ totalPaginas() }} Páginas)</span>
+                </button>
+              </div>
+              <div class="text-[11px] text-muted-foreground">
+                Rol oficial activo: <span class="font-bold text-purple-700 dark:text-purple-300">{{ rolSeleccionadoInfo() }}</span>
+              </div>
             </div>
+
+            <!-- Alerta contextual visible junto al botón de ejecución -->
+            @if (mensajeOmr() && mensajeOmrEsError()) {
+              <div class="w-full bg-rose-50 border border-rose-200 text-rose-900 rounded-xl px-4 py-2.5 text-xs font-bold flex items-center justify-between gap-2 animate-fade-in shadow-xs">
+                <div class="flex items-center gap-2">
+                  <i class="pi pi-exclamation-triangle text-rose-600 shrink-0"></i>
+                  <span>{{ mensajeOmr() }}</span>
+                </div>
+                <button type="button" (click)="mensajeOmr.set('')" class="text-xs text-rose-700 hover:text-rose-950 cursor-pointer p-1 shrink-0" title="Cerrar aviso">
+                  <i class="pi pi-times"></i>
+                </button>
+              </div>
+            }
           </div>
 
           <!-- Visor de Alineación e Inspección Geométrica -->
@@ -246,7 +273,7 @@ interface PreguntaSeleccionadaAnulacionOmr {
                 <div class="flex items-center gap-1">
                   @for (pIdx of listaBotonesPagina(); track pIdx) {
                     <button 
-                      (click)="paginaAlineacionIdx.set(pIdx)"
+                      (click)="seleccionarPaginaAlineacion(pIdx)"
                       [class]="paginaAlineacionIdx() === pIdx ? 'bg-purple-700 text-white font-bold' : 'bg-card border border-border text-foreground font-medium hover:bg-muted'"
                       class="px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer">
                       Pág {{ pIdx + 1 }}
@@ -260,24 +287,25 @@ interface PreguntaSeleccionadaAnulacionOmr {
                 <!-- Botón Auto-Ajustar Inteligente -->
                 <button 
                   (click)="autoCalibrarCartilla()"
-                  class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                  class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-transform hover:scale-105 cursor-pointer"
+                  title="Detectar formato y auto-ajustar grilla y código">
                   <i class="pi pi-sparkles text-amber-300"></i>
                   <span>Auto-Ajustar</span>
                 </button>
 
-                <!-- Presets Rápidos -->
+                <!-- Presets Rápidos Oficiales -->
                 <div class="flex items-center gap-1 bg-card border border-border rounded-lg p-0.5">
                   <button 
-                    (click)="aplicarPresetEscaneoFisico()"
-                    title="Ajustar a Escaneo Físico"
-                    class="px-2 py-1 text-[11px] font-bold rounded text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/60 cursor-pointer">
-                    Escaneo Físico
+                    (click)="aplicarPresetSinTalon()"
+                    title="Ajustar a cartilla sin talón (arrancada por el estudiante)"
+                    class="px-2.5 py-1 text-[11px] font-bold rounded text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/60 cursor-pointer">
+                    Sin Talón (Arrancado)
                   </button>
                   <button 
-                    (click)="aplicarPresetDigital()"
-                    title="Ajustar a PDF Digital"
-                    class="px-2 py-1 text-[11px] font-bold rounded text-muted-foreground hover:bg-muted cursor-pointer">
-                    Digital
+                    (click)="aplicarPresetConTalon()"
+                    title="Ajustar a cartilla completa (con talón de respuestas inferior)"
+                    class="px-2.5 py-1 text-[11px] font-bold rounded text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 cursor-pointer">
+                    Con Talón (Completo)
                   </button>
                 </div>
 
@@ -1042,6 +1070,15 @@ export class CalificacionOmrComponent implements OnInit {
   public readonly gateway = inject(UnitepcGatewayService);
   private readonly rolExamenService = inject(RolExamenService);
   private readonly omrProcesamientoService = inject(OmrProcesamientoService);
+  private readonly feedback = inject(UiFeedbackService);
+
+  public rolSeleccionadoInfo = computed<string>(() => {
+    const rol = this.rolesExamen().find(r => r.id === this.rolExamenSeleccionado());
+    if (!rol) return 'Ningún rol oficial seleccionado';
+    const materia = [rol.materiaCodigo, rol.grupo].filter(Boolean).join(' · ');
+    const detalle = [rol.tipoParcial, rol.materiaNombre].filter(Boolean).join(' - ');
+    return detalle ? `${materia} (${detalle})` : materia;
+  });
 
   // Estados reactivos
   public estadoFlujo = signal<'ALINEACION' | 'RESULTADOS'>('ALINEACION');
@@ -1060,27 +1097,29 @@ export class CalificacionOmrComponent implements OnInit {
       .sort((a, b) => this.compararCodigos(a.materiaCodigo, b.materiaCodigo))
       .map(rol => ({
         value: rol.id,
-        label: `${rol.materiaCodigo} · ${rol.materiaNombre} · ${rol.grupo} · ${rol.fecha}`,
-        searchText: `${rol.materiaCodigo} ${rol.materiaNombre} ${rol.grupo} ${rol.fecha}`
+        label: this.etiquetaRolExamen(rol),
+        searchText: this.textoBusquedaRolExamen(rol)
       }))
   );
   public mensajeOmr = signal<string>('');
+  public mensajeOmrEsError = signal<boolean>(false);
   public paginaAlineacionIdx = signal<number>(0);
   public mostrarGuiasAlineacion = signal<boolean>(true);
   public zoomAlineacion = signal<number>(0.85);
   public rotacionAlineacion = signal<number>(0);
 
   // Coordenadas dinámicas del marco de calibración OMR (%) - Cartilla en Hoja 1 (Margen 2.0 cm)
-  public boxTop = signal<number>(28.0);
-  public boxLeft = signal<number>(2.8);
-  public boxWidth = signal<number>(94.5);
+  // Por defecto inicializa en el perfil de cartilla sin talón (arrancado por el estudiante)
+  public boxTop = signal<number>(28.5);
+  public boxLeft = signal<number>(2.3);
+  public boxWidth = signal<number>(95.0);
   public boxHeight = signal<number>(71.0);
-  // La guía del código se deriva de la matriz detectada. Así acompaña tanto
-  // al escaneo físico como al PDF recortado con margen blanco lateral.
-  public codigoBoxTop = computed(() => Math.max(0, this.boxTop() - this.boxHeight() * 0.23));
-  public codigoBoxLeft = computed(() => Math.min(100, Math.max(0, this.boxLeft() + this.boxWidth() * 0.70)));
-  public codigoBoxWidth = computed(() => Math.min(100 - this.codigoBoxLeft(), this.boxWidth() * 0.34));
-  public codigoBoxHeight = computed(() => Math.min(100 - this.codigoBoxTop(), this.boxHeight() * 0.18));
+  // La guía del código se deriva directamente del ancla geométrica de la matriz OMR.
+  // Encuadra con exactitud el recuadro del código estudiantil sin tocar bordes ni el serial rojo.
+  public codigoBoxTop = computed(() => Math.max(0, this.boxTop() - this.boxHeight() * 0.168));
+  public codigoBoxLeft = computed(() => Math.min(100, Math.max(0, this.boxLeft() + this.boxWidth() * 0.730)));
+  public codigoBoxWidth = computed(() => Math.min(100 - this.codigoBoxLeft(), this.boxWidth() * 0.252));
+  public codigoBoxHeight = computed(() => Math.min(100 - this.codigoBoxTop(), this.boxHeight() * 0.082));
 
   public estudiantes = signal<EstudianteOmrItem[]>([]);
   public estudianteActivoIdx = signal<number>(0);
@@ -1473,18 +1512,19 @@ export class CalificacionOmrComponent implements OnInit {
     this.cargandoRoles.set(true);
     this.rolExamenService.listar().subscribe({
       next: roles => {
-        // La modalidad no determina si un rol puede calificarse con OMR.
-        // Las cartillas son preimpresas y el cotejo usa el mapeo oficial
-        // del rol seleccionado, incluso si el rol fue creado sin cartilla.
-        const rolesDisponibles = roles.filter(rol =>
-          !['PROGRAMADO', 'VALIDADO'].includes(rol.estadoFlujo) &&
-          rol.variantesGeneradasCount > 0
-        ).sort((a, b) => this.compararCodigos(a.materiaCodigo, b.materiaCodigo));
+        // Mostrar todos los roles permite localizar el examen antes de iniciar
+        // OMR. La ejecución se valida aparte para no procesar roles sin
+        // variantes generadas o todavía no preparados.
+        const rolesDisponibles = roles
+          .slice()
+          .sort((a, b) => this.compararCodigos(a.materiaCodigo, b.materiaCodigo));
         this.rolesExamen.set(rolesDisponibles);
         const primerRol = this.rolesExamen()[0];
         if (primerRol) {
           this.rolExamenSeleccionado.set(primerRol.id);
           this._cargarAnulaciones(primerRol.id);
+        } else {
+          this.mensajeOmr.set('No se encontraron roles de examen oficiales para buscar.');
         }
       },
       error: () => this.mensajeOmr.set('No se pudieron cargar los roles de examen oficiales.'),
@@ -1494,6 +1534,32 @@ export class CalificacionOmrComponent implements OnInit {
 
   private compararCodigos(a: string, b: string): number {
     return (a || '').localeCompare(b || '', 'es', { numeric: true, sensitivity: 'base' });
+  }
+
+  private etiquetaRolExamen(rol: RolExamenResponse): string {
+    const sede = rol.sedeCodigo || rol.sedeNombre || 'Sede sin definir';
+    const carrera = rol.carreraCodigo || rol.carreraNombre || 'Carrera sin definir';
+    const asignatura = [rol.materiaCodigo, rol.materiaNombre].filter(Boolean).join(' · ');
+    const grupo = rol.grupo || 'Grupo sin definir';
+    const examen = [rol.tipoParcial, rol.fecha].filter(Boolean).join(' · ');
+    const estado = rol.estadoFlujo || 'ESTADO SIN DEFINIR';
+    return [sede, carrera, asignatura || 'Asignatura sin definir', grupo, examen || 'Examen sin definir', estado]
+      .join(' · ');
+  }
+
+  private textoBusquedaRolExamen(rol: RolExamenResponse): string {
+    return [
+      rol.sedeCodigo,
+      rol.sedeNombre,
+      rol.carreraCodigo,
+      rol.carreraNombre,
+      rol.materiaCodigo,
+      rol.materiaNombre,
+      rol.grupo,
+      rol.tipoParcial,
+      rol.fecha,
+      rol.campus
+    ].filter(Boolean).join(' ');
   }
 
   public moverCaja(dx: number, dy: number): void {
@@ -1506,33 +1572,55 @@ export class CalificacionOmrComponent implements OnInit {
     this.boxHeight.set(Math.max(Math.round((this.boxHeight() + dh) * 10) / 10, 15));
   }
 
-  public aplicarPresetEscaneoFisico(): void {
-    this.boxTop.set(28.0);
-    this.boxLeft.set(2.8);
-    this.boxWidth.set(94.5);
+  public aplicarPresetSinTalon(): void {
+    this.boxTop.set(28.5);
+    this.boxLeft.set(2.3);
+    this.boxWidth.set(95.0);
     this.boxHeight.set(71.0);
   }
 
+  public aplicarPresetConTalon(): void {
+    this.boxTop.set(24.6);
+    this.boxLeft.set(2.4);
+    this.boxWidth.set(94.8);
+    this.boxHeight.set(61.8);
+  }
+
+  public aplicarPresetEscaneoFisico(): void {
+    this.aplicarPresetSinTalon();
+  }
+
   public aplicarPresetDigital(): void {
-    this.aplicarPresetEscaneoFisico();
+    this.aplicarPresetConTalon();
+  }
+
+  public seleccionarPaginaAlineacion(pIdx: number): void {
+    this.paginaAlineacionIdx.set(pIdx);
+    this.autoCalibrarCartilla();
   }
 
   public autoCalibrarCartilla(): void {
     const imgSrc = this.imagenActivaAlineacion();
     if (!imgSrc) {
-      this.aplicarPresetEscaneoFisico();
+      this.aplicarPresetSinTalon();
       return;
     }
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
+        const relacionAspecto = img.width / (img.height || 1);
+
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          this.aplicarPresetEscaneoFisico();
+          if (relacionAspecto > 0.88) {
+            this.aplicarPresetSinTalon();
+          } else {
+            this.aplicarPresetConTalon();
+          }
           return;
         }
         ctx.drawImage(img, 0, 0);
@@ -1547,17 +1635,34 @@ export class CalificacionOmrComponent implements OnInit {
           return;
         }
 
-        // Fallback al contorno de la cartilla
+        // Detección de matriz de respuestas por contorno/líneas en canvas
         const contorno = this._detectarContornoCartillaEnCanvas(imgData.data, img.width, img.height);
-        this.boxTop.set(Math.round((contorno.ry / img.height) * 1000) / 10);
-        this.boxLeft.set(Math.round((contorno.rx / img.width) * 1000) / 10);
-        this.boxWidth.set(Math.round((contorno.rw / img.width) * 1000) / 10);
-        this.boxHeight.set(Math.round((contorno.rh / img.height) * 1000) / 10);
+        if (contorno) {
+          const topPct = Math.round((contorno.ry / img.height) * 1000) / 10;
+          const leftPct = Math.round((contorno.rx / img.width) * 1000) / 10;
+          const widthPct = Math.round((contorno.rw / img.width) * 1000) / 10;
+          const heightPct = Math.round((contorno.rh / img.height) * 1000) / 10;
+          // Validar que corresponda a la grilla de respuestas y no a los encabezados
+          if (topPct >= 20.0 && heightPct >= 50.0) {
+            this.boxTop.set(topPct);
+            this.boxLeft.set(leftPct);
+            this.boxWidth.set(widthPct);
+            this.boxHeight.set(heightPct);
+            return;
+          }
+        }
+
+        // Fallback según relación de aspecto del escaneo
+        if (relacionAspecto > 0.88) {
+          this.aplicarPresetSinTalon();
+        } else {
+          this.aplicarPresetConTalon();
+        }
       } catch (e) {
-        this.aplicarPresetEscaneoFisico();
+        this.aplicarPresetSinTalon();
       }
     };
-    img.onerror = () => this.aplicarPresetEscaneoFisico();
+    img.onerror = () => this.aplicarPresetSinTalon();
     img.src = imgSrc;
   }
 
@@ -1572,7 +1677,9 @@ export class CalificacionOmrComponent implements OnInit {
       this.estudiantes.set([]);
       this.calificacionEjecutada.set(false);
       this.mensajeOmr.set('');
+      this.mensajeOmrEsError.set(false);
       this.archivoCargadoNombre.set(file.name);
+      this.autoSeleccionarRolSegunArchivo(file.name);
       this.estadoFlujo.set('ALINEACION');
       this.paginaAlineacionIdx.set(0);
       this.zoomAlineacion.set(0.85);
@@ -1609,10 +1716,12 @@ export class CalificacionOmrComponent implements OnInit {
             this.paginasRenderizadas.set(renderedPages);
             this.autoCalibrarCartilla();
           } else {
+            this.mensajeOmrEsError.set(true);
             this.mensajeOmr.set('El PDF no contiene páginas renderizables. Seleccione nuevamente el escaneo.');
           }
         } catch (err) {
           console.error('Error renderizando PDF escaneado:', err);
+          this.mensajeOmrEsError.set(true);
           this.mensajeOmr.set('No se pudo mostrar el PDF. Verifique que sea un escaneo PDF válido.');
         } finally {
           this.cargandoPdf.set(false);
@@ -1631,19 +1740,64 @@ export class CalificacionOmrComponent implements OnInit {
     }
   }
 
+  private autoSeleccionarRolSegunArchivo(nombreArchivo: string): void {
+    if (!nombreArchivo) return;
+    const nombreNorm = nombreArchivo.toUpperCase();
+    const roles = this.rolesExamen();
+    const rolExacto = roles.find(r =>
+      r.materiaCodigo && nombreNorm.includes(r.materiaCodigo.toUpperCase()) &&
+      r.grupo && nombreNorm.includes(r.grupo.toUpperCase())
+    );
+    if (rolExacto) {
+      this.rolExamenSeleccionado.set(rolExacto.id);
+      this._cargarAnulaciones(rolExacto.id);
+      return;
+    }
+    const rolMateria = roles.find(r =>
+      r.materiaCodigo && nombreNorm.includes(r.materiaCodigo.toUpperCase())
+    );
+    if (rolMateria) {
+      this.rolExamenSeleccionado.set(rolMateria.id);
+      this._cargarAnulaciones(rolMateria.id);
+    }
+  }
+
   public ejecutarProcesamientoOmrEnVivo(): void {
     const archivo = this.archivoSeleccionado();
     const rolId = this.rolExamenSeleccionado();
     if (!archivo) {
-      this.mensajeOmr.set('Seleccione el PDF o la imagen escaneada antes de procesar.');
+      const msg = 'Seleccione el PDF o la imagen escaneada antes de procesar.';
+      this.mensajeOmrEsError.set(true);
+      this.mensajeOmr.set(msg);
+      void this.feedback.mostrar(msg, 'Archivo no seleccionado', 'warning');
       return;
     }
     if (!rolId) {
-      this.mensajeOmr.set('Seleccione el rol de examen oficial para validar el código del estudiante.');
+      const msg = 'Seleccione el rol de examen oficial para validar el código del estudiante.';
+      this.mensajeOmrEsError.set(true);
+      this.mensajeOmr.set(msg);
+      void this.feedback.mostrar(msg, 'Rol de examen requerido', 'warning');
+      return;
+    }
+
+    const rol = this.rolesExamen().find(item => item.id === rolId);
+    if (!rol) {
+      const msg = 'El rol seleccionado ya no está disponible. Recargue la lista de roles e intente nuevamente.';
+      this.mensajeOmrEsError.set(true);
+      this.mensajeOmr.set(msg);
+      void this.feedback.mostrar(msg, 'Rol no disponible', 'warning');
+      return;
+    }
+    if (!this.rolListoParaOmr(rol)) {
+      const msg = `El examen ${rol.materiaCodigo} · ${rol.grupo} todavía no está listo para OMR. Debe tener variantes generadas y encontrarse fuera de los estados Programado o Validado.`;
+      this.mensajeOmrEsError.set(true);
+      this.mensajeOmr.set(msg);
+      void this.feedback.mostrar(msg, 'Examen no preparado para OMR', 'warning');
       return;
     }
 
     this.mensajeOmr.set('');
+    this.mensajeOmrEsError.set(false);
     this.procesandoOmr.set(true);
     this.calificacionEjecutada.set(false);
     this.paginaProgreso.set(1);
@@ -1652,9 +1806,17 @@ export class CalificacionOmrComponent implements OnInit {
       error: error => {
         console.error('Error enviando escaneo OMR al backend:', error);
         this.procesandoOmr.set(false);
-        this.mensajeOmr.set(error?.error?.error || error?.error?.message || 'No se pudo enviar el escaneo al motor OMR. Revise que el backend y RabbitMQ estén disponibles.');
+        const mensajeError = error?.error?.error || error?.error?.message || (typeof error?.error === 'string' ? error.error : null) || 'No se pudo enviar el escaneo al motor OMR. Revise que el backend y RabbitMQ estén disponibles.';
+        this.mensajeOmrEsError.set(true);
+        this.mensajeOmr.set(mensajeError);
+        void this.feedback.mostrar(mensajeError, 'Error al procesar OMR', 'error');
       }
     });
+  }
+
+  public rolListoParaOmr(rol: RolExamenResponse): boolean {
+    return !['PROGRAMADO', 'VALIDADO'].includes(rol.estadoFlujo)
+      && (rol.variantesGeneradasCount || 0) > 0;
   }
 
   private _esperarResultadoOmr(jobId: string, archivo: File): void {
@@ -1666,7 +1828,10 @@ export class CalificacionOmrComponent implements OnInit {
         }
         this.procesandoOmr.set(false);
         if (resultado.estado !== 'COMPLETADO') {
-          this.mensajeOmr.set(resultado.mensaje || 'El motor OMR no pudo completar la lectura.');
+          const mensajeError = resultado.mensaje || 'El motor OMR no pudo completar la lectura.';
+          this.mensajeOmrEsError.set(true);
+          this.mensajeOmr.set(mensajeError);
+          void this.feedback.mostrar(mensajeError, 'Lectura OMR no completada', 'error');
           return;
         }
         const paginas = this.paginasRenderizadas();
@@ -1679,12 +1844,18 @@ export class CalificacionOmrComponent implements OnInit {
         this.paginaProgreso.set(resultado.totalPaginas || lecturas.length || 1);
         this.calificacionEjecutada.set(true);
         this.estadoFlujo.set('RESULTADOS');
-        this.mensajeOmr.set(resultado.mensaje || 'Lectura OMR completada. Los códigos no reconocidos quedaron para revisión manual.');
+        this.mensajeOmrEsError.set(false);
+        const mensajeExito = resultado.mensaje || 'Lectura OMR completada. Los códigos no reconocidos quedaron para revisión manual.';
+        this.mensajeOmr.set(mensajeExito);
+        void this.feedback.mostrar(mensajeExito, 'Calificación OMR finalizada', 'success');
       },
       error: error => {
         console.error('Error consultando resultado OMR:', error);
         this.procesandoOmr.set(false);
-        this.mensajeOmr.set('No se pudo consultar el resultado del motor OMR.');
+        const mensajeError = 'No se pudo consultar el resultado del motor OMR.';
+        this.mensajeOmrEsError.set(true);
+        this.mensajeOmr.set(mensajeError);
+        void this.feedback.mostrar(mensajeError, 'Error de consulta OMR', 'error');
       }
     });
   }
@@ -1856,15 +2027,23 @@ export class CalificacionOmrComponent implements OnInit {
       };
     }
 
-    // 3. Fallback de alta precisión para Cartilla en Hoja 1 OMR (Margen 2.0 cm)
+    // 3. Fallback de alta precisión para Cartilla OMR (con talón vs sin talón)
+    const relacionAspecto = width / (height || 1);
+    if (relacionAspecto > 0.88) {
+      // Sin talón (recortado / arrancado)
+      return {
+        rx: Math.floor(width * 0.023),
+        ry: Math.floor(height * 0.285),
+        rw: Math.floor(width * 0.950),
+        rh: Math.floor(height * 0.710)
+      };
+    }
+    // Con talón (completo)
     return {
-      // La cabecera mantiene su posición física cuando el escaneo incluye el
-      // talón inferior; por eso estas medidas se calculan con el ancho de la
-      // cartilla y no con el alto total de la imagen.
-      rx: Math.floor(width * 0.028),
-      ry: Math.floor(width * 0.31),
-      rw: Math.floor(width * 0.945),
-      rh: Math.floor(width * 0.78)
+      rx: Math.floor(width * 0.024),
+      ry: Math.floor(height * 0.246),
+      rw: Math.floor(width * 0.948),
+      rh: Math.floor(height * 0.618)
     };
   }
 
@@ -1909,7 +2088,7 @@ export class CalificacionOmrComponent implements OnInit {
     const rw = derecha - izquierda;
 
     // Se elige el par horizontal cuya altura coincide con la proporción real
-    // de la matriz (aprox. 1.21:1), evitando líneas del encabezado.
+    // de la matriz (aprox. 1.25:1), evitando líneas del encabezado y talón.
     const minimoHorizontal = Math.max(30, Math.floor((width / paso) * 0.25));
     const filasFuertes: number[] = [];
     for (let y = Math.floor(height * 0.15); y < Math.floor(height * 0.99); y += paso) {
@@ -1919,20 +2098,23 @@ export class CalificacionOmrComponent implements OnInit {
     }
     const filas = agrupar(filasFuertes);
     if (filas.length < 2) return null;
-    const altoEsperado = rw / 1.21;
-    // La línea inferior de la matriz es la última línea larga de la zona de
-    // respuestas. Desde ella se busca hacia arriba el borde superior con la
-    // altura esperada; así no se confunden las líneas de cada encabezado/fila.
-    const bottom = filas[filas.length - 1];
+    const altoEsperado = rw / 1.25;
+
+    // La línea inferior de la matriz es la última línea larga antes del talón.
+    const relacionAspecto = width / (height || 1);
+    const limiteBottom = relacionAspecto <= 0.88 ? height * 0.88 : height * 0.995;
+    const filasValidasBottom = filas.filter(y => y >= height * 0.60 && y <= limiteBottom);
+    const bottom = filasValidasBottom.length > 0 ? filasValidasBottom[filasValidasBottom.length - 1] : filas[filas.length - 1];
+
     const candidatosTop = filas
       .slice(0, -1)
+      .filter(top => top >= height * 0.20 && bottom - top >= height * 0.40)
       .map(top => ({ top, diferencia: Math.abs((bottom - top) - altoEsperado) }))
-      .filter(item => bottom - item.top >= height * 0.25)
       .sort((a, b) => a.diferencia - b.diferencia);
     const top = candidatosTop[0]?.top;
     if (top === undefined) return null;
     const rh = bottom - top;
-    if (rh < height * 0.25) return null;
+    if (rh < height * 0.40) return null;
     return { rx: izquierda, ry: top, rw, rh };
   }
 

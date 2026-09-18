@@ -127,10 +127,13 @@ interface InstanciaImportacionItem {
               <i class="pi pi-graduation-cap text-primary text-[10px]"></i> Carrera
             </label>
             <select 
-              [ngModel]="carreraSeleccionada()?.careerCode"
+              [ngModel]="todasCarrerasSeleccionadas() ? carreraTodasCodigo : (carreraSeleccionada()?.careerCode || '')"
               (ngModelChange)="onCarreraChange($event)"
               [disabled]="cargandoCarreras()"
               class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
+              @if (puedeListarTodasLasCarreras()) {
+                <option [value]="carreraTodasCodigo">Todas las carreras de la sede</option>
+              }
               @for (carrera of carreras(); track carrera.careerId) {
                 <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
               }
@@ -465,8 +468,9 @@ interface InstanciaImportacionItem {
             <div class="flex items-center gap-3">
               <button 
                 (click)="vaciarRol()" 
-                [disabled]="esVicerrector()"
-                class="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer">
+                [disabled]="!esAdministrador()"
+                [title]="esAdministrador() ? 'Eliminar todos los exámenes PROGRAMADOS visibles' : 'Solo disponible para el administrador del sistema'"
+                class="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                 <i class="pi pi-trash text-xs"></i>
                 <span>Vaciar Rol de Examen</span>
               </button>
@@ -917,6 +921,13 @@ export class RolExamenesComponent implements OnInit {
   private readonly _auth = inject(AuthService);
   public readonly storage = inject(EvaluacionesStorageService);
   public readonly esVicerrector = computed(() => this._auth.usuario()?.rol === 'VICERRECTOR');
+  public readonly esAdministrador = computed(() => this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA');
+  public readonly esResponsable = computed(() => this._auth.usuario()?.rol === 'RESPONSABLE_EVALUACIONES');
+  public readonly puedeListarTodasLasCarreras = computed(() => this.esAdministrador() || this.esResponsable());
+  public readonly carreraTodasCodigo = '__TODAS_LAS_CARRERAS__';
+  public readonly todasCarrerasSeleccionadas = computed(() =>
+    this.puedeListarTodasLasCarreras() && !this.carreraSeleccionada()
+  );
 
   // Estados de Datos Reales de SEA
   public sedes = signal<BranchOffice[]>([]);
@@ -1077,6 +1088,15 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public onCarreraChange(careerCode: string): void {
+    if (this.puedeListarTodasLasCarreras() && careerCode === this.carreraTodasCodigo) {
+      this.carreraSeleccionada.set(null);
+      this.materias.set([]);
+      this.grupos.set([]);
+      this.cargando.set(false);
+      this._cargarRolesOficiales();
+      return;
+    }
+
     const carrera = this.carreras().find(c => c.careerCode === careerCode);
     if (carrera) {
       this.carreraSeleccionada.set(carrera);
@@ -1202,8 +1222,8 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public async vaciarRol(): Promise<void> {
-    if (this.esVicerrector()) {
-      this._mostrarToast('El vicerrector cuenta con acceso de consulta por sede.');
+    if (!this.esAdministrador()) {
+      this._mostrarToast('Solo el administrador del sistema puede vaciar el rol de examen.');
       return;
     }
     const programados = this.examenes().filter(item => item.estado === 'PROGRAMADO');
@@ -1222,7 +1242,7 @@ export class RolExamenesComponent implements OnInit {
     }
 
     this.cargando.set(true);
-    forkJoin(programados.map(item => this._rolService.eliminar(item.id))).subscribe({
+    this._rolService.vaciar(programados.map(item => item.id)).subscribe({
       next: () => {
         this.cargando.set(false);
         this._cargarRolesOficiales();
@@ -1258,7 +1278,13 @@ export class RolExamenesComponent implements OnInit {
       next: carreras => {
         this.carreras.set(carreras);
         this.cargandoCarreras.set(false);
-        if (carreras.length > 0) {
+        if (this.puedeListarTodasLasCarreras()) {
+          this.carreraSeleccionada.set(null);
+          this.materias.set([]);
+          this.grupos.set([]);
+          this.cargando.set(false);
+          this._cargarRolesOficiales();
+        } else if (carreras.length > 0) {
           this.carreraSeleccionada.set(carreras[0]);
           this._cargarMateriasYGrupos();
         } else {
@@ -1309,10 +1335,10 @@ export class RolExamenesComponent implements OnInit {
   private _cargarRolesOficiales(): void {
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
-    if (!sede || !carrera) return;
+    if (!sede || (!carrera && !this.todasCarrerasSeleccionadas())) return;
 
     this.cargandoRoles.set(true);
-    this._rolService.listar(sede.code, carrera.careerCode).subscribe({
+    this._rolService.listar(sede.code, carrera?.careerCode).subscribe({
       next: roles => {
         this.examenes.set(roles.map(rol => this._mapearRolResponse(rol)));
         this.cargandoRoles.set(false);

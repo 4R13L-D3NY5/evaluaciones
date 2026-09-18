@@ -1,4 +1,4 @@
-﻿# Dependencias Node / Angular
+# Dependencias Node / Angular
 **/node_modules/
 **/__pycache__/
 **/.angular/
@@ -53,6 +53,7 @@ bases/test_*
 
 # Artefactos generados localmente (pueden contener exámenes o ciphertext)
 /storage/*
+/output/*
 /outputs/*
 /evaluaciones-workers/test_output/*
 

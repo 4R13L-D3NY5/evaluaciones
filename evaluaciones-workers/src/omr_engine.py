@@ -154,8 +154,13 @@ def _detectar_grilla(gray: np.ndarray, parametros: dict[str, float] | None = Non
     if candidatos:
         _, x, y, w, h = max(candidatos)
         return x, y, w, h
-    # Fallback para un recorte de cartilla sin borde recuperable.
-    return int(ancho * .028), int(alto * .28), int(ancho * .945), int(alto * .71)
+    # Fallback según relación de aspecto (con talón vs sin talón).
+    relacion = ancho / float(alto) if alto else 1.0
+    if relacion > 0.88:
+        # Sin talón inferior (recortado / arrancado)
+        return int(ancho * 0.023), int(alto * 0.285), int(ancho * 0.950), int(alto * 0.710)
+    # Con talón inferior (cartilla completa)
+    return int(ancho * 0.024), int(alto * 0.246), int(ancho * 0.948), int(alto * 0.618)
 
 
 def _densidad_centro(
@@ -359,13 +364,13 @@ def _zona_codigo_desde_grilla(
     en imágenes con inclinación o recorte parcial.
     """
     gx, gy, gw, gh = grilla
-    # El .70 todavía alcanza el recuadro contiguo de N°/materia en el
-    # escaneo físico. El .73 inicia dentro del recuadro numérico del estudiante
-    # y sigue cubriendo el PDF recortado.
-    x1 = gx + int(gw * .73)
-    y1 = gy - int(gh * .23)
-    x2 = gx + int(gw * 1.04)
-    y2 = gy - int(gh * .05)
+    # El recuadro del código del estudiante se ubica exactamente en la cabecera
+    # derecha superior. Los márgenes relativos se calibran para excluir el
+    # cuadro contiguo (N°/materia) y las líneas divisorias.
+    x1 = gx + int(gw * 0.740)
+    y1 = gy - int(gh * 0.165)
+    x2 = gx + int(gw * 0.985)
+    y2 = gy - int(gh * 0.088)
     return max(0, x1), max(0, y1), min(ancho, x2), min(alto, y2)
 
 
@@ -420,22 +425,24 @@ def _candidatos_codigo(
             cv2.threshold(ampliada, 170, 255, cv2.THRESH_BINARY)[1],
             cv2.threshold(ampliada, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1],
         )
-        for variante in variantes:
-            texto = pytesseract.image_to_string(
-                variante, config="--psm 6 -c tessedit_char_whitelist=0123456789"
-            )
-            # Se extraen secuencias de dígitos aunque Tesseract las devuelva
-            # separadas por saltos de línea o espacios.
-            secuencias = re.findall(r"\d{5,12}", texto)
-            candidatos.extend(secuencias)
-            # Los bordes del recuadro o restos de la numeración impresa pueden
-            # pegar uno o dos dígitos al código. Se incluyen ventanas de siete
-            # dígitos para recuperar el código institucional real sin aceptar
-            # datos de otras zonas de la cartilla.
-            for secuencia in secuencias:
-                if len(secuencia) > 7:
-                    candidatos.append(secuencia[-7:])
-                    candidatos.append(secuencia[:7])
+        for psm in (
+            "--psm 7 -c tessedit_char_whitelist=0123456789",
+            "--psm 6 -c tessedit_char_whitelist=0123456789",
+        ):
+            for variante in variantes:
+                texto = pytesseract.image_to_string(variante, config=psm)
+                # Se extraen secuencias de dígitos aunque Tesseract las devuelva
+                # separadas por saltos de línea o espacios.
+                secuencias = re.findall(r"\d{5,12}", texto)
+                candidatos.extend(secuencias)
+                # Los bordes del recuadro o restos de la numeración impresa pueden
+                # pegar uno o dos dígitos al código. Se incluyen ventanas de siete
+                # dígitos para recuperar el código institucional real sin aceptar
+                # datos de otras zonas de la cartilla.
+                for secuencia in secuencias:
+                    if len(secuencia) > 7:
+                        candidatos.append(secuencia[-7:])
+                        candidatos.append(secuencia[:7])
     # Cuando una captura tiene poco contraste, Tesseract puede confundir un
     # dígito en una de las variantes de binarización. Se prioriza el candidato
     # que más veces aparece entre las zonas/variantes, en lugar del primero que

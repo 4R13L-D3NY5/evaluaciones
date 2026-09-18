@@ -179,6 +179,16 @@ export class RolExamenService {
     );
   }
 
+  /** Elimina en una sola operación los roles PROGRAMADOS seleccionados. */
+  public vaciar(ids: string[]): Observable<void> {
+    return this._http.delete<void>(`${this._baseUrl}/vaciar`, { body: ids }).pipe(
+      catchError(err => {
+        console.error('[RolExamenService] Error al vaciar los roles de examen:', err);
+        return throwError(() => err);
+      })
+    );
+  }
+
   /**
    * Transiciona el estado de un rol de examen.
    */

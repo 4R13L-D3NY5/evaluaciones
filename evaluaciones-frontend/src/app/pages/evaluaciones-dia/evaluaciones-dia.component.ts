@@ -187,7 +187,7 @@ interface CampusDisponible extends Campus {
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
           
           @if (esEvaluacionesPorCampus()) {
-            <!-- Personal y responsables trabajan sobre un campus y sus carreras. -->
+            <!-- El personal de evaluaciones trabaja sobre un campus y sus carreras. -->
             <div>
               <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                 <i class="pi pi-building text-primary text-[10px]"></i> Campus
@@ -203,7 +203,7 @@ interface CampusDisponible extends Campus {
               </select>
             </div>
           } @else {
-            <!-- Sede institucional para responsables y demás perfiles con esta vista. -->
+            <!-- Sede institucional para administradores, responsables y demás perfiles. -->
             <div>
               <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                 <i class="pi pi-building text-primary text-[10px]"></i> Sede
@@ -230,8 +230,10 @@ interface CampusDisponible extends Campus {
               (ngModelChange)="onCarreraChange($event)"
               [disabled]="cargandoCarreras()"
               class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
-              @if (esEvaluacionesPorCampus()) {
-                <option [value]="carreraTodasCodigo">Todas las carreras del campus</option>
+              @if (puedeListarTodasLasCarreras()) {
+                <option [value]="carreraTodasCodigo">
+                  {{ esEvaluacionesPorCampus() ? 'Todas las carreras del campus' : 'Todas las carreras de la sede' }}
+                </option>
               }
               @for (carrera of carreras(); track carrera.careerId) {
                 <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
@@ -2305,7 +2307,12 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     () => this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
   );
   public readonly esEvaluacionesPorCampus = computed(
-    () => this.esPersonalEvaluaciones() || this.esResponsableEvaluaciones()
+    () => this.esPersonalEvaluaciones()
+  );
+  public readonly puedeListarTodasLasCarreras = computed(
+    () => this.esPersonalEvaluaciones()
+      || this.esResponsableEvaluaciones()
+      || this.esAdministradorSistema()
   );
   public readonly carreraTodasCodigo = '__TODAS_LAS_CARRERAS__';
   public todasCarrerasSeleccionadas = signal(false);
@@ -2731,7 +2738,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public onCarreraChange(careerCode: string): void {
-    if (this.esEvaluacionesPorCampus() && careerCode === this.carreraTodasCodigo) {
+    if (this.puedeListarTodasLasCarreras() && careerCode === this.carreraTodasCodigo) {
       this.todasCarrerasSeleccionadas.set(true);
       this.carreraSeleccionada.set(null);
       this._cargarEvaluaciones();
@@ -2833,7 +2840,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.carreras.set(carrerasVisibles);
         this.cargandoCarreras.set(false);
         if (carrerasVisibles.length > 0) {
-          if (this.esEvaluacionesPorCampus()) {
+          if (this.puedeListarTodasLasCarreras()) {
             this.todasCarrerasSeleccionadas.set(true);
             this.carreraSeleccionada.set(null);
           } else {
@@ -2904,7 +2911,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
     const campus = this.campusSeleccionado();
-    const todasCarreras = this.esEvaluacionesPorCampus() && this.todasCarrerasSeleccionadas();
+    const todasCarreras = this.puedeListarTodasLasCarreras() && this.todasCarrerasSeleccionadas();
     if (!sede || (!carrera && !todasCarreras) || (this.esEvaluacionesPorCampus() && !campus)) return;
 
     this.cargando.set(true);
@@ -3589,7 +3596,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public etiquetaCarreraSeleccionada(): string {
-    return this.todasCarrerasSeleccionadas() ? 'Todas las carreras del campus' : (this.carreraSeleccionada()?.careerName || '—');
+    return this.todasCarrerasSeleccionadas()
+      ? (this.esEvaluacionesPorCampus() ? 'Todas las carreras del campus' : 'Todas las carreras de la sede')
+      : (this.carreraSeleccionada()?.careerName || '—');
   }
 
   public onCampusChange(key: string): void {

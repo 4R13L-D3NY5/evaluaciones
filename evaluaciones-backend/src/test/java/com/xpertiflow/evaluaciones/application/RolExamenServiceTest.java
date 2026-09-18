@@ -223,6 +223,40 @@ class RolExamenServiceTest {
     }
 
     @Test
+    void eliminarProgramadosEliminaTodosLosRolesSolicitados() {
+        RolExamen primero = RolExamen.builder()
+                .id("ROL-PROGRAMADO-001")
+                .estadoFlujo(EstadoFlujo.PROGRAMADO)
+                .build();
+        RolExamen segundo = RolExamen.builder()
+                .id("ROL-PROGRAMADO-002")
+                .estadoFlujo(EstadoFlujo.PROGRAMADO)
+                .build();
+        when(rolExamenRepository.findById(primero.getId())).thenReturn(Optional.of(primero));
+        when(rolExamenRepository.findById(segundo.getId())).thenReturn(Optional.of(segundo));
+
+        service.eliminarProgramados(List.of(primero.getId(), segundo.getId()));
+
+        verify(rolExamenRepository).delete(primero);
+        verify(rolExamenRepository).delete(segundo);
+    }
+
+    @Test
+    void eliminarProgramadosRechazaRolesQueYaAvanzaron() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-VALIDADO-001")
+                .estadoFlujo(EstadoFlujo.VALIDADO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        assertThatThrownBy(() -> service.eliminarProgramados(List.of(rol.getId())))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("PROGRAMADO");
+
+        verify(rolExamenRepository, never()).delete(rol);
+    }
+
+    @Test
     void alDevolverUnaCartillaPasaAutomaticamenteAPendienteDeCalificacion() {
         RolExamen rol = RolExamen.builder()
                 .id("ROL-TEST-CARTILLA-001")

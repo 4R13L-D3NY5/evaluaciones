@@ -79,6 +79,14 @@ public class RolExamenController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/vaciar")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Vaciar los roles de examen programados seleccionados (solo administrador)")
+    public ResponseEntity<Void> vaciar(@RequestBody List<String> ids) {
+        rolExamenService.eliminarProgramados(ids);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/transicion")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
     @Operation(summary = "Transicionar el estado de un rol de examen")

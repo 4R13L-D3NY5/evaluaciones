@@ -15,6 +15,15 @@ import { LayoutPreferencesService, VistaContenido } from '../../../core/services
         
         <!-- Logo y Nombre del Sistema -->
         <div class="flex items-center gap-3">
+          <button
+            type="button"
+            title="Abrir menú"
+            aria-label="Abrir menú"
+            [attr.aria-expanded]="!preferencias.sidebarColapsado()"
+            (click)="preferencias.abrirSidebar()"
+            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-primary hover:bg-primary/5 transition-colors md:hidden">
+            <i class="pi pi-bars text-sm"></i>
+          </button>
           <div class="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
             <i class="pi pi-check-square text-lg"></i>
           </div>
@@ -65,18 +74,18 @@ import { LayoutPreferencesService, VistaContenido } from '../../../core/services
               title="Parametrizar evaluaciones"
               aria-label="Parametrizar evaluaciones"
               (click)="irAParametrizacion()"
-              class="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-xs font-bold text-primary hover:bg-primary/5 transition-colors">
+              class="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-xs font-bold text-primary hover:bg-primary/5 transition-colors sm:px-3.5">
               <i class="pi pi-sliders-h text-xs"></i>
-              <span>Parametrizar</span>
+              <span class="hidden sm:inline">Parametrizar</span>
             </button>
           }
-          <div class="flex items-center gap-2 bg-muted/70 border border-border rounded-xl px-2.5 sm:px-3.5 py-1.5 shadow-2xs">
+          <div class="flex min-w-0 items-center gap-1.5 bg-muted/70 border border-border rounded-xl px-2 sm:gap-2 sm:px-3.5 py-1.5 shadow-2xs">
             <i class="pi pi-calendar text-xs text-primary font-bold"></i>
             <span class="hidden sm:inline text-[10px] font-extrabold text-muted-foreground uppercase">Gestión:</span>
             <select 
               [value]="storage.gestionActiva()" 
               (change)="onGestionChange($event)"
-              class="bg-transparent text-xs font-black text-foreground outline-none cursor-pointer">
+              class="max-w-[5.5rem] bg-transparent text-[11px] font-black text-foreground outline-none cursor-pointer sm:max-w-none sm:text-xs">
               <option value="II-2026">II-2026 (Activa)</option>
               <option value="I-2026">I-2026 (Anterior)</option>
               <option value="II-2025">II-2025 (Histórico)</option>

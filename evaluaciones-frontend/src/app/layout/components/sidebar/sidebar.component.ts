@@ -1,9 +1,10 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { UnitepcGatewayService } from '../../../core/services/unitepc-gateway.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { AppRole } from '../../../core/models/auth.models';
+import { LayoutPreferencesService } from '../../../core/services/layout-preferences.service';
 
 export interface MenuItem {
   label: string;
@@ -22,7 +23,17 @@ export interface MenuItem {
   styles: [`
     .sea-sidebar-shell {
       width: 16rem;
-      transition: width 250ms ease;
+      transition: width 250ms ease, transform 250ms ease;
+    }
+
+    .sea-sidebar-mobile-layer {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+
+    .sea-sidebar-backdrop {
+      display: none;
     }
 
     .sea-sidebar-shell--collapsed {
@@ -71,9 +82,35 @@ export interface MenuItem {
     }
 
     @media (max-width: 768px) {
+      :host {
+        position: absolute;
+        inset: 0;
+        z-index: 40;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .sea-sidebar-mobile-layer {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
       .sea-sidebar-shell,
       .sea-sidebar-shell--collapsed {
+        position: absolute;
+        inset: 0 auto 0 0;
         width: 16rem;
+        max-width: min(82vw, 20rem);
+        box-shadow: 12px 0 30px rgba(15, 23, 42, 0.14);
+        pointer-events: auto;
+        transform: translateX(0);
+      }
+
+      .sea-sidebar-shell--collapsed {
+        transform: translateX(-105%);
       }
 
       .sea-sidebar-shell--collapsed .sea-sidebar__section-title,
@@ -102,12 +139,36 @@ export interface MenuItem {
         padding-left: 0.5rem;
         padding-right: 0.5rem;
       }
+
+      .sea-sidebar-backdrop {
+        position: absolute;
+        inset: 0;
+        display: block;
+        border: 0;
+        background: rgba(15, 23, 42, 0.34);
+        opacity: 1;
+        pointer-events: auto;
+        transition: opacity 250ms ease;
+      }
+
+      .sea-sidebar-backdrop--hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
     }
   `],
   template: `
-    <aside
-      class="sea-sidebar-shell bg-card border-r border-border h-full p-4 flex flex-col justify-between shrink-0 overflow-y-auto"
-      [class.sea-sidebar-shell--collapsed]="sidebarColapsado()">
+    <div class="sea-sidebar-mobile-layer">
+      <button
+        type="button"
+        aria-label="Cerrar menú"
+        class="sea-sidebar-backdrop"
+        [class.sea-sidebar-backdrop--hidden]="sidebarColapsado()"
+        (click)="cerrarSidebarMovil()"></button>
+
+      <aside
+        class="sea-sidebar-shell bg-card border-r border-border h-full p-4 flex flex-col justify-between shrink-0 overflow-y-auto"
+        [class.sea-sidebar-shell--collapsed]="sidebarColapsado()">
       
       <!-- Menús de Navegación -->
       <div class="space-y-6">
@@ -131,6 +192,7 @@ export interface MenuItem {
             @for (item of visibleMenuItems(); track item.route) {
               <a 
                 [routerLink]="item.route" 
+                (click)="cerrarSidebarDespuesDeNavegar()"
               routerLinkActive="bg-primary/10 text-primary border-primary font-bold shadow-2xs"
               [routerLinkActiveOptions]="{ exact: false }"
               [title]="sidebarColapsado() ? item.label : item.description"
@@ -188,15 +250,16 @@ export interface MenuItem {
         </div>
       }
 
-    </aside>
+      </aside>
+    </div>
   `
 })
 export class SidebarComponent implements OnInit {
   public readonly gatewayService = inject(UnitepcGatewayService);
   public readonly authService = inject(AuthService);
+  public readonly preferencias = inject(LayoutPreferencesService);
   private readonly _router = inject(Router);
-  private readonly _sidebarStorageKey = 'sea.sidebar.collapsed';
-  public readonly sidebarColapsado = signal(this._leerEstadoSidebar());
+  public readonly sidebarColapsado = this.preferencias.sidebarColapsado;
   public readonly visibleMenuItems = computed(() => {
     const usuario = this.authService.usuario();
     if (!usuario) return [];
@@ -313,16 +376,17 @@ export class SidebarComponent implements OnInit {
   }
 
   public alternarSidebar(): void {
-    const nuevoEstado = !this.sidebarColapsado();
-    this.sidebarColapsado.set(nuevoEstado);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(this._sidebarStorageKey, String(nuevoEstado));
-    }
+    this.preferencias.alternarSidebar();
   }
 
-  private _leerEstadoSidebar(): boolean {
-    if (typeof localStorage === 'undefined') return false;
-    return localStorage.getItem(this._sidebarStorageKey) === 'true';
+  public cerrarSidebarMovil(): void {
+    this.preferencias.cerrarSidebar();
+  }
+
+  public cerrarSidebarDespuesDeNavegar(): void {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      this.preferencias.cerrarSidebar();
+    }
   }
 
   public obtenerIniciales(nombre: string): string {
