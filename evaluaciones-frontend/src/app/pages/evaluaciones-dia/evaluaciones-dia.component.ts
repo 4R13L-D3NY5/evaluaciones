@@ -1133,42 +1133,165 @@ interface CampusDisponible extends Campus {
         <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-purple-200 rounded-2xl max-w-4xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
             <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
-              <div><p class="text-[10px] font-black uppercase tracking-widest text-purple-700">{{ salaVirtualExistente() ? 'Sala virtual ya generada' : 'Sala virtual preparada' }}</p><h3 class="text-lg font-black text-foreground">Ingreso organizado por estudiante</h3><p class="text-xs text-muted-foreground">{{ salaVirtualExistente() ? 'Se recuperaron los datos guardados de esta sala. Los accesos individuales solo se muestran al crearla por primera vez.' : 'Comparte a cada estudiante únicamente su token. Los tokens se muestran una sola vez.' }}</p></div>
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-purple-700">{{ salaVirtualExistente() ? 'Sala virtual ya generada' : 'Sala virtual preparada' }}</p>
+                <h3 class="text-lg font-black text-foreground">Gestión de Examen Virtual y Acceso</h3>
+                <p class="text-xs text-muted-foreground">Comparte la información de acceso y el enlace institucional a los estudiantes para ingresar a la evaluación.</p>
+              </div>
               <button (click)="cerrarSalaVirtual()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
             </div>
             <div class="p-5 space-y-4 overflow-y-auto">
               @if (salaVirtualCreada(); as sala) {
+                <!-- Header con datos de la materia y examen -->
+                @if (_obtenerEvaluacionSalaActual(); as evalItem) {
+                  <div class="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <span class="font-mono font-black text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded text-[11px]">{{ evalItem.codigo }}</span>
+                        <strong class="text-sm font-black text-slate-900">{{ evalItem.materia }}</strong>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800">Grupo {{ evalItem.grupo }}</span>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                        @if (evalItem.carreraNombre) { <span><i class="pi pi-book mr-1 text-[10px]"></i>{{ evalItem.carreraNombre }}</span> }
+                        @if (evalItem.docenteNombre) { <span><i class="pi pi-user mr-1 text-[10px]"></i>{{ evalItem.docenteNombre }}</span> }
+                        @if (evalItem.tipo) { <span><i class="pi pi-tag mr-1 text-[10px]"></i>{{ evalItem.tipo }}</span> }
+                        @if (evalItem.fechaDisplay || evalItem.fecha) { <span><i class="pi pi-calendar mr-1 text-[10px]"></i>{{ evalItem.fechaDisplay || evalItem.fecha }}{{ evalItem.horario ? ' · ' + evalItem.horario : '' }}</span> }
+                      </div>
+                    </div>
+                  </div>
+                }
+
                 <div class="grid gap-3 sm:grid-cols-3">
                   <div class="rounded-xl border border-purple-200 bg-purple-50 p-4"><span class="text-[10px] font-black uppercase text-purple-700">Código de sala</span><strong class="mt-1 block font-mono text-xl text-purple-950">{{ sala.codigoSala }}</strong></div>
                   <div class="rounded-xl border border-border bg-muted/40 p-4"><span class="text-[10px] font-black uppercase text-muted-foreground">Duración</span><strong class="mt-1 block text-xl text-foreground">{{ sala.duracionMinutos }} min</strong></div>
                   <div class="rounded-xl border border-border bg-muted/40 p-4"><span class="text-[10px] font-black uppercase text-muted-foreground">Estado</span><strong class="mt-1 block text-xl text-foreground">{{ sala.estado }}</strong></div>
                 </div>
-                @if (accesosVirtuales().length) {
-                  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4"><p class="text-xs font-black text-amber-950">Tokens individuales</p><p class="mt-1 text-[11px] text-amber-900">Guárdalos o entrégalos individualmente antes de cerrar esta ventana.</p><div class="mt-3 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-amber-200 text-[10px] font-black uppercase text-amber-800"><th class="p-2">Estudiante</th><th class="p-2">Token</th></tr></thead><tbody>@for (acceso of accesosVirtuales(); track acceso.codigoEstudiante) {<tr class="border-b border-amber-100"><td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td><td class="p-2 font-mono break-all">{{ acceso.token }}</td></tr>}</tbody></table></div></div>
-                } @else {
-                  <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-xs text-indigo-950">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p class="font-black">Acceso para todo el grupo</p>
-                        <p class="mt-1 max-w-2xl text-[11px] text-indigo-800">Los tokens individuales solo se muestran una vez, al crear la sala. Puedes emitir un token grupal nuevo y compartirlo junto con el código de sala.</p>
-                      </div>
-                      @if (!tokenGrupoVirtual()) {
-                        <button (click)="emitirTokenGrupoDesdeLista()" [disabled]="emitiendoTokenGrupoVirtual()" class="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-[11px] font-black text-white hover:bg-indigo-700 cursor-pointer disabled:opacity-50">
-                          <i class="pi" [class.pi-spin]="emitiendoTokenGrupoVirtual()" [class.pi-spinner]="emitiendoTokenGrupoVirtual()" [class.pi-key]="!emitiendoTokenGrupoVirtual()"></i>
-                          {{ emitiendoTokenGrupoVirtual() ? 'Emitiendo...' : 'Emitir token grupal' }}
-                        </button>
-                      }
+
+                <!-- ACCESO PARA TODO EL GRUPO (TOKEN / PIN) -->
+                <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs text-indigo-950">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p class="font-black text-sm text-indigo-950">Acceso grupal para estudiantes</p>
+                      <p class="mt-1 max-w-2xl text-[11px] text-indigo-800 leading-relaxed">
+                        Comparte la información de ingreso con los estudiantes por WhatsApp, Teams o en el aula. Al copiar, se incluye la materia, docente, código de sala, token y el link oficial.
+                      </p>
                     </div>
-                    @if (tokenGrupoVirtual(); as token) {
-                      <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-                        <div><span class="text-[10px] font-black uppercase tracking-wide text-indigo-700">Token grupal</span><div class="mt-1 break-all rounded-xl border border-indigo-200 bg-white px-3 py-2 font-mono text-sm font-black text-indigo-950">{{ token }}</div></div>
-                        <button (click)="copiarTokenGrupoDesdeLista()" class="rounded-xl border border-indigo-300 bg-white px-3 py-2 text-[11px] font-black text-indigo-700 hover:bg-indigo-100 cursor-pointer"><i class="pi pi-copy mr-1"></i>Copiar token</button>
-                      </div>
+                    @if (!tokenGrupoVirtual()) {
+                      <button (click)="emitirTokenGrupoDesdeLista()" [disabled]="emitiendoTokenGrupoVirtual()" class="shrink-0 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-black text-white hover:bg-indigo-700 cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs">
+                        <i class="pi" [class.pi-spin]="emitiendoTokenGrupoVirtual()" [class.pi-spinner]="emitiendoTokenGrupoVirtual()" [class.pi-key]="!emitiendoTokenGrupoVirtual()"></i>
+                        {{ emitiendoTokenGrupoVirtual() ? 'Emitiendo token...' : 'Emitir token grupal' }}
+                      </button>
                     }
                   </div>
+
+                  @if (tokenGrupoVirtual(); as token) {
+                    <div class="mt-3.5 rounded-xl bg-white border border-indigo-200 p-4">
+                      <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700">Token grupal / PIN de acceso</span>
+                          <div class="mt-1 font-mono text-2xl font-black text-indigo-950 tracking-widest">{{ token }}</div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <button (click)="copiarTokenGrupoDesdeLista()" class="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 text-xs font-black transition cursor-pointer shadow-sm flex items-center gap-2" title="Copiar mensaje con materia, docente, link institucional y token para enviar a los estudiantes">
+                            <i class="pi pi-copy text-sm"></i>
+                            <span>Copiar datos para estudiantes</span>
+                          </button>
+                          <button (click)="copiarSoloToken()" class="rounded-xl border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 px-3 py-2.5 text-xs font-bold transition cursor-pointer flex items-center gap-1.5" title="Copiar únicamente el PIN de 6 dígitos">
+                            <i class="pi pi-key text-xs"></i>
+                            <span>Solo PIN</span>
+                          </button>
+                          <button (click)="emitirTokenGrupoDesdeLista()" [disabled]="emitiendoTokenGrupoVirtual()" class="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2.5 text-xs font-bold transition cursor-pointer flex items-center gap-1" title="Generar un nuevo token para este grupo">
+                            <i class="pi pi-refresh text-xs"></i>
+                            <span>Renovar</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="mt-3 pt-3 border-t border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-indigo-900">
+                        <div class="flex items-center gap-1.5">
+                          <i class="pi pi-link text-indigo-600"></i>
+                          <span>Portal: <a href="https://planificacion.unitepc.edu.bo/" target="_blank" class="font-bold underline text-indigo-700 hover:text-indigo-900">https://planificacion.unitepc.edu.bo/</a></span>
+                        </div>
+                        <span class="text-muted-foreground text-[10px]">El botón copia el enlace institucional directo con sala y token incluidos.</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <!-- TOKENS INDIVIDUALES (OPCIONALES) -->
+                @if (accesosVirtuales().length) {
+                  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <p class="text-xs font-black text-amber-950">Tokens individuales (alternativa)</p>
+                        <p class="mt-0.5 text-[11px] text-amber-900">Tokens únicos por estudiante si se prefiere no usar el token grupal.</p>
+                      </div>
+                      <span class="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded">{{ accesosVirtuales().length }} estudiantes</span>
+                    </div>
+                    <div class="mt-3 overflow-x-auto max-h-48">
+                      <table class="w-full text-left text-xs">
+                        <thead>
+                          <tr class="border-b border-amber-200 text-[10px] font-black uppercase text-amber-800 sticky top-0 bg-amber-50">
+                            <th class="p-2">Estudiante</th>
+                            <th class="p-2">Token</th>
+                            <th class="p-2 text-right">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (acceso of accesosVirtuales(); track acceso.codigoEstudiante) {
+                            <tr class="border-b border-amber-100/70 hover:bg-amber-100/40">
+                              <td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td>
+                              <td class="p-2 font-mono break-all">{{ acceso.token }}</td>
+                              <td class="p-2 text-right">
+                                <button (click)="copiarAccesoEstudianteIndividual(acceso)" class="px-2 py-1 rounded bg-white hover:bg-amber-100 border border-amber-300 text-[10px] font-bold text-amber-900 cursor-pointer" title="Copiar mensaje de acceso para este estudiante">
+                                  <i class="pi pi-copy mr-1"></i>Copiar
+                                </button>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 }
+
                 @if (sala.participantes.length) {
-                  <div class="rounded-xl border border-border bg-muted/20 p-4"><div class="flex items-center justify-between gap-3"><p class="text-xs font-black text-foreground">Estudiantes de la sala</p><span class="text-[10px] font-black text-muted-foreground">{{ sala.participantes.length }} registrados</span></div><div class="mt-3 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-border text-[10px] font-black uppercase text-muted-foreground"><th class="p-2">Código</th><th class="p-2">Estudiante</th><th class="p-2">Estado</th></tr></thead><tbody>@for (participante of sala.participantes; track participante.codigoEstudiante) {<tr class="border-b border-border/70"><td class="p-2 font-mono font-bold">{{ participante.codigoEstudiante }}</td><td class="p-2 font-bold">{{ participante.nombreEstudiante }}</td><td class="p-2">{{ participante.estado }}</td></tr>}</tbody></table></div></div>
+                  <div class="rounded-xl border border-border bg-muted/20 p-4">
+                    <div class="flex items-center justify-between gap-3">
+                      <p class="text-xs font-black text-foreground">Estudiantes conectados en la sala</p>
+                      <span class="text-[10px] font-black text-muted-foreground">{{ sala.participantes.length }} registrados</span>
+                    </div>
+                    <div class="mt-3 overflow-x-auto">
+                      <table class="w-full text-left text-xs">
+                        <thead>
+                          <tr class="border-b border-border text-[10px] font-black uppercase text-muted-foreground">
+                            <th class="p-2">Código</th>
+                            <th class="p-2">Estudiante</th>
+                            <th class="p-2">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (participante of sala.participantes; track participante.codigoEstudiante) {
+                            <tr class="border-b border-border/70">
+                              <td class="p-2 font-mono font-bold">{{ participante.codigoEstudiante }}</td>
+                              <td class="p-2 font-bold">{{ participante.nombreEstudiante }}</td>
+                              <td class="p-2">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                      [ngClass]="{
+                                        'bg-emerald-100 text-emerald-800': participante.estado === 'EN_EXAMEN' || participante.estado === 'CONECTADO',
+                                        'bg-amber-100 text-amber-800': participante.estado === 'ESPERANDO',
+                                        'bg-blue-100 text-blue-800': participante.estado === 'FINALIZADO' || participante.estado === 'CALIFICADO',
+                                        'bg-slate-100 text-slate-700': !['EN_EXAMEN','CONECTADO','ESPERANDO','FINALIZADO','CALIFICADO'].includes(participante.estado)
+                                      }">
+                                  {{ participante.estado }}
+                                </span>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 }
               }
             </div>
@@ -2837,6 +2960,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public dialogSalaVirtual = signal<boolean>(false);
   public salaVirtualCreada = signal<SalaVirtualOperacion | null>(null);
   public salaVirtualExistente = signal<boolean>(false);
+  public evaluacionSeleccionadaSala = signal<EvaluacionItemUI | null>(null);
   public accesosVirtuales = signal<AccesoVirtualGenerado[]>([]);
   public tokenGrupoVirtual = signal<string | null>(null);
   public emitiendoTokenGrupoVirtual = signal<boolean>(false);
@@ -3431,7 +3555,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     return (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones())
       && !this.esConsultaAcademica()
       && item.modalidad !== 'PRESENCIAL_SIN_CARTILLA'
-      && ['Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa);
+      && ['Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado', 'Confirmado'].includes(item.etapa);
   }
 
   public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
@@ -4042,7 +4166,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       error: async err => {
         ventana?.close();
         this.imprimiendoPatronCalificado.set(false);
-        let mensaje = 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido devuelto.';
+        let mensaje = 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido entregado o devuelto.';
         if (err?.error instanceof Blob) {
           try {
             const raw = await err.error.text();
@@ -5055,13 +5179,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public abrirSalaVirtualDesdeLista(item: EvaluacionItemUI): void {
     if (item.modalidad !== 'VIRTUAL' || this.consultandoSalaVirtual()) return;
     this.consultandoSalaVirtual.set(true);
+    this.evaluacionSeleccionadaSala.set(item);
     this._http.get<SalaVirtualOperacion>(`/api/examenes-virtuales/roles/${item.id}/sala`).subscribe({
       next: sala => {
         this.consultandoSalaVirtual.set(false);
         this.salaVirtualCreada.set(sala);
         this.salaVirtualExistente.set(true);
         this.accesosVirtuales.set([]);
-        this.tokenGrupoVirtual.set(null);
+        const tokenGuardado = this._recuperarTokenSala(sala.id);
+        this.tokenGrupoVirtual.set(tokenGuardado);
         this.dialogSalaVirtual.set(true);
       },
       error: err => {
@@ -5307,6 +5433,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (esVirtual && this.rolVirtualVerificadoParaGenerar !== item.id) {
       if (this.consultandoSalaVirtual()) return;
       this.consultandoSalaVirtual.set(true);
+      this.evaluacionSeleccionadaSala.set(item);
       this._http.get<SalaVirtualOperacion>(`/api/examenes-virtuales/roles/${item.id}/sala`).subscribe({
         next: sala => {
           this.consultandoSalaVirtual.set(false);
@@ -5314,7 +5441,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
           this.salaVirtualCreada.set(sala);
           this.salaVirtualExistente.set(true);
           this.accesosVirtuales.set([]);
-          this.tokenGrupoVirtual.set(null);
+          const tokenGuardado = this._recuperarTokenSala(sala.id);
+          this.tokenGrupoVirtual.set(tokenGuardado);
           this.dialogSalaVirtual.set(true);
           this._mostrarToast(`${item.codigo}: ya tiene una sala virtual generada. Se muestran sus datos disponibles.`);
         },
@@ -5460,6 +5588,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   private crearSalaVirtual(item: EvaluacionItemUI): void {
     this.creandoSalaVirtual.set(true);
+    this.evaluacionSeleccionadaSala.set(item);
     this.errorGeneracionTypst.set(null);
     this._http.post<SalaVirtualCreada>('/api/examenes-virtuales/salas', {
       rolExamenId: item.id,
@@ -5471,10 +5600,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.salaVirtualCreada.set(creada.sala);
         this.salaVirtualExistente.set(false);
         this.accesosVirtuales.set(creada.accesos || []);
+        if (creada.tokenGrupo) {
+          this._guardarTokenSala(creada.sala.id, creada.tokenGrupo);
+        }
         this.tokenGrupoVirtual.set(creada.tokenGrupo || null);
         this.dialogQueueWorker.set(false);
         this.dialogSalaVirtual.set(true);
-        this._mostrarToast(`${item.codigo}: sala virtual preparada con tokens individuales.`);
+        this._mostrarToast(`${item.codigo}: sala virtual preparada con tokens.`);
       },
       error: err => {
         this.creandoSalaVirtual.set(false);
@@ -5534,6 +5666,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.dialogRestablecerSalaVirtual.set(false);
         this.motivoRestablecimientoSalaVirtual = '';
         this.accesosVirtuales.set([]);
+        this._limpiarTokenSala(sala.id);
         this.tokenGrupoVirtual.set(null);
         this.dialogSalaVirtual.set(true);
         this._mostrarToast('Sala restablecida. Las respuestas guardadas se conservaron; inicia nuevamente cuando estén listos.', 'info');
@@ -5580,8 +5713,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this._http.post<TokenGrupoVirtual>(`/api/examenes-virtuales/salas/${encodeURIComponent(sala.id)}/token-grupo`, {}).subscribe({
       next: respuesta => {
         this.tokenGrupoVirtual.set(respuesta.tokenGrupo);
+        this._guardarTokenSala(sala.id, respuesta.tokenGrupo);
         this.emitiendoTokenGrupoVirtual.set(false);
-        this._mostrarToast('Token grupal emitido. Compártelo junto con el código de sala.', 'info');
+        this._mostrarToast('Token grupal emitido. Ya puedes copiar la información completa para los estudiantes.', 'info');
       },
       error: err => {
         this.emitiendoTokenGrupoVirtual.set(false);
@@ -5590,17 +5724,150 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     });
   }
 
+  private _guardarTokenSala(salaId: string, token: string): void {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(`sea_token_sala_${salaId}`, token);
+      }
+    } catch (_) {}
+  }
+
+  private _recuperarTokenSala(salaId: string): string | null {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        return window.sessionStorage.getItem(`sea_token_sala_${salaId}`) || null;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  private _limpiarTokenSala(salaId: string): void {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.removeItem(`sea_token_sala_${salaId}`);
+      }
+    } catch (_) {}
+  }
+
+  public _obtenerEvaluacionSalaActual(): EvaluacionItemUI | null {
+    if (this.evaluacionSeleccionadaSala()) {
+      return this.evaluacionSeleccionadaSala();
+    }
+    const sala = this.salaVirtualCreada();
+    if (sala?.rolExamenId) {
+      const encontrada = this.evaluaciones().find(e => e.id === sala.rolExamenId);
+      if (encontrada) return encontrada;
+    }
+    return this.evaluacionSeleccionadaParaParametrizar();
+  }
+
+  public construirMensajeAccesoVirtual(): string {
+    const item = this._obtenerEvaluacionSalaActual();
+    const sala = this.salaVirtualCreada();
+    const token = this.tokenGrupoVirtual() || '';
+    const codigoSala = sala?.codigoSala || '';
+    const portalUrl = 'https://planificacion.unitepc.edu.bo/';
+    const directUrl = codigoSala && token
+      ? `https://planificacion.unitepc.edu.bo/examen-virtual?sala=${encodeURIComponent(codigoSala)}&pin=${encodeURIComponent(token)}`
+      : 'https://planificacion.unitepc.edu.bo/examen-virtual';
+
+    const lineas: (string | null)[] = [
+      '📋 *EVALUACIÓN VIRTUAL · UNITEPC*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      item?.materia ? `📚 *Materia:* ${item.codigo ? `[${item.codigo}] ` : ''}${item.materia}` : null,
+      (item?.carreraNombre || item?.careerCode) ? `🎓 *Carrera:* ${item.carreraNombre || item.careerCode}` : null,
+      item?.grupo ? `👥 *Grupo:* ${item.grupo}` : null,
+      item?.docenteNombre ? `👨‍🏫 *Docente:* ${item.docenteNombre}` : null,
+      item?.tipo ? `📝 *Evaluación:* ${item.tipo}` : null,
+      (item?.fechaDisplay || item?.fecha) ? `📅 *Fecha:* ${item.fechaDisplay || item.fecha}${item.horario ? ` (${item.horario})` : ''}` : null,
+      sala?.duracionMinutos ? `⏱️ *Duración:* ${sala.duracionMinutos} minutos` : null,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '🔑 *DATOS DE ACCESO:*',
+      codigoSala ? `• *Código de Sala:* ${codigoSala}` : null,
+      token ? `• *PIN / Token Grupal:* ${token}` : null,
+      '',
+      '🌐 *Enlace directo al examen:*',
+      directUrl,
+      '',
+      '🌐 *Portal institucional:*',
+      portalUrl,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      'ℹ️ *Instrucciones para el estudiante:*',
+      '1. Ingresa al enlace directo de arriba o a ' + portalUrl + ' (opción Examen Virtual).',
+      '2. Introduce tu Código de Estudiante (matrícula institucional).',
+      codigoSala && token
+        ? `3. Confirma el Código de Sala (${codigoSala}) y el PIN (${token}).`
+        : '3. Introduce el Código de Sala y el PIN proporcionados por tu docente.',
+      '4. Presiona "Ingresar" y espera en la sala de espera hasta que el docente inicie la evaluación.'
+    ];
+
+    return lineas.filter(l => l !== null).join('\n');
+  }
+
   public copiarTokenGrupoDesdeLista(): void {
+    const texto = this.construirMensajeAccesoVirtual();
+    if (!navigator.clipboard?.writeText) {
+      this._mostrarToast('No se pudo acceder al portapapeles. Copia manualmente los datos.', 'error');
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(
+      () => this._mostrarToast('Información completa del examen copiada para compartir con los estudiantes.', 'info'),
+      () => this._mostrarToast('No se pudo copiar automáticamente. Por favor, selecciona y copia los datos.', 'error')
+    );
+  }
+
+  public copiarSoloToken(): void {
     const token = this.tokenGrupoVirtual();
     if (!token) return;
-    const escritura = navigator.clipboard?.writeText(token);
-    if (!escritura) {
+    if (!navigator.clipboard?.writeText) {
       this._mostrarToast('Selecciona el token y cópialo manualmente.', 'error');
       return;
     }
-    escritura.then(
-      () => this._mostrarToast('Token grupal copiado.', 'info'),
-      () => this._mostrarToast('No se pudo copiar automáticamente. Selecciona el token y cópialo.', 'error')
+    navigator.clipboard.writeText(token).then(
+      () => this._mostrarToast('PIN de acceso copiado al portapapeles.', 'info'),
+      () => this._mostrarToast('No se pudo copiar el token.', 'error')
+    );
+  }
+
+  public copiarAccesoEstudianteIndividual(acceso: AccesoVirtualGenerado): void {
+    const item = this._obtenerEvaluacionSalaActual();
+    const sala = this.salaVirtualCreada();
+    const codigoSala = sala?.codigoSala || '';
+    const portalUrl = 'https://planificacion.unitepc.edu.bo/';
+    const directUrl = `https://planificacion.unitepc.edu.bo/examen-virtual?sala=${encodeURIComponent(codigoSala)}&pin=${encodeURIComponent(acceso.token)}&estudiante=${encodeURIComponent(acceso.codigoEstudiante)}`;
+
+    const lineas: (string | null)[] = [
+      '📋 *ACCESO A EVALUACIÓN VIRTUAL · UNITEPC*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      item?.materia ? `📚 *Materia:* ${item.codigo ? `[${item.codigo}] ` : ''}${item.materia}` : null,
+      item?.carreraNombre ? `🎓 *Carrera:* ${item.carreraNombre}` : null,
+      item?.grupo ? `👥 *Grupo:* ${item.grupo}` : null,
+      item?.docenteNombre ? `👨‍🏫 *Docente:* ${item.docenteNombre}` : null,
+      item?.tipo ? `📝 *Evaluación:* ${item.tipo}` : null,
+      `👤 *Estudiante:* ${acceso.nombreEstudiante} (${acceso.codigoEstudiante})`,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      codigoSala ? `🔑 *Código de Sala:* ${codigoSala}` : null,
+      `🎫 *Token Personal:* ${acceso.token}`,
+      '',
+      '🌐 *Enlace directo al examen:*',
+      directUrl,
+      '',
+      '🌐 *Portal institucional:*',
+      portalUrl,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      'ℹ️ *Instrucciones:*',
+      '1. Ingresa directamente con tu enlace personal arriba.',
+      '2. Verifica tus datos y espera el inicio del examen.'
+    ];
+
+    const texto = lineas.filter(l => l !== null).join('\n');
+    if (!navigator.clipboard?.writeText) {
+      this._mostrarToast('No se pudo acceder al portapapeles.', 'error');
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(
+      () => this._mostrarToast(`Acceso individual copiado para ${acceso.nombreEstudiante}.`, 'info'),
+      () => this._mostrarToast('No se pudo copiar el acceso.', 'error')
     );
   }
 

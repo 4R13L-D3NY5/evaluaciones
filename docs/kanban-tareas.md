@@ -1,4 +1,4 @@
-﻿# Kanban de tareas del proyecto
+# Kanban de tareas del proyecto
 
 Tablero documental para dar seguimiento a las tareas pendientes de `evaluaciones`. Este archivo es la fuente de verdad del seguimiento operativo y puede actualizarse desde cualquier conversación que esté trabajando sobre este proyecto y esta rama.
 
@@ -110,7 +110,16 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
-*(Sin tareas activas)*
+#### T-021 — Descarga de patrón oficial de respuestas por docente desde Banco de Preguntas en estado Entregado o posterior
+
+- Prioridad: Alta
+- Área: Banco de Preguntas / Patrón de Respuestas / Rol Docente
+- Responsable: Antigravity
+- Creada: 2026-09-19
+- Fecha límite: 2026-09-19
+- Dependencias: `OmrProcesamientoController.java`, `OmrProcesamientoService.java`, `evaluaciones-dia.component.ts`, `banco-preguntas.component.ts`.
+- Criterio de cierre: 1) Permitir al rol `DOCENTE` descargar el PDF del patrón oficial de respuestas (`/api/omr/{rolExamenId}/patron-calificado/pdf`) y consultar el patrón (`/patron-calificado`) para sus grupos asignados; 2) Habilitar la consulta y descarga a partir del estado `ENTREGADO` y etapas posteriores (`DEVUELTO`, `PENDIENTE_NOTAS`, `CALIFICADO`, `CONFIRMADO`); 3) En `banco-preguntas.component.ts`, mostrar tarjeta/botón institucional para descargar el PDF con las variantes para compartir con los estudiantes de su grupo asignado; 4) En `evaluaciones-dia.component.ts`, permitir visualización/descarga del patrón desde el estado `Entregado`.
+- Notas: En progreso. Iniciando implementación técnica en backend y frontend.
 
 ### En revisión
 
@@ -123,7 +132,7 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Fecha límite: 2026-09-19
 - Dependencias: `evaluaciones-dia.component.ts`, `GeneracionTypstService.java`, `ExamenVirtualService.java`.
 - Criterio de cierre: 1) Incorporar en el flujo de estados de modalidad VIRTUAL el paso intermedio "Sala Virtual" (`pi pi-desktop`) entre Validado y Calificado; 2) Permitir que al pulsar el paso Sala Virtual en Validado se abra la parametrización/generación o la gestión de sala virtual si ya existe; 3) Mantener el estado "Calificado" exclusivamente como el paso de finalización cuando el examen haya concluido en la sala virtual; 4) Habilitar apertura directa de resultados virtuales y descarga en Excel al pulsar Calificado; 5) Sincronizar transición en backend a GENERADO tras preparar variantes virtuales y a CALIFICADO al concluir sala.
-- Notas: En progreso. Implementado paso intermedio Sala Virtual (pi pi-desktop) para exámenes virtuales en evaluaciones-dia y reservado Calificado para cuando concluye la sala. Verificada compilación de frontend y backend en Docker.
+- Notas: En revisión. Implementado paso intermedio Sala Virtual (pi pi-desktop) para exámenes virtuales en evaluaciones-dia y reservado Calificado para cuando concluye la sala. Incorporada copia de mensaje de acceso institucional completo para estudiantes (materia, grupo, docente, sala, token, link https://planificacion.unitepc.edu.bo/ e instrucciones paso a paso) con caché de sesión. Verificada compilación de frontend en Docker.
 
 #### T-002 — Flujo completo de notas docente sin cartilla, planilla PDF y estado Confirmado
 
@@ -266,7 +275,7 @@ _Sin tareas._
 | Indicador | Total |
 |---|---:|
 | Pendientes | 7 |
-| En progreso | 0 |
+| En progreso | 1 |
 | En revisión | 9 |
 | Bloqueadas | 0 |
 | Completadas | 4 |

@@ -76,15 +76,21 @@ interface TokenGrupo { codigoSala: string; tokenGrupo: string; }
               </div>
 
               <div class="rounded-2xl border border-indigo-300 bg-indigo-600 text-white p-5 shadow-md flex flex-col justify-between">
-                <div class="flex items-start justify-between">
+                <div class="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <span class="text-[10px] font-black uppercase tracking-wider text-indigo-200">2. PIN de Acceso (6 dígitos)</span>
                     <div class="mt-1 font-mono text-3xl sm:text-4xl font-black tracking-widest select-all">{{ tokenGrupo() }}</div>
                   </div>
-                  <button (click)="copiarTokenGrupo()" class="rounded-xl bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 text-xs font-bold transition flex items-center gap-1 cursor-pointer">
-                    <i class="pi pi-copy text-xs"></i>
-                    <span>Copiar PIN</span>
-                  </button>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button (click)="copiarDatosCompletosEstudiante()" class="rounded-xl bg-white text-indigo-900 hover:bg-indigo-50 px-3.5 py-2 text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs" title="Copiar mensaje con sala, link institucional y token para enviar a los estudiantes">
+                      <i class="pi pi-copy text-xs"></i>
+                      <span>Copiar datos para estudiantes</span>
+                    </button>
+                    <button (click)="copiarTokenGrupo()" class="rounded-xl bg-white/20 hover:bg-white/30 text-white px-3 py-2 text-xs font-bold transition flex items-center gap-1 cursor-pointer" title="Copiar únicamente el PIN de 6 dígitos">
+                      <i class="pi pi-key text-xs"></i>
+                      <span>Solo PIN</span>
+                    </button>
+                  </div>
                 </div>
                 <p class="mt-2 text-[11px] text-indigo-100">Fácil de escribir en celular o computadora.</p>
               </div>
@@ -211,10 +217,47 @@ export class SalaVirtualComponent implements OnDestroy {
     }
   }
 
+  copiarDatosCompletosEstudiante(): void {
+    const sala = this.sala();
+    const pin = this.tokenGrupo();
+    const codigoSala = sala?.codigoSala || '';
+    const portalUrl = 'https://planificacion.unitepc.edu.bo/';
+    const directUrl = `https://planificacion.unitepc.edu.bo/examen-virtual?sala=${encodeURIComponent(codigoSala)}&pin=${encodeURIComponent(pin)}`;
+
+    const lineas = [
+      '📋 *EVALUACIÓN VIRTUAL · UNITEPC*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      sala?.duracionMinutos ? `⏱️ *Duración:* ${sala.duracionMinutos} minutos` : null,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '🔑 *DATOS DE INGRESO:*',
+      `• *Código de Sala:* ${codigoSala}`,
+      `• *PIN / Token Grupal:* ${pin}`,
+      '',
+      '🌐 *Enlace directo al examen:*',
+      directUrl,
+      '',
+      '🌐 *Portal institucional:*',
+      portalUrl,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      'ℹ️ *Instrucciones para el estudiante:*',
+      '1. Ingresa al enlace institucional ' + portalUrl + ' o al enlace directo.',
+      '2. Introduce tu código de estudiante y verifica la sala y PIN.',
+      '3. Espera a que el docente inicie la evaluación.'
+    ].filter(Boolean).join('\n');
+
+    if (navigator.clipboard && lineas) {
+      navigator.clipboard.writeText(lineas);
+      this.feedback.mostrar('Información completa para estudiantes copiada al portapapeles', 'Copiado', 'success');
+    }
+  }
+
   urlAccesoConParams(): string {
     const sala = this.sala()?.codigoSala || '';
     const pin = this.tokenGrupo() || '';
-    return `${window.location.origin}/examen-virtual?sala=${encodeURIComponent(sala)}&pin=${encodeURIComponent(pin)}`;
+    const host = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
+      ? window.location.origin
+      : 'https://planificacion.unitepc.edu.bo';
+    return `${host}/examen-virtual?sala=${encodeURIComponent(sala)}&pin=${encodeURIComponent(pin)}`;
   }
 
   copiarEnlaceDirecto(): void {
