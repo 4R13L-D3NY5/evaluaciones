@@ -261,7 +261,7 @@ public class ExamenVirtualService {
 
         RolExamen rol = rolRepository.findById(sala.getRolExamenId()).orElse(null);
         if (rol != null && rol.getModalidad() == ModalidadExamen.VIRTUAL
-                && rol.getEstadoFlujo() == EstadoFlujo.VALIDADO) {
+                && (rol.getEstadoFlujo() == EstadoFlujo.VALIDADO || rol.getEstadoFlujo() == EstadoFlujo.GENERADO)) {
             rolExamenService.transicionarEstado(rol.getId(), com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto.builder()
                     .nuevoEstado(EstadoFlujo.CALIFICADO)
                     .usuario(usuario == null ? "Sistema" : usuario)

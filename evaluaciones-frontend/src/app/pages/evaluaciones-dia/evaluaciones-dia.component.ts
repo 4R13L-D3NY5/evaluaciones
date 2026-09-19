@@ -3298,10 +3298,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const conCartilla = modalidad === 'PRESENCIAL_CARTILLA';
     const etapaMapeada = this._mapearEtapa(rol.estadoFlujo);
     const registroAnterior = this.evaluaciones().find(item => item.id === rol.id);
-    // Compatibilidad con generaciones virtuales antiguas: aunque hayan
-    // quedado como GENERADO, operativamente esperan una sala y no un PDF.
-    const etapa = modalidad === 'VIRTUAL' && etapaMapeada === 'Generado'
-      ? 'Validado'
+    // Para evaluaciones virtuales: si ya cuenta con variantes generadas o se
+    // encuentra en GENERADO, operativamente se ubica en 'Generado' (Sala Virtual).
+    const etapa = modalidad === 'VIRTUAL' && (etapaMapeada === 'Generado' || (etapaMapeada === 'Validado' && (rol.variantesGeneradasCount || 0) > 0))
+      ? 'Generado'
       : etapaMapeada;
 
     return {
@@ -3381,7 +3381,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
    * PERSONAL_EVALUACIONES. La hora oficial continúa siendo la del servidor.
    */
   public politicaTemporalBloqueada(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): boolean {
-    if (!this.esPersonalEvaluaciones() || !['Generado', 'Entregado'].includes(pasoKey)) return false;
+    if (!this.esPersonalEvaluaciones() || item.modalidad === 'VIRTUAL' || !['Generado', 'Entregado'].includes(pasoKey)) return false;
     const inicio = this.inicioExamenLocal(item);
     if (!inicio) return true;
     const configuracion = this._configuracionEvaluaciones.configuracion();
@@ -3439,7 +3439,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public puedeMostrarConfiguracion(item: EvaluacionItemUI): boolean {
     return !this.esConsultaAcademica() && (item.modalidad === 'VIRTUAL'
-      ? ['Validado', 'Calificado'].includes(item.etapa)
+      ? ['Validado', 'Generado', 'Calificado'].includes(item.etapa)
       : ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa));
   }
 
@@ -3711,21 +3711,16 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public getPasosFlujo(item: EvaluacionItemUI): StepDef[] {
     if (item.modalidad === 'VIRTUAL') {
-      const labelSiguiente = item.etapa === 'Validado' ? 'Generar Examen Virtual' : 'Calificado';
-      const iconSiguiente = item.etapa === 'Validado' ? 'pi pi-desktop' : 'pi pi-check-circle';
-      if (item.requiereVerificacion) {
-        return [
-          { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
-          { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
-          { key: 'Verificado', label: 'Verificado', icon: 'pi pi-verified' },
-          { key: 'Calificado', label: labelSiguiente, icon: iconSiguiente }
-        ];
-      }
-      return [
+      const pasosVirtual: StepDef[] = [
         { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
-        { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
-        { key: 'Calificado', label: labelSiguiente, icon: iconSiguiente }
+        { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' }
       ];
+      if (item.requiereVerificacion) {
+        pasosVirtual.push({ key: 'Verificado', label: 'Verificado', icon: 'pi pi-verified' });
+      }
+      pasosVirtual.push({ key: 'Generado', label: 'Sala Virtual', icon: 'pi pi-desktop' });
+      pasosVirtual.push({ key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' });
+      return pasosVirtual;
     }
     if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
       return [
@@ -3795,15 +3790,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return 'bg-amber-50 text-amber-700 border border-amber-300 font-bold hover:bg-amber-100';
     }
 
-    // Bloqueo preventivo de Generado o Calificado (en Virtual) si requiere verificación y no está verificado
-    if ((pasoKey === 'Generado' || (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado'))
+    // Bloqueo preventivo de Generado si requiere verificación y no está verificado
+    if (pasoKey === 'Generado'
         && item.requiereVerificacion
         && item.estadoVerificacion !== 'VERIFICADO') {
       return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
     }
 
     // Si ya está verificado y está en etapa Validado, Generado es el siguiente paso listo
-    if ((pasoKey === 'Generado' || (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado'))
+    if (pasoKey === 'Generado'
         && item.requiereVerificacion
         && item.estadoVerificacion === 'VERIFICADO'
         && item.etapa === 'Validado') {
@@ -3866,7 +3861,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return 'Verificación académica requerida antes de generar.';
     }
 
-    if ((st.key === 'Generado' || (item.modalidad === 'VIRTUAL' && st.key === 'Calificado'))
+    if (st.key === 'Generado'
         && item.requiereVerificacion
         && item.estadoVerificacion !== 'VERIFICADO') {
       if (item.estadoVerificacion === 'DEVUELTO') {
@@ -3879,7 +3874,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return `Completado: ${this.formatearFechaHoraAuditoria(actividad.fechaEvento)} · ${actividad.usuario || 'Sistema'}`;
     }
     if (pasoIdx < currentIdx) return `Completado: ${st.label}`;
-    if (pasoIdx === currentIdx) return `Estado actual: ${st.label}`;
+    if (pasoIdx === currentIdx) {
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Generado') {
+        return 'Gestionar sala virtual y monitorear examen';
+      }
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') {
+        return 'Examen virtual concluido y calificado. Clic para ver notas';
+      }
+      return `Estado actual: ${st.label}`;
+    }
     if (pasoIdx === currentIdx + 1 || (item.requiereVerificacion && item.estadoVerificacion === 'VERIFICADO' && st.key === 'Generado')) {
       if (this.validacionPorBancoBloqueada(item, st.key)) {
         return 'Este estado se asigna automáticamente cuando el docente carga y se valida el banco de preguntas';
@@ -3891,14 +3894,20 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         return 'Confirma primero la impresión de las marcas OMR y de la lista de estudiantes';
       }
       if (st.key === 'Validado') return 'Clic para Validar y Encriptar Examen de Docente';
-      if (st.key === 'Generado') return 'Clic para generar el examen PDF';
-      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') {
-        return item.etapa === 'Validado'
-          ? 'Clic para generar examen virtual: crear variantes, tokens y sala'
-          : 'Cerrar sala y calificar examen virtual';
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Generado') {
+        return (item.variantesGeneradas && item.variantesGeneradas > 0)
+          ? 'Gestionar sala virtual y proyectar tokens'
+          : 'Clic para preparar examen y generar sala virtual';
       }
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') {
+        return 'Concluir examen y registrar calificaciones automáticas';
+      }
+      if (st.key === 'Generado') return 'Clic para generar el examen PDF';
       if (st.key === 'Pendiente de notas') return 'Habilita la carga de notas del docente o el procesamiento OMR';
       return `Clic para avanzar a: ${st.label}`;
+    }
+    if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') {
+      return 'Se califica automáticamente al concluir el examen en la sala virtual';
     }
     return `Pendiente: ${st.label}`;
   }
@@ -3941,7 +3950,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if ((pasoKey === 'Generado' || (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado'))
+    if (pasoKey === 'Generado'
         && item.requiereVerificacion
         && item.estadoVerificacion !== 'VERIFICADO') {
       this._mostrarToast(item.estadoVerificacion === 'DEVUELTO'
@@ -3957,12 +3966,21 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (pasoKey === 'Generado' && (item.etapa === 'Validado' || item.etapa === 'Programado')) {
-      this.abrirModalParametrizacion(item);
+    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Generado') {
+      this.abrirSalaVirtualDesdeLista(item);
       return;
     }
 
-    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado' && item.etapa === 'Validado') {
+    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado') {
+      if (item.etapa === 'Calificado') {
+        this.abrirResultadosVirtuales(item);
+        return;
+      }
+      this.abrirSalaVirtualDesdeLista(item);
+      return;
+    }
+
+    if (pasoKey === 'Generado' && (item.etapa === 'Validado' || item.etapa === 'Programado')) {
       this.abrirModalParametrizacion(item);
       return;
     }
@@ -4193,6 +4211,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   private etiquetaPaso(item: EvaluacionItemUI, etapa: EtapaEvaluacion): string {
+    if (item.modalidad === 'VIRTUAL' && etapa === 'Generado') {
+      return 'Sala Virtual';
+    }
     return item.modalidad === 'PRESENCIAL_CARTILLA' && etapa === 'Pendiente de notas'
       ? 'Pendiente de calificación'
       : etapa;
@@ -5406,8 +5427,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
                 `[${new Date().toLocaleTimeString()}] ✅ ${esVirtual ? 'Asignaciones estudiante-variante listas' : `${resultado.mapeos.length} cuadernillos listos`}`
               ]);
 
-              item.etapa = esVirtual ? 'Validado' : 'Generado';
-              item.estado = esVirtual ? 'VALIDADO' : 'GENERADO';
+              item.etapa = 'Generado';
+              item.estado = 'GENERADO';
               item.variantesGeneradas = cantVariantes;
               item.estudiantesInscritosCount = estudiantes.length;
               this.evaluaciones.update(items => [...items]);
