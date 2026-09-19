@@ -939,7 +939,7 @@ interface InstanciaImportacionItem {
                 </div>
                 <div>
                   <h3 class="text-sm font-black text-foreground">Reprogramar por Rango (Suspensión)</h3>
-                  <p class="text-xs text-muted-foreground">{{ carreraSeleccionada()?.careerName }} · {{ sedeSeleccionada()?.name }}</p>
+                  <p class="text-xs text-muted-foreground">{{ sedeSeleccionada()?.name || 'Sede institucional' }} · Programación Oficial</p>
                 </div>
               </div>
 
@@ -954,11 +954,27 @@ interface InstanciaImportacionItem {
                 <span>Traslado masivo de fechas por contingencia o suspensión:</span>
               </div>
               <p class="leading-relaxed">
-                Selecciona el rango de fechas que sufrió la suspensión y la nueva fecha de inicio. Los exámenes se reprogramarán correlativamente día a día (ej. 14 y 15 se trasladan al 28 y 29).
+                Selecciona la carrera y el rango de fechas que sufrió la suspensión. Los exámenes se reprogramarán correlativamente día a día (ej. 14 y 15 se trasladan al 28 y 29).
               </p>
             </div>
 
             <div class="space-y-3">
+              <!-- Selección de Carrera -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Carrera a reprogramar *
+                </label>
+                <select 
+                  [ngModel]="rangoCarreraCodigo()"
+                  (ngModelChange)="rangoCarreraCodigo.set($event)"
+                  class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
+                  <option value="__TODAS_LAS_CARRERAS__">🌐 Todas las carreras de la sede (Reprogramación Institucional)</option>
+                  @for (c of carreras(); track c.careerCode) {
+                    <option [value]="c.careerCode">{{ c.careerName }} ({{ c.careerCode }})</option>
+                  }
+                </select>
+              </div>
+
               <!-- Rango Origen -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -1075,6 +1091,7 @@ export class RolExamenesComponent implements OnInit {
 
   // Estado del Modal de Reprogramación Masiva por Rango
   public readonly dialogReprogramarRango = signal<boolean>(false);
+  public readonly rangoCarreraCodigo = signal<string>('__TODAS_LAS_CARRERAS__');
   public readonly rangoFechaDesdeOrigen = signal<string>('');
   public readonly rangoFechaHastaOrigen = signal<string>('');
   public readonly rangoFechaNuevaInicio = signal<string>('');
@@ -1084,11 +1101,13 @@ export class RolExamenesComponent implements OnInit {
   public readonly examenesEnRangoReprogramar = computed(() => {
     const desde = this.rangoFechaDesdeOrigen();
     const hasta = this.rangoFechaHastaOrigen();
+    const carreraCod = this.rangoCarreraCodigo();
     if (!desde || !hasta) return [];
-    return this.examenes().filter(e =>
-      e.fecha && e.fecha >= desde && e.fecha <= hasta &&
-      e.estado !== 'CALIFICADO' && e.estado !== 'SUSPENDIDO'
-    );
+    return this.examenes().filter(e => {
+      const matchCarrera = !carreraCod || carreraCod === '__TODAS_LAS_CARRERAS__' || e.careerCode === carreraCod;
+      return matchCarrera && e.fecha && e.fecha >= desde && e.fecha <= hasta &&
+        e.estado !== 'CALIFICADO' && e.estado !== 'SUSPENDIDO';
+    });
   });
 
   public readonly desgloseReprogramacion = computed(() => {
@@ -2480,13 +2499,10 @@ export class RolExamenesComponent implements OnInit {
       this._mostrarToast('Solo el administrador del sistema puede reprogramar masivamente.');
       return;
     }
-    const carrera = this.carreraSeleccionada();
-    if (!carrera || this.todasCarrerasSeleccionadas()) {
-      this._mostrarToast('Selecciona una carrera específica en los filtros antes de reprogramar.');
-      return;
-    }
-    this.rangoFechaDesdeOrigen.set('');
-    this.rangoFechaHastaOrigen.set('');
+    const c = this.carreraSeleccionada();
+    this.rangoCarreraCodigo.set(c ? c.careerCode : '__TODAS_LAS_CARRERAS__');
+    this.rangoFechaDesdeOrigen.set(this.filtroFechaDesde() || '');
+    this.rangoFechaHastaOrigen.set(this.filtroFechaHasta() || '');
     this.rangoFechaNuevaInicio.set('');
     this.rangoMotivo.set('Suspensión de actividades académicas');
     this.dialogReprogramarRango.set(true);
@@ -2499,11 +2515,11 @@ export class RolExamenesComponent implements OnInit {
   public async procesarReprogramarRango(): Promise<void> {
     if (!this.esAdministrador()) return;
     const sede = this.sedeSeleccionada();
-    const carrera = this.carreraSeleccionada();
+    const carreraCod = this.rangoCarreraCodigo();
     const desde = this.rangoFechaDesdeOrigen();
     const hasta = this.rangoFechaHastaOrigen();
     const nueva = this.rangoFechaNuevaInicio();
-    if (!sede || !carrera || !desde || !hasta || !nueva) {
+    if (!sede || !desde || !hasta || !nueva) {
       this._mostrarToast('Por favor completa todos los campos de fechas obligatorios.');
       return;
     }
@@ -2517,8 +2533,11 @@ export class RolExamenesComponent implements OnInit {
       return;
     }
 
+    const cObj = this.carreras().find(c => c.careerCode === carreraCod);
+    const ambitoTexto = cObj ? `la carrera ${cObj.careerName}` : 'todas las carreras de la sede';
+
     const confirmado = await this._feedback.confirmar(
-      `¿Confirmas la reprogramación de ${total} exámenes de la carrera ${carrera.careerName}?`,
+      `¿Confirmas la reprogramación de ${total} exámenes de ${ambitoTexto}?`,
       'Reprogramar exámenes por rango',
       'warning',
       'Reprogramar'
@@ -2528,7 +2547,7 @@ export class RolExamenesComponent implements OnInit {
     this.reprogramandoRango.set(true);
     this._rolService.reprogramarRango({
       sedeCodigo: sede.code,
-      carreraCodigo: carrera.careerCode,
+      carreraCodigo: carreraCod || '__TODAS_LAS_CARRERAS__',
       fechaDesdeOrigen: desde,
       fechaHastaOrigen: hasta,
       fechaNuevaInicio: nueva,

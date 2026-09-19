@@ -578,8 +578,16 @@ public class RolExamenService {
             throw new IllegalArgumentException("La fecha origen 'hasta' no puede ser anterior a la fecha origen 'desde'.");
         }
 
-        List<RolExamen> roles = rolExamenRepository.findBySedeCodigoAndCarreraCodigo(
-                dto.getSedeCodigo(), dto.getCarreraCodigo());
+        List<RolExamen> roles;
+        boolean todasCarreras = dto.getCarreraCodigo() == null
+                || dto.getCarreraCodigo().isBlank()
+                || "__TODAS_LAS_CARRERAS__".equalsIgnoreCase(dto.getCarreraCodigo().trim());
+        if (todasCarreras) {
+            roles = rolExamenRepository.findBySedeCodigo(dto.getSedeCodigo());
+        } else {
+            roles = rolExamenRepository.findBySedeCodigoAndCarreraCodigo(
+                    dto.getSedeCodigo(), dto.getCarreraCodigo().trim());
+        }
 
         List<RolExamen> rolesEnRango = roles.stream()
                 .filter(r -> r.getFecha() != null)
