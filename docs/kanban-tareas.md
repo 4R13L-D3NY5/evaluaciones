@@ -11,6 +11,7 @@ Vista visual: [Abrir tablero de tarjetas](../tasks.html). La página permite mov
 - `=move <ID> <estado>`: mover una tarjeta a `Pendiente`, `En progreso`, `En revisión`, `Bloqueada` o `Completada`.
 - `=edit <ID> <cambio>`: modificar título, prioridad, responsable, fecha límite, dependencia o notas.
 - `=done <ID>`: marcar una tarea como **Completada** y registrar la fecha de cierre.
+- **Sincronización automática entre chats**: Cualquier agente que opere en este proyecto actualiza el estado de la tarea automáticamente (`En progreso` al iniciar el trabajo, `En revisión` al finalizar la implementación técnica y `Completada` al ser validada por el usuario). Puede utilizarse el utilitario `powershell -ExecutionPolicy Bypass -File scripts/kanban.ps1 move <ID> <estado>`.
 
 Si el usuario escribe una tarea sin usar un comando, se puede registrar como nueva cuando la intención sea clara. No se deben inventar fechas, responsables ni dependencias; se dejan como `Por definir`.
 
@@ -38,7 +39,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Dependencias: Publicar la versión actual de `main` en el servidor.
 - Criterio de cierre: Confirmar que una programación existente en `PROGRAMADO` o `VALIDADO` se actualiza con la fecha y horario del Excel, y que los estados posteriores permanecen protegidos.
 - Notas: La corrección ya fue implementada y verificada localmente.
-
 
 #### T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor
 
@@ -123,7 +123,7 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Fecha límite: Por definir
 - Dependencias: Migración Flyway V40 (estado `CONFIRMADO`), PDFBox, endpoints de carga de notas y frontend `banco-preguntas` y `evaluaciones-dia`.
 - Criterio de cierre: 1) Permitir al docente registrar notas sobre 60 puntos desde `/banco-preguntas` cuando el examen está en `PENDIENTE_NOTAS`; 2) Transicionar automáticamente a `CALIFICADO` al guardar notas; 3) Generar la Planilla Oficial de Calificaciones en PDF con membrete institucional, notas sobre 60 y 100, y espacios de firma/sello de Docente y Recepción de Evaluaciones; 4) Incorporar el estado `CONFIRMADO` para que Evaluaciones confirme la entrega física firmada desde `/evaluaciones-dia`; 5) Actualizar selectores y etiquetas en roles y reportes sin afectar datos productivos existentes.
-- Notas: Implementación completada con migración V40, `ReporteNotasSinCartillaPdfService`, tests unitarios en backend y vistas actualizadas en frontend.
+- Notas: Implementación completada con migración V40, `ReporteNotasSinCartillaPdfService`, tests unitarios en backend y vistas actualizadas en frontend. Se corrigió la alerta nativa del navegador al eliminar examen sin cartilla sustituyéndola por un modal institucional de confirmación.
 
 #### T-018 — Políticas de reprogramación de exámenes, candado 72h y reprogramación masiva por rango
 

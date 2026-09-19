@@ -41,3 +41,25 @@ When working on this project (**Sistema de Evaluaciones SEA / SISA**), load the 
 - **Frontend**: Angular 18, PrimeNG, Tailwind CSS, standalone components.
 - **Workers**: Python 3.10/3.12, RabbitMQ AMQP, Typst, OpenCV OMR, Restic backups.
 - **Security**: HashiCorp Vault Transit KMS (`sea-banco-kek`) for envelope encryption.
+
+## Regla Obligatoria: Sincronización Automática del Tablero Kanban
+
+En **cualquier conversación o chat** que opere sobre este repositorio, el agente **DEBE sincronizar automáticamente el estado del tablero Kanban** (`docs/kanban-tareas.md` y `tasks.html`):
+
+1. **Al iniciar trabajo en una tarea** (mencionada explícitamente por su ID `T-XXX` o deducible por el requerimiento planteado por el usuario):
+   - El agente DEBE mover la tarea inmediatamente a **`En progreso`** (`progress`).
+2. **Al finalizar la implementación técnica** (código modificado, tests unitarios ejecutados o compilación verificada):
+   - El agente DEBE mover la tarea a **`En revisión`** (`review`) resumiendo en las notas lo que se implementó.
+3. **Al confirmar o validar con el usuario** (cuando el usuario apruebe, confirme que funciona o solicite cerrarla):
+   - El agente DEBE mover la tarea a **`Completada`** (`done`) con la fecha de cierre (`YYYY-MM-DD`).
+4. **Ante un bloqueo externo** (falta de accesos de servidor, dependencias externas o datos requeridos):
+   - El agente DEBE mover la tarea a **`Bloqueada`** (`blocked`) documentando el motivo en las notas.
+5. **Nuevas tareas**:
+   - Ante un nuevo requerimiento no contemplado, registrarlo con el siguiente ID disponible en **`Pendiente`** (`=new`).
+
+**Método de sincronización atómica**:
+El agente puede ejecutar directamente el script sincronizador PowerShell o modificar los archivos con sus herramientas de edición:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/kanban.ps1 move <ID> <pending|progress|review|blocked|done> -Notes "<resumen opcional>"
+powershell -ExecutionPolicy Bypass -File scripts/kanban.ps1 done <ID> -Notes "<nota de cierre>"
+```

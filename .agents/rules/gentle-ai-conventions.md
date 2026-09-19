@@ -52,3 +52,15 @@ Para cambios sustanciales o nuevas funcionalidades, seguir el ciclo de fases est
 - **Frontend (Angular 18 / Tailwind / PrimeNG)**: Componentes desacoplados, uso de standalone components y servicios fuertemente tipados.
 - **Workers Python (Typst, OMR, Backups)**: Respetar el contrato de mensajes AMQP de RabbitMQ y el almacenamiento seguro en `storage/`.
 - **Cifrado Vault**: Toda operación con bancos o preguntas sensibles debe respetar el envelope encryption DEK/KEK con Vault Transit.
+ 
+ ---
+ 
++## 6. Sincronización Automática del Tablero Kanban (`docs/kanban-tareas.md` y `tasks.html`)
++
++- **Seguimiento transparente del ciclo de vida**: Todo agente en cualquier hilo o sesión debe reflejar el estado real de la tarea:
++  - **Inicio**: Mover a `En progreso` al empezar el trabajo activo en una tarea.
++  - **Término técnico**: Mover a `En revisión` al finalizar el código y pruebas.
++  - **Cierre**: Mover a `Completada` cuando el usuario apruebe o confirme el funcionamiento.
++  - **Bloqueo**: Mover a `Bloqueada` si faltan accesos o dependencias críticas.
++- **Sincronización dual**: El cambio debe impactar tanto `docs/kanban-tareas.md` como `tasks.html`. Puede realizarse directamente o mediante `powershell -ExecutionPolicy Bypass -File scripts/kanban.ps1 move <ID> <estado>`.
++

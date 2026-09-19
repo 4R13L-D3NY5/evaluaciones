@@ -461,7 +461,7 @@ export interface DiaCalendario {
                     <div class="flex flex-wrap gap-2">
                       <button (click)="abrirDocumentoSinCartilla()" class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-[10px] font-black text-emerald-800 hover:bg-emerald-100 cursor-pointer"><i class="pi pi-download mr-1"></i> Descargar examen</button>
                       @if (rolPuedeCargarBanco()) {
-                        <button (click)="eliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-[10px] font-black text-rose-700 hover:bg-rose-50 cursor-pointer disabled:opacity-50"><i class="pi pi-trash mr-1"></i> Eliminar examen</button>
+                        <button (click)="abrirEliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-[10px] font-black text-rose-700 hover:bg-rose-50 cursor-pointer disabled:opacity-50"><i class="pi pi-trash mr-1"></i> Eliminar examen</button>
                       }
                     </div>
                     </div>
@@ -2539,6 +2539,64 @@ export interface DiaCalendario {
         </div>
       }
 
+      <!-- MODAL: ELIMINAR EXAMEN SIN CARTILLA -->
+      @if (dialogEliminarDocumentoSinCartilla()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" (click)="cerrarEliminarDocumentoSinCartilla()">
+          <div class="bg-card border border-rose-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden" (click)="$event.stopPropagation()">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <div class="h-9 w-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                  <i class="pi pi-trash text-base"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Eliminar examen sin cartilla</h3>
+                  <p class="text-xs text-muted-foreground">{{ asignaturaNombreCompleto() }} · {{ grupoSeleccionado() }} · {{ parcialActivo() }}</p>
+                </div>
+              </div>
+              <button (click)="cerrarEliminarDocumentoSinCartilla()" class="text-muted-foreground hover:text-foreground cursor-pointer" title="Cerrar">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+              <div class="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-rose-900 leading-relaxed space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-rose-950">
+                  <i class="pi pi-exclamation-triangle text-rose-600"></i> ¿Deseas eliminar este examen?
+                </div>
+                <p>
+                  Se eliminará el documento cargado y el rol volverá al estado <strong>PROGRAMADO</strong> para permitir registrar un nuevo examen.
+                </p>
+              </div>
+
+              @if (documentoSinCartilla(); as doc) {
+                <div class="rounded-xl border border-border bg-muted/40 p-3 space-y-1">
+                  <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Documento actual:</span>
+                  <div class="text-xs font-black text-foreground flex items-center gap-2 break-all">
+                    <i class="pi pi-file-word text-rose-600 shrink-0"></i>
+                    <span>{{ doc.nombreArchivo }}</span>
+                  </div>
+                  <div class="text-[10px] text-muted-foreground">
+                    {{ formatearTamanoDocumento(doc.tamanoBytes) }} · Registrado por {{ doc.cargadoPor }}
+                  </div>
+                </div>
+              }
+
+              <p class="text-muted-foreground leading-relaxed">
+                Esta acción no se puede deshacer. Los estudiantes o el personal no podrán consultar este archivo una vez eliminado.
+              </p>
+            </div>
+            <div class="p-4 border-t border-border flex justify-end gap-2">
+              <button (click)="cerrarEliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                Cancelar
+              </button>
+              <button (click)="confirmarEliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs">
+                <i class="pi" [class.pi-spin]="cargandoDocumentoSinCartilla()" [class.pi-spinner]="cargandoDocumentoSinCartilla()" [class.pi-trash]="!cargandoDocumentoSinCartilla()"></i>
+                {{ cargandoDocumentoSinCartilla() ? 'Eliminando...' : 'Sí, eliminar examen' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
@@ -2569,6 +2627,7 @@ export class BancoPreguntasComponent implements OnInit {
   public archivoSinCartillaSeleccionado = signal<File | null>(null);
   public documentoSinCartilla = signal<DocumentoSinCartilla | null>(null);
   public cargandoDocumentoSinCartilla = signal<boolean>(false);
+  public dialogEliminarDocumentoSinCartilla = signal<boolean>(false);
   private readonly maxDocumentoSinCartillaBytes = 5 * 1024 * 1024;
 
   public dialogNotasDocente = signal<boolean>(false);
@@ -3784,13 +3843,27 @@ export class BancoPreguntasComponent implements OnInit {
     window.open(this._sinCartillaService.urlDocumento(rol.id), '_blank');
   }
 
-  public eliminarDocumentoSinCartilla(): void {
+  public abrirEliminarDocumentoSinCartilla(): void {
     const rol = this.rolExamenActivo();
     if (!rol || !this.documentoSinCartilla() || !this.rolPuedeCargarBanco()) {
       this._mostrarToast('El examen sin cartilla solo se puede eliminar antes de GENERADO.', 'error');
       return;
     }
-    if (!window.confirm('Se eliminará el examen sin cartilla y el rol volverá a PROGRAMADO. ¿Deseas continuar?')) return;
+    this.dialogEliminarDocumentoSinCartilla.set(true);
+  }
+
+  public cerrarEliminarDocumentoSinCartilla(): void {
+    if (this.cargandoDocumentoSinCartilla()) return;
+    this.dialogEliminarDocumentoSinCartilla.set(false);
+  }
+
+  public confirmarEliminarDocumentoSinCartilla(): void {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.documentoSinCartilla() || !this.rolPuedeCargarBanco()) {
+      this._mostrarToast('El examen sin cartilla solo se puede eliminar antes de GENERADO.', 'error');
+      this.cerrarEliminarDocumentoSinCartilla();
+      return;
+    }
 
     this.cargandoDocumentoSinCartilla.set(true);
     this._sinCartillaService.eliminarDocumento(rol.id).subscribe({
@@ -3798,6 +3871,7 @@ export class BancoPreguntasComponent implements OnInit {
         this.documentoSinCartilla.set(null);
         this.archivoSinCartillaSeleccionado.set(null);
         this.cargandoDocumentoSinCartilla.set(false);
+        this.dialogEliminarDocumentoSinCartilla.set(false);
         this._mostrarToast('Examen sin cartilla eliminado. Puedes cargar un nuevo documento.');
         const sede = this.sedeSeleccionada();
         const carrera = this.carreraSeleccionada();
@@ -3808,6 +3882,10 @@ export class BancoPreguntasComponent implements OnInit {
         this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo eliminar el examen sin cartilla.', 'error');
       }
     });
+  }
+
+  public eliminarDocumentoSinCartilla(): void {
+    this.abrirEliminarDocumentoSinCartilla();
   }
 
   public formatearTamanoDocumento(bytes: number): string {
