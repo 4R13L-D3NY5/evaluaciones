@@ -1210,7 +1210,7 @@ interface CampusDisponible extends Campus {
                       <div class="mt-3 pt-3 border-t border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-indigo-900">
                         <div class="flex items-center gap-1.5">
                           <i class="pi pi-link text-indigo-600"></i>
-                          <span>Enlace para estudiantes: <a href="https://planificacion.unitepc.edu.bo/examen-virtual" target="_blank" class="font-bold underline text-indigo-700 hover:text-indigo-900">https://planificacion.unitepc.edu.bo/examen-virtual</a></span>
+                          <span>Enlace para estudiantes: <a [href]="obtenerLinkExamenVirtual()" target="_blank" class="font-bold underline text-indigo-700 hover:text-indigo-900">{{ obtenerLinkExamenVirtual() }}</a></span>
                         </div>
                         <span class="text-muted-foreground text-[10px]">El estudiante ingresa a este enlace y completa la sala y el PIN.</span>
                       </div>
@@ -5761,12 +5761,19 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     return this.evaluacionSeleccionadaParaParametrizar();
   }
 
+  public obtenerLinkExamenVirtual(): string {
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return `${window.location.origin}/examen-virtual`;
+    }
+    return 'https://planificacion.unitepc.edu.bo/examen-virtual';
+  }
+
   public construirMensajeAccesoVirtual(): string {
     const item = this._obtenerEvaluacionSalaActual();
     const sala = this.salaVirtualCreada();
     const token = this.tokenGrupoVirtual() || '';
     const codigoSala = sala?.codigoSala || '';
-    const linkExamen = 'https://planificacion.unitepc.edu.bo/examen-virtual';
+    const linkExamen = this.obtenerLinkExamenVirtual();
 
     const lineas: (string | null)[] = [
       '📋 *EVALUACIÓN VIRTUAL · UNITEPC*',
@@ -5827,7 +5834,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const item = this._obtenerEvaluacionSalaActual();
     const sala = this.salaVirtualCreada();
     const codigoSala = sala?.codigoSala || '';
-    const linkExamen = 'https://planificacion.unitepc.edu.bo/examen-virtual';
+    const linkExamen = this.obtenerLinkExamenVirtual();
 
     const lineas: (string | null)[] = [
       '📋 *ACCESO A EVALUACIÓN VIRTUAL · UNITEPC*',
