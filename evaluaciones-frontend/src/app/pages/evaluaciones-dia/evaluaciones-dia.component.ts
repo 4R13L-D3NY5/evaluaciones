@@ -1210,9 +1210,9 @@ interface CampusDisponible extends Campus {
                       <div class="mt-3 pt-3 border-t border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-indigo-900">
                         <div class="flex items-center gap-1.5">
                           <i class="pi pi-link text-indigo-600"></i>
-                          <span>Portal: <a href="https://planificacion.unitepc.edu.bo/" target="_blank" class="font-bold underline text-indigo-700 hover:text-indigo-900">https://planificacion.unitepc.edu.bo/</a></span>
+                          <span>Enlace para estudiantes: <a href="https://planificacion.unitepc.edu.bo/examen-virtual" target="_blank" class="font-bold underline text-indigo-700 hover:text-indigo-900">https://planificacion.unitepc.edu.bo/examen-virtual</a></span>
                         </div>
-                        <span class="text-muted-foreground text-[10px]">El botón copia el enlace institucional directo con sala y token incluidos.</span>
+                        <span class="text-muted-foreground text-[10px]">El estudiante ingresa a este enlace y completa la sala y el PIN.</span>
                       </div>
                     </div>
                   }
@@ -5766,10 +5766,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const sala = this.salaVirtualCreada();
     const token = this.tokenGrupoVirtual() || '';
     const codigoSala = sala?.codigoSala || '';
-    const portalUrl = 'https://planificacion.unitepc.edu.bo/';
-    const directUrl = codigoSala && token
-      ? `https://planificacion.unitepc.edu.bo/examen-virtual?sala=${encodeURIComponent(codigoSala)}&pin=${encodeURIComponent(token)}`
-      : 'https://planificacion.unitepc.edu.bo/examen-virtual';
+    const linkExamen = 'https://planificacion.unitepc.edu.bo/examen-virtual';
 
     const lineas: (string | null)[] = [
       '📋 *EVALUACIÓN VIRTUAL · UNITEPC*',
@@ -5782,21 +5779,18 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       (item?.fechaDisplay || item?.fecha) ? `📅 *Fecha:* ${item.fechaDisplay || item.fecha}${item.horario ? ` (${item.horario})` : ''}` : null,
       sala?.duracionMinutos ? `⏱️ *Duración:* ${sala.duracionMinutos} minutos` : null,
       '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '🔑 *DATOS DE ACCESO:*',
+      '🌐 *ENLACE DE ACCESO:*',
+      linkExamen,
+      '',
+      '🔑 *DATOS PARA INGRESAR:*',
       codigoSala ? `• *Código de Sala:* ${codigoSala}` : null,
-      token ? `• *PIN / Token Grupal:* ${token}` : null,
-      '',
-      '🌐 *Enlace directo al examen:*',
-      directUrl,
-      '',
-      '🌐 *Portal institucional:*',
-      portalUrl,
+      token ? `• *PIN / Token:* ${token}` : null,
       '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
       'ℹ️ *Instrucciones para el estudiante:*',
-      '1. Ingresa al enlace directo de arriba o a ' + portalUrl + ' (opción Examen Virtual).',
+      `1. Ingresa al enlace: ${linkExamen}`,
       '2. Introduce tu Código de Estudiante (matrícula institucional).',
       codigoSala && token
-        ? `3. Confirma el Código de Sala (${codigoSala}) y el PIN (${token}).`
+        ? `3. Introduce el Código de Sala (${codigoSala}) y el PIN (${token}).`
         : '3. Introduce el Código de Sala y el PIN proporcionados por tu docente.',
       '4. Presiona "Ingresar" y espera en la sala de espera hasta que el docente inicie la evaluación.'
     ];
@@ -5811,7 +5805,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return;
     }
     navigator.clipboard.writeText(texto).then(
-      () => this._mostrarToast('Información completa del examen copiada para compartir con los estudiantes.', 'info'),
+      () => this._mostrarToast('Información de acceso copiada para compartir con los estudiantes.', 'info'),
       () => this._mostrarToast('No se pudo copiar automáticamente. Por favor, selecciona y copia los datos.', 'error')
     );
   }
@@ -5833,8 +5827,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const item = this._obtenerEvaluacionSalaActual();
     const sala = this.salaVirtualCreada();
     const codigoSala = sala?.codigoSala || '';
-    const portalUrl = 'https://planificacion.unitepc.edu.bo/';
-    const directUrl = `https://planificacion.unitepc.edu.bo/examen-virtual?sala=${encodeURIComponent(codigoSala)}&pin=${encodeURIComponent(acceso.token)}&estudiante=${encodeURIComponent(acceso.codigoEstudiante)}`;
+    const linkExamen = 'https://planificacion.unitepc.edu.bo/examen-virtual';
 
     const lineas: (string | null)[] = [
       '📋 *ACCESO A EVALUACIÓN VIRTUAL · UNITEPC*',
@@ -5846,18 +5839,18 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       item?.tipo ? `📝 *Evaluación:* ${item.tipo}` : null,
       `👤 *Estudiante:* ${acceso.nombreEstudiante} (${acceso.codigoEstudiante})`,
       '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      codigoSala ? `🔑 *Código de Sala:* ${codigoSala}` : null,
-      `🎫 *Token Personal:* ${acceso.token}`,
+      '🌐 *ENLACE DE ACCESO:*',
+      linkExamen,
       '',
-      '🌐 *Enlace directo al examen:*',
-      directUrl,
-      '',
-      '🌐 *Portal institucional:*',
-      portalUrl,
+      '🔑 *DATOS PARA INGRESAR:*',
+      codigoSala ? `• *Código de Sala:* ${codigoSala}` : null,
+      `• *Token Personal:* ${acceso.token}`,
       '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
       'ℹ️ *Instrucciones:*',
-      '1. Ingresa directamente con tu enlace personal arriba.',
-      '2. Verifica tus datos y espera el inicio del examen.'
+      `1. Ingresa al enlace: ${linkExamen}`,
+      `2. Introduce tu Código de Estudiante (${acceso.codigoEstudiante}).`,
+      `3. Introduce el Código de Sala (${codigoSala}) y tu Token Personal (${acceso.token}).`,
+      '4. Presiona "Ingresar" y espera el inicio del examen.'
     ];
 
     const texto = lineas.filter(l => l !== null).join('\n');

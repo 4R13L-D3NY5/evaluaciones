@@ -550,14 +550,15 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
-    const params = this.route.snapshot.queryParamMap;
-    const salaParam = params.get('sala');
-    const pinParam = params.get('pin') || params.get('token');
-    const estParam = params.get('estudiante') || params.get('codigo');
+    this.route.queryParamMap.subscribe(params => {
+      const salaParam = params.get('sala');
+      const pinParam = params.get('pin') || params.get('token');
+      const estParam = params.get('estudiante') || params.get('codigo');
 
-    if (salaParam) this.codigoSala = salaParam.trim().toUpperCase();
-    if (pinParam) this.token = pinParam.trim();
-    if (estParam) this.codigoEstudiante = estParam.trim();
+      if (salaParam) this.codigoSala = salaParam.trim().toUpperCase();
+      if (pinParam) this.token = pinParam.trim();
+      if (estParam) this.codigoEstudiante = estParam.trim();
+    });
   }
 
   ingresar(): void {

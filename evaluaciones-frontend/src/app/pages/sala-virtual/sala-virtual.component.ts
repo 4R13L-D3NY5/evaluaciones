@@ -221,33 +221,30 @@ export class SalaVirtualComponent implements OnDestroy {
     const sala = this.sala();
     const pin = this.tokenGrupo();
     const codigoSala = sala?.codigoSala || '';
-    const portalUrl = 'https://planificacion.unitepc.edu.bo/';
-    const directUrl = `https://planificacion.unitepc.edu.bo/examen-virtual?sala=${encodeURIComponent(codigoSala)}&pin=${encodeURIComponent(pin)}`;
+    const linkExamen = 'https://planificacion.unitepc.edu.bo/examen-virtual';
 
     const lineas = [
       '📋 *EVALUACIÓN VIRTUAL · UNITEPC*',
       '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
       sala?.duracionMinutos ? `⏱️ *Duración:* ${sala.duracionMinutos} minutos` : null,
       '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '🔑 *DATOS DE INGRESO:*',
+      '🌐 *ENLACE DE ACCESO:*',
+      linkExamen,
+      '',
+      '🔑 *DATOS PARA INGRESAR:*',
       `• *Código de Sala:* ${codigoSala}`,
-      `• *PIN / Token Grupal:* ${pin}`,
-      '',
-      '🌐 *Enlace directo al examen:*',
-      directUrl,
-      '',
-      '🌐 *Portal institucional:*',
-      portalUrl,
+      `• *PIN / Token:* ${pin}`,
       '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
       'ℹ️ *Instrucciones para el estudiante:*',
-      '1. Ingresa al enlace institucional ' + portalUrl + ' o al enlace directo.',
-      '2. Introduce tu código de estudiante y verifica la sala y PIN.',
-      '3. Espera a que el docente inicie la evaluación.'
+      `1. Ingresa al enlace: ${linkExamen}`,
+      '2. Introduce tu Código de Estudiante (matrícula institucional).',
+      `3. Introduce el Código de Sala (${codigoSala}) y el PIN (${pin}).`,
+      '4. Presiona "Ingresar" y espera en la sala de espera hasta que el docente inicie la evaluación.'
     ].filter(Boolean).join('\n');
 
     if (navigator.clipboard && lineas) {
       navigator.clipboard.writeText(lineas);
-      this.feedback.mostrar('Información completa para estudiantes copiada al portapapeles', 'Copiado', 'success');
+      this.feedback.mostrar('Información de acceso para estudiantes copiada al portapapeles', 'Copiado', 'success');
     }
   }
 
