@@ -1,4 +1,4 @@
-# Kanban de tareas del proyecto
+﻿# Kanban de tareas del proyecto
 
 Tablero documental para dar seguimiento a las tareas pendientes de `evaluaciones`. Este archivo es la fuente de verdad del seguimiento operativo y puede actualizarse desde cualquier conversación que esté trabajando sobre este proyecto y esta rama.
 
@@ -110,6 +110,10 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
+*(Sin tareas activas)*
+
+### En revisión
+
 #### T-021 — Descarga de patrón oficial de respuestas por docente desde Banco de Preguntas en estado Entregado o posterior
 
 - Prioridad: Alta
@@ -119,9 +123,7 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Fecha límite: 2026-09-19
 - Dependencias: `OmrProcesamientoController.java`, `OmrProcesamientoService.java`, `evaluaciones-dia.component.ts`, `banco-preguntas.component.ts`.
 - Criterio de cierre: 1) Permitir al rol `DOCENTE` descargar el PDF del patrón oficial de respuestas (`/api/omr/{rolExamenId}/patron-calificado/pdf`) y consultar el patrón (`/patron-calificado`) para sus grupos asignados; 2) Habilitar la consulta y descarga a partir del estado `ENTREGADO` y etapas posteriores (`DEVUELTO`, `PENDIENTE_NOTAS`, `CALIFICADO`, `CONFIRMADO`); 3) En `banco-preguntas.component.ts`, mostrar tarjeta/botón institucional para descargar el PDF con las variantes para compartir con los estudiantes de su grupo asignado; 4) En `evaluaciones-dia.component.ts`, permitir visualización/descarga del patrón desde el estado `Entregado`.
-- Notas: En progreso. Iniciando implementación técnica en backend y frontend.
-
-### En revisión
+- Notas: En progreso. Iniciando implementación técnica en backend y frontend. Descarga de patrones variantes habilitada para DOCENTE en ENTREGADO o posteriores desde Banco de Preguntas y Calendario. Tests unitarios aprobados y contenedores reconstruidos.
 
 #### T-020 — Flujo de Estados para Exámenes Virtuales: Paso intermedio Sala Virtual e icono de computadora con estado Calificado al concluir
 
@@ -275,8 +277,8 @@ _Sin tareas._
 | Indicador | Total |
 |---|---:|
 | Pendientes | 7 |
-| En progreso | 1 |
-| En revisión | 9 |
+| En progreso | 0 |
+| En revisión | 10 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

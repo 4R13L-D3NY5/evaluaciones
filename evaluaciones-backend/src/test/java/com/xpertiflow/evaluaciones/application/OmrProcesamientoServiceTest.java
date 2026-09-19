@@ -170,4 +170,36 @@ class OmrProcesamientoServiceTest {
         assertThat(captor.getValue().getIpOrigen()).isEqualTo("192.168.1.50");
         assertThat(captor.getValue().getDetallesJson()).contains("Recalificación solicitada");
     }
+
+    @Test
+    void consultarPatronCalificado_enEstadoProgramado_lanzaIllegalStateException() {
+        rol.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                service.consultarPatronCalificado(rolId, auth));
+    }
+
+    @Test
+    void consultarPatronCalificado_enEstadoEntregado_validaEstadoFlujoCorrectamente() {
+        rol.setEstadoFlujo(EstadoFlujo.ENTREGADO);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+        when(varianteRepository.findByRolExamenId(rolId)).thenReturn(Collections.emptyList());
+
+        // Al pasar la verificación de estado ENTREGADO, prosigue a verificar variantes persistidas
+        IllegalStateException ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                service.consultarPatronCalificado(rolId, auth));
+        assertThat(ex.getMessage()).isEqualTo("No existe un patrón persistido para esta evaluación.");
+    }
+
+    @Test
+    void consultarPatronCalificado_enEstadoConfirmado_validaEstadoFlujoCorrectamente() {
+        rol.setEstadoFlujo(EstadoFlujo.CONFIRMADO);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+        when(varianteRepository.findByRolExamenId(rolId)).thenReturn(Collections.emptyList());
+
+        IllegalStateException ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                service.consultarPatronCalificado(rolId, auth));
+        assertThat(ex.getMessage()).isEqualTo("No existe un patrón persistido para esta evaluación.");
+    }
 }

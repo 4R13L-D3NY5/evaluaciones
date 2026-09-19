@@ -753,9 +753,9 @@ public class OmrProcesamientoService {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
         politicaTiempoEvaluacionesService.exigirPatronHabilitado(rol, authentication);
-        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO")
+        if (rol.getEstadoFlujo() == null || !Set.of("ENTREGADO", "DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO", "CONFIRMADO")
                 .contains(rol.getEstadoFlujo().name())) {
-            throw new IllegalStateException("El patrón solo puede consultarse después de devolver el examen y habilitar la revisión de notas.");
+            throw new IllegalStateException("El patrón solo puede consultarse una vez que el examen ha sido entregado o en etapas posteriores.");
         }
 
         List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);

@@ -12,6 +12,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { PrevisualizacionTypstRequest } from '../../core/models/generacion-typst.model';
 import { DocumentoSinCartilla, ExamenSinCartillaService, NotaDocente } from '../../core/services/examen-sin-cartilla.service';
+import { OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { firstValueFrom, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -486,6 +487,49 @@ export interface DiaCalendario {
               </div>
             }
             } @else {
+              @if (puedeDescargarPatronDocente()) {
+                <!-- Tarjeta Oficial: Descarga de Patrón de Respuestas para Estudiantes -->
+                <div class="bg-card border-2 border-indigo-400 dark:border-indigo-600 rounded-2xl p-6 shadow-md space-y-4 bg-gradient-to-r from-indigo-50/90 via-purple-50/80 to-blue-50/90 animate-fade-in">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-start gap-3.5">
+                      <div class="h-12 w-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-2xl shrink-0 shadow-md">
+                        <i class="pi pi-file-pdf"></i>
+                      </div>
+                      <div>
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-300">
+                            Etapa: {{ rolExamenActivo()?.estadoFlujo }}
+                          </span>
+                          <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Patrón Oficial Disponible
+                          </span>
+                        </div>
+                        <h3 class="text-base font-black text-foreground">Patrón Oficial de Respuestas (Variantes del Examen)</h3>
+                        <p class="text-xs text-muted-foreground mt-0.5 max-w-2xl leading-relaxed">
+                          El examen ha sido entregado a los estudiantes. Puedes descargar el documento PDF oficial con la clave de respuestas de todas las variantes generadas (A, B, C, D...) para compartir y resolver dudas con los estudiantes de tu grupo asignado.
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                      <button 
+                        (click)="descargarPatronOficialDocente(false)" 
+                        [disabled]="descargandoPatronOficial()"
+                        class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="pi" [class.pi-spin]="descargandoPatronOficial()" [class.pi-spinner]="descargandoPatronOficial()" [class.pi-download]="!descargandoPatronOficial()"></i>
+                        <span>{{ descargandoPatronOficial() ? 'Descargando PDF...' : 'Descargar Patrón Oficial (PDF)' }}</span>
+                      </button>
+                      <button 
+                        (click)="descargarPatronOficialDocente(true)" 
+                        [disabled]="descargandoPatronOficial()"
+                        class="px-4 py-3 rounded-xl border border-indigo-300 bg-white hover:bg-indigo-50 text-indigo-800 text-xs font-black flex items-center gap-2 shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="pi pi-external-link"></i>
+                        <span>Ver en Visor</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
+
           <!-- Zona Principal de Validación y Acciones de Aprobación -->
           <div class="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
             
@@ -1415,19 +1459,30 @@ export interface DiaCalendario {
 
             </div>
 
-            <div class="bg-muted/30 border-t border-border p-4 flex items-center justify-between">
+            <div class="bg-muted/30 border-t border-border p-4 flex flex-wrap items-center justify-between gap-2">
               <button 
                 (click)="examenSeleccionadoModal.set(null)"
                 class="px-4 py-2 bg-muted text-foreground rounded-xl text-xs font-bold hover:bg-muted/80">
                 Cerrar
               </button>
 
-              <button 
-                (click)="irAValidarExamenDesdeCalendario(examenSeleccionadoModal()!)"
-                class="px-5 py-2 bg-purple-700 text-white rounded-xl text-xs font-black hover:bg-purple-800 flex items-center gap-2 shadow-xs cursor-pointer">
-                <i class="pi pi-verified text-xs"></i>
-                <span>Ir a Validar Banco para este Examen</span>
-              </button>
+              <div class="flex flex-wrap items-center gap-2">
+                @if (puedeDescargarPatronCronograma(examenSeleccionadoModal())) {
+                  <button 
+                    (click)="descargarPatronCronograma(examenSeleccionadoModal()!, false)" 
+                    [disabled]="descargandoPatronOficial()"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 flex items-center gap-2 shadow-xs cursor-pointer transition-transform hover:scale-105 disabled:opacity-50">
+                    <i class="pi" [class.pi-spin]="descargandoPatronOficial()" [class.pi-spinner]="descargandoPatronOficial()" [class.pi-download]="!descargandoPatronOficial()"></i>
+                    <span>Descargar Patrón Oficial (PDF)</span>
+                  </button>
+                }
+                <button 
+                  (click)="irAValidarExamenDesdeCalendario(examenSeleccionadoModal()!)"
+                  class="px-5 py-2 bg-purple-700 text-white rounded-xl text-xs font-black hover:bg-purple-800 flex items-center gap-2 shadow-xs cursor-pointer">
+                  <i class="pi pi-verified text-xs"></i>
+                  <span>Ir a Banco para este Examen</span>
+                </button>
+              </div>
             </div>
 
           </div>
@@ -2618,9 +2673,12 @@ export class BancoPreguntasComponent implements OnInit {
   private readonly _auth = inject(AuthService);
   private readonly _generacionTypst = inject(GeneracionTypstService);
   private readonly _sinCartillaService = inject(ExamenSinCartillaService);
+  private readonly _omrService = inject(OmrProcesamientoService);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
   @ViewChild('imageInput') public imageInputRef!: ElementRef<HTMLInputElement>;
+
+  public descargandoPatronOficial = signal<boolean>(false);
 
   // Archivo Excel original para subir al backend
   public archivoExcelSeleccionado = signal<File | null>(null);
@@ -3975,6 +4033,113 @@ export class BancoPreguntasComponent implements OnInit {
       },
       error: err => {
         this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo generar la planilla PDF oficial.', 'error');
+      }
+    });
+  }
+
+  public puedeDescargarPatronDocente(): boolean {
+    const rol = this.rolExamenActivo();
+    if (!rol || this.esSinCartillaActivo()) return false;
+    const estados = ['ENTREGADO', 'DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO', 'CONFIRMADO'];
+    return !!rol.estadoFlujo && estados.includes(rol.estadoFlujo);
+  }
+
+  public puedeDescargarPatronCronograma(ex: ExamenDocenteCronograma | null): boolean {
+    if (!ex || !ex.conCartilla) return false;
+    const estado = (ex.estado || '').toLowerCase().trim();
+    const estados = ['entregado', 'devuelto', 'pendiente_notas', 'pendiente de notas', 'calificado', 'confirmado'];
+    return estados.includes(estado);
+  }
+
+  public descargarPatronOficialDocente(abrirEnPestana: boolean = false): void {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.puedeDescargarPatronDocente() || this.descargandoPatronOficial()) return;
+
+    this.descargandoPatronOficial.set(true);
+    this._omrService.imprimirPatronCalificado(rol.id).subscribe({
+      next: (blob: Blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        if (abrirEnPestana) {
+          const win = window.open(blobUrl, '_blank');
+          if (!win) {
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `Patron_Oficial_${rol.materiaCodigo || 'Examen'}_G${rol.grupo || '1'}.pdf`;
+            a.click();
+          }
+        } else {
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = `Patron_Oficial_${rol.materiaCodigo || 'Examen'}_G${rol.grupo || '1'}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        this.descargandoPatronOficial.set(false);
+        this._mostrarToast(abrirEnPestana ? 'Patrón oficial de respuestas abierto en visor.' : 'Patrón oficial de respuestas descargado. Puedes compartirlo con tus estudiantes.');
+      },
+      error: async err => {
+        this.descargandoPatronOficial.set(false);
+        let mensaje = 'No se pudo generar el patrón oficial de respuestas.';
+        if (err?.error instanceof Blob) {
+          try {
+            const raw = await err.error.text();
+            const parsed = JSON.parse(raw);
+            mensaje = parsed.message || parsed.error || mensaje;
+          } catch {
+            mensaje = err.message || mensaje;
+          }
+        } else {
+          mensaje = err?.error?.message || err?.error?.error || err?.message || mensaje;
+        }
+        this._mostrarToast(mensaje, 'error');
+      }
+    });
+  }
+
+  public descargarPatronCronograma(ex: ExamenDocenteCronograma, abrirEnPestana: boolean = false): void {
+    if (!ex || !this.puedeDescargarPatronCronograma(ex) || this.descargandoPatronOficial()) return;
+
+    this.descargandoPatronOficial.set(true);
+    this._omrService.imprimirPatronCalificado(ex.id).subscribe({
+      next: (blob: Blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        if (abrirEnPestana) {
+          const win = window.open(blobUrl, '_blank');
+          if (!win) {
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `Patron_Oficial_${ex.codigo || 'Examen'}_G${ex.grupo || '1'}.pdf`;
+            a.click();
+          }
+        } else {
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = `Patron_Oficial_${ex.codigo || 'Examen'}_G${ex.grupo || '1'}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        this.descargandoPatronOficial.set(false);
+        this._mostrarToast(abrirEnPestana ? 'Patrón oficial de respuestas abierto en visor.' : 'Patrón oficial de respuestas descargado correctamente.');
+      },
+      error: async err => {
+        this.descargandoPatronOficial.set(false);
+        let mensaje = 'No se pudo generar el patrón oficial de respuestas.';
+        if (err?.error instanceof Blob) {
+          try {
+            const raw = await err.error.text();
+            const parsed = JSON.parse(raw);
+            mensaje = parsed.message || parsed.error || mensaje;
+          } catch {
+            mensaje = err.message || mensaje;
+          }
+        } else {
+          mensaje = err?.error?.message || err?.error?.error || err?.message || mensaje;
+        }
+        this._mostrarToast(mensaje, 'error');
       }
     });
   }

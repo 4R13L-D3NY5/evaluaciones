@@ -90,16 +90,16 @@ public class OmrProcesamientoController {
     }
 
     @GetMapping("/{rolExamenId}/patron-calificado")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
-    @Operation(summary = "Consultar el patrón de respuestas después de devolver el examen")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Consultar el patrón de respuestas después de entregar o devolver el examen")
     public ResponseEntity<PatronCalificadoResponseDto> consultarPatronCalificado(@PathVariable String rolExamenId,
                                                                                     Authentication authentication) {
         return ResponseEntity.ok(omrProcesamientoService.consultarPatronCalificado(rolExamenId, authentication));
     }
 
     @GetMapping(value = "/{rolExamenId}/patron-calificado/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
-    @Operation(summary = "Generar el PDF del patrón de respuestas después de devolver el examen")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Generar el PDF del patrón de respuestas después de entregar o devolver el examen")
     public ResponseEntity<byte[]> imprimirPatronCalificado(@PathVariable String rolExamenId,
                                                             Authentication authentication,
                                                             HttpServletRequest request) {
