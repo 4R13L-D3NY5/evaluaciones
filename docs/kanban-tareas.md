@@ -114,16 +114,38 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
-#### T-021 — Descarga de patrón oficial de respuestas por docente desde Banco de Preguntas en estado Entregado o posterior
+#### T-024 — Visibilidad y accesibilidad del botón "Aprobar y Guardar" en previsualización de examen en vista móvil
 
 - Prioridad: Alta
-- Área: Banco de Preguntas / Patrón de Respuestas / Rol Docente
+- Área: Banco de Preguntas / Previsualización PDF / Responsividad Móvil
 - Responsable: Antigravity
 - Creada: 2026-09-19
 - Fecha límite: 2026-09-19
-- Dependencias: `OmrProcesamientoController.java`, `OmrProcesamientoService.java`, `evaluaciones-dia.component.ts`, `banco-preguntas.component.ts`.
-- Criterio de cierre: 1) Permitir al rol `DOCENTE` descargar el PDF del patrón oficial de respuestas (`/api/omr/{rolExamenId}/patron-calificado/pdf`) y consultar el patrón (`/patron-calificado`) para sus grupos asignados; 2) Habilitar la consulta y descarga a partir del estado `ENTREGADO` y etapas posteriores (`DEVUELTO`, `PENDIENTE_NOTAS`, `CALIFICADO`, `CONFIRMADO`); 3) En `banco-preguntas.component.ts`, mostrar tarjeta/botón institucional para descargar el PDF con las variantes para compartir con los estudiantes de su grupo asignado; 4) En `evaluaciones-dia.component.ts`, permitir visualización/descarga del patrón desde el estado `Entregado`.
-- Notas: En progreso. Iniciando implementación técnica en backend y frontend. Descarga de patrones variantes habilitada para DOCENTE en ENTREGADO o posteriores desde Banco de Preguntas y Calendario. Tests unitarios aprobados y contenedores reconstruidos.
+- Dependencias: `banco-preguntas.component.ts`.
+- Criterio de cierre: 1) Asegurar que en pantallas móviles o con altura reducida, el contenedor modal de previsualización de cuadernillo PDF mantenga visible el encabezado y el pie de página con sus acciones; 2) Flexibilizar el área de scroll del PDF con flex-1 min-h-0 para evitar que el visor desborde y oculte los botones; 3) Compactar insignias y texto del botón de aprobación en móvil evitando desbordes; 4) Calibrar el umbral de scroll de finalización a 100px para garantizar la detección de lectura completa en pantallas táctiles.
+- Notas: En progreso. Implementando corrección de layout flexbox, scroll contenedor y umbral de lectura en banco-preguntas.component.ts. Corregido layout flexbox del modal de previsualización PDF oficial: contenedor ajustado a 94dvh/92vh, flex-1 min-h-0 en el visor de documentos, cabecera compacta y pie de página shrink-0 con botones visibles permanentemente y textos responsivos. Tolerancia de lectura calibrada a 100px para pantallas táctiles. Frontend compilado y verificado en Docker.
+
+#### T-023 — Reconocimiento OCR Robusto y Multi-Zona del Código de Estudiante (Dentro y Fuera del Recuadro de Cartilla OMR)
+
+- Prioridad: Alta
+- Área: Calificación OMR / Motor Python / Detección OCR
+- Responsable: Antigravity
+- Creada: 2026-09-19
+- Fecha límite: 2026-09-19
+- Dependencias: `omr_engine.py`, `evaluaciones-dia.component.ts`.
+- Criterio de cierre: 1) Ampliar la zona de búsqueda OMR a múltiples áreas: recuadro preimpreso con márgenes holgados, área manuscrita izquierda ("Código Estudiante") y escaneo de cabecera; 2) Corregir el corte de márgenes que truncaba el último dígito en el recuadro preimpreso; 3) Normalizar confusiones tipográficas OCR comunes (e.g. ¢ por 4, líneas divisorias por 4 o 1); 4) Implementar resolución inteligente y fuzzy contra la nómina oficial (`mapeos`) del examen para asignar automáticamente el estudiante cuando la coincidencia sea unívoca; 5) Habilitar en el frontend selección interactiva de los códigos OCR candidatos para autocompletar con un clic.
+- Notas: En progreso. Implementando soporte para lectura de código fuera del recuadro y corrección de márgenes. Implementado reconocimiento OCR multi-zona (recuadro preimpreso calibrado, area manuscrita izquierda, cabecera global) con tolerancia fuzzy a errores OCR (¢ por 4, líneas divisorias) y cruce inteligente contra la nómina oficial del examen. Ajustando interfaz de inspección OMR: ocultar escaneados por defecto sin recuadros residuales, remover OCRs candidatos y estructurar respuestas en columnas 1-20, 21-40 y tab 41-60 Ajustes de interfaz OMR concluidos: 1) Ocultar previsualizaciones por defecto sin recuadros residuales oscuros; 2) Remoción de OCR candidatos; 3) Distribución en dos columnas verticales (1-20 y 21-40) y segundo tab para 41-60 tipo cartilla física. Contenedores frontend y worker-omr reconstruidos con éxito. Cartillas escaneadas visibles por defecto en cada página; modal ampliado a max-w-7xl y botón toggle funcional para ocultar/mostrar sin espacios residuales oscuros Diseño OMR fijo lado a lado: cartilla escaneada a la izquierda (lg:col-span-5) y respuestas/patrones a la derecha (lg:col-span-7) con columnas 1-20 y 21-40 y segundo tab 41-60
+
+#### T-022 — Re-escaneo y Re-lectura OMR: Cargar nuevo archivo PDF de cartillas y actualizar calificaciones en evaluaciones calificadas o confirmadas
+
+- Prioridad: Alta
+- Área: Calificación OMR / Lista de Evaluaciones / Escaneo de Cartillas
+- Responsable: Antigravity
+- Creada: 2026-09-19
+- Fecha límite: 2026-09-19
+- Dependencias: `evaluaciones-dia.component.ts`, `OmrProcesamientoService.java`, `OmrProcesamientoController.java`.
+- Criterio de cierre: 1) Permitir abrir el lector OMR (`abrirCalificacionOmr`) en evaluaciones que ya estén en etapa `Calificado` o `Confirmado`; 2) Al pulsar "Volver a calificar" o desde el visor de notas OMR, abrir directamente la interfaz de carga de nuevo archivo PDF escaneado; 3) Ejecutar lectura OMR con el motor OpenCV, previsualizar resultados y al guardar reemplazar/actualizar las calificaciones y cartillas de los estudiantes; 4) Registrar formalmente la auditoría del re-escaneo con usuario, fecha y cantidad de cartillas leídas.
+- Notas: En progreso. Implementando acceso directo a re-escaneo OMR y carga de nuevo PDF en etapas Calificado y Confirmado. Habilitado re-escaneo OMR y carga de nuevo PDF en etapas Calificado y Confirmado con actualizacion automatica de calificaciones y auditoria formal. Frontend y backend reconstruidos y activos.
 
 #### T-020 — Flujo de Estados para Exámenes Virtuales: Paso intermedio Sala Virtual e icono de computadora con estado Calificado al concluir
 
@@ -134,7 +156,18 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Fecha límite: 2026-09-19
 - Dependencias: `evaluaciones-dia.component.ts`, `GeneracionTypstService.java`, `ExamenVirtualService.java`.
 - Criterio de cierre: 1) Incorporar en el flujo de estados de modalidad VIRTUAL el paso intermedio "Sala Virtual" (`pi pi-desktop`) entre Validado y Calificado; 2) Permitir que al pulsar el paso Sala Virtual en Validado se abra la parametrización/generación o la gestión de sala virtual si ya existe; 3) Mantener el estado "Calificado" exclusivamente como el paso de finalización cuando el examen haya concluido en la sala virtual; 4) Habilitar apertura directa de resultados virtuales y descarga en Excel al pulsar Calificado; 5) Sincronizar transición en backend a GENERADO tras preparar variantes virtuales y a CALIFICADO al concluir sala.
-- Notas: En revisión. Implementado paso intermedio Sala Virtual (pi pi-desktop) para exámenes virtuales en evaluaciones-dia y reservado Calificado para cuando concluye la sala. Incorporada copia de mensaje de acceso institucional completo para estudiantes (materia, grupo, docente, sala, token, link https://planificacion.unitepc.edu.bo/ e instrucciones paso a paso) con caché de sesión. Verificada compilación de frontend en Docker.
+- Notas: En revisión. Implementado paso intermedio Sala Virtual (pi pi-desktop) para exámenes virtuales en evaluaciones-dia y reservado Calificado para cuando concluye la sala. Incorporada copia de mensaje de acceso institucional completo para estudiantes (materia, grupo, docente, sala, token, link https://planificacion.unitepc.edu.bo/ e instrucciones paso a paso) con caché de sesión. Verificada compilación de frontend en Docker. Corrigiendo error 400 al finalizar y entregar examen virtual: soporte para variantes con cifrado KMS en calificar() Implementada corrección para examen virtual en ExamenVirtualService (desencriptación de patrón maestro mediante Vault Transit KMS en calificar y sincronización atómica de estado en enviar/guardarRespuesta) y frontend examen-virtual con estado de envío, spinner y alertas amigables. Tests unitarios aprobados (ExamenVirtualServiceTest) y contenedores reconstruidos.
+
+#### T-021 — Descarga de patrón oficial de respuestas por docente desde Banco de Preguntas en estado Entregado o posterior
+
+- Prioridad: Alta
+- Área: Banco de Preguntas / Patrón de Respuestas / Rol Docente
+- Responsable: Antigravity
+- Creada: 2026-09-19
+- Fecha límite: 2026-09-19
+- Dependencias: `OmrProcesamientoController.java`, `OmrProcesamientoService.java`, `evaluaciones-dia.component.ts`, `banco-preguntas.component.ts`.
+- Criterio de cierre: 1) Permitir al rol `DOCENTE` descargar el PDF del patrón oficial de respuestas (`/api/omr/{rolExamenId}/patron-calificado/pdf`) y consultar el patrón (`/patron-calificado`) para sus grupos asignados; 2) Habilitar la consulta y descarga a partir del estado `ENTREGADO` y etapas posteriores (`DEVUELTO`, `PENDIENTE_NOTAS`, `CALIFICADO`, `CONFIRMADO`); 3) En `banco-preguntas.component.ts`, mostrar tarjeta/botón institucional para descargar el PDF con las variantes para compartir con los estudiantes de su grupo asignado; 4) En `evaluaciones-dia.component.ts`, permitir visualización/descarga del patrón desde el estado `Entregado`.
+- Notas: En progreso. Iniciando implementación técnica en backend y frontend. Descarga de patrones variantes habilitada para DOCENTE en ENTREGADO o posteriores desde Banco de Preguntas y Calendario. Tests unitarios aprobados y contenedores reconstruidos.
 
 #### T-002 — Flujo completo de notas docente sin cartilla, planilla PDF y estado Confirmado
 
@@ -278,7 +311,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 7 |
 | En progreso | 0 |
-| En revisión | 10 |
+| En revisión | 13 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

@@ -1,5 +1,6 @@
 package com.xpertiflow.evaluaciones.application;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertiflow.evaluaciones.api.dto.virtual.*;
@@ -379,6 +380,7 @@ public class ExamenVirtualService {
         IntentoExamenVirtual intento = autenticarIntento(token);
         SalaExamenVirtual sala = obtenerSala(intento.getSalaId());
         verificarTiempo(sala, intento);
+        sincronizarInicioIntento(sala, intento);
         if (!"EN_CURSO".equals(intento.getEstado()) || !"EN_CURSO".equals(sala.getEstado())) {
             throw new RuntimeException("El intento no está en curso");
         }
@@ -407,7 +409,8 @@ public class ExamenVirtualService {
         IntentoExamenVirtual intento = autenticarIntento(token);
         SalaExamenVirtual sala = obtenerSala(intento.getSalaId());
         if (Set.of("ENVIADO", "CALIFICADO").contains(intento.getEstado())) return intento;
-        if (!Set.of("EN_CURSO", "PAUSADA").contains(intento.getEstado())) {
+        sincronizarInicioIntento(sala, intento);
+        if (!Set.of("EN_CURSO", "PAUSADA").contains(intento.getEstado()) && !"EN_CURSO".equals(sala.getEstado())) {
             throw new RuntimeException("El intento aún no puede enviarse");
         }
         calificar(intento);
@@ -433,14 +436,20 @@ public class ExamenVirtualService {
         ExamenVariante variante = varianteRepository.findById(intento.getVarianteId())
                 .orElseThrow(() -> new RuntimeException("Variante no encontrada"));
         try {
-            Map<String, String> patron = objectMapper.readValue(variante.getPatronClavesJson(), Map.class);
+            Map<String, String> patron = obtenerPatronClaves(variante);
             Map<Integer, String> respuestas = new HashMap<>();
             for (RespuestaExamenVirtual r : respuestaRepository.findByIntentoIdOrderByNumeroPreguntaAsc(intento.getId())) {
                 respuestas.put(r.getNumeroPregunta(), r.getRespuesta());
             }
             int aciertos = 0;
             for (Map.Entry<String, String> clave : patron.entrySet()) {
-                if (clave.getValue().equalsIgnoreCase(respuestas.getOrDefault(Integer.valueOf(clave.getKey()), ""))) aciertos++;
+                try {
+                    Integer numPregunta = Integer.valueOf(clave.getKey());
+                    String respEstudiante = respuestas.getOrDefault(numPregunta, "");
+                    if (clave.getValue() != null && clave.getValue().equalsIgnoreCase(respEstudiante.trim())) {
+                        aciertos++;
+                    }
+                } catch (NumberFormatException ignored) {}
             }
             int total = Math.max(patron.size(), 1);
             intento.setAciertos(aciertos);
@@ -448,6 +457,33 @@ public class ExamenVirtualService {
             intento.setNotaSobre100(BigDecimal.valueOf(aciertos * 100.0 / total).setScale(2, RoundingMode.HALF_UP));
         } catch (Exception ex) {
             throw new RuntimeException("No se pudo calificar la variante virtual", ex);
+        }
+    }
+
+    private Map<String, String> obtenerPatronClaves(ExamenVariante variante) {
+        if (variante.getPatronClavesJson() != null && !variante.getPatronClavesJson().isBlank()) {
+            try {
+                return objectMapper.readValue(variante.getPatronClavesJson(),
+                        new TypeReference<LinkedHashMap<String, String>>() {});
+            } catch (Exception ignored) {}
+        }
+        try {
+            String contenidoSeguro = descifrarContenidoVariante(variante);
+            JsonNode paquete = objectMapper.readTree(contenidoSeguro);
+            JsonNode patronNode = paquete.path("patronClavesJson");
+            if (patronNode.isMissingNode() || patronNode.isNull()) {
+                return Map.of();
+            }
+            if (patronNode.isTextual()) {
+                String patronJson = patronNode.asText("");
+                if (patronJson.isBlank()) return Map.of();
+                return objectMapper.readValue(patronJson,
+                        new TypeReference<LinkedHashMap<String, String>>() {});
+            }
+            return objectMapper.convertValue(patronNode,
+                    new TypeReference<LinkedHashMap<String, String>>() {});
+        } catch (Exception ex) {
+            throw new RuntimeException("No se pudo obtener el patrón de claves de la variante", ex);
         }
     }
 

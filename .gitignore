@@ -71,3 +71,7 @@ backups/*
 !backups/.gitkeep
 backups-external/*
 !backups-external/.gitkeep
+
+# Framework Gentle-AI local
+gentle-ai/
+

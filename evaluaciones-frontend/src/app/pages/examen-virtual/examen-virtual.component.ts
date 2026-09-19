@@ -468,9 +468,15 @@ interface AccesoVirtual {
             </div>
 
             <button (click)="enviar()" 
-                    class="rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-6 py-3 font-black text-white text-xs sm:text-sm shadow-lg shadow-emerald-600/20 transition flex items-center gap-2 cursor-pointer">
-              <span>Finalizar y entregar</span>
-              <i class="pi pi-send text-xs"></i>
+                    [disabled]="enviando()"
+                    class="rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-6 py-3 font-black text-white text-xs sm:text-sm shadow-lg shadow-emerald-600/20 transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              @if (enviando()) {
+                <i class="pi pi-spin pi-spinner"></i>
+                <span>Enviando respuestas...</span>
+              } @else {
+                <span>Finalizar y entregar</span>
+                <i class="pi pi-send text-xs"></i>
+              }
             </button>
           </div>
         }
@@ -513,6 +519,7 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
   cargando = signal(false);
   error = signal('');
   guardandoEstado = signal<'guardado' | 'guardando' | 'error'>('guardado');
+  enviando = signal(false);
 
   codigoSala = '';
   codigoEstudiante = '';
@@ -612,6 +619,8 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
   }
 
   async enviar(confirmar = true): Promise<void> {
+    if (this.enviando()) return;
+
     if (confirmar) {
       const sinResponder: number[] = [];
       for (const s of this.secciones()) {
@@ -636,14 +645,19 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
       if (!confirmado) return;
     }
 
+    this.enviando.set(true);
     const headers = new HttpHeaders({ 'X-Examen-Token': this.acceso()?.tokenSesion || this.token });
     this.http.post('/api/examen-virtual/enviar', {}, { headers }).subscribe({
       next: () => {
+        this.enviando.set(false);
         this.detener();
         this.vista.set('finalizado');
       },
       error: err => {
-        this.error.set(err?.error?.error || err?.error?.message || 'No se pudo enviar el examen.');
+        this.enviando.set(false);
+        const mensajeError = err?.error?.error || err?.error?.message || 'No se pudo enviar el examen.';
+        this.error.set(mensajeError);
+        this.feedback.mostrar(mensajeError, 'Error al enviar examen', 'error');
       }
     });
   }

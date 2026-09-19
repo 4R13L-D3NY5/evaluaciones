@@ -356,22 +356,172 @@ def _zona_codigo_desde_grilla(
     ancho: int,
     alto: int,
 ) -> tuple[int, int, int, int]:
-    """Ubica el recuadro del código respecto a la matriz, no respecto a la hoja.
+    """Ubica el recuadro principal del código respecto a la matriz.
 
-    La matriz conserva la misma relación con el código tanto en el escaneo
-    físico que llena casi toda la página como en el PDF recortado que deja
-    margen blanco lateral. Las coordenadas se recortan para que también sirvan
-    en imágenes con inclinación o recorte parcial.
+    Se añaden márgenes de tolerancia holgados a la derecha e izquierda para
+    evitar que el borde derecho corte el último dígito (ej. el '4' leído como '¢')
+    o que la línea divisoria izquierda genere dígitos falsos.
     """
     gx, gy, gw, gh = grilla
-    # El recuadro del código del estudiante se ubica exactamente en la cabecera
-    # derecha superior. Los márgenes relativos se calibran para excluir el
-    # cuadro contiguo (N°/materia) y las líneas divisorias.
-    x1 = gx + int(gw * 0.740)
-    y1 = gy - int(gh * 0.165)
-    x2 = gx + int(gw * 0.985)
-    y2 = gy - int(gh * 0.088)
+    x1 = gx + int(gw * 0.690)
+    y1 = gy - int(gh * 0.185)
+    x2 = gx + int(gw * 1.015)
+    y2 = gy - int(gh * 0.075)
     return max(0, x1), max(0, y1), min(ancho, x2), min(alto, y2)
+
+
+def _zonas_busqueda_codigo(
+    grilla: tuple[int, int, int, int] | None,
+    ancho: int,
+    alto: int,
+    parametros: dict[str, float] | None = None,
+) -> list[tuple[int, int, int, int]]:
+    """Genera las regiones prioritarias para ubicar el código del estudiante.
+    
+    Permite encontrar el código tanto si está impreso en el recuadro oficial
+    superior derecho, como si el estudiante lo escribió en el área manuscrita
+    'Código Estudiante' a la izquierda, o si la cartilla sufrió leves desplazamientos.
+    """
+    parametros = parametros or PARAMETROS_OMR_DEFECTO
+    zonas: list[tuple[int, int, int, int]] = []
+    
+    if grilla:
+        gx, gy, gw, gh = grilla
+        # 1. Recuadro preimpreso calibrado con padding seguro (evita truncar el último dígito)
+        x1_box = gx + int(gw * 0.690)
+        y1_box = gy - int(gh * 0.185)
+        x2_box = gx + int(gw * 1.015)
+        y2_box = gy - int(gh * 0.075)
+        zonas.append((max(0, x1_box), max(0, y1_box), min(ancho, x2_box), min(alto, y2_box)))
+        
+        # 2. Recuadro amplio derecho (abarca N° cartilla, grupo y código completo)
+        x1_wide = gx + int(gw * 0.520)
+        y1_wide = gy - int(gh * 0.220)
+        x2_wide = gx + int(gw * 1.020)
+        y2_wide = gy - int(gh * 0.065)
+        zonas.append((max(0, x1_wide), max(0, y1_wide), min(ancho, x2_wide), min(alto, y2_wide)))
+        
+        # 3. Área manuscrita del estudiante a la izquierda ('Código Estudiante:' y datos)
+        # Permite leer el código aunque esté FUERA del cuadro preimpreso de la cartilla
+        x1_hand = gx + int(gw * 0.050)
+        y1_hand = gy - int(gh * 0.170)
+        x2_hand = gx + int(gw * 0.580)
+        y2_hand = gy - int(gh * 0.065)
+        zonas.append((max(0, x1_hand), max(0, y1_hand), min(ancho, x2_hand), min(alto, y2_hand)))
+        
+        # 4. Franja de cabecera completa (cobertura global superior)
+        x1_hdr = max(0, gx)
+        y1_hdr = max(0, gy - int(gh * 0.280))
+        x2_hdr = min(ancho, gx + gw)
+        y2_hdr = min(alto, gy - int(gh * 0.040))
+        zonas.append((x1_hdr, y1_hdr, x2_hdr, y2_hdr))
+
+    # Respaldo para imágenes donde no se detectó la grilla (coordenadas relativas de página)
+    x1_cfg = parametros["zona_codigo_x"]
+    y1_cfg = parametros["zona_codigo_y"]
+    alto_ref = min(alto, int(ancho * 1.12))
+    zonas.append((
+        int(ancho * max(0.0, x1_cfg - 0.05)),
+        int(alto_ref * max(0.0, y1_cfg - 0.03)),
+        int(ancho * min(1.0, x1_cfg + parametros["zona_codigo_ancho"] + 0.05)),
+        int(alto_ref * min(1.0, y1_cfg + parametros["zona_codigo_alto"] + 0.03)),
+    ))
+    return zonas
+
+
+def _normalizar_digitos_ocr(texto: str) -> str:
+    """Convierte confusiones tipográficas comunes de OCR a dígitos numéricos."""
+    reemplazos = {
+        '¢': '4', '€': '6',
+        'I': '1', 'l': '1', '|': '1', '!': '1', 'i': '1',
+        'O': '0', 'o': '0', 'D': '0',
+        'S': '5', 's': '5',
+        'B': '8',
+        'Z': '2', 'z': '2',
+    }
+    limpio = texto
+    for orig, dest in reemplazos.items():
+        limpio = limpio.replace(orig, dest)
+    return limpio
+
+
+def _distancia_levenshtein(s1: str, s2: str) -> int:
+    """Calcula la distancia de edición mínima entre dos cadenas."""
+    if len(s1) < len(s2):
+        return _distancia_levenshtein(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    prev = list(range(len(s2) + 1))
+    for i, c1 in enumerate(s1):
+        curr = [i + 1]
+        for j, c2 in enumerate(s2):
+            ins = prev[j + 1] + 1
+            dele = curr[j] + 1
+            sub = prev[j] + (c1 != c2)
+            curr.append(min(ins, dele, sub))
+        prev = curr
+    return prev[-1]
+
+
+def _resolver_codigo_estudiante(
+    candidatos: list[str],
+    mapeos: dict[str, dict[str, Any]],
+    imagen: np.ndarray | None = None,
+    grilla: tuple[int, int, int, int] | None = None,
+) -> tuple[str | None, str]:
+    """Resuelve el código oficial del estudiante usando la nómina oficial del examen.
+    
+    Aplica una cascada de tolerancia progresiva:
+    1. Coincidencia exacta de candidatos en la nómina.
+    2. Coincidencia por subcadena (código oficial contenido en el OCR o viceversa).
+    3. Coincidencia difusa (distancia Levenshtein <= 1) unívoca en la nómina.
+    4. Coincidencia por nombre completo o apellidos del estudiante en la cabecera.
+    """
+    codigos_nomina = list(mapeos.keys())
+    
+    # Nivel 1: Coincidencia exacta
+    for candidato in candidatos:
+        if candidato in mapeos:
+            return candidato, "EXACTA"
+            
+    # Nivel 2: Subcadena (ej. candidato '4110174' contiene '1110174')
+    for codigo in codigos_nomina:
+        for cand in candidatos:
+            if codigo in cand or (len(cand) >= 6 and cand in codigo):
+                return codigo, "SUBCADENA"
+                
+    # Nivel 3: Distancia difusa Levenshtein <= 1 (ej. '111017' vs '1110174' o '4110174' vs '1110174')
+    coincidencias_fuzzy: list[tuple[str, int]] = []
+    for codigo in codigos_nomina:
+        min_dist = min((_distancia_levenshtein(codigo, cand) for cand in candidatos), default=99)
+        if min_dist <= 1:
+            coincidencias_fuzzy.append((codigo, min_dist))
+            
+    if len(coincidencias_fuzzy) == 1:
+        return coincidencias_fuzzy[0][0], "FUZZY_DISTANCIA_1"
+    elif len(coincidencias_fuzzy) > 1:
+        coincidencias_fuzzy.sort(key=lambda x: x[1])
+        if coincidencias_fuzzy[0][1] < coincidencias_fuzzy[1][1]:
+            return coincidencias_fuzzy[0][0], "FUZZY_DISTANCIA_1"
+            
+    # Nivel 4: Verificación por nombre impreso en la cabecera
+    if imagen is not None and grilla is not None:
+        try:
+            gx, gy, gw, gh = grilla
+            y_top = max(0, gy - int(gh * 0.280))
+            crop_hdr = imagen[y_top:gy, max(0, gx):min(imagen.shape[1], gx + gw)]
+            if crop_hdr.size > 0:
+                hdr_gray = cv2.cvtColor(crop_hdr, cv2.COLOR_BGR2GRAY)
+                texto_hdr = pytesseract.image_to_string(hdr_gray, config="--psm 6").upper()
+                for codigo, datos in mapeos.items():
+                    nombre = datos.get("nombre", "").upper().strip()
+                    partes = [p for p in nombre.split() if len(p) >= 4]
+                    if len(partes) >= 2 and all(p in texto_hdr for p in partes):
+                        return codigo, "NOMBRE_CABECERA"
+        except Exception as e:
+            logger.debug("No se pudo verificar por nombre en cabecera: %s", e)
+            
+    return None, "NO_RECONOCIDO"
 
 
 def _clasificar_perfil_escaneo(
@@ -391,23 +541,8 @@ def _candidatos_codigo(
 ) -> list[str]:
     alto, ancho = imagen.shape[:2]
     parametros = parametros or PARAMETROS_OMR_DEFECTO
-    # La matriz detectada es el ancla común para los dos formatos de captura.
-    # El recuadro del código queda arriba y hacia su extremo derecho.
-    zonas_pixeles: list[tuple[int, int, int, int]] = []
-    if grilla:
-        zonas_pixeles.append(_zona_codigo_desde_grilla(grilla, ancho, alto))
+    zonas_pixeles = _zonas_busqueda_codigo(grilla, ancho, alto, parametros)
 
-    # Respaldo para imágenes donde no se pudo detectar la matriz. Conserva la
-    # configuración administrativa y la geometría histórica de la cartilla.
-    x1 = parametros["zona_codigo_x"]
-    y1 = parametros["zona_codigo_y"]
-    alto_referencia = min(alto, int(ancho * 1.12))
-    zonas_pixeles.append((
-        int(ancho * x1),
-        int(alto_referencia * y1),
-        int(ancho * (x1 + parametros["zona_codigo_ancho"])),
-        int(alto_referencia * (y1 + parametros["zona_codigo_alto"])),
-    ))
     candidatos: list[str] = []
     for x1, y1, x2, y2 in zonas_pixeles:
         x1, y1 = max(0, x1), max(0, y1)
@@ -416,8 +551,9 @@ def _candidatos_codigo(
         if recorte.size == 0:
             continue
         gris = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
+        escala = parametros.get("escala_ocr", 3.0)
         ampliada = cv2.resize(
-            gris, None, fx=parametros["escala_ocr"], fy=parametros["escala_ocr"],
+            gris, None, fx=escala, fy=escala,
             interpolation=cv2.INTER_CUBIC
         )
         variantes = (
@@ -428,26 +564,29 @@ def _candidatos_codigo(
         for psm in (
             "--psm 7 -c tessedit_char_whitelist=0123456789",
             "--psm 6 -c tessedit_char_whitelist=0123456789",
+            "--psm 7",
+            "--psm 6",
+            "--psm 8",
         ):
             for variante in variantes:
-                texto = pytesseract.image_to_string(variante, config=psm)
-                # Se extraen secuencias de dígitos aunque Tesseract las devuelva
-                # separadas por saltos de línea o espacios.
-                secuencias = re.findall(r"\d{5,12}", texto)
-                candidatos.extend(secuencias)
-                # Los bordes del recuadro o restos de la numeración impresa pueden
-                # pegar uno o dos dígitos al código. Se incluyen ventanas de siete
-                # dígitos para recuperar el código institucional real sin aceptar
-                # datos de otras zonas de la cartilla.
-                for secuencia in secuencias:
-                    if len(secuencia) > 7:
-                        candidatos.append(secuencia[-7:])
-                        candidatos.append(secuencia[:7])
-    # Cuando una captura tiene poco contraste, Tesseract puede confundir un
-    # dígito en una de las variantes de binarización. Se prioriza el candidato
-    # que más veces aparece entre las zonas/variantes, en lugar del primero que
-    # devuelve el OCR. Esto es importante para conciliación, que no dispone de
-    # la nómina oficial para elegir entre candidatos.
+                texto_raw = pytesseract.image_to_string(variante, config=psm)
+                secuencias_raw = re.findall(r"\d{5,12}", texto_raw)
+                texto_norm = _normalizar_digitos_ocr(texto_raw)
+                secuencias_norm = re.findall(r"\d{5,12}", texto_norm)
+                
+                todas = list(set(secuencias_raw + secuencias_norm))
+                candidatos.extend(todas)
+                
+                for sec in todas:
+                    n = len(sec)
+                    if n > 7:
+                        candidatos.append(sec[-7:])
+                        candidatos.append(sec[:7])
+                        candidatos.append(sec[1:8])
+                    if n >= 7:
+                        candidatos.append(sec[1:])
+                        candidatos.append(sec[:-1])
+                        
     return [candidato for candidato, _ in Counter(candidatos).most_common()]
 
 
@@ -614,7 +753,9 @@ def procesar_archivo(archivo: str, rol_examen_id: str, campus: str = "", impreso
         gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
         grilla = _detectar_grilla(gris, parametros)
         candidatos = _candidatos_codigo(imagen, parametros, grilla)
-        codigo = next((valor for valor in candidatos if valor in mapeos), None)
+        codigo, metodo_resolucion = _resolver_codigo_estudiante(candidatos, mapeos, imagen, grilla)
+        if codigo and codigo not in candidatos:
+            candidatos.insert(0, codigo)
         lectura = {
             "pagina": numero_pagina,
             "codigoEstudiante": codigo,

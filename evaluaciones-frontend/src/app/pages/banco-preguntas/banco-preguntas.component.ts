@@ -1607,31 +1607,31 @@ export interface DiaCalendario {
       <!-- MODAL: PREVISUALIZACIÓN DEL EXAMEN EN FORMATO PDF OFICIAL -->
       <!-- ================================================================= -->
       @if (dialogPrevisualizacionPdf()) {
-        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div class="bg-card border border-border rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto flex flex-col max-h-[92vh]">
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-xl sm:rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto flex flex-col h-[94dvh] sm:h-auto sm:max-h-[92vh] max-h-[96dvh]">
             
             <!-- Barra Superior del Visor PDF (Estilo Lector de Documentos) -->
-            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-700/60 shrink-0">
-              <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-xl bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-400 text-xl shrink-0">
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-3 sm:p-4 flex items-center justify-between gap-2 sm:gap-3 border-b border-slate-700/60 shrink-0">
+              <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div class="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-400 text-base sm:text-xl shrink-0">
                   <i class="pi pi-file-pdf"></i>
                 </div>
-                <div>
-                  <div class="flex items-center gap-2">
-                    <h3 class="text-base font-black">Previsualización de Cuadernillo de Examen (Formato oficial)</h3>
-                    <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
-                      Excel actual · {{ preguntasValidasContablesParaPdf().length }} preguntas
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <h3 class="text-xs sm:text-base font-black truncate max-w-[190px] xs:max-w-[280px] sm:max-w-none">Previsualización de Cuadernillo</h3>
+                    <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono text-[8px] sm:text-[9px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full uppercase shrink-0">
+                      {{ preguntasValidasContablesParaPdf().length }} preguntas
                     </span>
                   </div>
-                  <p class="text-xs text-slate-300 font-mono">
-                    {{ parcialActivo() | uppercase }} · {{ nombreArchivoCargado() || 'Excel actual' }} · UNA COLUMNA
+                  <p class="text-[10px] sm:text-xs text-slate-300 font-mono truncate max-w-[220px] xs:max-w-[300px] sm:max-w-none">
+                    {{ parcialActivo() | uppercase }} · {{ nombreArchivoCargado() || 'Excel actual' }} · 1 COLUMNA
                   </p>
                 </div>
               </div>
 
               <!-- El PDF de validación siempre se genera en una sola columna. -->
-              <div class="flex flex-wrap items-center gap-2">
-                <button (click)="cerrarModalPrevisualizacionPdf()" class="text-white/80 hover:text-white p-1 text-base cursor-pointer ml-1">
+              <div class="flex items-center gap-2 shrink-0">
+                <button (click)="cerrarModalPrevisualizacionPdf()" class="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 text-base sm:text-lg cursor-pointer transition-colors" title="Cerrar previsualización">
                   <i class="pi pi-times"></i>
                 </button>
               </div>
@@ -1639,9 +1639,9 @@ export interface DiaCalendario {
 
             <!-- PDF real generado con las reglas oficiales, renderizado por el
                  componente para poder controlar el desplazamiento completo. -->
-            <div id="area-scroll-banco-pdf" (scroll)="onScrollDocumentoPdf($event)" class="p-4 sm:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 min-h-[65vh] max-h-[72vh]">
+            <div id="area-scroll-banco-pdf" (scroll)="onScrollDocumentoPdf($event)" class="p-2 sm:p-6 md:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 min-h-0">
               @if (pdfPreviewPages().length > 0) {
-                <div class="w-full flex flex-col items-center gap-6">
+                <div class="w-full flex flex-col items-center gap-4 sm:gap-6">
                   @for (page of pdfPreviewPages(); track $index) {
                     <div class="w-full max-w-[900px] bg-white shadow-xl border border-slate-300 rounded-sm overflow-hidden">
                       <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-[10px] font-mono text-slate-500 text-right">
@@ -1652,9 +1652,9 @@ export interface DiaCalendario {
                   }
                 </div>
               } @else if (pdfPreviewUrl()) {
-                <div class="h-[65vh] flex items-center justify-center text-slate-600">Renderizando páginas del PDF oficial...</div>
+                <div class="h-64 sm:h-96 flex items-center justify-center text-slate-600 font-medium text-xs sm:text-sm">Renderizando páginas del PDF oficial...</div>
               } @else {
-                <div class="h-[65vh] flex items-center justify-center text-slate-600">Generando PDF oficial...</div>
+                <div class="h-64 sm:h-96 flex items-center justify-center text-slate-600 font-medium text-xs sm:text-sm">Generando PDF oficial...</div>
               }
             </div>
 
@@ -1901,34 +1901,36 @@ export interface DiaCalendario {
             </div>
 
             <!-- Pie del Modal con Acción de Aprobación de Banco Requerida -->
-            <div class="bg-card border-t border-border p-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs shrink-0">
-              <div class="flex items-center gap-2 text-center sm:text-left">
+            <div class="bg-card border-t border-border p-2.5 sm:p-4 flex flex-col sm:flex-row justify-between items-center gap-2.5 sm:gap-3 text-xs shrink-0 shadow-lg">
+              <div class="w-full sm:w-auto flex items-center justify-center sm:justify-start">
                 @if (!documentoRecorridoCompleto()) {
-                  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 font-bold">
-                    <i class="pi pi-arrow-down animate-bounce text-xs"></i>
-                    <span>Debes visualizar y recorrer las {{ pdfPreviewPages().length || 'todas las' }} páginas del PDF oficial hasta el final para habilitar la validación y el registro.</span>
+                  <div class="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 font-bold text-[11px] sm:text-xs">
+                    <i class="pi pi-arrow-down animate-bounce text-xs shrink-0"></i>
+                    <span>Desplázate hasta el final de las {{ pdfPreviewPages().length || 'todas las' }} páginas para habilitar la aprobación.</span>
                   </div>
                 } @else {
-                  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 font-bold">
-                    <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
-                    <span>PDF oficial real generado en Oficio, una columna y revisado hasta el final. Ya puedes validar y registrar.</span>
+                  <div class="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 font-bold text-[11px] sm:text-xs">
+                    <i class="pi pi-check-circle text-emerald-600 text-sm shrink-0"></i>
+                    <span>PDF oficial revisado hasta el final. Listo para validar y registrar.</span>
                   </div>
                 }
               </div>
 
-              <div class="flex items-center gap-2.5">
+              <div class="w-full sm:w-auto flex items-center justify-end gap-2 sm:gap-2.5">
                 <button 
                   (click)="cerrarModalPrevisualizacionPdf()"
-                  class="px-4 py-2.5 bg-muted hover:bg-border text-foreground rounded-xl font-bold transition-colors cursor-pointer">
+                  class="px-3 sm:px-4 py-2 sm:py-2.5 bg-muted hover:bg-border text-foreground rounded-xl font-bold transition-colors cursor-pointer text-xs sm:text-sm shrink-0">
                   Cerrar
                 </button>
 
                 <button 
                   [disabled]="!pdfPrevisualizadoYConforme() || !documentoRecorridoCompleto() || !rolExamenActivo() || !archivoExcelSeleccionado() || cargandoBanco() || pdfPreviewPages().length === 0"
                   (click)="aprobarDiagramacionPdf()"
-                  class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-                  <i class="pi pi-check-circle text-sm"></i>
-                  <span>{{ cargandoBanco() ? 'Guardando en PostgreSQL...' : 'Aprobar y Guardar Banco de Preguntas' }}</span>
+                  class="flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm">
+                  <i class="pi pi-check-circle text-sm shrink-0"></i>
+                  <span class="truncate">
+                    {{ cargandoBanco() ? 'Guardando en PostgreSQL...' : 'Aprobar y Guardar' }}<span class="hidden sm:inline"> Banco de Preguntas</span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -5368,8 +5370,8 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   public onScrollDocumentoPdf(event: Event): void {
     const element = event.target as HTMLElement;
     if (!element) return;
-    // Comprobar si el scroll llegó al final o está a menos de 80px del final.
-    if (element.scrollTop + element.clientHeight >= element.scrollHeight - 80) {
+    // Comprobar si el scroll llegó al final o está a menos de 100px del final (tolerancia para móviles).
+    if (element.scrollTop + element.clientHeight >= element.scrollHeight - 100) {
       this.documentoRecorridoCompleto.set(true);
       this.pdfPrevisualizadoYConforme.set(true);
     }
@@ -5384,7 +5386,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       setTimeout(() => this._comprobarFinPrevisualizacion(), 50);
       return;
     }
-    if (element.scrollHeight <= element.clientHeight + 2) {
+    if (element.scrollHeight <= element.clientHeight + 10) {
       this.documentoRecorridoCompleto.set(true);
       this.pdfPrevisualizadoYConforme.set(true);
     }
