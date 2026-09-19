@@ -493,8 +493,17 @@ class RolExamenServiceTest {
                 .grupo("G-01")
                 .build();
 
+        com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto grupo = new com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto();
+        grupo.setGroupId("GRP-01");
+        grupo.setCode("G-01");
+        grupo.setTeacherName("Dr. Pérez");
+        grupo.setTeacherIdentityNumber("1234567");
+        when(unitepcGatewayClient.getGroups(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(grupo));
+
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
-        when(mapper.toEntity(dto)).thenReturn(new RolExamen());
+        RolExamen entidadPrevia = RolExamen.builder().id("ROL-IMPRESO-001").materiaCodigo("MED-101").grupo("G-01").build();
+        when(mapper.toEntity(dto)).thenReturn(entidadPrevia);
         when(rolExamenRepository.save(rol)).thenReturn(rol);
         when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
@@ -558,6 +567,14 @@ class RolExamenServiceTest {
                 .thenReturn(List.of(rol1, rol2));
         when(rolExamenRepository.save(org.mockito.ArgumentMatchers.any(RolExamen.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponseDto(org.mockito.ArgumentMatchers.any(RolExamen.class)))
+                .thenAnswer(invocation -> {
+                    RolExamen r = invocation.getArgument(0);
+                    return com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto.builder()
+                            .id(r.getId())
+                            .fecha(r.getFecha())
+                            .build();
+                });
 
         ReprogramarRangoRequestDto dto = ReprogramarRangoRequestDto.builder()
                 .sedeCodigo("CBB")
@@ -591,5 +608,30 @@ class RolExamenServiceTest {
 
         assertThatThrownBy(() -> service.reprogramarRangoParaCarrera(dto, authDirector))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void transicionarEstadoPermiteCalificadoAConfirmado() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-CONF-1")
+                .estadoFlujo(EstadoFlujo.CALIFICADO)
+                .modalidad(ModalidadExamen.PRESENCIAL_SIN_CARTILLA)
+                .build();
+
+        when(rolExamenRepository.findById("ROL-CONF-1")).thenReturn(Optional.of(rol));
+        when(rolExamenRepository.save(org.mockito.ArgumentMatchers.any(RolExamen.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        TransicionEstadoRequestDto request = TransicionEstadoRequestDto.builder()
+                .nuevoEstado(EstadoFlujo.CONFIRMADO)
+                .motivo("Recepción de planilla impresa y firmada")
+                .usuario("evaluaciones_admin")
+                .ipOrigen("127.0.0.1")
+                .build();
+
+        service.transicionarEstado("ROL-CONF-1", request);
+
+        assertThat(rol.getEstadoFlujo()).isEqualTo(EstadoFlujo.CONFIRMADO);
+        verify(auditoriaRepository).save(org.mockito.ArgumentMatchers.any());
     }
 }

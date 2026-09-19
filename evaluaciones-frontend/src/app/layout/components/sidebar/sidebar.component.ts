@@ -324,7 +324,7 @@ export class SidebarComponent implements OnInit {
       route: '/salas-virtuales',
       icon: 'pi pi-desktop',
       description: 'Ingreso, espera, inicio y seguimiento de exámenes virtuales',
-      roles: ['ADMINISTRADOR_SISTEMA', 'DOCENTE']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE']
     },
     {
       label: 'Calificación OMR',

@@ -39,16 +39,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Criterio de cierre: Confirmar que una programación existente en `PROGRAMADO` o `VALIDADO` se actualiza con la fecha y horario del Excel, y que los estados posteriores permanecen protegidos.
 - Notas: La corrección ya fue implementada y verificada localmente.
 
-#### T-002 — Revisar carga de exámenes sin cartilla por parte del docente
-
-- Prioridad: Alta
-- Área: Exámenes sin cartilla / Docentes
-- Responsable: Por definir
-- Creada: 2026-09-12
-- Fecha límite: Por definir
-- Dependencias: Por definir
-- Criterio de cierre: Confirmar el flujo que debe utilizar el docente, reproducir la operación y documentar o corregir cualquier bloqueo encontrado.
-- Notas: Tarea creada desde el comando `=new`.
 
 #### T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor
 
@@ -73,16 +63,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Criterio de cierre: Respaldo, copia, verificación y restauración aislada comprobados sin afectar producción, con auditoría completa y procedimiento operativo documentado.
 - Notas: La funcionalidad base ya está implementada. La restauración no debe probarse directamente sobre producción. Ver [plan de continuación y cierre](plan-cierre-respaldos.md).
 
-#### T-007 — Optimizar y concluir el examen tipo virtual
-
-- Prioridad: Alta
-- Área: Examen Virtual
-- Responsable: Por definir
-- Creada: 2026-09-12
-- Fecha límite: Por definir
-- Dependencias: Revisar el flujo actual de generación, publicación, acceso del estudiante, respuestas, calificación y cierre.
-- Criterio de cierre: Completar la optimización funcional y visual del examen virtual, validar el flujo integral y dejar documentados los pendientes o ajustes finales.
-- Notas: Tarea creada desde el comando `=new`.
 
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
@@ -133,6 +113,39 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 *(Sin tareas activas)*
 
 ### En revisión
+
+#### T-002 — Flujo completo de notas docente sin cartilla, planilla PDF y estado Confirmado
+
+- Prioridad: Alta
+- Área: Exámenes sin cartilla / Docentes / Evaluaciones
+- Responsable: Por definir
+- Creada: 2026-09-12
+- Fecha límite: Por definir
+- Dependencias: Migración Flyway V40 (estado `CONFIRMADO`), PDFBox, endpoints de carga de notas y frontend `banco-preguntas` y `evaluaciones-dia`.
+- Criterio de cierre: 1) Permitir al docente registrar notas sobre 60 puntos desde `/banco-preguntas` cuando el examen está en `PENDIENTE_NOTAS`; 2) Transicionar automáticamente a `CALIFICADO` al guardar notas; 3) Generar la Planilla Oficial de Calificaciones en PDF con membrete institucional, notas sobre 60 y 100, y espacios de firma/sello de Docente y Recepción de Evaluaciones; 4) Incorporar el estado `CONFIRMADO` para que Evaluaciones confirme la entrega física firmada desde `/evaluaciones-dia`; 5) Actualizar selectores y etiquetas en roles y reportes sin afectar datos productivos existentes.
+- Notas: Implementación completada con migración V40, `ReporteNotasSinCartillaPdfService`, tests unitarios en backend y vistas actualizadas en frontend.
+
+#### T-018 — Políticas de reprogramación de exámenes, candado 72h y reprogramación masiva por rango
+
+- Prioridad: Alta
+- Área: Rol de Exámenes / Reprogramación y Seguridad
+- Responsable: Por definir
+- Creada: 2026-09-18
+- Fecha límite: Por definir
+- Dependencias: Parámetro dinámico `horasCandado72`, endpoints de reprogramación y bitácora en backend y modal en frontend.
+- Criterio de cierre: 1) Carga Excel, registro manual y vaciado de rol exclusivos para `ADMINISTRADOR_SISTEMA`; 2) Directores solo reprograman a fechas futuras (> hoy) y con candado de 72h dinámico; 3) Administrador puede reprogramar exámenes en estados avanzados (`GENERADO`, `IMPRESO`, etc.) registrando auditoría oficial; 4) Modal de reprogramación masiva por rango de fechas (por suspensión de actividades) con selector de carrera (o todas las de la sede), cálculo correlativo día por día y auditoría individual.
+- Notas: Implementado completamente en frontend y backend. Pruebas unitarias aprobadas, imágenes Docker compiladas y desplegadas.
+
+#### T-017 — Notificaciones para Director de Carrera: Grupos observados y exámenes sin banco validado (< 72h)
+
+- Prioridad: Alta
+- Área: Notificaciones / Dirección de Carrera
+- Responsable: Por definir
+- Creada: 2026-09-18
+- Fecha límite: Por definir
+- Dependencias: Integración en `NotificacionesService`, `TopbarComponent` y navegación reactiva hacia `RolExamenesComponent`.
+- Criterio de cierre: 1) Mostrar en la campana del topbar alertas rojas para grupos con `DEVUELTO` con datos del docente titular; 2) Mostrar alertas rojas para exámenes a menos de 72 horas sin banco de preguntas validado, calculando tiempo restante y docente titular; 3) Sincronizar búsqueda instantánea al navegar a Rol de Exámenes.
+- Notas: Implementado en `notificaciones.service.ts`, `topbar.component.ts` y `rol-examenes.component.ts`. Compilación y despliegue en ejecución.
 
 #### T-016 — Corregir presentación de tipologías complejas, numeración de enunciados y filtro de estados en Verificación
 
@@ -215,17 +228,26 @@ _Sin tareas._
 - Fecha límite: 2026-09-13
 - Dependencias: Confirmar los nombres definitivos, permisos y alcance académico de los roles integrados en `main`.
 - Criterio de cierre: Mostrar en el apartado de Usuarios y accesos todos los roles integrados, especialmente `VERIFICADOR`, con su descripción, alcance y permisos coherentes con el backend.
-- Notas: Completada en `main`: `VERIFICADOR` quedó visible y administrable en el contexto institucional; se alinearon el filtro del backend, el formulario, el catálogo visual y la documentación. Frontend compilado y backend construido en Docker.
+#### T-007 — Optimizar y concluir el examen tipo virtual
+
+- Prioridad: Alta
+- Área: Examen Virtual
+- Responsable: Antigravity
+- Creada: 2026-09-12
+- Fecha límite: 2026-09-18
+- Dependencias: Revisar el flujo actual de generación, publicación, acceso del estudiante, respuestas, calificación y cierre.
+- Criterio de cierre: Completar la optimización funcional y visual del examen virtual, validar el flujo integral y dejar documentados los pendientes o ajustes finales.
+- Notas: Completada con éxito. Implementación de PIN numérico corto de 6 dígitos retrocompatible (SHA-256), auto-recuperación de respuestas al recargar (F5), fórmulas KaTeX, diseño institucional moderno con minimapa y timer adaptativo, cierre/calificación directa de sala y exportación a Excel (.xlsx).
 
 ## Resumen
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 9 |
-| En progreso | 1 |
-| En revisión | 4 |
+| Pendientes | 8 |
+| En progreso | 0 |
+| En revisión | 7 |
 | Bloqueadas | 0 |
-| Completadas | 2 |
+| Completadas | 3 |
 
 ## Decisiones del módulo
 

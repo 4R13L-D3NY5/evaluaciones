@@ -72,7 +72,7 @@ public class ExamenVirtualService {
         sala.setGraciaIngresoMinutos(Optional.ofNullable(request.getGraciaIngresoMinutos()).orElse(10));
         sala.setPermiteReconexion(Optional.ofNullable(request.getPermiteReconexion()).orElse(true));
         sala.setCreadoPor(usuario == null ? "Sistema" : usuario);
-        String tokenGrupo = generarToken();
+        String tokenGrupo = generarPinGrupo();
         sala.setTokenGrupoHash(hashToken(tokenGrupo));
         sala.setTokenGrupoEmitidoEn(ahora);
         salaRepository.save(sala);
@@ -112,7 +112,7 @@ public class ExamenVirtualService {
         if (!Set.of("PREPARADA", "ABIERTA", "EN_CURSO", "PAUSADA").contains(sala.getEstado())) {
             throw new RuntimeException("Solo se puede generar un acceso grupal mientras la sala esté disponible");
         }
-        String token = generarToken();
+        String token = generarPinGrupo();
         boolean yaExistia = sala.getTokenGrupoHash() != null;
         sala.setTokenGrupoHash(hashToken(token));
         sala.setTokenGrupoEmitidoEn(LocalDateTime.now());
@@ -321,13 +321,18 @@ public class ExamenVirtualService {
             throw new RuntimeException("La sala no está habilitada para recibir estudiantes");
         }
         String tokenSesion = request.getToken().trim();
+        String tokenNormalizado = tokenSesion.replaceAll("[\\s-]+", "");
         String tokenHash = hashToken(tokenSesion);
-        Optional<IntentoExamenVirtual> intentoPorPersona = intentoRepository.findBySalaIdAndTokenHash(sala.getId(), tokenHash);
+        String tokenHashNorm = hashToken(tokenNormalizado);
+        Optional<IntentoExamenVirtual> intentoPorPersona = intentoRepository.findBySalaIdAndTokenHash(sala.getId(), tokenHash)
+                .or(() -> intentoRepository.findBySalaIdAndTokenHash(sala.getId(), tokenHashNorm));
         IntentoExamenVirtual intento;
         if (intentoPorPersona.isPresent()) {
             intento = intentoPorPersona.get();
         } else {
-            if (sala.getTokenGrupoHash() == null || !sala.getTokenGrupoHash().equals(tokenHash)) {
+            boolean coincideGrupo = sala.getTokenGrupoHash() != null &&
+                    (sala.getTokenGrupoHash().equals(tokenHash) || sala.getTokenGrupoHash().equals(tokenHashNorm));
+            if (!coincideGrupo) {
                 throw new RuntimeException("El código de sala o el token no son válidos");
             }
             if (request.getCodigoEstudiante() == null || request.getCodigoEstudiante().isBlank()) {
@@ -478,6 +483,11 @@ public class ExamenVirtualService {
         dto.setCuentaRegresivaSegundos(cuentaRegresivaRestante(sala));
         dto.setTiempoRestanteSegundos(tiempoRestante(sala));
         dto.setPreguntas("EN_CURSO".equals(sala.getEstado()) && examenIniciado(sala) ? construirPreguntas(variante) : List.of());
+        Map<Integer, String> guardadas = new HashMap<>();
+        for (RespuestaExamenVirtual r : respuestaRepository.findByIntentoIdOrderByNumeroPreguntaAsc(intento.getId())) {
+            guardadas.put(r.getNumeroPregunta(), r.getRespuesta());
+        }
+        dto.setRespuestasGuardadas(guardadas);
         return dto;
     }
 
@@ -633,6 +643,7 @@ public class ExamenVirtualService {
     }
 
     private String generarCodigoSala() { String codigo; do { codigo = "SALA-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT); } while (salaRepository.findByCodigoSala(codigo).isPresent()); return codigo; }
+    private String generarPinGrupo() { return String.format("%06d", secureRandom.nextInt(1_000_000)); }
     private String generarToken() { byte[] bytes = new byte[32]; secureRandom.nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
     private String hashToken(String token) { try { byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)); StringBuilder out = new StringBuilder(); for (byte b : digest) out.append(String.format("%02x", b)); return out.toString(); } catch (Exception ex) { throw new IllegalStateException(ex); } }
     private String nombreCompleto(MapeoEstudianteVariante m) { return String.join(" ", Arrays.asList(m.getNombres(), m.getApellidoPaterno(), m.getApellidoMaterno())).replaceAll("\\s+", " ").trim(); }

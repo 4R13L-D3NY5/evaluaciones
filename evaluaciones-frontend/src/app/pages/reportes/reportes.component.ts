@@ -192,7 +192,7 @@ interface FilaRemark {
             <div class="space-y-1">
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Estado:</label>
               <select [ngModel]="filtroEstadoReporte" (ngModelChange)="filtroEstadoReporte = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
-                <option value="Todos">Todos los estados</option><option value="PROGRAMADO">Programado</option><option value="VALIDADO">Validado</option><option value="GENERADO">Generado</option><option value="IMPRESO">Impreso</option><option value="ENTREGADO">Entregado</option><option value="DEVUELTO">Devuelto</option><option value="CALIFICADO">Calificado</option>
+                <option value="Todos">Todos los estados</option><option value="PROGRAMADO">Programado</option><option value="VALIDADO">Validado</option><option value="GENERADO">Generado</option><option value="IMPRESO">Impreso</option><option value="ENTREGADO">Entregado</option><option value="DEVUELTO">Devuelto</option><option value="CALIFICADO">Calificado</option><option value="CONFIRMADO">Confirmado</option>
               </select>
             </div>
           </div>
@@ -887,7 +887,7 @@ export class ReporteEvaluacionesComponent implements OnInit {
     const etiquetas: Record<string, string> = {
       PROGRAMADO: 'Programado', VALIDADO: 'Validado', GENERADO: 'Generado', IMPRESO: 'Impreso',
       ENTREGADO: 'Entregado', DEVUELTO: 'Devuelto', PENDIENTE_NOTAS: 'Pendiente de notas',
-      CALIFICADO: 'Calificado', SUSPENDIDO: 'Suspendido'
+      CALIFICADO: 'Calificado', CONFIRMADO: 'Confirmado', SUSPENDIDO: 'Suspendido'
     };
     return etiquetas[estado] || estado;
   }

@@ -50,7 +50,7 @@ if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
 }
 
-export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Verificado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Pendiente de notas' | 'Calificado';
+export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Verificado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Pendiente de notas' | 'Calificado' | 'Confirmado';
 
 export interface StepDef {
   key: EtapaEvaluacion;
@@ -618,13 +618,13 @@ interface CampusDisponible extends Campus {
                           <div class="relative group/salaVirtual">
                             <button
                               (click)="abrirSalaVirtualDesdeLista(item)"
-                              title="Restablecer examen virtual"
-                              aria-label="Restablecer examen virtual"
-                              class="h-7 w-7 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex items-center justify-center cursor-pointer transition-colors">
-                              <i class="pi pi-refresh text-xs"></i>
+                              title="Gestionar sala virtual"
+                              aria-label="Gestionar sala virtual"
+                              class="h-7 w-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-desktop text-xs"></i>
                             </button>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/salaVirtual:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Restablecer examen virtual</span>
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Gestionar sala virtual</span>
                               <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                             </div>
                           </div>
@@ -1169,7 +1169,11 @@ interface CampusDisponible extends Campus {
             <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2 shrink-0">
               @if (salaVirtualCreada()?.estado === 'PREPARADA') { <button (click)="abrirSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-door-open mr-1"></i> Abrir sala para estudiantes</button> }
               @else if (salaVirtualCreada()?.estado === 'ABIERTA') { <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button> }
-              @else if (salaVirtualCreada()?.estado === 'EN_CURSO' || salaVirtualCreada()?.estado === 'PAUSADA') { <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso. El tiempo lo controla el servidor.</span><button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer examen</button> }
+              @else if (salaVirtualCreada()?.estado === 'EN_CURSO' || salaVirtualCreada()?.estado === 'PAUSADA') { 
+                <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso.</span>
+                <button (click)="cerrarSalaVirtualOperativa()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50 flex items-center gap-1.5"><i class="pi pi-stop-circle"></i> Cerrar sala y calificar</button>
+                <button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer examen</button> 
+              }
               @else if (salaVirtualCreada()?.estado === 'CERRADA' || salaVirtualCreada()?.estado === 'CALIFICADA') { <span class="self-center text-[11px] font-bold text-amber-700">El examen concluyó y puede restablecerse por una incidencia.</span><button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer examen</button> }
               @else { <span class="self-center text-[11px] font-bold text-muted-foreground">La sala ya concluyó.</span> }
               <button (click)="cerrarSalaVirtual()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
@@ -2218,7 +2222,13 @@ interface CampusDisponible extends Campus {
               @else if (resultadosVirtuales().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen resultados para esta sala.</div> }
               @else { <div class="space-y-3">@for (resultado of resultadosVirtuales(); track resultado.intentoId) {<article class="rounded-xl border border-border bg-muted/20 p-4"><div class="flex flex-wrap items-center justify-between gap-3"><div><strong class="text-sm text-foreground">{{ resultado.codigoEstudiante }} · {{ resultado.nombreEstudiante }}</strong><p class="mt-1 text-[10px] font-black uppercase text-cyan-700">Variante {{ resultado.letraVariante || '—' }} · {{ resultado.estado }}</p></div><div class="flex gap-4 text-xs"><span><small class="block text-[10px] text-muted-foreground">Aciertos</small><b>{{ resultado.aciertos ?? 0 }}/30</b></span><span><small class="block text-[10px] text-muted-foreground">Nota /30</small><b>{{ resultado.notaSobre30 || '0.00' }}</b></span><span><small class="block text-[10px] text-muted-foreground">Nota /100</small><b>{{ resultado.notaSobre100 || '0.00' }}</b></span></div></div><div class="mt-3 flex flex-wrap gap-1.5">@for (respuesta of resultado.respuestas; track respuesta.numeroPregunta) {<span class="rounded-lg border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-900">{{ respuesta.numeroPregunta }}: {{ respuesta.respuesta }}</span>} @if (!resultado.respuestas.length) {<span class="text-[11px] text-muted-foreground">Sin respuestas marcadas</span>}</div></article>}</div> }
             </div>
-            <div class="p-4 border-t border-border flex justify-end shrink-0"><button (click)="cerrarResultadosVirtuales()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
+            <div class="p-4 border-t border-border flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <button (click)="exportarResultadosVirtualesExcel()" [disabled]="!resultadosVirtuales().length" class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs transition">
+                <i class="pi pi-file-excel"></i>
+                <span>Exportar calificaciones (.xlsx)</span>
+              </button>
+              <button (click)="cerrarResultadosVirtuales()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button>
+            </div>
           </div>
         </div>
       }
@@ -3041,6 +3051,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       case 'DEVUELTO': return 'Devuelto';
       case 'PENDIENTE_NOTAS': return 'Pendiente de notas';
       case 'CALIFICADO': return 'Calificado';
+      case 'CONFIRMADO': return 'Confirmado';
       default: return 'Programado';
     }
   }
@@ -3401,7 +3412,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
         { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
         { key: 'Pendiente de notas', label: 'Pendiente de notas', icon: 'pi pi-upload' },
-        { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
+        { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' },
+        { key: 'Confirmado', label: 'Confirmado', icon: 'pi pi-check-square' }
       ];
     }
     if (item.requiereVerificacion) {
@@ -3847,7 +3859,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       'Entregado': 'ENTREGADO',
       'Devuelto': 'DEVUELTO',
       'Pendiente de notas': 'PENDIENTE_NOTAS',
-      'Calificado': 'CALIFICADO'
+      'Calificado': 'CALIFICADO',
+      'Confirmado': 'CONFIRMADO'
     };
     return estados[etapa];
   }
@@ -4453,19 +4466,26 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public imprimirReporteNotasDocente(): void {
     const item = this.evaluacionSeleccionadaNotasDocente();
-    const notas = this.notasDocente();
     if (!item || !this.notasDocenteCompletas()) {
       this._mostrarToast('Complete todas las notas antes de imprimir el reporte.', 'error');
       return;
     }
-    const ventana = window.open('', '_blank', 'width=1000,height=750');
-    if (!ventana) {
-      this._mostrarToast('El navegador bloqueó la ventana del reporte. Permita las ventanas emergentes.', 'error');
-      return;
-    }
-    const filas = notas.map((nota, indice) => `<tr><td>${indice + 1}</td><td>${this.escapeHtml(nota.codigoEstudiante)}</td><td>${this.escapeHtml(nota.estudianteNombreCompleto)}</td><td>${nota.notaSobre60 ?? '—'}</td><td>${nota.notaSobre100 ?? '—'}</td></tr>`).join('');
-    ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de notas ${this.escapeHtml(item.codigo)}</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:32px}h1{font-size:20px;margin:0 0 6px}p{color:#53627b;font-size:12px;margin:4px 0 20px}.meta{border:1px solid #d9e1ef;padding:12px;border-radius:8px;margin-bottom:18px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d9e1ef;padding:9px;text-align:left}th{background:#eef3fa;text-transform:uppercase;font-size:10px}td:nth-child(1),td:nth-child(4),td:nth-child(5){text-align:center}@media print{body{padding:0}}</style></head><body><h1>Reporte de notas — examen sin cartilla</h1><p>Sistema de Evaluaciones</p><div class="meta"><strong>${this.escapeHtml(item.codigo)} — ${this.escapeHtml(item.materia)}</strong><br>Grupo: ${this.escapeHtml(item.grupo)} · Parcial: ${this.escapeHtml(item.tipo)} · Docente: ${this.escapeHtml(item.docenteNombre || '—')}<br>Estado: ${this.escapeHtml(item.etapa)}</div><table><thead><tr><th>N°</th><th>Código</th><th>Estudiante</th><th>Nota /60</th><th>Nota /100</th></tr></thead><tbody>${filas}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
-    ventana.document.close();
+    this._sinCartillaService.descargarReporteNotasPdf(item.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if (!win) {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Planilla_Notas_${item.codigo}_${item.grupo}.pdf`;
+          a.click();
+        }
+        this._mostrarToast('Planilla oficial generada con formato institucional, firma y sello.');
+      },
+      error: err => {
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo generar la planilla PDF oficial.', 'error');
+      }
+    });
   }
 
   private escapeHtml(valor: string): string {
@@ -4482,7 +4502,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.salaVirtualExistente.set(true);
         this.accesosVirtuales.set([]);
         this.tokenGrupoVirtual.set(null);
-        this.abrirDialogoRestablecerSalaVirtual();
+        this.dialogSalaVirtual.set(true);
       },
       error: err => {
         this.consultandoSalaVirtual.set(false);
@@ -4492,6 +4512,64 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         );
       }
     });
+  }
+
+  public cerrarSalaVirtualOperativa(): void {
+    const sala = this.salaVirtualCreada();
+    if (!sala || this.creandoSalaVirtual()) return;
+    this.creandoSalaVirtual.set(true);
+    this._http.post<SalaVirtualOperacion>(`/api/examenes-virtuales/salas/${sala.id}/cerrar`, {}).subscribe({
+      next: actualizada => {
+        this.salaVirtualCreada.set(actualizada);
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast('Sala virtual cerrada y calificada exitosamente.');
+        this._cargarEvaluaciones();
+      },
+      error: err => {
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo cerrar la sala virtual.', 'error');
+      }
+    });
+  }
+
+  public exportarResultadosVirtualesExcel(): void {
+    const resultados = this.resultadosVirtuales();
+    if (!resultados.length) return;
+    const evaluacion = this.evaluacionSeleccionadaResultados();
+    const codigoMateria = evaluacion?.codigo || 'EXAMEN_VIRTUAL';
+
+    const data: any[][] = [
+      ['COD_EST', 'ESTUDIANTE', 'VAR', 'ACIERTOS', 'NOTA/30', 'NOTA/100', 'ESTADO', 'FECHA_ENVIO']
+    ];
+
+    resultados.forEach(r => {
+      data.push([
+        r.codigoEstudiante,
+        r.nombreEstudiante,
+        r.letraVariante || '—',
+        r.aciertos ?? 0,
+        r.notaSobre30 ? Number(r.notaSobre30) : 0,
+        r.notaSobre100 ? Number(r.notaSobre100) : 0,
+        r.estado,
+        r.enviadoEn || '—'
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 14 },
+      { wch: 35 },
+      { wch: 6 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 22 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, 'Resultados');
+    XLSX.writeFile(wb, `NOTAS_VIRTUAL_${codigoMateria}_${evaluacion?.grupo || 'G1'}.xlsx`);
+    this._mostrarToast('Reporte Excel descargado correctamente.');
   }
 
   public abrirResultadosVirtuales(item: EvaluacionItemUI): void {

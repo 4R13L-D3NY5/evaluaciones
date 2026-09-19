@@ -1108,7 +1108,7 @@ export class RolExamenesComponent implements OnInit {
     return this.examenes().filter(e => {
       const matchCarrera = !carreraCod || carreraCod === '__TODAS_LAS_CARRERAS__' || e.careerCode === carreraCod;
       return matchCarrera && e.fecha && e.fecha >= desde && e.fecha <= hasta &&
-        e.estado !== 'CALIFICADO' && e.estado !== 'SUSPENDIDO';
+        e.estado !== 'CALIFICADO' && e.estado !== 'CONFIRMADO' && e.estado !== 'SUSPENDIDO';
     });
   });
 
@@ -1600,6 +1600,7 @@ export class RolExamenesComponent implements OnInit {
       case 'DEVUELTO': return 'bg-amber-600 text-white';
       case 'PENDIENTE_NOTAS': return 'bg-amber-600 text-white';
       case 'CALIFICADO': return 'bg-emerald-600 text-white';
+      case 'CONFIRMADO': return 'bg-teal-700 text-white';
       case 'SUSPENDIDO': return 'bg-rose-600 text-white';
       default: return 'bg-slate-600 text-white';
     }

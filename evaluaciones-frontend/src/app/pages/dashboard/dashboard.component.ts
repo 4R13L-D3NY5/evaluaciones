@@ -30,7 +30,7 @@ interface EstadoMetrica {
   icon: string;
 }
 
-type DashboardEtapa = EtapaEvaluacion | 'Validado' | 'Suspendido';
+type DashboardEtapa = EtapaEvaluacion | 'Validado' | 'Confirmado' | 'Suspendido';
 
 interface DashboardRolConfig {
   titulo: string;
@@ -850,6 +850,7 @@ export class DashboardComponent implements OnInit {
       { estado: 'Devuelto', backend: 'DEVUELTO', color: 'bg-rose-600', badge: 'bg-rose-100 text-rose-800 border border-rose-300', icon: 'pi pi-replay' },
       { estado: 'Pendiente de notas', backend: 'PENDIENTE_NOTAS', color: 'bg-amber-600', badge: 'bg-amber-100 text-amber-800 border border-amber-300', icon: 'pi pi-upload' },
       { estado: 'Calificado', backend: 'CALIFICADO', color: 'bg-emerald-600', badge: 'bg-emerald-100 text-emerald-800 border border-emerald-300', icon: 'pi pi-check-circle' },
+      { estado: 'Confirmado', backend: 'CONFIRMADO', color: 'bg-teal-600', badge: 'bg-teal-100 text-teal-800 border border-teal-300', icon: 'pi pi-verified' },
       { estado: 'Suspendido', backend: 'SUSPENDIDO', color: 'bg-slate-600', badge: 'bg-slate-100 text-slate-800 border border-slate-300', icon: 'pi pi-ban' }
     ];
 
@@ -917,6 +918,7 @@ export class DashboardComponent implements OnInit {
       case 'Devuelto': return 'bg-rose-100 text-rose-800 border border-rose-300 font-bold';
       case 'Pendiente de notas': return 'bg-amber-100 text-amber-800 border border-amber-300 font-bold';
       case 'Calificado': return 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold';
+      case 'Confirmado': return 'bg-teal-100 text-teal-800 border border-teal-300 font-bold';
       case 'Suspendido': return 'bg-slate-100 text-slate-800 border border-slate-300 font-bold';
       default: return 'bg-slate-100 text-slate-800 font-bold';
     }
@@ -943,6 +945,7 @@ export class DashboardComponent implements OnInit {
       DEVUELTO: 'Devuelto',
       PENDIENTE_NOTAS: 'Pendiente de notas',
       CALIFICADO: 'Calificado',
+      CONFIRMADO: 'Confirmado',
       SUSPENDIDO: 'Suspendido'
     };
     return estados[estado];

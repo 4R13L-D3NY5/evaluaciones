@@ -52,22 +52,102 @@ interface TokenGrupo { codigoSala: string; tokenGrupo: string; }
         </section>
 
         @if (tokenGrupo()) {
-          <section class="rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-              <div><h2 class="font-black text-indigo-950">Acceso para todo el grupo</h2><p class="mt-1 max-w-2xl text-xs text-indigo-800">Comparte este token y el código de sala con todos los estudiantes. Cada uno debe ingresar también su código institucional; así el sistema lo vincula con su propio intento.</p></div>
-              <button (click)="emitirTokenGrupo()" [disabled]="cargando()" class="rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-black text-indigo-700 disabled:opacity-50">Emitir otro token</button>
+          <section class="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 via-white to-indigo-50/40 p-6 sm:p-7 shadow-lg shadow-indigo-100/50">
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-indigo-100 pb-4">
+              <div>
+                <span class="text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-full">Acceso Grupal Rápido</span>
+                <h2 class="mt-2 text-lg font-black text-indigo-950">Datos de Ingreso para Proyectar en el Aula</h2>
+                <p class="mt-1 max-w-2xl text-xs text-indigo-800/80">Proyecta estos datos en la pizarra o comparte el enlace directo. Cada estudiante ingresará con este PIN y su propio código de estudiante.</p>
+              </div>
+              <button (click)="emitirTokenGrupo()" [disabled]="cargando()" class="rounded-xl border border-indigo-200 bg-white hover:bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-700 disabled:opacity-50 transition cursor-pointer flex items-center gap-1.5 shadow-xs">
+                <i class="pi pi-refresh text-xs"></i>
+                <span>Generar otro PIN</span>
+              </button>
             </div>
-            <div class="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"><div><label class="block text-[10px] font-black uppercase tracking-wide text-indigo-700">Token grupal</label><div class="mt-2 break-all rounded-xl border border-indigo-200 bg-white px-4 py-3 font-mono text-sm font-black text-indigo-950">{{ tokenGrupo() }}</div></div><button (click)="copiarTokenGrupo()" class="rounded-xl bg-indigo-600 px-4 py-3 text-xs font-black text-white hover:bg-indigo-700">Copiar token</button></div>
-            <p class="mt-3 text-xs text-indigo-800">Acceso de estudiantes: <span class="font-mono font-bold">{{ urlAcceso() }}</span></p>
+
+            <!-- PROJECTION CARDS: SALA & PIN -->
+            <div class="mt-5 grid gap-4 sm:grid-cols-2">
+              <div class="rounded-2xl border border-indigo-200 bg-white p-5 shadow-xs flex flex-col justify-between">
+                <div>
+                  <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">1. Código de Sala</span>
+                  <div class="mt-1 font-mono text-3xl sm:text-4xl font-black text-indigo-900 tracking-wider select-all">{{ actual.codigoSala }}</div>
+                </div>
+                <p class="mt-2 text-[11px] text-slate-500">Identificador único de la sala de evaluación.</p>
+              </div>
+
+              <div class="rounded-2xl border border-indigo-300 bg-indigo-600 text-white p-5 shadow-md flex flex-col justify-between">
+                <div class="flex items-start justify-between">
+                  <div>
+                    <span class="text-[10px] font-black uppercase tracking-wider text-indigo-200">2. PIN de Acceso (6 dígitos)</span>
+                    <div class="mt-1 font-mono text-3xl sm:text-4xl font-black tracking-widest select-all">{{ tokenGrupo() }}</div>
+                  </div>
+                  <button (click)="copiarTokenGrupo()" class="rounded-xl bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 text-xs font-bold transition flex items-center gap-1 cursor-pointer">
+                    <i class="pi pi-copy text-xs"></i>
+                    <span>Copiar PIN</span>
+                  </button>
+                </div>
+                <p class="mt-2 text-[11px] text-indigo-100">Fácil de escribir en celular o computadora.</p>
+              </div>
+            </div>
+
+            <!-- DIRECT URL & QR BUTTON -->
+            <div class="mt-5 rounded-2xl bg-white border border-indigo-100 p-4 flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <span class="block text-[10px] font-black uppercase tracking-wider text-slate-400">Enlace directo con PIN incluido</span>
+                <span class="font-mono text-xs font-bold text-indigo-900 truncate block mt-0.5 select-all">{{ urlAccesoConParams() }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button (click)="copiarEnlaceDirecto()" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 text-xs font-black shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+                  <i class="pi pi-link text-xs"></i>
+                  <span>Copiar enlace directo</span>
+                </button>
+              </div>
+            </div>
           </section>
         }
 
         @if (accesos().length) {
-          <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6"><div class="flex items-center justify-between"><div><h2 class="font-black text-amber-900">Tokens individuales</h2><p class="text-xs text-amber-800">Se conservan como alternativa. Para este grupo puedes compartir un solo token grupal.</p></div><button (click)="accesos.set([])" class="text-xs font-bold text-amber-800">Ocultar tokens</button></div><div class="mt-4 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-amber-200 text-[10px] uppercase text-amber-800"><th class="p-2">Estudiante</th><th class="p-2">Token</th></tr></thead><tbody>@for (acceso of accesos(); track acceso.codigoEstudiante) { <tr class="border-b border-amber-100"><td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td><td class="p-2 font-mono">{{ acceso.token }}</td></tr> }</tbody></table></div></section>
+          <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6"><div class="flex items-center justify-between"><div><h2 class="font-black text-amber-900">Tokens individuales</h2><p class="text-xs text-amber-800">Se conservan como alternativa. Para este grupo puedes compartir un solo token grupal.</p></div><button (click)="accesos.set([])" class="text-xs font-bold text-amber-800 cursor-pointer">Ocultar tokens</button></div><div class="mt-4 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-amber-200 text-[10px] uppercase text-amber-800"><th class="p-2">Estudiante</th><th class="p-2">Token</th></tr></thead><tbody>@for (acceso of accesos(); track acceso.codigoEstudiante) { <tr class="border-b border-amber-100"><td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td><td class="p-2 font-mono">{{ acceso.token }}</td></tr> }</tbody></table></div></section>
         }
 
         @if (['ABIERTA', 'EN_CURSO', 'PAUSADA', 'CERRADA', 'CALIFICADA'].includes(actual.estado)) { <p class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Si ocurre una interrupción, puedes restablecer el examen. Se conservarán las respuestas guardadas; los intentos podrán continuar cuando inicies nuevamente la sala.</p> }
-        <section class="rounded-2xl border border-border bg-card p-6 shadow-xs"><h2 class="font-black text-foreground">Participantes</h2><div class="mt-4 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-border text-[10px] uppercase text-muted-foreground"><th class="p-2">Código</th><th class="p-2">Estudiante</th><th class="p-2">Estado</th></tr></thead><tbody>@for (participante of actual.participantes; track participante.codigoEstudiante) { <tr class="border-b border-border"><td class="p-2 font-mono font-bold">{{ participante.codigoEstudiante }}</td><td class="p-2">{{ participante.nombreEstudiante }}</td><td class="p-2"><span class="rounded-full bg-muted px-2 py-1 text-[10px] font-black">{{ participante.estado }}</span></td></tr> }</tbody></table></div></section>
+        <section class="rounded-2xl border border-border bg-card p-6 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-black text-foreground">Participantes y Estados</h2>
+            <span class="text-xs text-muted-foreground font-semibold">{{ actual.participantes.length }} registrados</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <th class="p-2.5">Código</th>
+                  <th class="p-2.5">Estudiante</th>
+                  <th class="p-2.5 text-center">Estado del Intento</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (participante of actual.participantes; track participante.codigoEstudiante) { 
+                  <tr class="border-b border-border/60 hover:bg-muted/30 transition">
+                    <td class="p-2.5 font-mono font-bold text-foreground">{{ participante.codigoEstudiante }}</td>
+                    <td class="p-2.5 font-medium text-foreground">{{ participante.nombreEstudiante }}</td>
+                    <td class="p-2.5 text-center">
+                      <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase border"
+                            [ngClass]="{
+                              'bg-amber-50 text-amber-800 border-amber-200': participante.estado === 'EN_ESPERA',
+                              'bg-indigo-50 text-indigo-700 border-indigo-200': participante.estado === 'EN_CURSO',
+                              'bg-emerald-50 text-emerald-700 border-emerald-200': ['CALIFICADO', 'ENVIADO'].includes(participante.estado),
+                              'bg-rose-50 text-rose-700 border-rose-200': participante.estado === 'ANULADO',
+                              'bg-muted text-muted-foreground border-border': !['EN_ESPERA', 'EN_CURSO', 'CALIFICADO', 'ENVIADO', 'ANULADO'].includes(participante.estado)
+                            }">
+                        {{ participante.estado }}
+                      </span>
+                    </td>
+                  </tr> 
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
       }
 
       @if (mostrarMotivoRestablecimiento()) {
@@ -124,7 +204,26 @@ export class SalaVirtualComponent implements OnDestroy {
     this.ejecutar(this.http.post<TokenGrupo>(`/api/examenes-virtuales/salas/${encodeURIComponent(id)}/token-grupo`, {}), data => this.tokenGrupo.set(data.tokenGrupo));
   }
 
-  copiarTokenGrupo(): void { navigator.clipboard?.writeText(this.tokenGrupo()); }
+  copiarTokenGrupo(): void {
+    if (navigator.clipboard && this.tokenGrupo()) {
+      navigator.clipboard.writeText(this.tokenGrupo());
+      this.feedback.mostrar('PIN copiado al portapapeles', 'Copiado', 'success');
+    }
+  }
+
+  urlAccesoConParams(): string {
+    const sala = this.sala()?.codigoSala || '';
+    const pin = this.tokenGrupo() || '';
+    return `${window.location.origin}/examen-virtual?sala=${encodeURIComponent(sala)}&pin=${encodeURIComponent(pin)}`;
+  }
+
+  copiarEnlaceDirecto(): void {
+    const url = this.urlAccesoConParams();
+    if (navigator.clipboard && url) {
+      navigator.clipboard.writeText(url);
+      this.feedback.mostrar('Enlace directo copiado al portapapeles', 'Copiado', 'success');
+    }
+  }
   abrir(): void { this.cambiarEstado('abrir'); }
   iniciar(): void { this.cambiarEstado('iniciar'); }
   cerrar(): void { this.cambiarEstado('cerrar'); }

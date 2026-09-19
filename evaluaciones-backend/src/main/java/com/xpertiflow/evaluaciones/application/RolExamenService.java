@@ -68,6 +68,7 @@ public class RolExamenService {
             EstadoFlujo.ENTREGADO, Set.of(EstadoFlujo.DEVUELTO, EstadoFlujo.SUSPENDIDO),
             EstadoFlujo.DEVUELTO, Set.of(EstadoFlujo.PENDIENTE_NOTAS, EstadoFlujo.SUSPENDIDO),
             EstadoFlujo.PENDIENTE_NOTAS, Set.of(EstadoFlujo.CALIFICADO, EstadoFlujo.SUSPENDIDO),
+            EstadoFlujo.CALIFICADO, Set.of(EstadoFlujo.CONFIRMADO, EstadoFlujo.SUSPENDIDO),
             EstadoFlujo.SUSPENDIDO, Set.of(EstadoFlujo.PROGRAMADO)
     );
 
@@ -77,7 +78,8 @@ public class RolExamenService {
             EstadoFlujo.ENTREGADO,
             EstadoFlujo.DEVUELTO,
             EstadoFlujo.PENDIENTE_NOTAS,
-            EstadoFlujo.CALIFICADO
+            EstadoFlujo.CALIFICADO,
+            EstadoFlujo.CONFIRMADO
     );
 
     @Transactional(readOnly = true)
@@ -592,7 +594,9 @@ public class RolExamenService {
         List<RolExamen> rolesEnRango = roles.stream()
                 .filter(r -> r.getFecha() != null)
                 .filter(r -> !r.getFecha().isBefore(dto.getFechaDesdeOrigen()) && !r.getFecha().isAfter(dto.getFechaHastaOrigen()))
-                .filter(r -> r.getEstadoFlujo() != EstadoFlujo.CALIFICADO && r.getEstadoFlujo() != EstadoFlujo.SUSPENDIDO)
+                .filter(r -> r.getEstadoFlujo() != EstadoFlujo.CALIFICADO
+                        && r.getEstadoFlujo() != EstadoFlujo.CONFIRMADO
+                        && r.getEstadoFlujo() != EstadoFlujo.SUSPENDIDO)
                 .toList();
 
         if (rolesEnRango.isEmpty()) {
