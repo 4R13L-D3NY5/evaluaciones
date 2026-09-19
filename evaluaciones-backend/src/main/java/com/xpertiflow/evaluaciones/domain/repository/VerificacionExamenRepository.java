@@ -10,5 +10,7 @@ public interface VerificacionExamenRepository extends JpaRepository<Verificacion
 
     Optional<VerificacionExamen> findByRolExamenId(String rolExamenId);
 
+    List<VerificacionExamen> findByRolExamenIdIn(java.util.Collection<String> rolExamenIds);
+
     List<VerificacionExamen> findByEstadoIgnoreCase(String estado);
 }

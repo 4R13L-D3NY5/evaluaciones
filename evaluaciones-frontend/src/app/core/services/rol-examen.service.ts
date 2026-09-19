@@ -32,6 +32,10 @@ export interface RolExamenResponse {
   estudiantesInscritosCount: number;
   variantesGeneradasCount: number;
   bancoPreguntasCargado: boolean;
+  requiereVerificacion?: boolean;
+  estadoVerificacion?: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | null;
+  verificadoPor?: string;
+  fechaVerificacion?: string;
   hashEncriptacion?: string;
   fechaValidacion?: string;
   fechaGeneracion?: string;
@@ -93,6 +97,21 @@ export interface AuditoriaRolExamen {
   ipOrigen?: string;
   detallesJson?: string;
   fechaEvento?: string;
+}
+
+export interface ReprogramarRangoRequest {
+  sedeCodigo: string;
+  carreraCodigo: string;
+  fechaDesdeOrigen: string;
+  fechaHastaOrigen: string;
+  fechaNuevaInicio: string;
+  motivo?: string;
+}
+
+export interface ReprogramarRangoResponse {
+  totalReprogramados: number;
+  mensaje: string;
+  examenesActualizados: RolExamenResponse[];
 }
 
 /**
@@ -214,6 +233,15 @@ export class RolExamenService {
     return this._http.get<AuditoriaRolExamen[]>(`${this._baseUrl}/${id}/auditoria`).pipe(
       catchError(err => {
         console.error(`[RolExamenService] Error al cargar la bitácora del rol ${id}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public reprogramarRango(request: ReprogramarRangoRequest): Observable<ReprogramarRangoResponse> {
+    return this._http.post<ReprogramarRangoResponse>(`${this._baseUrl}/reprogramar-rango`, request).pipe(
+      catchError(err => {
+        console.error('[RolExamenService] Error al reprogramar rango masivo:', err);
         return throwError(() => err);
       })
     );

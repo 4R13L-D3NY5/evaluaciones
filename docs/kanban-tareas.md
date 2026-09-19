@@ -130,9 +130,20 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
-_Sin tareas._
+*(Sin tareas activas)*
 
 ### En revisión
+
+#### T-016 — Corregir presentación de tipologías complejas, numeración de enunciados y filtro de estados en Verificación
+
+- Prioridad: Alta
+- Área: Verificación de Exámenes / Tipologías de Preguntas
+- Responsable: Por definir
+- Creada: 2026-09-18
+- Fecha límite: Por definir
+- Dependencias: Revisar componentes de renderizado de tipologías en `verificar-examenes.component.ts`, directivas matemáticas/enunciados, endpoints de listado del módulo de verificación y modelos de preguntas compuestas.
+- Criterio de cierre: 1) Corregir el formato y visualización de preguntas de Verdadero/Falso complejas y de A/B/Ambas/Ninguna en la vista del verificador; 2) Asegurar que en este módulo únicamente se listen evaluaciones en estado VALIDADO y VERIFICADO; 3) Evitar asignar número de pregunta individual a los enunciados de emparejamiento ampliado e ítems agrupados, tratándolos como contextos de grupo sin numeración correlativa de reactivo.
+- Notas: Implementado completamente en backend (`VerificacionExamenService`, `VerificacionPreguntaDto`, pruebas unitarias aprobadas) y frontend (`verificar-examenes.component.ts`, `examenes-aprobados.component.ts`, `verificacion-examen.service.ts`). Contenedores Docker de backend y frontend reconstruidos y operativos. Pendiente de validación visual por el usuario.
 
 #### T-012 — Confirmar la contraseña actual antes de habilitar el cambio
 
@@ -211,7 +222,7 @@ _Sin tareas._
 | Indicador | Total |
 |---|---:|
 | Pendientes | 9 |
-| En progreso | 0 |
+| En progreso | 1 |
 | En revisión | 4 |
 | Bloqueadas | 0 |
 | Completadas | 2 |

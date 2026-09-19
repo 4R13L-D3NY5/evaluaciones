@@ -50,7 +50,7 @@ if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
 }
 
-export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Pendiente de notas' | 'Calificado';
+export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Verificado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Pendiente de notas' | 'Calificado';
 
 export interface StepDef {
   key: EtapaEvaluacion;
@@ -66,6 +66,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   hashEncriptacion?: string;
   variantesGeneradas?: number;
   bancoPreguntasCargado?: boolean;
+  requiereVerificacion?: boolean;
+  estadoVerificacion?: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | null;
+  verificadoPor?: string;
+  fechaVerificacion?: string;
   fueRestablecido?: boolean;
   estadoPrevioRestablecimiento?: EtapaEvaluacion;
   motivoRestablecimiento?: string;
@@ -410,14 +414,26 @@ interface CampusDisponible extends Campus {
                       <div class="text-[10px] text-muted-foreground font-medium">
                         {{ carreraSeleccionada()?.careerName || item.carreraNombre }} · Sem. {{ item.semestre }}° · <strong>{{ item.grupo }}</strong>
                       </div>
-                      @if (bancoPreguntasCargado(item)) {
-                        <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
-                          <i class="pi pi-check-circle text-[9px]"></i> Banco cargado
-                        </span>
-                      } @else {
-                        <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Este examen todavía no tiene un banco de preguntas cargado">
-                          <i class="pi pi-exclamation-circle text-[9px]"></i> Sin banco
-                        </span>
+                      @if (item.modalidad !== 'PRESENCIAL_SIN_CARTILLA' && bancoPreguntasCargado(item)) {
+                        @if (item.requiereVerificacion) {
+                          @if (item.estadoVerificacion === 'VERIFICADO') {
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Banco de preguntas verificado y aprobado">
+                              <i class="pi pi-check-circle text-[9px]"></i> Banco verificado
+                            </span>
+                          } @else if (item.estadoVerificacion === 'DEVUELTO') {
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-black uppercase text-rose-700" title="Banco de preguntas devuelto con observaciones por el verificador">
+                              <i class="pi pi-exclamation-triangle text-[9px]"></i> Banco observado
+                            </span>
+                          } @else {
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Banco validado, pendiente de revisión por el verificador">
+                              <i class="pi pi-clock text-[9px]"></i> Pendiente de verificación
+                            </span>
+                          }
+                        } @else {
+                          <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
+                            <i class="pi pi-check-circle text-[9px]"></i> Banco cargado
+                          </span>
+                        }
                       }
                     </td>
 
@@ -2999,7 +3015,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       etapa,
       hora: rol.horario.split('-')[0]?.trim() || '08:15',
       variantesGeneradas: rol.variantesGeneradasCount,
-      bancoPreguntasCargado: rol.bancoPreguntasCargado
+      bancoPreguntasCargado: rol.bancoPreguntasCargado,
+      requiereVerificacion: rol.requiereVerificacion,
+      estadoVerificacion: rol.estadoVerificacion,
+      verificadoPor: rol.verificadoPor,
+      fechaVerificacion: rol.fechaVerificacion
     };
   }
 
@@ -3359,6 +3379,14 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public getPasosFlujo(item: EvaluacionItemUI): StepDef[] {
     if (item.modalidad === 'VIRTUAL') {
+      if (item.requiereVerificacion) {
+        return [
+          { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
+          { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
+          { key: 'Verificado', label: 'Verificado', icon: 'pi pi-verified' },
+          { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
+        ];
+      }
       return [
         { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
         { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
@@ -3373,6 +3401,19 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
         { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
         { key: 'Pendiente de notas', label: 'Pendiente de notas', icon: 'pi pi-upload' },
+        { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
+      ];
+    }
+    if (item.requiereVerificacion) {
+      return [
+        { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
+        { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
+        { key: 'Verificado', label: 'Verificado', icon: 'pi pi-verified' },
+        { key: 'Generado', label: 'Generado', icon: 'pi pi-bolt' },
+        { key: 'Impreso', label: 'Impreso', icon: 'pi pi-print' },
+        { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
+        { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
+        { key: 'Pendiente de notas', label: 'Pendiente de calificación', icon: 'pi pi-upload' },
         { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
       ];
     }
@@ -3405,11 +3446,41 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
     }
 
+    // Manejo específico del paso Verificado
+    if (pasoKey === 'Verificado') {
+      if (item.etapa === 'Programado') {
+        return 'bg-muted/40 text-muted-foreground/40 border border-transparent cursor-not-allowed';
+      }
+      if (item.estadoVerificacion === 'VERIFICADO' || (currentIdx > pasos.indexOf('Verificado') && currentIdx !== -1)) {
+        return 'bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold hover:bg-emerald-100';
+      }
+      if (item.estadoVerificacion === 'DEVUELTO') {
+        return 'bg-rose-50 text-rose-700 border border-rose-300 font-bold hover:bg-rose-100 animate-pulse';
+      }
+      return 'bg-amber-50 text-amber-700 border border-amber-300 font-bold hover:bg-amber-100';
+    }
+
+    // Bloqueo preventivo de Generado o Calificado (en Virtual) si requiere verificación y no está verificado
+    if ((pasoKey === 'Generado' || (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado'))
+        && item.requiereVerificacion
+        && item.estadoVerificacion !== 'VERIFICADO') {
+      return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
+    }
+
+    // Si ya está verificado y está en etapa Validado, Generado es el siguiente paso listo
+    if ((pasoKey === 'Generado' || (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado'))
+        && item.requiereVerificacion
+        && item.estadoVerificacion === 'VERIFICADO'
+        && item.etapa === 'Validado') {
+      return 'bg-card text-purple-700 border border-purple-300 hover:bg-purple-100 font-bold animate-pulse hover:animate-none';
+    }
+
+    // Progreso estándar
     if (pasoIdx < currentIdx) {
       return 'bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold hover:bg-emerald-100';
     } else if (pasoIdx === currentIdx) {
       return 'bg-purple-700 text-white font-black shadow-xs ring-2 ring-purple-300 scale-105';
-    } else if (pasoIdx === currentIdx + 1) {
+    } else if (pasoIdx === currentIdx + 1 && (!item.requiereVerificacion || item.estadoVerificacion === 'VERIFICADO')) {
       return 'bg-card text-purple-700 border border-purple-300 hover:bg-purple-100 font-bold animate-pulse hover:animate-none';
     } else {
       return 'bg-muted/40 text-muted-foreground/40 border border-transparent cursor-not-allowed';
@@ -3420,6 +3491,19 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const pasos = this.getPasosFlujo(item).map(p => p.key);
     const currentIdx = pasos.indexOf(item.etapa);
     const pasoIdx = pasos.indexOf(st.key);
+
+    if (st.key === 'Verificado') {
+      if (item.estadoVerificacion === 'VERIFICADO' || (currentIdx > pasos.indexOf('Verificado') && currentIdx !== -1)) {
+        return 'pi pi-check';
+      }
+      if (item.estadoVerificacion === 'DEVUELTO') {
+        return 'pi pi-exclamation-triangle';
+      }
+      if (item.etapa === 'Validado') {
+        return 'pi pi-clock';
+      }
+      return 'pi pi-verified';
+    }
 
     if (pasoIdx < currentIdx) {
       return 'pi pi-check';
@@ -3433,12 +3517,35 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const pasoIdx = pasos.indexOf(st.key);
     const actividad = this.auditoriaDeEtapa(item, st.key);
 
+    if (st.key === 'Verificado') {
+      if (item.estadoVerificacion === 'VERIFICADO' || (currentIdx > pasos.indexOf('Verificado') && currentIdx !== -1)) {
+        const por = item.verificadoPor ? ` por ${item.verificadoPor}` : '';
+        return `Examen verificado y aprobado${por}. Listo para generar`;
+      }
+      if (item.estadoVerificacion === 'DEVUELTO') {
+        return 'Banco observado: El verificador devolvió el banco con observaciones. El docente titular debe corregirlas.';
+      }
+      if (item.etapa === 'Validado') {
+        return 'Pendiente de verificación: En espera de revisión por el verificador designado.';
+      }
+      return 'Verificación académica requerida antes de generar.';
+    }
+
+    if ((st.key === 'Generado' || (item.modalidad === 'VIRTUAL' && st.key === 'Calificado'))
+        && item.requiereVerificacion
+        && item.estadoVerificacion !== 'VERIFICADO') {
+      if (item.estadoVerificacion === 'DEVUELTO') {
+        return 'Bloqueado: El examen presenta observaciones y fue devuelto al docente titular.';
+      }
+      return 'Bloqueado: El examen debe ser verificado antes de generar el documento oficial.';
+    }
+
     if (pasoIdx <= currentIdx && actividad) {
       return `Completado: ${this.formatearFechaHoraAuditoria(actividad.fechaEvento)} · ${actividad.usuario || 'Sistema'}`;
     }
     if (pasoIdx < currentIdx) return `Completado: ${st.label}`;
     if (pasoIdx === currentIdx) return `Estado actual: ${st.label}`;
-    if (pasoIdx === currentIdx + 1) {
+    if (pasoIdx === currentIdx + 1 || (item.requiereVerificacion && item.estadoVerificacion === 'VERIFICADO' && st.key === 'Generado')) {
       if (this.validacionPorBancoBloqueada(item, st.key)) {
         return 'Este estado se asigna automáticamente cuando el docente carga y se valida el banco de preguntas';
       }
@@ -3481,6 +3588,26 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
     if (this.politicaTemporalBloqueada(item, pasoKey)) {
       this._mostrarToast(this.mensajePoliticaTemporal(item, pasoKey), 'warning');
+      return;
+    }
+
+    if (pasoKey === 'Verificado') {
+      if (item.estadoVerificacion === 'VERIFICADO') {
+        this._mostrarToast(`Examen verificado y aprobado${item.verificadoPor ? ' por ' + item.verificadoPor : ''}. Listo para generar.`, 'success');
+      } else if (item.estadoVerificacion === 'DEVUELTO') {
+        this._mostrarToast('El banco de preguntas presenta observaciones del verificador y fue devuelto al docente titular.', 'error');
+      } else {
+        this._mostrarToast('El examen se encuentra en espera de dictamen por el docente verificador.', 'info');
+      }
+      return;
+    }
+
+    if ((pasoKey === 'Generado' || (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado'))
+        && item.requiereVerificacion
+        && item.estadoVerificacion !== 'VERIFICADO') {
+      this._mostrarToast(item.estadoVerificacion === 'DEVUELTO'
+        ? 'El examen presenta observaciones y fue devuelto al docente titular. Debe subsanarse antes de generar.'
+        : 'El examen debe ser verificado antes de generar el documento oficial.', 'warning');
       return;
     }
 
@@ -3714,6 +3841,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const estados: Record<EtapaEvaluacion, RolExamenResponse['estadoFlujo']> = {
       'Programado': 'PROGRAMADO',
       'Validado': 'VALIDADO',
+      'Verificado': 'VALIDADO',
       'Generado': 'GENERADO',
       'Impreso': 'IMPRESO',
       'Entregado': 'ENTREGADO',

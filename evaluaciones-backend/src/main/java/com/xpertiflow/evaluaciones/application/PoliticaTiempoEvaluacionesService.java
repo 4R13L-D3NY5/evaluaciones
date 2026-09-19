@@ -102,12 +102,60 @@ public class PoliticaTiempoEvaluacionesService {
                 .orElse(false);
     }
 
+    public boolean esAdministrador(Authentication authentication) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMINISTRADOR_SISTEMA".equals(authority.getAuthority()));
+    }
+
+    public void exigirEdicionPermitida(RolExamen rol, java.time.LocalDate nuevaFecha, Authentication authentication) {
+        if (esAdministrador(authentication)) {
+            return;
+        }
+
+        int horasCandado = configuracion().getHorasCandado72() != null
+                ? configuracion().getHorasCandado72()
+                : 72;
+
+        inicioExamenSeguro(rol).ifPresent(inicio -> {
+            LocalDateTime limiteCandado = inicio.minusHours(horasCandado);
+            if (LocalDateTime.now().isAfter(limiteCandado)) {
+                throw new RuntimeException("No es posible editar el examen: se encuentra dentro del candado de seguridad ("
+                        + horasCandado + " horas previas al inicio de la prueba).");
+            }
+        });
+
+        if (nuevaFecha == null || !nuevaFecha.isAfter(java.time.LocalDate.now())) {
+            throw new RuntimeException("La fecha a la que se reprograma el examen debe ser posterior a la fecha actual ("
+                    + java.time.LocalDate.now() + ").");
+        }
+    }
+
+    public void exigirEliminacionPermitida(RolExamen rol, Authentication authentication) {
+        if (esAdministrador(authentication)) {
+            return;
+        }
+
+        int horasCandado = configuracion().getHorasCandado72() != null
+                ? configuracion().getHorasCandado72()
+                : 72;
+
+        inicioExamenSeguro(rol).ifPresent(inicio -> {
+            LocalDateTime limiteCandado = inicio.minusHours(horasCandado);
+            if (LocalDateTime.now().isAfter(limiteCandado)) {
+                throw new RuntimeException("No es posible eliminar el examen: se encuentra dentro del candado de seguridad ("
+                        + horasCandado + " horas previas al inicio de la prueba).");
+            }
+        });
+    }
+
     private ConfiguracionEvaluacionesDto configuracion() {
         ConfiguracionEvaluacionesDto configuracion = configuracionService.obtener();
         if (configuracion.getHorasAntesLista() == null) configuracion.setHorasAntesLista(24);
         if (configuracion.getHorasAntesGeneracion() == null) configuracion.setHorasAntesGeneracion(144);
         if (configuracion.getMinutosAntesEntrega() == null) configuracion.setMinutosAntesEntrega(15);
         if (configuracion.getHorasPostPatron() == null) configuracion.setHorasPostPatron(8);
+        if (configuracion.getHorasCandado72() == null) configuracion.setHorasCandado72(72);
         return configuracion;
     }
 

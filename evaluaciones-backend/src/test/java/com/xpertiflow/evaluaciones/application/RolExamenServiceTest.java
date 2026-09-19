@@ -13,13 +13,17 @@ import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoResponseDto;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
 
 import java.util.Optional;
 import java.util.List;
@@ -43,6 +47,8 @@ class RolExamenServiceTest {
     @Mock
     private DocumentoExamenSinCartillaRepository documentoSinCartillaRepository;
     @Mock
+    private VerificacionExamenRepository verificacionExamenRepository;
+    @Mock
     private RolExamenMapper mapper;
     @Mock
     private UnitepcGatewayClient unitepcGatewayClient;
@@ -57,7 +63,7 @@ class RolExamenServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, verificacionExamenRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService);
     }
 
     @Test
@@ -465,5 +471,125 @@ class RolExamenServiceTest {
 
         assertThat(service.resolverNombreDocenteOficial(rol))
                 .isEqualTo("ARIEL DENYS CAMARA ARZE");
+    }
+
+    @Test
+    void actualizarPermiteAAdministradorEditarRolEnEstadoAvanzado() {
+        Authentication authAdmin = org.mockito.Mockito.mock(Authentication.class);
+        when(politicaTiempoEvaluacionesService.esAdministrador(authAdmin)).thenReturn(true);
+
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-IMPRESO-001")
+                .estadoFlujo(EstadoFlujo.IMPRESO)
+                .fecha(LocalDate.of(2026, 9, 14))
+                .materiaCodigo("MED-101")
+                .grupo("G-01")
+                .build();
+
+        RolExamenRequestDto dto = RolExamenRequestDto.builder()
+                .id("ROL-IMPRESO-001")
+                .fecha(LocalDate.of(2026, 9, 28))
+                .materiaCodigo("MED-101")
+                .grupo("G-01")
+                .build();
+
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(mapper.toEntity(dto)).thenReturn(new RolExamen());
+        when(rolExamenRepository.save(rol)).thenReturn(rol);
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
+
+        service.actualizar(rol.getId(), dto, authAdmin);
+
+        verify(politicaTiempoEvaluacionesService).exigirEdicionPermitida(rol, dto.getFecha(), authAdmin);
+        verify(rolExamenRepository).save(rol);
+
+        ArgumentCaptor<AuditoriaEvaluacion> captor = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
+        verify(auditoriaRepository).save(captor.capture());
+        assertThat(captor.getValue().getAccion()).isEqualTo("REPROGRAMACION_FECHA_ADMINISTRADOR");
+    }
+
+    @Test
+    void actualizarRechazaANoAdministradorEnEstadoAvanzado() {
+        Authentication authDirector = org.mockito.Mockito.mock(Authentication.class);
+        when(politicaTiempoEvaluacionesService.esAdministrador(authDirector)).thenReturn(false);
+
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-IMPRESO-002")
+                .estadoFlujo(EstadoFlujo.IMPRESO)
+                .fecha(LocalDate.of(2026, 9, 14))
+                .build();
+
+        RolExamenRequestDto dto = RolExamenRequestDto.builder()
+                .id("ROL-IMPRESO-002")
+                .fecha(LocalDate.of(2026, 9, 28))
+                .build();
+
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        assertThatThrownBy(() -> service.actualizar(rol.getId(), dto, authDirector))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Solo se puede editar un rol de examen en estado PROGRAMADO o VALIDADO");
+
+        verify(rolExamenRepository, never()).save(rol);
+    }
+
+    @Test
+    void reprogramarRangoParaCarreraExitoso() {
+        Authentication authAdmin = org.mockito.Mockito.mock(Authentication.class);
+        when(politicaTiempoEvaluacionesService.esAdministrador(authAdmin)).thenReturn(true);
+
+        RolExamen rol1 = RolExamen.builder()
+                .id("ROL-01")
+                .sedeCodigo("CBB")
+                .carreraCodigo("MED")
+                .fecha(LocalDate.of(2026, 9, 14))
+                .estadoFlujo(EstadoFlujo.PROGRAMADO)
+                .build();
+
+        RolExamen rol2 = RolExamen.builder()
+                .id("ROL-02")
+                .sedeCodigo("CBB")
+                .carreraCodigo("MED")
+                .fecha(LocalDate.of(2026, 9, 15))
+                .estadoFlujo(EstadoFlujo.IMPRESO)
+                .build();
+
+        when(rolExamenRepository.findBySedeCodigoAndCarreraCodigo("CBB", "MED"))
+                .thenReturn(List.of(rol1, rol2));
+        when(rolExamenRepository.save(org.mockito.ArgumentMatchers.any(RolExamen.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReprogramarRangoRequestDto dto = ReprogramarRangoRequestDto.builder()
+                .sedeCodigo("CBB")
+                .carreraCodigo("MED")
+                .fechaDesdeOrigen(LocalDate.of(2026, 9, 14))
+                .fechaHastaOrigen(LocalDate.of(2026, 9, 15))
+                .fechaNuevaInicio(LocalDate.of(2026, 9, 28))
+                .motivo("Suspensión por contingencia")
+                .build();
+
+        ReprogramarRangoResponseDto res = service.reprogramarRangoParaCarrera(dto, authAdmin);
+
+        assertThat(res.getTotalReprogramados()).isEqualTo(2);
+        assertThat(rol1.getFecha()).isEqualTo(LocalDate.of(2026, 9, 28));
+        assertThat(rol2.getFecha()).isEqualTo(LocalDate.of(2026, 9, 29));
+        verify(auditoriaRepository, org.mockito.Mockito.times(2)).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void reprogramarRangoRechazaNoAdministrador() {
+        Authentication authDirector = org.mockito.Mockito.mock(Authentication.class);
+        when(politicaTiempoEvaluacionesService.esAdministrador(authDirector)).thenReturn(false);
+
+        ReprogramarRangoRequestDto dto = ReprogramarRangoRequestDto.builder()
+                .sedeCodigo("CBB")
+                .carreraCodigo("MED")
+                .fechaDesdeOrigen(LocalDate.of(2026, 9, 14))
+                .fechaHastaOrigen(LocalDate.of(2026, 9, 15))
+                .fechaNuevaInicio(LocalDate.of(2026, 9, 28))
+                .build();
+
+        assertThatThrownBy(() -> service.reprogramarRangoParaCarrera(dto, authDirector))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 }

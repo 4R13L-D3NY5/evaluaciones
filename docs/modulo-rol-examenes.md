@@ -46,6 +46,19 @@ Cada fila puede generar hasta cuatro roles:
 
 La importación envía los roles válidos al backend y PostgreSQL mediante el servicio oficial de roles. No se utiliza `localStorage` ni datos ficticios para completar materias, grupos o docentes.
 
+## Políticas de Roles, Seguridad y Reprogramación
+
+1. **Privilegios Exclusivos del Administrador del Sistema (`ADMINISTRADOR_SISTEMA`)**:
+   - **Carga Masiva Excel**: Los botones de importar Excel (ordinario y 2da instancia) están reservados únicamente al Administrador.
+   - **Registro Manual**: El botón de "Añadir Examen al Rol de Examen" es exclusivo del Administrador (restringido tanto en UI como en `POST /api/roles-examen`).
+   - **Vaciar Rol**: Solo el Administrador puede vaciar el rol de exámenes.
+   - **Reprogramación en Estados Avanzados**: El Administrador puede reprogramar fechas de exámenes incluso si ya se encuentran en estado `GENERADO`, `IMPRESO`, etc. Cada cambio de fecha en estos estados genera automáticamente un registro de auditoría (`REPROGRAMACION_FECHA_ADMINISTRADOR`) con usuario, fecha previa, nueva fecha y estado.
+   - **Reprogramación Masiva por Rango (Suspensión)**: Modal exclusivo para el Administrador que permite trasladar en bloque todos los exámenes de una carrera entre un rango de fechas origen hacia una nueva fecha de inicio, manteniendo la correlatividad de días y registrando auditoría (`REPROGRAMACION_MASIVA_ADMINISTRADOR`) por cada examen afectado.
+
+2. **Políticas para Directores de Carrera y Roles No Administradores**:
+   - **Fechas Futuras**: Un director solo puede reprogramar hacia una fecha estrictamente posterior a la actual (`nuevaFecha > hoy`).
+   - **Candado de Seguridad de 72 Horas**: Los directores no pueden editar ni reprogramar un examen si faltan 72 horas (o el valor configurado dinámicamente en el módulo de Administración de Evaluaciones) o menos para el inicio del examen. Este candado se valida tanto en la interfaz de usuario como en `PoliticaTiempoEvaluacionesService` en el backend.
+
 ## Bitácora en Lista de Evaluaciones
 
 - La acción de bitácora del menú **Lista de Evaluaciones** utiliza el icono de reloj y consulta la auditoría persistida del rol.

@@ -13,16 +13,22 @@ import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.DocumentoExamenSinCartillaRepository;
+import com.xpertiflow.evaluaciones.domain.entity.VerificacionExamen;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.CourseDto;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoResponseDto;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Comparator;
 import java.util.List;
@@ -42,6 +48,7 @@ public class RolExamenService {
     private final AuditoriaEvaluacionRepository auditoriaRepository;
     private final BancoPreguntasRepository bancoPreguntasRepository;
     private final DocumentoExamenSinCartillaRepository documentoSinCartillaRepository;
+    private final VerificacionExamenRepository verificacionExamenRepository;
     private final RolExamenMapper mapper;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AccesoAcademicoService accesoAcademicoService;
@@ -199,9 +206,17 @@ public class RolExamenService {
         RolExamen rol = rolExamenRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
 
-        if (rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
+        boolean esAdmin = politicaTiempoEvaluacionesService.esAdministrador(authentication);
+
+        if (!esAdmin && rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
             throw new RuntimeException("Solo se puede editar un rol de examen en estado PROGRAMADO o VALIDADO");
         }
+
+        politicaTiempoEvaluacionesService.exigirEdicionPermitida(rol, dto.getFecha(), authentication);
+
+        LocalDate fechaAnterior = rol.getFecha();
+        boolean fechaCambiada = fechaAnterior != null && !fechaAnterior.equals(dto.getFecha());
+        boolean esEstadoAvanzado = rol.getEstadoFlujo() != EstadoFlujo.PROGRAMADO && rol.getEstadoFlujo() != EstadoFlujo.VALIDADO;
 
         normalizarModalidadVigente(dto);
         RolExamen previsualizacion = mapper.toEntity(dto);
@@ -213,8 +228,17 @@ public class RolExamenService {
         rol.setDia(nombreDiaSemana(dto.getFecha()));
         rol.setFechaDisplay(formatearFecha(dto.getFecha()));
         RolExamen guardado = rolExamenRepository.save(rol);
+
+        String accionAuditoria = (esAdmin && esEstadoAvanzado)
+                ? "REPROGRAMACION_FECHA_ADMINISTRADOR"
+                : (fechaCambiada ? "REPROGRAMACION_FECHA_ROL" : "ACTUALIZACION_ROL_EXAMEN");
+
+        String motivoAuditoria = fechaCambiada
+                ? "Cambio de fecha: " + fechaAnterior + " -> " + dto.getFecha() + " (Estado: " + rol.getEstadoFlujo() + ")"
+                : "Actualización de parámetros del rol";
+
         registrarAuditoria(guardado, rol.getEstadoFlujo(), rol.getEstadoFlujo(),
-                "ACTUALIZACION_ROL_EXAMEN", actor(authentication, null), "127.0.0.1");
+                accionAuditoria, actor(authentication, null), "127.0.0.1", motivoAuditoria);
         return mapper.toResponseDto(guardado);
     }
 
@@ -229,20 +253,29 @@ public class RolExamenService {
             return List.of();
         }
         Map<String, GroupItemDto> gruposOficiales = resolverGruposOficiales(roles);
-        Set<String> rolesConBanco = bancoPreguntasRepository.findByRolExamenIdIn(
-                        roles.stream().map(RolExamen::getId).collect(Collectors.toSet()))
+        Set<String> rolesIds = roles.stream().map(RolExamen::getId).collect(Collectors.toSet());
+        Set<String> rolesConBanco = bancoPreguntasRepository.findByRolExamenIdIn(rolesIds)
                 .stream()
                 .map(banco -> banco.getRolExamenId())
                 .collect(Collectors.toSet());
+        Map<String, VerificacionExamen> verificaciones = verificacionExamenRepository.findByRolExamenIdIn(rolesIds)
+                .stream()
+                .collect(Collectors.toMap(VerificacionExamen::getRolExamenId, v -> v, (v1, v2) -> v1));
+
         return roles.stream()
-                .map(rol -> mapearRol(rol, gruposOficiales.get(rol.getId()), rolesConBanco.contains(rol.getId())))
+                .map(rol -> mapearRol(rol, gruposOficiales.get(rol.getId()), rolesConBanco.contains(rol.getId()),
+                        verificacionPoliticaService.requiere(rol), verificaciones.get(rol.getId())))
                 .collect(Collectors.toList());
     }
 
     private RolExamenResponseDto mapearRolConDocenteOficial(RolExamen rol) {
         Map<String, GroupItemDto> gruposOficiales = resolverGruposOficiales(List.of(rol));
         boolean tieneBanco = bancoPreguntasRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rol.getId()).isPresent();
-        return mapearRol(rol, gruposOficiales.get(rol.getId()), tieneBanco);
+        boolean requiereVerif = verificacionPoliticaService.requiere(rol);
+        VerificacionExamen verificacion = requiereVerif
+                ? verificacionExamenRepository.findByRolExamenId(rol.getId()).orElse(null)
+                : null;
+        return mapearRol(rol, gruposOficiales.get(rol.getId()), tieneBanco, requiereVerif, verificacion);
     }
 
     public String resolverNombreDocenteOficial(RolExamen rol) {
@@ -270,9 +303,23 @@ public class RolExamenService {
                 : null;
     }
 
-    private RolExamenResponseDto mapearRol(RolExamen rol, GroupItemDto grupoOficial, boolean tieneBanco) {
+    private RolExamenResponseDto mapearRol(RolExamen rol, GroupItemDto grupoOficial, boolean tieneBanco,
+                                           boolean requiereVerificacion, VerificacionExamen verificacion) {
         RolExamenResponseDto dto = mapper.toResponseDto(rol);
         dto.setBancoPreguntasCargado(tieneBanco);
+        dto.setRequiereVerificacion(requiereVerificacion);
+        if (requiereVerificacion) {
+            String estadoVerif = (verificacion != null && verificacion.getEstado() != null)
+                    ? verificacion.getEstado()
+                    : "PENDIENTE";
+            dto.setEstadoVerificacion(estadoVerif);
+            dto.setVerificadoPor(verificacion != null ? verificacion.getVerificadoPor() : null);
+            dto.setFechaVerificacion(verificacion != null ? verificacion.getFechaVerificacion() : null);
+        } else {
+            dto.setEstadoVerificacion(null);
+            dto.setVerificadoPor(null);
+            dto.setFechaVerificacion(null);
+        }
         // Los campos locales del rol nunca son una fuente de presentación.
         dto.setDocenteNombre(null);
         dto.setDocenteCi(null);
@@ -514,7 +561,70 @@ public class RolExamenService {
             throw new RuntimeException("Solo se puede eliminar un rol de examen en estado PROGRAMADO o VALIDADO");
         }
 
+        politicaTiempoEvaluacionesService.exigirEliminacionPermitida(rol, authentication);
+
         rolExamenRepository.delete(rol);
+    }
+
+    @Transactional
+    public ReprogramarRangoResponseDto reprogramarRangoParaCarrera(ReprogramarRangoRequestDto dto,
+                                                                   Authentication authentication) {
+        if (!politicaTiempoEvaluacionesService.esAdministrador(authentication)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Solo el administrador del sistema puede reprogramar masivamente exámenes.");
+        }
+
+        if (dto.getFechaHastaOrigen().isBefore(dto.getFechaDesdeOrigen())) {
+            throw new IllegalArgumentException("La fecha origen 'hasta' no puede ser anterior a la fecha origen 'desde'.");
+        }
+
+        List<RolExamen> roles = rolExamenRepository.findBySedeCodigoAndCarreraCodigo(
+                dto.getSedeCodigo(), dto.getCarreraCodigo());
+
+        List<RolExamen> rolesEnRango = roles.stream()
+                .filter(r -> r.getFecha() != null)
+                .filter(r -> !r.getFecha().isBefore(dto.getFechaDesdeOrigen()) && !r.getFecha().isAfter(dto.getFechaHastaOrigen()))
+                .filter(r -> r.getEstadoFlujo() != EstadoFlujo.CALIFICADO && r.getEstadoFlujo() != EstadoFlujo.SUSPENDIDO)
+                .toList();
+
+        if (rolesEnRango.isEmpty()) {
+            return ReprogramarRangoResponseDto.builder()
+                    .totalReprogramados(0)
+                    .mensaje("No se encontraron exámenes activos en el rango de fechas seleccionado para la carrera.")
+                    .examenesActualizados(List.of())
+                    .build();
+        }
+
+        String motivoBase = dto.getMotivo() != null && !dto.getMotivo().isBlank()
+                ? dto.getMotivo().trim()
+                : "Reprogramación masiva administrativa por suspensión";
+
+        List<RolExamen> guardados = new ArrayList<>();
+        for (RolExamen rol : rolesEnRango) {
+            LocalDate fechaOriginal = rol.getFecha();
+            long diasOffset = java.time.temporal.ChronoUnit.DAYS.between(dto.getFechaDesdeOrigen(), fechaOriginal);
+            LocalDate nuevaFecha = dto.getFechaNuevaInicio().plusDays(diasOffset);
+
+            rol.setFecha(nuevaFecha);
+            rol.setDia(nombreDiaSemana(nuevaFecha));
+            rol.setFechaDisplay(formatearFecha(nuevaFecha));
+            rol.setActualizadoEn(LocalDateTime.now());
+            RolExamen guardado = rolExamenRepository.save(rol);
+            guardados.add(guardado);
+
+            String motivoDetallado = motivoBase + " | Traslado de fecha: " + fechaOriginal + " -> " + nuevaFecha
+                    + " (Estado: " + rol.getEstadoFlujo() + ")";
+            registrarAuditoria(guardado, rol.getEstadoFlujo(), rol.getEstadoFlujo(),
+                    "REPROGRAMACION_MASIVA_ADMINISTRADOR", actor(authentication, null), "127.0.0.1", motivoDetallado);
+        }
+
+        List<RolExamenResponseDto> dtosActualizados = mapearRolesConDocenteOficial(guardados);
+
+        return ReprogramarRangoResponseDto.builder()
+                .totalReprogramados(guardados.size())
+                .mensaje("Se reprogramaron " + guardados.size() + " exámenes exitosamente.")
+                .examenesActualizados(dtosActualizados)
+                .build();
     }
 
     @Transactional

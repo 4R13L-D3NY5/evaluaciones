@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { EvaluacionesStorageService } from '../../../core/services/evaluaciones-storage.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { LayoutPreferencesService, VistaContenido } from '../../../core/services/layout-preferences.service';
+import { NotificacionesService, NotificacionUsuario } from '../../../core/services/notificaciones.service';
 
 @Component({
   selector: 'sea-topbar',
@@ -37,6 +38,98 @@ import { LayoutPreferencesService, VistaContenido } from '../../../core/services
 
         <!-- Selector de Gestión Académica (Default II-2026) -->
         <div class="relative flex items-center gap-2 shrink-0">
+          <!-- Apartado de Notificaciones (Campana) -->
+          <div class="relative">
+            <button
+              type="button"
+              title="Notificaciones"
+              aria-label="Notificaciones"
+              [attr.aria-expanded]="menuNotificacionesAbierto()"
+              (click)="toggleMenuNotificaciones()"
+              class="relative inline-flex items-center justify-center h-9 w-9 rounded-xl border border-border bg-card text-foreground hover:bg-primary/5 transition-colors cursor-pointer">
+              <i class="pi pi-bell text-sm" [class.text-primary]="notificacionesService.noLeidasCount() > 0"></i>
+              @if (notificacionesService.noLeidasCount() > 0) {
+                <span class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white shadow-xs animate-pulse">
+                  {{ notificacionesService.noLeidasCount() }}
+                </span>
+              }
+            </button>
+
+            @if (menuNotificacionesAbierto()) {
+              <div class="absolute right-0 top-[calc(100%+8px)] z-40 w-80 sm:w-96 rounded-2xl border border-border bg-card p-3 shadow-2xl animate-fade-in">
+                <div class="flex items-center justify-between border-b border-border pb-2.5 mb-2">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-bell text-primary text-sm font-bold"></i>
+                    <h3 class="text-xs font-extrabold text-foreground">Notificaciones</h3>
+                    @if (notificacionesService.noLeidasCount() > 0) {
+                      <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-black text-rose-700">
+                        {{ notificacionesService.noLeidasCount() }} nuevas
+                      </span>
+                    }
+                  </div>
+                  @if (notificacionesService.notificaciones().length > 0) {
+                    <button
+                      type="button"
+                      (click)="notificacionesService.marcarTodasComoLeidas()"
+                      class="text-[10px] font-bold text-primary hover:underline cursor-pointer">
+                      Marcar leídas
+                    </button>
+                  }
+                </div>
+
+                <div class="max-h-80 overflow-y-auto space-y-2 pr-1">
+                  @if (notificacionesService.notificaciones().length === 0) {
+                    <div class="py-6 text-center text-muted-foreground flex flex-col items-center gap-1.5">
+                      <i class="pi pi-check-circle text-2xl text-emerald-500"></i>
+                      <p class="text-xs font-bold text-foreground">Sin notificaciones</p>
+                      <p class="text-[10px]">No tienes observaciones ni alertas pendientes.</p>
+                    </div>
+                  } @else {
+                    @for (notif of notificacionesService.notificaciones(); track notif.id) {
+                      <div
+                        (click)="abrirNotificacion(notif)"
+                        [ngClass]="{
+                          'bg-muted/40': notif.leida,
+                          'bg-rose-50/70': !notif.leida && notif.nivel === 'error',
+                          'border-rose-200': !notif.leida && notif.nivel === 'error'
+                        }"
+                        class="p-2.5 rounded-xl border border-border transition-all cursor-pointer hover:shadow-xs hover:border-primary/40">
+                        <div class="flex items-start gap-2.5">
+                          <div
+                            [class.bg-rose-100]="notif.nivel === 'error'"
+                            [class.text-rose-700]="notif.nivel === 'error'"
+                            [class.bg-amber-100]="notif.nivel === 'warning'"
+                            [class.text-amber-800]="notif.nivel === 'warning'"
+                            class="h-7 w-7 rounded-lg flex items-center justify-center shrink-0">
+                            <i class="pi text-xs" [class.pi-exclamation-triangle]="notif.nivel === 'error'" [class.pi-info-circle]="notif.nivel !== 'error'"></i>
+                          </div>
+                          <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between gap-1 mb-0.5">
+                              <span class="text-xs font-black text-foreground truncate">{{ notif.titulo }}</span>
+                              @if (!notif.leida) {
+                                <span class="h-2 w-2 rounded-full bg-rose-600 shrink-0"></span>
+                              }
+                            </div>
+                            @if (notif.materiaNombre) {
+                              <p class="text-[10px] font-bold text-primary truncate">
+                                {{ notif.materiaCodigo ? notif.materiaCodigo + ' · ' : '' }}{{ notif.materiaNombre }} ({{ notif.grupo }})
+                              </p>
+                            }
+                            <p class="text-[10px] text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">{{ notif.mensaje }}</p>
+                            <div class="mt-1.5 flex items-center justify-between text-[9px] text-muted-foreground font-semibold">
+                              <span>{{ notif.parcial || '' }}</span>
+                              <span class="text-primary font-bold inline-flex items-center gap-1">Ver banco <i class="pi pi-arrow-right text-[8px]"></i></span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
           <button
             type="button"
             title="Parametrizar vista"
@@ -102,7 +195,23 @@ export class TopbarComponent {
   private readonly _authService = inject(AuthService);
   private readonly _router = inject(Router);
   public readonly preferencias = inject(LayoutPreferencesService);
+  public readonly notificacionesService = inject(NotificacionesService);
   public readonly menuVistaAbierto = signal(false);
+  public readonly menuNotificacionesAbierto = signal(false);
+
+  public toggleMenuNotificaciones(): void {
+    const estado = !this.menuNotificacionesAbierto();
+    this.menuNotificacionesAbierto.set(estado);
+    if (estado) {
+      this.menuVistaAbierto.set(false);
+      this.notificacionesService.cargarNotificaciones();
+    }
+  }
+
+  public abrirNotificacion(notif: NotificacionUsuario): void {
+    this.menuNotificacionesAbierto.set(false);
+    this.notificacionesService.abrirNotificacion(notif);
+  }
 
   public puedeParametrizar(): boolean {
     return this._authService.tieneRol(['RESPONSABLE_EVALUACIONES']);

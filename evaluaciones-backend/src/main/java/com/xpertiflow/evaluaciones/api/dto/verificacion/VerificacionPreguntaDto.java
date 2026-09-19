@@ -9,6 +9,8 @@ import java.util.List;
 @Data
 public class VerificacionPreguntaDto {
     private Integer numeroOriginal;
+    private Integer numeroPregunta;
+    private Boolean esEnunciadoContexto;
     private String identificadorOriginal;
     private String tipoReactivo;
     private String dificultad;
