@@ -3711,18 +3711,20 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public getPasosFlujo(item: EvaluacionItemUI): StepDef[] {
     if (item.modalidad === 'VIRTUAL') {
+      const labelSiguiente = item.etapa === 'Validado' ? 'Generar Examen Virtual' : 'Calificado';
+      const iconSiguiente = item.etapa === 'Validado' ? 'pi pi-desktop' : 'pi pi-check-circle';
       if (item.requiereVerificacion) {
         return [
           { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
           { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
           { key: 'Verificado', label: 'Verificado', icon: 'pi pi-verified' },
-          { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
+          { key: 'Calificado', label: labelSiguiente, icon: iconSiguiente }
         ];
       }
       return [
         { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
         { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
-        { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
+        { key: 'Calificado', label: labelSiguiente, icon: iconSiguiente }
       ];
     }
     if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
@@ -3890,7 +3892,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       }
       if (st.key === 'Validado') return 'Clic para Validar y Encriptar Examen de Docente';
       if (st.key === 'Generado') return 'Clic para generar el examen PDF';
-      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') return 'Preparar sala virtual, variantes y tokens de acceso';
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') {
+        return item.etapa === 'Validado'
+          ? 'Clic para generar examen virtual: crear variantes, tokens y sala'
+          : 'Cerrar sala y calificar examen virtual';
+      }
       if (st.key === 'Pendiente de notas') return 'Habilita la carga de notas del docente o el procesamiento OMR';
       return `Clic para avanzar a: ${st.label}`;
     }
@@ -5055,6 +5061,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       },
       error: err => {
         this.consultandoSalaVirtual.set(false);
+        if (err?.status === 404 && (item.etapa === 'Validado' || item.etapa === 'Programado')) {
+          this._mostrarToast('El examen está validado pero aún no tiene sala virtual. Abriendo generador...', 'info');
+          this.abrirModalParametrizacion(item);
+          return;
+        }
         this._mostrarToast(
           err?.error?.message || err?.error?.error || 'Este examen todavía no tiene una sala virtual preparada.',
           'error'
