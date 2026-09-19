@@ -618,22 +618,6 @@ interface CampusDisponible extends Campus {
                     <!-- Acciones -->
                     <td class="p-3.5 text-center">
                       <div class="inline-flex items-center gap-1.5">
-
-                        @if (item.modalidad === 'VIRTUAL') {
-                          <div class="relative group/salaVirtual">
-                            <button
-                              (click)="abrirSalaVirtualDesdeLista(item)"
-                              title="Gestionar sala virtual"
-                              aria-label="Gestionar sala virtual"
-                              class="h-7 w-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center cursor-pointer transition-colors">
-                              <i class="pi pi-desktop text-xs"></i>
-                            </button>
-                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/salaVirtual:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Gestionar sala virtual</span>
-                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
-                            </div>
-                          </div>
-                        }
                         
                         <!-- 1. Bitácora -->
                         <div class="relative group/bitacora">
