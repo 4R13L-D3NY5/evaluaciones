@@ -20,4 +20,6 @@ public class AnulacionPreguntaOmrRequestDto {
     @NotBlank(message = "El motivo de anulación es obligatorio")
     @Size(min = 5, max = 500, message = "El motivo debe tener entre 5 y 500 caracteres")
     private String motivo;
+
+    private boolean propagarVariantes = true;
 }

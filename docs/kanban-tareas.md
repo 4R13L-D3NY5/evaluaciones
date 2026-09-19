@@ -239,15 +239,26 @@ _Sin tareas._
 - Criterio de cierre: Completar la optimización funcional y visual del examen virtual, validar el flujo integral y dejar documentados los pendientes o ajustes finales.
 - Notas: Completada con éxito. Implementación de PIN numérico corto de 6 dígitos retrocompatible (SHA-256), auto-recuperación de respuestas al recargar (F5), fórmulas KaTeX, diseño institucional moderno con minimapa y timer adaptativo, cierre/calificación directa de sala y exportación a Excel (.xlsx).
 
+#### T-019 — Mejoras en Calificación OMR: Visualización de marcajes, examen anulado, edición de clave, anulación con propagación y recalificación
+
+- Prioridad: Alta
+- Área: Calificación OMR / Lista de Evaluaciones / Clave de Respuestas
+- Responsable: Antigravity
+- Creada: 2026-09-18
+- Fecha límite: 2026-09-19
+- Dependencias: Módulo OMR existente, tablas `sea_calificaciones_omr` y `sea_auditoria_evaluaciones`.
+- Criterio de cierre: 1) Visualización clara de marcajes sin selects truncados con insignias legibles (`Est: [ A ]`, `Pat: [ A ]`, badges de estado semántico); 2) Previsualización directa y visible de escaneados en inspección y apertura de notas; 3) Anulación de examen individual con nota 0/60 forzada y soporte de restauración; 4) Corrección de clave de respuestas oficial del docente con propagación opcional y recálculo automático; 5) Anulación de preguntas con detección y propagación transversal automática a todas las variantes vinculadas (`A`, `B`, `C`, `D`); 6) Botón "Volver a calificar" (Recalificación OMR) para Responsable y Administrador con motivo obligatorio y auditoría integral (`RECALIFICACION_OMR`).
+- Notas: Completada con éxito. Implementación completa en backend Spring Boot (tests unitarios `OmrProcesamientoServiceTest` aprobados) y frontend Angular 18 (compilación de producción verificada). Cero migraciones de base de datos requeridas.
+
 ## Resumen
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 8 |
+| Pendientes | 7 |
 | En progreso | 0 |
-| En revisión | 7 |
+| En revisión | 8 |
 | Bloqueadas | 0 |
-| Completadas | 3 |
+| Completadas | 4 |
 
 ## Decisiones del módulo
 

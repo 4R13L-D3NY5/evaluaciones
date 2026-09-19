@@ -41,6 +41,46 @@ export interface OmrLecturaResponse {
   estadoCalificacion?: string;
 }
 
+export interface VarianteVinculada {
+  letraVariante: string;
+  numeroPregunta: number;
+  reactivoId?: string;
+  numeroBanco?: number;
+  claveActual?: string;
+}
+
+export interface ResumenVariantesVinculadas {
+  rolExamenId: string;
+  reactivoId?: string;
+  numeroBanco?: number;
+  varianteOrigen: string;
+  preguntaOrigen: number;
+  claveActualOrigen?: string;
+  variantesVinculadas: VarianteVinculada[];
+}
+
+export interface CorregirClavePatronRequest {
+  letraVariante: string;
+  numeroPregunta: number;
+  nuevaClave: string;
+  propagarVariantes?: boolean;
+  motivo: string;
+}
+
+export interface CorregirClavePatronResponse {
+  rolExamenId: string;
+  letraVarianteOrigen: string;
+  numeroPreguntaOrigen: number;
+  nuevaClave: string;
+  variantesModificadas: string[];
+  totalExamenesRecalculados: number;
+  mensaje: string;
+}
+
+export interface RecalificarOmrRequest {
+  motivo: string;
+}
+
 export interface AjustarCalificacionOmrRequest {
   pagina: number;
   codigoAnterior?: string | null;
@@ -49,6 +89,8 @@ export interface AjustarCalificacionOmrRequest {
   ajusteManual?: boolean;
   respuestasOriginales?: Record<string, string>;
   usuario?: string;
+  examenAnulado?: boolean;
+  motivoAnulacionExamen?: string;
 }
 
 export interface CalificacionOmrResponse {
@@ -90,12 +132,16 @@ export interface AnulacionPreguntaOmr {
   anuladoPor: string;
   anuladoEn?: string;
   activo: boolean;
+  anulacionesPropagadas?: number;
+  reactivoId?: string;
+  numeroBanco?: number;
 }
 
 export interface AnulacionPreguntaOmrRequest {
   letraVariante: string;
   numeroPregunta: number;
   motivo: string;
+  propagarVariantes?: boolean;
 }
 
 export interface ConfiguracionOmr {
@@ -222,5 +268,48 @@ export class OmrProcesamientoService {
 
   public reactivarPregunta(rolExamenId: string, letraVariante: string, numeroPregunta: number): Observable<void> {
     return this._http.delete<void>(`/api/omr/${encodeURIComponent(rolExamenId)}/anulaciones-preguntas/${encodeURIComponent(letraVariante)}/${numeroPregunta}`);
+  }
+
+  public consultarVariantesVinculadas(
+    rolExamenId: string,
+    letraVariante: string,
+    numeroPregunta: number
+  ): Observable<ResumenVariantesVinculadas> {
+    return this._http.get<ResumenVariantesVinculadas>(
+      `/api/omr/${encodeURIComponent(rolExamenId)}/preguntas/${encodeURIComponent(letraVariante)}/${numeroPregunta}/variantes-vinculadas`
+    );
+  }
+
+  public corregirClavePatron(
+    rolExamenId: string,
+    request: CorregirClavePatronRequest
+  ): Observable<CorregirClavePatronResponse> {
+    return this._http.put<CorregirClavePatronResponse>(
+      `/api/omr/${encodeURIComponent(rolExamenId)}/preguntas/corregir-clave`,
+      request
+    );
+  }
+
+  public recalificarEvaluacion(
+    rolExamenId: string,
+    request: RecalificarOmrRequest
+  ): Observable<CalificacionOmrResponse[]> {
+    return this._http.post<CalificacionOmrResponse[]>(
+      `/api/omr/${encodeURIComponent(rolExamenId)}/recalificar`,
+      request
+    );
+  }
+
+  public anularExamenEstudiante(
+    rolExamenId: string,
+    codigoEstudiante: string,
+    anular = true,
+    motivo = ''
+  ): Observable<CalificacionOmrResponse> {
+    const params = `anular=${anular}&motivo=${encodeURIComponent(motivo)}`;
+    return this._http.post<CalificacionOmrResponse>(
+      `/api/omr/${encodeURIComponent(rolExamenId)}/estudiantes/${encodeURIComponent(codigoEstudiante)}/anular-examen?${params}`,
+      {}
+    );
   }
 }

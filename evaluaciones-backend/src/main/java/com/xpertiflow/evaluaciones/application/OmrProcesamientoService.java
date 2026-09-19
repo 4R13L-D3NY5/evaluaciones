@@ -48,12 +48,20 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.RecalificarOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.VarianteVinculadaDto;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OmrProcesamientoService {
@@ -217,7 +225,39 @@ public class OmrProcesamientoService {
         recalcularCalificacionesDeVariante(rolExamenId, varianteSolicitada);
         registrarAuditoriaAnulacion(rol, "PREGUNTA_OMR_ANULADA", authentication, ipOrigen,
                 varianteSolicitada, numeroPregunta, motivo);
-        return mapearAnulacion(guardada);
+
+        AnulacionPreguntaOmrResponseDto responseDto = mapearAnulacion(guardada);
+
+        // Propagación automática a variantes vinculadas si está solicitado
+        if (request.isPropagarVariantes()) {
+            List<AnulacionPreguntaOmrResponseDto> propagadas = new ArrayList<>();
+            VarianteVinculadaDto.ResumenVariantesVinculadasDto resumen = consultarVariantesVinculadas(rolExamenId, varianteSolicitada, numeroPregunta);
+            responseDto.setReactivoId(resumen.getReactivoId());
+            responseDto.setNumeroBanco(resumen.getNumeroBanco());
+
+            String usuario = usuarioValido(authentication == null ? null : authentication.getName());
+            for (VarianteVinculadaDto vinc : resumen.getVariantesVinculadas()) {
+                if (vinc.isAnulada()) continue;
+                AnulacionPreguntaOmr anProp = anulacionRepository
+                        .findFirstByRolExamenIdAndLetraVarianteAndNumeroPreguntaOrderByIdDesc(
+                                rolExamenId, vinc.getLetraVariante(), vinc.getNumeroPregunta())
+                        .orElseGet(AnulacionPreguntaOmr::new);
+                anProp.setRolExamenId(rolExamenId);
+                anProp.setLetraVariante(vinc.getLetraVariante());
+                anProp.setNumeroPregunta(vinc.getNumeroPregunta());
+                anProp.setMotivo(motivo + " (Propagación automática desde Variante " + varianteSolicitada + ")");
+                anProp.setAnuladoPor(usuario);
+                anProp.setActivo(true);
+                AnulacionPreguntaOmr anGuardada = anulacionRepository.save(anProp);
+                recalcularCalificacionesDeVariante(rolExamenId, vinc.getLetraVariante());
+                registrarAuditoriaAnulacion(rol, "PREGUNTA_OMR_ANULADA_PROPAGADA", authentication, ipOrigen,
+                        vinc.getLetraVariante(), vinc.getNumeroPregunta(), anProp.getMotivo());
+                propagadas.add(mapearAnulacion(anGuardada));
+            }
+            responseDto.setAnulacionesPropagadas(propagadas);
+        }
+
+        return responseDto;
     }
 
     @Transactional
@@ -242,8 +282,8 @@ public class OmrProcesamientoService {
     private RolExamen buscarRolParaAnulacion(String rolExamenId) {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
-        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS").contains(rol.getEstadoFlujo().name())) {
-            throw new IllegalStateException("Las preguntas solo pueden anularse mientras la evaluación está devuelta o pendiente de notas.");
+        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO", "CONFIRMADO").contains(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("Esta operación solo aplica a evaluaciones devueltas, pendientes de notas, calificadas o confirmadas.");
         }
         if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_CARTILLA) {
             throw new IllegalStateException("La anulación por pregunta solo aplica a evaluaciones calificadas con cartilla OMR.");
@@ -269,6 +309,15 @@ public class OmrProcesamientoService {
                                  Map<String, String> patron,
                                  Map<String, String> respuestas,
                                  Set<Integer> anuladas) {
+        if ("ANULADO".equalsIgnoreCase(calificacion.getEstadoCalificacion())) {
+            calificacion.setAciertos(0);
+            calificacion.setFallos(0);
+            calificacion.setBlancos(0);
+            calificacion.setDoblesMarcas(0);
+            calificacion.setNotaSobre60(BigDecimal.ZERO);
+            calificacion.setNotaSobre100(BigDecimal.ZERO);
+            return;
+        }
         ResultadoCalificacion resultado = calcularMetricas(patron, respuestas, anuladas);
         calificacion.setTotalReactivos(resultado.total());
         calificacion.setAciertos(resultado.aciertos());
@@ -359,6 +408,329 @@ public class OmrProcesamientoService {
         dto.setAnuladoEn(anulacion.getAnuladoEn());
         dto.setActivo(anulacion.isActivo());
         return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public VarianteVinculadaDto.ResumenVariantesVinculadasDto consultarVariantesVinculadas(
+            String rolExamenId, String letraVariante, Integer numeroPregunta) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        String varOrigen = texto(letraVariante).toUpperCase(Locale.ROOT);
+        ExamenVariante varianteOrigen = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, varOrigen)
+                .orElseThrow(() -> new IllegalArgumentException("Variante " + varOrigen + " no encontrada en este rol."));
+
+        JsonNode contenidoOrigen = leerContenidoVariante(varianteOrigen);
+        List<PatronCalificadoResponseDto.TrazabilidadPreguntaDto> trazabilidadOrigen = leerTrazabilidad(contenidoOrigen);
+        Map<String, String> patronOrigen = leerPatron(contenidoOrigen);
+
+        PatronCalificadoResponseDto.TrazabilidadPreguntaDto itemOrigen = trazabilidadOrigen.stream()
+                .filter(t -> Objects.equals(t.getNumeroPresentado(), numeroPregunta))
+                .findFirst()
+                .orElse(null);
+
+        String reactivoId = itemOrigen != null ? itemOrigen.getReactivoId() : null;
+        Integer numeroBanco = itemOrigen != null ? itemOrigen.getNumeroBanco() : null;
+        String claveOrigen = patronOrigen.getOrDefault(String.valueOf(numeroPregunta), "");
+        boolean anuladaOrigen = anulacionRepository
+                .findByRolExamenIdAndLetraVarianteAndNumeroPreguntaAndActivoTrue(rolExamenId, varOrigen, numeroPregunta)
+                .isPresent();
+
+        List<VarianteVinculadaDto> vinculadas = new ArrayList<>();
+        if (reactivoId != null || numeroBanco != null) {
+            List<ExamenVariante> todasVariantes = varianteRepository.findByRolExamenId(rolExamenId);
+            for (ExamenVariante v : todasVariantes) {
+                if (v.getLetraVariante().equalsIgnoreCase(varOrigen)) continue;
+                JsonNode contV = leerContenidoVariante(v);
+                List<PatronCalificadoResponseDto.TrazabilidadPreguntaDto> trazV = leerTrazabilidad(contV);
+                Map<String, String> patronV = leerPatron(contV);
+
+                for (PatronCalificadoResponseDto.TrazabilidadPreguntaDto t : trazV) {
+                    boolean coincide = (reactivoId != null && reactivoId.equals(t.getReactivoId()))
+                            || (numeroBanco != null && numeroBanco.equals(t.getNumeroBanco()));
+                    if (coincide) {
+                        boolean anuladaV = anulacionRepository
+                                .findByRolExamenIdAndLetraVarianteAndNumeroPreguntaAndActivoTrue(
+                                        rolExamenId, v.getLetraVariante(), t.getNumeroPresentado())
+                                .isPresent();
+                        vinculadas.add(VarianteVinculadaDto.builder()
+                                .letraVariante(v.getLetraVariante())
+                                .numeroPregunta(t.getNumeroPresentado())
+                                .reactivoId(t.getReactivoId())
+                                .numeroBanco(t.getNumeroBanco())
+                                .respuestaCorrecta(patronV.getOrDefault(String.valueOf(t.getNumeroPresentado()), ""))
+                                .anulada(anuladaV)
+                                .build());
+                    }
+                }
+            }
+        }
+
+        return VarianteVinculadaDto.ResumenVariantesVinculadasDto.builder()
+                .rolExamenId(rolExamenId)
+                .letraVarianteOrigen(varOrigen)
+                .numeroPreguntaOrigen(numeroPregunta)
+                .reactivoId(reactivoId)
+                .numeroBanco(numeroBanco)
+                .respuestaCorrecta(claveOrigen)
+                .anulada(anuladaOrigen)
+                .variantesVinculadas(vinculadas)
+                .build();
+    }
+
+    @Transactional
+    public CorregirClavePatronResponseDto corregirClavePatron(String rolExamenId,
+                                                             CorregirClavePatronRequestDto request,
+                                                             Authentication authentication,
+                                                             String ipOrigen) {
+        RolExamen rol = buscarRolParaAnulacion(rolExamenId);
+        validarRolAjuste(authentication);
+
+        String varOrigen = texto(request.getLetraVariante()).toUpperCase(Locale.ROOT);
+        Integer numPregunta = request.getNumeroPregunta();
+        String nuevaClave = texto(request.getNuevaClave()).toUpperCase(Locale.ROOT);
+        String motivo = texto(request.getMotivo());
+
+        if (numPregunta == null || numPregunta < 1) {
+            throw new IllegalArgumentException("El número de pregunta es inválido.");
+        }
+        if (nuevaClave.isBlank()) {
+            throw new IllegalArgumentException("La nueva clave es obligatoria.");
+        }
+
+        ExamenVariante variante = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, varOrigen)
+                .orElseThrow(() -> new IllegalArgumentException("La variante " + varOrigen + " no pertenece a esta evaluación."));
+
+        JsonNode contenidoOrigen = leerContenidoVariante(variante);
+        Map<String, String> patronOrigen = leerPatron(contenidoOrigen);
+        String claveAnterior = patronOrigen.getOrDefault(String.valueOf(numPregunta), "");
+
+        List<String> detalles = new ArrayList<>();
+        int variantesActualizadas = 0;
+        int calificacionesRecalculadas = 0;
+
+        // 1. Actualizar la variante de origen
+        actualizarClaveEnVariante(variante, contenidoOrigen, numPregunta, nuevaClave);
+        variantesActualizadas++;
+        detalles.add("Variante " + varOrigen + ": Pregunta #" + numPregunta + " actualizada de '" + claveAnterior + "' a '" + nuevaClave + "'");
+        recalcularCalificacionesDeVariante(rolExamenId, varOrigen);
+        calificacionesRecalculadas += (int) calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId).stream()
+                .filter(c -> varOrigen.equalsIgnoreCase(c.getLetraVariante()))
+                .count();
+
+        // 2. Si se solicitó propagación, buscar en las demás variantes
+        if (request.isPropagarVariantes()) {
+            VarianteVinculadaDto.ResumenVariantesVinculadasDto resumen = consultarVariantesVinculadas(rolExamenId, varOrigen, numPregunta);
+            for (VarianteVinculadaDto vinc : resumen.getVariantesVinculadas()) {
+                ExamenVariante vDestino = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, vinc.getLetraVariante())
+                        .orElse(null);
+                if (vDestino != null) {
+                    JsonNode contDest = leerContenidoVariante(vDestino);
+                    actualizarClaveEnVariante(vDestino, contDest, vinc.getNumeroPregunta(), nuevaClave);
+                    variantesActualizadas++;
+                    detalles.add("Variante " + vinc.getLetraVariante() + ": Pregunta #" + vinc.getNumeroPregunta() + " actualizada a '" + nuevaClave + "' (Propagada)");
+                    recalcularCalificacionesDeVariante(rolExamenId, vinc.getLetraVariante());
+                    calificacionesRecalculadas += (int) calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId).stream()
+                            .filter(c -> vinc.getLetraVariante().equalsIgnoreCase(c.getLetraVariante()))
+                            .count();
+                }
+            }
+        }
+
+        // 3. Registrar auditoría formal
+        try {
+            Map<String, Object> auditoriaData = new LinkedHashMap<>();
+            auditoriaData.put("variante", varOrigen);
+            auditoriaData.put("pregunta", numPregunta);
+            auditoriaData.put("claveAnterior", claveAnterior);
+            auditoriaData.put("nuevaClave", nuevaClave);
+            auditoriaData.put("propagarVariantes", request.isPropagarVariantes());
+            auditoriaData.put("motivo", motivo);
+            auditoriaData.put("variantesActualizadas", variantesActualizadas);
+            auditoriaData.put("calificacionesRecalculadas", calificacionesRecalculadas);
+            auditoriaData.put("detalles", detalles);
+
+            auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen(rol.getEstadoFlujo().getValor())
+                    .etapaDestino(rol.getEstadoFlujo().getValor())
+                    .accion("CLAVE_PATRON_OMR_CORREGIDA")
+                    .usuario(usuarioValido(authentication == null ? null : authentication.getName()))
+                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                    .detallesJson(objectMapper.writeValueAsString(auditoriaData))
+                    .build());
+        } catch (IOException e) {
+            log.error("No se pudo registrar la auditoría de corrección de clave OMR", e);
+        }
+
+        return CorregirClavePatronResponseDto.builder()
+                .rolExamenId(rolExamenId)
+                .letraVariante(varOrigen)
+                .numeroPregunta(numPregunta)
+                .claveAnterior(claveAnterior)
+                .nuevaClave(nuevaClave)
+                .propagada(request.isPropagarVariantes())
+                .variantesActualizadas(variantesActualizadas)
+                .calificacionesRecalculadas(calificacionesRecalculadas)
+                .detalles(detalles)
+                .build();
+    }
+
+    private void actualizarClaveEnVariante(ExamenVariante variante, JsonNode contenido, int numPregunta, String nuevaClave) {
+        try {
+            ObjectNode root = contenido.deepCopy();
+            String patronJson = root.path("patronClavesJson").asText("{}");
+            Map<String, String> patron = objectMapper.readValue(patronJson, new TypeReference<LinkedHashMap<String, String>>() {});
+            patron.put(String.valueOf(numPregunta), nuevaClave);
+            root.put("patronClavesJson", objectMapper.writeValueAsString(patron));
+
+            List<PatronCalificadoResponseDto.TrazabilidadPreguntaDto> traz = leerTrazabilidad(root);
+            for (PatronCalificadoResponseDto.TrazabilidadPreguntaDto t : traz) {
+                if (Objects.equals(t.getNumeroPresentado(), numPregunta)) {
+                    t.setRespuestaCorrectaVariante(nuevaClave);
+                }
+            }
+            root.put("trazabilidadPreguntasJson", objectMapper.writeValueAsString(traz));
+
+            String nuevoTexto = objectMapper.writeValueAsString(root);
+            BancoEncryptedPayload nuevoPayload = cifradoService.cifrarTexto(
+                    nuevoTexto, "variante:" + variante.getId() + ":rol:" + variante.getRolExamenId());
+
+            variante.setContenidoSeguroCifrado(nuevoPayload.getCiphertext());
+            variante.setContenidoSeguroNonce(nuevoPayload.getNonce());
+            variante.setContenidoSeguroDekEnvuelta(nuevoPayload.getWrappedDataKey());
+            variante.setContenidoSeguroKekReferencia(nuevoPayload.getKeyReference());
+            variante.setContenidoSeguroKekVersion(nuevoPayload.getKeyVersion());
+            variante.setContenidoSeguroAlgoritmo(nuevoPayload.getAlgorithm());
+            varianteRepository.save(variante);
+        } catch (IOException e) {
+            throw new IllegalStateException("Error al actualizar la clave cifrada de la variante " + variante.getLetraVariante(), e);
+        }
+    }
+
+    @Transactional
+    public List<CalificacionOmrResponseDto> recalificarEvaluacion(String rolExamenId,
+                                                                  RecalificarOmrRequestDto request,
+                                                                  Authentication authentication,
+                                                                  String ipOrigen) {
+        validarRolAjuste(authentication);
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+
+        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO", "CONFIRMADO").contains(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("Solo se puede recalificar una evaluación en devolución, calificación o confirmación.");
+        }
+
+        String motivo = texto(request.getMotivo());
+        if (motivo.length() < 5) {
+            throw new IllegalArgumentException("El motivo de recalificación es obligatorio (mínimo 5 caracteres).");
+        }
+
+        String usuario = usuarioValido(authentication == null ? null : authentication.getName());
+
+        // Recalcular todas las variantes de esta evaluación
+        List<ExamenVariante> variantes = varianteRepository.findByRolExamenId(rolExamenId);
+        for (ExamenVariante v : variantes) {
+            recalcularCalificacionesDeVariante(rolExamenId, v.getLetraVariante());
+        }
+
+        // Marcar en las calificaciones quién hizo la recalificación
+        List<CalificacionOmr> calificaciones = calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId);
+        for (CalificacionOmr c : calificaciones) {
+            c.setProcesadoPor(usuario + "_RECALIFICACION");
+            calificacionRepository.save(c);
+        }
+
+        // Registrar auditoría formal inmutable
+        try {
+            Map<String, Object> auditoriaData = new LinkedHashMap<>();
+            auditoriaData.put("accion", "RECALIFICACION_OMR");
+            auditoriaData.put("motivo", motivo);
+            auditoriaData.put("totalEstudiantesRecalculados", calificaciones.size());
+            auditoriaData.put("variantesRecalculadas", variantes.size());
+            auditoriaData.put("fecha", LocalDateTime.now().toString());
+
+            auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen(rol.getEstadoFlujo().getValor())
+                    .etapaDestino(rol.getEstadoFlujo().getValor())
+                    .accion("RECALIFICACION_OMR")
+                    .usuario(usuario)
+                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                    .detallesJson(objectMapper.writeValueAsString(auditoriaData))
+                    .build());
+        } catch (IOException e) {
+            log.error("Error al registrar auditoría de recalificación OMR", e);
+        }
+
+        return calificaciones.stream().map(this::mapearCalificacion).toList();
+    }
+
+    @Transactional
+    public CalificacionOmrResponseDto anularExamenEstudiante(String rolExamenId,
+                                                             String codigoEstudiante,
+                                                             boolean anular,
+                                                             String motivo,
+                                                             Authentication authentication,
+                                                             String ipOrigen) {
+        validarRolAjuste(authentication);
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+
+        CalificacionOmr calificacion = calificacionRepository
+                .findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigoEstudiante)
+                .orElseThrow(() -> new IllegalArgumentException("Calificación no encontrada para el estudiante " + codigoEstudiante));
+
+        String usuario = usuarioValido(authentication == null ? null : authentication.getName());
+
+        if (anular) {
+            calificacion.setEstadoCalificacion("ANULADO");
+            calificacion.setAciertos(0);
+            calificacion.setFallos(0);
+            calificacion.setBlancos(0);
+            calificacion.setDoblesMarcas(0);
+            calificacion.setNotaSobre60(BigDecimal.ZERO);
+            calificacion.setNotaSobre100(BigDecimal.ZERO);
+            calificacion.setProcesadoPor(usuario + "_ANULACION_EXAMEN");
+            calificacionRepository.save(calificacion);
+
+            registrarAuditoriaAnulacion(rol, "EXAMEN_ESTUDIANTE_ANULADO", authentication, ipOrigen,
+                    calificacion.getLetraVariante(), null,
+                    "Examen anulado para estudiante " + codigoEstudiante + " (" + calificacion.getEstudianteNombreCompleto() + "): " + motivo);
+        } else {
+            // Restaurar: recalculamos con el patrón
+            ExamenVariante variante = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, calificacion.getLetraVariante())
+                    .orElseThrow(() -> new IllegalStateException("Variante no encontrada: " + calificacion.getLetraVariante()));
+            Map<String, String> patron = leerPatron(variante);
+            Map<String, String> respuestas = leerRespuestasGuardadas(calificacion.getRespuestasDetectadasJson());
+            Set<Integer> anuladas = preguntasAnuladas(rolExamenId, calificacion.getLetraVariante());
+
+            ResultadoCalificacion res = calcularMetricas(patron, respuestas, anuladas);
+            calificacion.setTotalReactivos(res.total());
+            calificacion.setAciertos(res.aciertos());
+            calificacion.setFallos(res.fallos());
+            calificacion.setBlancos(res.blancos());
+            calificacion.setDoblesMarcas(res.dobles());
+            calificacion.setNotaSobre60(res.notaSobre60());
+            calificacion.setNotaSobre100(res.notaSobre100());
+            calificacion.setEstadoCalificacion(res.notaSobre100().doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
+            calificacion.setProcesadoPor(usuario + "_RESTAURACION_EXAMEN");
+            calificacionRepository.save(calificacion);
+
+            registrarAuditoriaAnulacion(rol, "EXAMEN_ESTUDIANTE_RESTAURADO", authentication, ipOrigen,
+                    calificacion.getLetraVariante(), null,
+                    "Examen restaurado para estudiante " + codigoEstudiante + " (" + calificacion.getEstudianteNombreCompleto() + "): " + motivo);
+        }
+
+        return mapearCalificacion(calificacion);
+    }
+
+    private void validarRolAjuste(Authentication authentication) {
+        boolean autorizado = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_RESPONSABLE_EVALUACIONES".equals(authority.getAuthority())
+                        || "ROLE_ADMINISTRADOR_SISTEMA".equals(authority.getAuthority()));
+        if (!autorizado) {
+            throw new AccessDeniedException("Solo el responsable de evaluaciones o el administrador pueden realizar esta acción.");
+        }
     }
 
     private record ResultadoCalificacion(int total, int aciertos, int fallos, int blancos, int dobles,
@@ -686,41 +1058,54 @@ public class OmrProcesamientoService {
         calificacion.setEstudianteNombreCompleto(nombreCompleto(mapeo));
         calificacion.setLetraVariante(mapeo.getLetraVariante());
         calificacion.setTotalReactivos(resultado.total());
-        calificacion.setAciertos(resultado.aciertos());
-        calificacion.setFallos(resultado.fallos());
-        calificacion.setBlancos(resultado.blancos());
-        calificacion.setDoblesMarcas(resultado.dobles());
-        calificacion.setNotaSobre60(resultado.notaSobre60());
-        calificacion.setNotaSobre100(resultado.notaSobre100());
-        calificacion.setEstadoCalificacion(resultado.notaSobre100().doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
+        if (Boolean.TRUE.equals(request.getExamenAnulado())) {
+            calificacion.setAciertos(0);
+            calificacion.setFallos(0);
+            calificacion.setBlancos(0);
+            calificacion.setDoblesMarcas(0);
+            calificacion.setNotaSobre60(BigDecimal.ZERO);
+            calificacion.setNotaSobre100(BigDecimal.ZERO);
+            calificacion.setEstadoCalificacion("ANULADO");
+        } else {
+            calificacion.setAciertos(resultado.aciertos());
+            calificacion.setFallos(resultado.fallos());
+            calificacion.setBlancos(resultado.blancos());
+            calificacion.setDoblesMarcas(resultado.dobles());
+            calificacion.setNotaSobre60(resultado.notaSobre60());
+            calificacion.setNotaSobre100(resultado.notaSobre100());
+            calificacion.setEstadoCalificacion(resultado.notaSobre100().doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
+        }
         try {
             calificacion.setRespuestasDetectadasJson(objectMapper.writeValueAsString(respuestas));
         } catch (IOException exception) {
             throw new IllegalStateException("No se pudieron serializar las respuestas ajustadas.", exception);
         }
         String usuario = authentication != null ? authentication.getName() : request.getUsuario();
-        calificacion.setProcesadoPor(usuarioValido(usuario) + "_AJUSTE_OMR");
+        calificacion.setProcesadoPor(usuarioValido(usuario) + (Boolean.TRUE.equals(request.getExamenAnulado()) ? "_ANULACION_EXAMEN" : "_AJUSTE_OMR"));
         CalificacionOmr guardada = calificacionRepository.save(calificacion);
-        if (request.isAjusteManual()) {
+        if (request.isAjusteManual() || Boolean.TRUE.equals(request.getExamenAnulado())) {
             Map<String, String> respuestasOriginales = request.getRespuestasOriginales() == null
                     ? respuestasPrevias
                     : normalizarRespuestas(request.getRespuestasOriginales());
-            registrarAuditoriaAjusteManual(rolParaAuditoria, guardada, request.getPagina(),
-                    respuestasOriginales, respuestas, authentication, ipOrigen);
+            if (rolParaAuditoria != null) {
+                registrarAuditoriaAjusteManual(rolParaAuditoria, guardada, request.getPagina(),
+                        respuestasOriginales, respuestas, authentication, ipOrigen);
+            }
         }
         return mapearCalificacion(guardada);
     }
 
     private RolExamen validarAjusteManual(String rolExamenId, Authentication authentication) {
-        boolean responsable = authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_RESPONSABLE_EVALUACIONES".equals(authority.getAuthority()));
-        if (!responsable) {
-            throw new AccessDeniedException("Solo el responsable de evaluaciones puede ajustar manualmente los incisos.");
+        boolean autorizado = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_RESPONSABLE_EVALUACIONES".equals(authority.getAuthority())
+                        || "ROLE_ADMINISTRADOR_SISTEMA".equals(authority.getAuthority()));
+        if (!autorizado) {
+            throw new AccessDeniedException("Solo el responsable de evaluaciones o el administrador pueden ajustar manualmente los incisos.");
         }
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
-        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS").contains(rol.getEstadoFlujo().name())) {
-            throw new IllegalStateException("Los incisos solo pueden ajustarse mientras la evaluación está devuelta o pendiente de notas.");
+        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO", "CONFIRMADO").contains(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("Los incisos solo pueden ajustarse mientras la evaluación está devuelta, pendiente de notas, calificada o confirmada.");
         }
         if (rol.getModalidad() != ModalidadExamen.PRESENCIAL_CARTILLA) {
             throw new IllegalStateException("El ajuste manual de incisos solo aplica a evaluaciones con cartilla OMR.");

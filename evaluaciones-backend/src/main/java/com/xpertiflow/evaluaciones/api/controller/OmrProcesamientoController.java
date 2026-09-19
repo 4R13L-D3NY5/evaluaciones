@@ -6,7 +6,11 @@ import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionOmrDto;
+import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.RecalificarOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.VarianteVinculadaDto;
 import com.xpertiflow.evaluaciones.application.OmrProcesamientoService;
 import com.xpertiflow.evaluaciones.application.OmrEscaneadoService;
 import org.springframework.core.io.FileSystemResource;
@@ -191,5 +195,53 @@ public class OmrProcesamientoController {
         omrProcesamientoService.reactivarPregunta(rolExamenId, letraVariante, numeroPregunta, authentication,
                 httpRequest == null ? null : httpRequest.getRemoteAddr());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{rolExamenId}/preguntas/{letraVariante}/{numeroPregunta}/variantes-vinculadas")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Consultar variantes donde se repite la misma pregunta del banco")
+    public ResponseEntity<VarianteVinculadaDto.ResumenVariantesVinculadasDto> consultarVariantesVinculadas(
+            @PathVariable String rolExamenId,
+            @PathVariable String letraVariante,
+            @PathVariable Integer numeroPregunta) {
+        return ResponseEntity.ok(omrProcesamientoService.consultarVariantesVinculadas(rolExamenId, letraVariante, numeroPregunta));
+    }
+
+    @PutMapping("/{rolExamenId}/preguntas/corregir-clave")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Corregir la clave de respuestas de una pregunta con propagación y recálculo automático")
+    public ResponseEntity<CorregirClavePatronResponseDto> corregirClavePatron(
+            @PathVariable String rolExamenId,
+            @Valid @RequestBody CorregirClavePatronRequestDto request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(omrProcesamientoService.corregirClavePatron(rolExamenId, request, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
+    }
+
+    @PostMapping("/{rolExamenId}/recalificar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Recalificar una evaluación OMR con auditoría formal")
+    public ResponseEntity<List<CalificacionOmrResponseDto>> recalificarEvaluacion(
+            @PathVariable String rolExamenId,
+            @Valid @RequestBody RecalificarOmrRequestDto request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(omrProcesamientoService.recalificarEvaluacion(rolExamenId, request, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
+    }
+
+    @PostMapping("/{rolExamenId}/estudiantes/{codigoEstudiante}/anular-examen")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Anular o restaurar el examen de un estudiante individual")
+    public ResponseEntity<CalificacionOmrResponseDto> anularExamenEstudiante(
+            @PathVariable String rolExamenId,
+            @PathVariable String codigoEstudiante,
+            @RequestParam(defaultValue = "true") boolean anular,
+            @RequestParam(required = false, defaultValue = "Anulación administrativa") String motivo,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(omrProcesamientoService.anularExamenEstudiante(rolExamenId, codigoEstudiante, anular, motivo, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
     }
 }
