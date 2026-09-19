@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
@@ -1086,6 +1087,7 @@ export class RolExamenesComponent implements OnInit {
   private readonly _feedback = inject(UiFeedbackService);
   private readonly _auth = inject(AuthService);
   private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
+  private readonly _route = inject(ActivatedRoute);
   public readonly storage = inject(EvaluacionesStorageService);
   public readonly horasCandado72 = signal<number>(72);
 
@@ -1295,6 +1297,12 @@ export class RolExamenesComponent implements OnInit {
     this._cargarSedes();
     this._configuracionService.cargar().subscribe({
       next: config => this.horasCandado72.set(config.horasCandado72 ?? 72)
+    });
+    this._route.queryParams.subscribe(params => {
+      const busqueda = params['busqueda'];
+      if (busqueda && typeof busqueda === 'string') {
+        this.busquedaMateria.set(busqueda);
+      }
     });
   }
 

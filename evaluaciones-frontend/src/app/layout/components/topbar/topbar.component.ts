@@ -115,10 +115,25 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
                                 {{ notif.materiaCodigo ? notif.materiaCodigo + ' · ' : '' }}{{ notif.materiaNombre }} ({{ notif.grupo }})
                               </p>
                             }
+                            @if (notif.docenteNombre) {
+                              <p class="text-[10px] font-bold text-foreground truncate flex items-center gap-1 mt-0.5">
+                                <i class="pi pi-user text-[9px] text-muted-foreground"></i>
+                                <span>Docente: {{ notif.docenteNombre }}</span>
+                              </p>
+                            }
                             <p class="text-[10px] text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">{{ notif.mensaje }}</p>
                             <div class="mt-1.5 flex items-center justify-between text-[9px] text-muted-foreground font-semibold">
-                              <span>{{ notif.parcial || '' }}</span>
-                              <span class="text-primary font-bold inline-flex items-center gap-1">Ver banco <i class="pi pi-arrow-right text-[8px]"></i></span>
+                              <div class="flex items-center gap-1.5">
+                                <span>{{ notif.parcial || '' }}</span>
+                                @if (notif.horasRestantes !== undefined && notif.horasRestantes > 0) {
+                                  <span class="rounded bg-rose-100 px-1 py-0.5 text-[8px] font-black text-rose-700">
+                                    {{ notif.horasRestantes }}h rest.
+                                  </span>
+                                }
+                              </div>
+                              <span class="text-primary font-bold inline-flex items-center gap-1">
+                                {{ notif.textoAccion || 'Ver detalle' }} <i class="pi pi-arrow-right text-[8px]"></i>
+                              </span>
                             </div>
                           </div>
                         </div>
