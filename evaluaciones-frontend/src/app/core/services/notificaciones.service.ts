@@ -1,9 +1,9 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 import { AuthService } from './auth.service';
 import { RolExamenService, RolExamenResponse } from './rol-examen.service';
 import { Router } from '@angular/router';
 
-export type TipoNotificacion = 'OBSERVACION_BANCO' | 'VERIFICACION_PENDIENTE' | 'EXAMEN_SIN_BANCO_72H' | 'SISTEMA' | 'INFO';
+export type TipoNotificacion = 'OBSERVACION_BANCO' | 'BANCO_VERIFICADO' | 'VERIFICACION_PENDIENTE' | 'EXAMEN_SIN_BANCO_72H' | 'NOTAS_SIN_CARTILLA_PENDIENTES' | 'SISTEMA' | 'INFO';
 
 export interface NotificacionUsuario {
   id: string;
@@ -37,12 +37,40 @@ export class NotificacionesService {
   public readonly notificaciones = signal<NotificacionUsuario[]>([]);
   public readonly cargando = signal<boolean>(false);
 
+  /**
+   * Alertas pendientes totales que deben llamar la atención del usuario en la campana.
+   * Las observaciones de banco devuelto y los exámenes sin cartilla pendientes de notas
+   * representan acciones obligatorias y permanecen visibles como alerta hasta su subsanación.
+   */
+  public readonly totalAlertasCount = computed(() =>
+    this.notificaciones().filter(n => n.tipo === 'OBSERVACION_BANCO' || n.tipo === 'NOTAS_SIN_CARTILLA_PENDIENTES' || !n.leida).length
+  );
+
   public readonly noLeidasCount = computed(() =>
     this.notificaciones().filter(n => !n.leida).length
   );
 
   constructor() {
-    this.cargarNotificaciones();
+    // Sincronización reactiva inmediata ante inicio de sesión o restauración de token
+    effect(() => {
+      const usuario = this._authService.usuario();
+      untracked(() => {
+        if (usuario) {
+          this.cargarNotificaciones();
+        } else {
+          this.notificaciones.set([]);
+        }
+      });
+    }, { allowSignalWrites: true });
+
+    // Sondeo periódico ligero (cada 60 s) para detectar observaciones sin necesidad de recargar la página
+    if (typeof window !== 'undefined') {
+      setInterval(() => {
+        if (this._authService.usuario()) {
+          this.cargarNotificaciones();
+        }
+      }, 60000);
+    }
   }
 
   public cargarNotificaciones(): void {
@@ -93,8 +121,65 @@ export class NotificacionesService {
               textoAccion: 'Ver banco',
               nivel: 'error'
             });
+          } else if (rol.estadoVerificacion === 'VERIFICADO') {
+            const id = 'verif-' + rol.id;
+            lista.push({
+              id,
+              tipo: 'BANCO_VERIFICADO',
+              titulo: 'Examen validado y verificado',
+              materiaCodigo: rol.materiaCodigo,
+              materiaNombre: rol.materiaNombre,
+              grupo: rol.grupo,
+              parcial: rol.tipoParcial,
+              docenteNombre: rol.docenteNombre,
+              mensaje: `El examen de ${rol.materiaNombre} (${rol.grupo}) fue verificado y aprobado conforme por la dirección académica.`,
+              fecha: rol.fechaVerificacion || rol.actualizadoEn || new Date(),
+              leida: leidas.has(id),
+              ruta: '/banco-preguntas',
+              queryParams: { rolId: rol.id },
+              textoAccion: 'Ver examen',
+              nivel: 'success'
+            });
+          }
+
+          // 3. Examen sin cartilla pendiente de notas (no subió notas aún)
+          const esSinCartilla = rol.modalidad === 'PRESENCIAL_SIN_CARTILLA';
+          if (esSinCartilla && rol.estadoFlujo === 'PENDIENTE_NOTAS') {
+            const id = 'sin-cartilla-notas-' + rol.id;
+            lista.push({
+              id,
+              tipo: 'NOTAS_SIN_CARTILLA_PENDIENTES',
+              titulo: 'Examen sin cartilla: Subir notas',
+              materiaCodigo: rol.materiaCodigo,
+              materiaNombre: rol.materiaNombre,
+              grupo: rol.grupo,
+              parcial: rol.tipoParcial,
+              docenteNombre: rol.docenteNombre,
+              mensaje: `El examen sin cartilla de ${rol.materiaNombre} (${rol.grupo}) no tiene notas subidas aún. Ingresa a registrar las calificaciones sobre 60 puntos.`,
+              fecha: rol.actualizadoEn || new Date(),
+              leida: leidas.has(id),
+              ruta: '/banco-preguntas',
+              queryParams: { rolId: rol.id, abrirNotas: 'true' },
+              textoAccion: 'Cargar notas',
+              nivel: 'warning'
+            });
           }
         });
+
+        // Limpiar automáticamente de localStorage las alertas de roles que ya fueron corregidos o calificados
+        const rolesIdsDevueltos = new Set(roles.filter(r => r.estadoVerificacion === 'DEVUELTO').map(r => 'obs-' + r.id));
+        const rolesIdsPendientesNotas = new Set(
+          roles.filter(r => r.modalidad === 'PRESENCIAL_SIN_CARTILLA' && r.estadoFlujo === 'PENDIENTE_NOTAS')
+               .map(r => 'sin-cartilla-notas-' + r.id)
+        );
+        const leidasActualizadas = new Set(Array.from(leidas).filter(id => {
+          if (id.startsWith('obs-')) return rolesIdsDevueltos.has(id);
+          if (id.startsWith('sin-cartilla-notas-')) return rolesIdsPendientesNotas.has(id);
+          return true;
+        }));
+        if (leidasActualizadas.size !== leidas.size) {
+          this._guardarIdsLeidos(leidasActualizadas);
+        }
 
         this.notificaciones.set(lista);
         this.cargando.set(false);
@@ -245,6 +330,28 @@ export class NotificacionesService {
     if (notif.ruta) {
       this._router.navigate([notif.ruta], { queryParams: notif.queryParams });
     }
+  }
+
+  /**
+   * Elimina el estado de observación devuelta cuando el docente reenvía el examen corregido,
+   * forzando la actualización inmediata de la campana.
+   */
+  public limpiarObservacion(rolId: string): void {
+    const leidas = this._obtenerIdsLeidos();
+    leidas.delete('obs-' + rolId);
+    leidas.delete('dir-obs-' + rolId);
+    this._guardarIdsLeidos(leidas);
+    this.cargarNotificaciones();
+  }
+
+  /**
+   * Elimina la alerta de notas pendientes cuando el docente concluye y guarda las notas sobre 60 puntos.
+   */
+  public limpiarNotasPendientes(rolId: string): void {
+    const leidas = this._obtenerIdsLeidos();
+    leidas.delete('sin-cartilla-notas-' + rolId);
+    this._guardarIdsLeidos(leidas);
+    this.cargarNotificaciones();
   }
 
   private _obtenerIdsLeidos(): Set<string> {

@@ -65,7 +65,7 @@ public class CalificacionOmr {
     @Column(name = "archivo_escaneado_path", length = 255)
     private String archivoEscaneadoPath;
 
-    @Column(name = "procesado_por", nullable = false, length = 50)
+    @Column(name = "procesado_por", nullable = false, length = 100)
     private String procesadoPor;
 
     @CreationTimestamp

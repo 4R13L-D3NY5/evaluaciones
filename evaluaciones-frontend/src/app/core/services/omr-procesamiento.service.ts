@@ -132,7 +132,7 @@ export interface AnulacionPreguntaOmr {
   anuladoPor: string;
   anuladoEn?: string;
   activo: boolean;
-  anulacionesPropagadas?: number;
+  anulacionesPropagadas?: AnulacionPreguntaOmr[];
   reactivoId?: string;
   numeroBanco?: number;
 }
@@ -169,6 +169,7 @@ export interface PatronCalificadoVariante {
   letra: string;
   totalPreguntas: number;
   respuestas: Record<string, string>;
+  preguntasAnuladas?: number[];
   estudiantes?: Array<{
     codigoEstudiante: string;
     nombreCompleto: string;
@@ -179,6 +180,7 @@ export interface PatronCalificadoVariante {
     reactivoId?: string;
     respuestaCorrectaBanco?: string;
     respuestaCorrectaVariante?: string;
+    anulada?: boolean;
   }>;
 }
 

@@ -8,6 +8,10 @@ export interface CartillaOmr {
   grupo: string;
   codigoEstudiante: string;
   nombreCompleto: string;
+  estadoCalificacion?: string;
+  observacion?: string;
+  notaSobre60?: number;
+  notaSobre100?: number;
 }
 
 export interface PreparacionCartillasOmr {

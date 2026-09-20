@@ -6,12 +6,14 @@ import com.xpertiflow.evaluaciones.api.dto.LoteCartillasOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.PreparacionCartillasOmrResponseDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
+import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.CartillaOmr;
 import com.xpertiflow.evaluaciones.domain.entity.LoteCartillasOmr;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
+import com.xpertiflow.evaluaciones.domain.repository.CalificacionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.CartillaOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.LoteCartillasOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
@@ -23,11 +25,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -43,13 +47,19 @@ public class CartillaOmrService {
             EstadoFlujo.PROGRAMADO,
             EstadoFlujo.VALIDADO,
             EstadoFlujo.GENERADO,
-            EstadoFlujo.IMPRESO
+            EstadoFlujo.IMPRESO,
+            EstadoFlujo.ENTREGADO,
+            EstadoFlujo.DEVUELTO,
+            EstadoFlujo.PENDIENTE_NOTAS,
+            EstadoFlujo.CALIFICADO,
+            EstadoFlujo.CONFIRMADO
     );
 
     private final RolExamenRepository rolExamenRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final LoteCartillasOmrRepository loteRepository;
     private final CartillaOmrRepository cartillaRepository;
+    private final CalificacionOmrRepository calificacionOmrRepository;
     private final AuditoriaEvaluacionRepository auditoriaRepository;
     private final CartillaOmrPdfService pdfService;
     private final AppProperties appProperties;
@@ -71,11 +81,27 @@ public class CartillaOmrService {
                 .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, ACCION_IMPRESION_MARCAS);
         Optional<AuditoriaEvaluacion> impresionLista = auditoriaRepository
                 .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, ACCION_IMPRESION_LISTA);
+        Map<String, CalificacionOmr> califsPorEstudiante = calificacionOmrRepository
+                .findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        c -> c.getCodigoEstudiante().trim(),
+                        c -> c,
+                        (existente, reemplazo) -> reemplazo
+                ));
         List<DatosCartillaOmrDto> datos = java.util.stream.IntStream.range(0, estudiantes.size())
                 .mapToObj(indice -> {
                     DatosEstudiante estudiante = estudiantes.get(indice);
+                    CalificacionOmr calif = califsPorEstudiante.get(estudiante.codigo().trim());
+                    String estadoCalif = calif != null ? calif.getEstadoCalificacion() : null;
+                    String obs = null;
+                    BigDecimal n60 = calif != null ? calif.getNotaSobre60() : null;
+                    BigDecimal n100 = calif != null ? calif.getNotaSobre100() : null;
+                    if (calif != null && "ANULADO".equalsIgnoreCase(calif.getEstadoCalificacion())) {
+                        obs = "ANULADO · 0/60";
+                    }
                     return new DatosCartillaOmrDto(indice + 1, rol.getMateriaCodigo(), rol.getGrupo(),
-                            estudiante.codigo(), estudiante.nombreCompleto());
+                            estudiante.codigo(), estudiante.nombreCompleto(), estadoCalif, obs, n60, n100);
                 }).toList();
         return new PreparacionCartillasOmrResponseDto(
                 rol.getId(), rol.getCarreraNombre(), rol.getMateriaCodigo(), rol.getGrupo(),
@@ -223,6 +249,14 @@ public class CartillaOmrService {
 
     private List<CartillaOmr> construirCartillas(String rolExamenId, RolExamen rol) {
         List<DatosEstudiante> estudiantes = obtenerEstudiantesParaMarcas(rolExamenId, rol);
+        Map<String, CalificacionOmr> califsPorEstudiante = calificacionOmrRepository
+                .findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        c -> c.getCodigoEstudiante().trim(),
+                        c -> c,
+                        (existente, reemplazo) -> reemplazo
+                ));
         List<CartillaOmr> cartillas = new java.util.ArrayList<>();
         for (int indice = 0; indice < estudiantes.size(); indice++) {
             DatosEstudiante estudiante = estudiantes.get(indice);
@@ -232,6 +266,15 @@ public class CartillaOmrService {
             cartilla.setGrupo(rol.getGrupo());
             cartilla.setCodigoEstudiante(estudiante.codigo());
             cartilla.setNombreCompleto(estudiante.nombreCompleto());
+            CalificacionOmr calif = califsPorEstudiante.get(estudiante.codigo().trim());
+            if (calif != null) {
+                cartilla.setEstadoCalificacion(calif.getEstadoCalificacion());
+                cartilla.setNotaSobre60(calif.getNotaSobre60());
+                cartilla.setNotaSobre100(calif.getNotaSobre100());
+                if ("ANULADO".equalsIgnoreCase(calif.getEstadoCalificacion())) {
+                    cartilla.setObservacion("ANULADO · 0/60");
+                }
+            }
             cartillas.add(cartilla);
         }
         return cartillas;

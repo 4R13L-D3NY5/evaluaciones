@@ -241,7 +241,11 @@ public class BancoPreguntasService {
             String paqueteJson = objectMapper.writeValueAsString(reactivos);
             String hash = calcularSha256(paqueteJson);
 
-            if (bancoRepository.existsByRolExamenIdAndHashSha256Integridad(rol.getId(), hash)) {
+            boolean esReenvioDevuelto = verificacionRepository.findByRolExamenId(rol.getId())
+                    .map(v -> "DEVUELTO".equalsIgnoreCase(v.getEstado()))
+                    .orElse(false);
+
+            if (!esReenvioDevuelto && bancoRepository.existsByRolExamenIdAndHashSha256Integridad(rol.getId(), hash)) {
                 return respuestaFallida(rol, List.of("El mismo banco ya fue registrado para este rol de examen (hash SHA-256 duplicado)."));
             }
 

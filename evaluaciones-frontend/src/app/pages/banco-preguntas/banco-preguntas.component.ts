@@ -12,6 +12,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { PrevisualizacionTypstRequest } from '../../core/models/generacion-typst.model';
 import { DocumentoSinCartilla, ExamenSinCartillaService, NotaDocente } from '../../core/services/examen-sin-cartilla.service';
+import { ActivatedRoute } from '@angular/router';
+import { NotificacionesService } from '../../core/services/notificaciones.service';
 import { OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { firstValueFrom, of } from 'rxjs';
@@ -320,7 +322,15 @@ export interface DiaCalendario {
                   <i [class]="rolPuedeCargarBanco() ? 'pi pi-database' : 'pi pi-lock'"></i>
                   <span><strong>Rol de examen oficial:</strong> {{ rol.id }} · {{ rol.fechaDisplay }}</span>
                 </div>
-                <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
+                <div>
+                  @if (esExamenVerificado()) {
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-xs">
+                      <i class="pi pi-check-circle"></i> Validado y Verificado
+                    </span>
+                  } @else {
+                    <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
+                  }
+                </div>
               </div>
               @if (cargandoBancoPersistido()) {
                 <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700">
@@ -329,11 +339,33 @@ export interface DiaCalendario {
               } @else {
                 @if (bancoPersistido(); as banco) {
                   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-950">
-                    <div class="flex items-start gap-2">
-                      <i class="pi pi-check-circle mt-0.5 text-emerald-700"></i>
+                    <div class="flex items-start gap-2.5">
+                      <i [class]="esExamenVerificado() ? 'pi pi-check-circle mt-0.5 text-emerald-600 text-base' : 'pi pi-check-circle mt-0.5 text-emerald-700'"></i>
                       <div>
-                        <strong class="block uppercase">Banco de preguntas cargado</strong>
-                        <span class="text-[10px]">{{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · Validado</span>
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <strong class="uppercase font-black">Banco de preguntas cargado</strong>
+                          @if (esExamenVerificado()) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-400 text-emerald-800 px-2 py-0.5 text-[10px] font-black uppercase">
+                              <i class="pi pi-check text-[10px]"></i> Verificado
+                            </span>
+                          } @else if (esExamenDevuelto()) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 border border-rose-400 text-rose-800 px-2 py-0.5 text-[10px] font-black uppercase">
+                              <i class="pi pi-exclamation-triangle text-[10px]"></i> Observado
+                            </span>
+                          } @else if (esExamenPendienteVerificacion()) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-400 text-amber-800 px-2 py-0.5 text-[10px] font-black uppercase">
+                              <i class="pi pi-clock text-[10px]"></i> Pendiente de verificación
+                            </span>
+                          }
+                        </div>
+                        <span class="text-[10px] text-emerald-900/80">
+                          {{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · 
+                          @if (esExamenVerificado()) {
+                            <strong class="text-emerald-800 font-bold">Validado y Verificado</strong>
+                          } @else {
+                            <span>Validado</span>
+                          }
+                        </span>
                       </div>
                     </div>
                     @if (rolPuedeEliminarBanco()) {
@@ -370,6 +402,9 @@ export interface DiaCalendario {
                     <div>
                       <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-300 mb-1">
                         Etapa: Pendiente de Calificación
+                      </span>
+                      <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 mb-1 ml-2">
+                        <i class="pi pi-exclamation-triangle text-[9px] mr-1"></i> No subió notas aún
                       </span>
                       <h3 class="text-base font-black text-foreground">Registro de Calificaciones Oficiales</h3>
                       <p class="text-xs text-muted-foreground mt-0.5">El examen presencial ya fue aplicado a los estudiantes. Como docente titular, registra las calificaciones sobre <strong>60 puntos</strong>. Al concluir, el examen pasará a <strong>Calificado</strong> y se generará la planilla oficial para firma y sello.</p>
@@ -634,6 +669,21 @@ export interface DiaCalendario {
               </div>
             } @else if (bancoPersistido()?.estadoVerificacion === 'PENDIENTE') {
               <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><i class="pi pi-clock mr-2"></i>Banco validado. Está pendiente de revisión por el verificador antes de generar el examen.</div>
+            } @else if (esExamenVerificado()) {
+              <div class="rounded-xl border border-emerald-300 bg-emerald-50/90 p-4 text-xs text-emerald-950 flex items-start gap-3 shadow-2xs">
+                <div class="h-8 w-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 border border-emerald-300">
+                  <i class="pi pi-check-circle text-base"></i>
+                </div>
+                <div class="space-y-1">
+                  <div class="font-black uppercase tracking-wide text-emerald-950 flex items-center gap-2">
+                    <span>Examen Validado y Verificado</span>
+                    <span class="bg-emerald-200 text-emerald-900 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Conforme ✓</span>
+                  </div>
+                  <p class="text-emerald-900/90 font-medium leading-relaxed">
+                    El banco de preguntas ha sido revisado y verificado oficialmente por la dirección académica. La evaluación se encuentra aprobada y lista para el proceso institucional.
+                  </p>
+                </div>
+              </div>
             }
 
             <!-- Zona Drag and Drop con Input Interactivo -->
@@ -647,7 +697,7 @@ export interface DiaCalendario {
               </div>
               <div>
                 <div class="text-sm font-black text-foreground">
-                  {{ nombreArchivoCargado() || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol de examen debe estar PROGRAMADO o VALIDADO') }}
+                  {{ nombreArchivoCargado() || (bancoPersistido()?.estadoVerificacion === 'DEVUELTO' ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) corregido o arrástralo aquí' : (esExamenVerificado() ? 'Banco validado y verificado: puedes arrastrar un nuevo archivo si necesitas reemplazarlo' : (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol de examen debe estar PROGRAMADO o VALIDADO'))) }}
                 </div>
                 <p class="text-xs text-muted-foreground mt-1">
                   Validación instantánea de tipos de preguntas, cuotas de dificultad y fórmulas matemáticas/químicas.
@@ -1044,6 +1094,12 @@ export interface DiaCalendario {
                             </span>
                           </div>
 
+                          @if (esSinCartillaPendienteNotas(ex)) {
+                            <div class="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-1.5 py-0.5 rounded text-[8.5px] flex items-center gap-1">
+                              <i class="pi pi-pencil text-[8px] text-amber-700"></i> No subió notas aún
+                            </div>
+                          }
+
                           <!-- Materia y Código -->
                           <div class="font-black text-foreground leading-tight">
                             [{{ ex.codigo }}] {{ ex.materia }}
@@ -1136,13 +1192,29 @@ export interface DiaCalendario {
                           <span [class]="getEstadoBadgeClass(ex.estado)" class="font-black px-2.5 py-0.5 rounded-full text-[10px] uppercase">
                             {{ ex.estado }}
                           </span>
+                          @if (esSinCartillaPendienteNotas(ex)) {
+                            <div class="mt-1">
+                              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                <i class="pi pi-pencil text-[8px]"></i> No subió notas aún
+                              </span>
+                            </div>
+                          }
                         </td>
                         <td class="p-3.5 text-right">
-                          <button 
-                            (click)="irAValidarExamenDesdeCalendario(ex)"
-                            class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                            Validar Banco
-                          </button>
+                          <div class="flex items-center justify-end gap-1.5">
+                            @if (esSinCartillaPendienteNotas(ex)) {
+                              <button 
+                                (click)="irACalificarExamenDesdeCalendario(ex)"
+                                class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-xs">
+                                <i class="pi pi-pencil text-[9px]"></i> Cargar Notas
+                              </button>
+                            }
+                            <button 
+                              (click)="irAValidarExamenDesdeCalendario(ex)"
+                              class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                              Validar Banco
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     }
@@ -1452,6 +1524,16 @@ export interface DiaCalendario {
                 </div>
               </div>
 
+              @if (esSinCartillaPendienteNotas(examenSeleccionadoModal())) {
+                <div class="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-950 text-xs flex items-start gap-2.5">
+                  <i class="pi pi-exclamation-triangle text-amber-700 text-sm mt-0.5 shrink-0"></i>
+                  <div class="flex-1">
+                    <span class="font-black block">Atención: No has subido las notas aún</span>
+                    <span class="text-[11px] text-amber-800">Este examen no utiliza cartilla óptica y concluyó su aplicación. Debes registrar las calificaciones de tus estudiantes para generar la planilla oficial.</span>
+                  </div>
+                </div>
+              }
+
               <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-[11px] leading-relaxed">
                 <i class="pi pi-info-circle text-blue-700 mr-1"></i>
                 Para este examen se requiere un banco validado de <strong>{{ getResumenCuota(examenSeleccionadoModal()!.tipo) }}</strong>.
@@ -1467,6 +1549,14 @@ export interface DiaCalendario {
               </button>
 
               <div class="flex flex-wrap items-center gap-2">
+                @if (esSinCartillaPendienteNotas(examenSeleccionadoModal())) {
+                  <button 
+                    (click)="irACalificarExamenDesdeCalendario(examenSeleccionadoModal()!)"
+                    class="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-black hover:bg-amber-700 flex items-center gap-2 shadow-xs cursor-pointer transition-transform hover:scale-105">
+                    <i class="pi pi-pencil text-xs"></i>
+                    <span>Cargar Notas de este Examen</span>
+                  </button>
+                }
                 @if (puedeDescargarPatronCronograma(examenSeleccionadoModal())) {
                   <button 
                     (click)="descargarPatronCronograma(examenSeleccionadoModal()!, false)" 
@@ -2676,6 +2766,8 @@ export class BancoPreguntasComponent implements OnInit {
   private readonly _generacionTypst = inject(GeneracionTypstService);
   private readonly _sinCartillaService = inject(ExamenSinCartillaService);
   private readonly _omrService = inject(OmrProcesamientoService);
+  private readonly _route = inject(ActivatedRoute);
+  private readonly _notificacionesService = inject(NotificacionesService);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
   @ViewChild('imageInput') public imageInputRef!: ElementRef<HTMLInputElement>;
@@ -2782,6 +2874,8 @@ export class BancoPreguntasComponent implements OnInit {
     const rol = this.rolExamenActivo();
     if (!rol) return false;
     const estado = rol.estadoFlujo;
+    const estadoVerif = rol.estadoVerificacion || this.bancoPersistido()?.estadoVerificacion;
+    if (estadoVerif === 'DEVUELTO') return true;
     return estado === 'PROGRAMADO' || estado === 'VALIDADO';
   });
 
@@ -2795,6 +2889,8 @@ export class BancoPreguntasComponent implements OnInit {
 
   public rolPuedeEliminarBanco = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
+    const estadoVerif = this.rolExamenActivo()?.estadoVerificacion || this.bancoPersistido()?.estadoVerificacion;
+    if (estadoVerif === 'DEVUELTO') return true;
     return this.bancoPersistido() !== null && (estado === 'PROGRAMADO' || estado === 'VALIDADO');
   });
 
@@ -2816,6 +2912,15 @@ export class BancoPreguntasComponent implements OnInit {
         this._cargarSedes();
       }
     });
+
+    this._route.queryParamMap.subscribe(params => {
+      const rolId = params.get('rolId');
+      if (rolId && this.sedes().length > 0 && this.examenRolSeleccionadoId() !== rolId) {
+        this._cargarPorRolId(rolId);
+      } else if (rolId && params.get('abrirNotas') === 'true' && this.examenRolSeleccionadoId() === rolId) {
+        this.abrirNotasDocente();
+      }
+    });
   }
 
   private _cargarSedes(): void {
@@ -2831,12 +2936,73 @@ export class BancoPreguntasComponent implements OnInit {
         this.carreraSeleccionada.set(null);
         this.asignaturaSeleccionada.set(null);
         this.grupoSeleccionado.set('');
-        const sedeInicial = this._gateway.resolverSedeInicial(data);
-        if (sedeInicial) {
-          this.seleccionarSede(sedeInicial);
+        const rolIdParam = this._route.snapshot.queryParamMap.get('rolId');
+        if (rolIdParam) {
+          this._cargarPorRolId(rolIdParam);
+        } else {
+          const sedeInicial = this._gateway.resolverSedeInicial(data);
+          if (sedeInicial) {
+            this.seleccionarSede(sedeInicial);
+          }
         }
       },
       error: () => this.cargandoSedes.set(false)
+    });
+  }
+
+  private _cargarPorRolId(rolId: string): void {
+    this._rolService.obtenerPorId(rolId).subscribe({
+      next: rol => {
+        this.tabActiva.set('validador');
+        const tipoParcialDisplay = rol.tipoParcial === 'Final' ? 'Examen Final' : rol.tipoParcial;
+        this.parcialActivo.set(tipoParcialDisplay as any);
+        this.examenRolSeleccionadoId.set(rol.id);
+
+        const sede = this.sedes().find(s => s.code === rol.sedeCodigo);
+        if (sede) {
+          this.sedeSeleccionada.set(sede);
+          this.cargandoCarreras.set(true);
+          this._gateway.getCareers(sede.code).subscribe({
+            next: carreras => {
+              this.carreras.set(carreras);
+              this.cargandoCarreras.set(false);
+              const carrera = carreras.find(c => c.careerCode === rol.carreraCodigo) || carreras[0];
+              if (carrera) {
+                this.carreraSeleccionada.set(carrera);
+                this._cargarRolesOficiales(sede.code, carrera.careerCode);
+                this.cargandoAsignaturas.set(true);
+                this._gateway.getCourses(sede.code, carrera.careerId).subscribe({
+                  next: asignaturas => {
+                    this.asignaturas.set(asignaturas);
+                    this.cargandoAsignaturas.set(false);
+                    const asig = asignaturas.find(a => a.courseCode === rol.materiaCodigo);
+                    if (asig) {
+                      this.asignaturaSeleccionada.set(asig);
+                      this._cargarGruposDeMateria(asig.syllabusCourseId, rol.grupo);
+                    }
+                    this.grupoSeleccionado.set(rol.grupo);
+                    setTimeout(() => {
+                      this.examenRolSeleccionadoId.set(rol.id);
+                      this._cargarBancoPersistido();
+                      if (this._route.snapshot.queryParamMap.get('abrirNotas') === 'true') {
+                        setTimeout(() => {
+                          this.abrirNotasDocente();
+                        }, 400);
+                      }
+                    }, 300);
+                  },
+                  error: () => this.cargandoAsignaturas.set(false)
+                });
+              }
+            },
+            error: () => this.cargandoCarreras.set(false)
+          });
+        }
+      },
+      error: () => {
+        const sedeInicial = this._gateway.resolverSedeInicial(this.sedes());
+        if (sedeInicial) this.seleccionarSede(sedeInicial);
+      }
     });
   }
 
@@ -3048,6 +3214,21 @@ export class BancoPreguntasComponent implements OnInit {
   public bancoPersistido = signal<BancoPreguntasResponse | null>(null);
   public bancoRegistrado = signal<boolean>(false);
   public observacionesVerificacionPreguntas = computed(() => Object.entries(this.bancoPersistido()?.observacionesVerificacionPreguntas || {}));
+  public esExamenVerificado = computed(() => {
+    const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
+    const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
+    return estadoBanco === 'VERIFICADO' || estadoRol === 'VERIFICADO';
+  });
+  public esExamenDevuelto = computed(() => {
+    const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
+    const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
+    return estadoBanco === 'DEVUELTO' || estadoRol === 'DEVUELTO';
+  });
+  public esExamenPendienteVerificacion = computed(() => {
+    const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
+    const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
+    return estadoBanco === 'PENDIENTE' || estadoRol === 'PENDIENTE';
+  });
   public cargandoBancoPersistido = signal<boolean>(false);
   public dialogEliminarBancoPersistido = signal<boolean>(false);
   public confirmacionEliminarBancoPersistido = '';
@@ -3201,9 +3382,25 @@ export class BancoPreguntasComponent implements OnInit {
     this._mostrarToast(`Redirigido al Validador para: ${ex.materia} (${ex.tipo}).`);
   }
 
+  public esSinCartillaPendienteNotas(ex: ExamenDocenteCronograma | null): boolean {
+    if (!ex || ex.conCartilla) return false;
+    const st = (ex.estado || '').toLowerCase().trim();
+    return st === 'pendiente_notas' || st === 'pendiente de notas';
+  }
+
+  public irACalificarExamenDesdeCalendario(ex: ExamenDocenteCronograma): void {
+    this.irAValidarExamenDesdeCalendario(ex);
+    setTimeout(() => {
+      this.abrirNotasDocente();
+    }, 450);
+  }
+
   private _mapearRolACronograma(rol: RolExamenResponse): ExamenDocenteCronograma {
     const tipo = rol.tipoParcial === 'Final' ? 'Examen Final' : rol.tipoParcial;
-    const estado = rol.estadoFlujo.charAt(0) + rol.estadoFlujo.slice(1).toLowerCase();
+    const esVerificado = rol.estadoVerificacion === 'VERIFICADO';
+    const estado = esVerificado && rol.estadoFlujo === 'VALIDADO'
+      ? 'Validado y Verificado'
+      : (rol.estadoFlujo.charAt(0) + rol.estadoFlujo.slice(1).toLowerCase());
     return {
       id: rol.id,
       codigo: rol.materiaCodigo,
@@ -3384,8 +3581,11 @@ export class BancoPreguntasComponent implements OnInit {
       const camposLargos = opciones.filter(opcion => opcion.valor.length > 2000).map(opcion => opcion.campo);
       return { regla: 'Opciones A–E', problema: `${camposLargos.join(', ')} supera(n) los 2.000 caracteres.`, correccion: 'Resume la alternativa manteniendo una sola idea y un texto legible para el cuadernillo.' };
     }
+    if (error === 'Falta respuesta correcta') {
+      return { regla: 'Respuesta correcta', problema: 'La celda de respuesta correcta está vacía.', correccion: 'Escribe la letra de la opción correcta (A–E) o A/B (o V/F) para Verdadero/Falso.' };
+    }
     if (error === 'Respuesta en V/F debe ser A (Verdadero) o B (Falso)') {
-      return { regla: 'Respuesta correcta', problema: 'La tipología Verdadero o Falso solo admite A o B.', correccion: 'Registra A para Verdadero o B para Falso y deja vacías las opciones C, D y E.' };
+      return { regla: 'Respuesta correcta', problema: 'La tipología Verdadero o Falso solo admite A (o V) o B (o F).', correccion: 'Registra A para Verdadero o B para Falso y deja vacías las opciones C, D y E.' };
     }
     if (error.includes('Respuesta en premisas')) {
       return { regla: 'Respuesta correcta', problema: 'La tipología de premisas solo admite las claves A, B, C o D.', correccion: 'Registra una de esas cuatro letras y verifica las dos premisas.' };
@@ -3434,6 +3634,9 @@ export class BancoPreguntasComponent implements OnInit {
     if (error.includes('opción de emparejamiento no debe')) {
       return { regla: 'Fila hija de emparejamiento', problema: 'La fila hija contiene valores en opcion_a a opcion_e.', correccion: 'Deja vacías las opciones A–E y coloca la clave únicamente en respuesta_correcta.' };
     }
+    if (error.includes('no tiene una opción activa en el enunciado principal')) {
+      return { regla: 'Respuesta de emparejamiento', problema: `${error}.`, correccion: 'Verifica que la clave de respuesta en la fila hija corresponda a una de las opciones con texto (A a E) definidas en la fila madre de su grupo.' };
+    }
     if (error.includes('no tiene una opción activa')) {
       return { regla: 'Respuesta correcta', problema: `${error}.`, correccion: 'Completa la opción indicada o cambia respuesta_correcta a una letra que tenga texto.' };
     }
@@ -3452,11 +3655,23 @@ export class BancoPreguntasComponent implements OnInit {
     if (error.startsWith('Peso inválido')) {
       return { regla: 'Columna peso', problema: 'El valor de peso no cumple el formato permitido.', correccion: 'Usa un número mayor que 0, hasta 100 y con máximo dos decimales.' };
     }
+    if (error.includes('delimitadores de fórmula $ sin cerrar')) {
+      return { regla: 'Fórmula matemática', problema: 'La celda contiene un número impar de signos de dólar ($).', correccion: 'Asegúrate de cerrar cada expresión matemática con otro signo $, por ejemplo: $x = 10$.' };
+    }
     if (error.includes('expresión matemática incompatible')) {
       return { regla: 'Fórmula matemática', problema: 'La expresión contiene delimitadores $ anidados o agrupadores desbalanceados para Typst.', correccion: 'No coloques signos $ dentro de otro bloque $...$. Usa un solo bloque matemático balanceado o escribe la fórmula como texto plano.' };
     }
     if (error.includes('comando de fórmula')) {
       return { regla: 'Compatibilidad Typst', problema: `${error}.`, correccion: 'Usa únicamente los comandos compatibles con la plantilla: \\times, \\cdot, \\rightarrow, \\to, \\pm y \\equiv. Para raíces y potencias usa la sintaxis Typst sin barra, por ejemplo sqrt(...) o x^2.' };
+    }
+    if (error.includes('barra invertida sin un comando')) {
+      return { regla: 'Compatibilidad Typst', problema: 'Contiene una barra invertida (\\) suelta o sin comando reconocido.', correccion: 'Elimina las barras invertidas innecesarias o usa únicamente los comandos permitidos: \\times, \\cdot, \\rightarrow, \\to, \\pm o \\equiv.' };
+    }
+    if (error.includes('error de fórmula')) {
+      return { regla: 'Error de fórmula Excel', problema: `${error}.`, correccion: 'Corrige la fórmula en Excel para que no devuelva error de cálculo o pega el texto como valor estático.' };
+    }
+    if (error.includes('caracteres de control no permitidos')) {
+      return { regla: 'Caracteres no permitidos', problema: 'La celda contiene caracteres de control invisibles o no imprimibles.', correccion: 'Limpia el texto copiándolo en el Bloc de notas antes de pegarlo en la celda de Excel.' };
     }
     if (error.includes('fórmula inválida')) {
       return { regla: 'Fórmula o contenido', problema: 'El enunciado u opción contiene un error de Excel, caracteres no permitidos o signos $ desbalanceados.', correccion: 'Corrige la fórmula o cierra correctamente cada expresión entre signos $.' };
@@ -3565,6 +3780,24 @@ export class BancoPreguntasComponent implements OnInit {
           this.agregarErrorEstructural(hijo, `Esta fila debe aparecer inmediatamente después del enunciado principal del grupo '${grupo}'. No dejes otras filas entre ambos`);
         }
       }
+
+      if (tipoPrincipal === 'EMPAREJAMIENTO_TRONCO') {
+        const opcionesMadre: Record<string, string | undefined> = {
+          A: principal.opcion_a,
+          B: principal.opcion_b,
+          C: principal.opcion_c,
+          D: principal.opcion_d,
+          E: principal.opcion_e
+        };
+        for (const hijo of hijos) {
+          if (hijo.respuesta_correcta && !opcionesMadre[hijo.respuesta_correcta]?.trim()) {
+            this.agregarErrorEstructural(
+              hijo,
+              `La respuesta ${hijo.respuesta_correcta} no tiene una opción activa en el enunciado principal del grupo '${grupo}'`
+            );
+          }
+        }
+      }
     }
   }
 
@@ -3656,6 +3889,8 @@ export class BancoPreguntasComponent implements OnInit {
 
   public getEstadoBadgeClass(estado: string): string {
     switch (estado) {
+      case 'Validado y Verificado':
+      case 'Verificado': return 'bg-emerald-100 text-emerald-800 border border-emerald-300';
       case 'Programado': return 'bg-blue-100 text-blue-800 border border-blue-200';
       case 'Generado': return 'bg-purple-100 text-purple-800 border border-purple-200';
       case 'Impreso': return 'bg-indigo-100 text-indigo-800 border border-indigo-200';
@@ -3956,7 +4191,14 @@ export class BancoPreguntasComponent implements OnInit {
 
   public abrirNotasDocente(): void {
     const rol = this.rolExamenActivo();
-    if (!rol) return;
+    if (!rol) {
+      setTimeout(() => {
+        if (this.rolExamenActivo()) {
+          this.abrirNotasDocente();
+        }
+      }, 350);
+      return;
+    }
     this.dialogNotasDocente.set(true);
     this.cargandoNotasDocente.set(true);
     this._sinCartillaService.listarNotas(rol.id).subscribe({
@@ -4004,6 +4246,7 @@ export class BancoPreguntasComponent implements OnInit {
         this.guardandoNotasDocente.set(false);
         this.dialogNotasDocente.set(false);
         this._mostrarToast('Calificaciones guardadas exitosamente. El examen pasó a Calificado. Descargando planilla oficial...');
+        this._notificacionesService.limpiarNotasPendientes(rol.id);
         const sede = this.sedeSeleccionada();
         const carrera = this.carreraSeleccionada();
         if (sede && carrera) {
@@ -4236,30 +4479,35 @@ export class BancoPreguntasComponent implements OnInit {
 
         // Normalizar Tipo de Pregunta Oficial UNITEPC
         let tipoNorm = '';
-        if (tipoClave.includes('VERDADERO_O_FALSO_SIMPLE') || tipoClave.includes('FALSO_VERDADERO') || tipoClave === 'VF_SIMPLE') {
-          tipoNorm = 'VERDADERO_O_FALSO_SIMPLE';
-        } else if (tipoClave.includes('VERDADERO_O_FALSO_COMPLEJAS') || tipoClave.includes('PREGUNTA_CON_CLAVE') || tipoClave === 'VF_COMPLEJAS') {
-          tipoNorm = 'VERDADERO_O_FALSO_COMPLEJAS';
-        } else if (tipoClave.includes('RESPUESTA_A_B_AMBAS_NINGUNA') || tipoClave.includes('RESPUESTA_COMPUESTA') || tipoClave.includes('PREMISAS')) {
-          tipoNorm = 'RESPUESTA_PREMISAS_ABCD';
-        } else if (tipoClave.includes('ITEMS_AGRUPADOS') || ['PROBLEMA', 'CASO_CLINICO', 'CASO_CLINICO_TRONCO'].includes(tipoClave)) {
-          tipoNorm = 'CASO_CLINICO_TRONCO';
-        } else if (tipoClave.includes('SUBITEM') || tipoClave === 'SUBPROBLEMA') {
-          tipoNorm = 'SUBITEM_CASO';
-        } else if (['EMPAREJAMIENTO_AMPLIADO', 'EMPAREJAMIENTO_DE_CONCEPTOS', 'EMPAREJAMIENTO_TRONCO', 'EMPAREJAMIENTO'].includes(tipoClave)) {
-          tipoNorm = 'EMPAREJAMIENTO_TRONCO';
-        } else if (tipoClave.includes('OPCION_DE_EMPAREJAMIENTO') || tipoClave === 'OPCION_EMPAREJAMIENTO') {
-          tipoNorm = 'OPCION_EMPAREJAMIENTO';
-        } else if (tipoClave.includes('SELECCION') || tipoClave === 'SELECCION_SIMPLE' || tipoClave === 'SELECCION_UNICA') {
+        if (['SELECCION_SIMPLE', 'SELECCION_UNICA', 'SELECCION_MEJOR_RESPUESTA', 'SELECCION_DE_LA_MEJOR_RESPUESTA'].includes(tipoClave)
+            || tipoClave.includes('SELECCION')) {
           tipoNorm = 'SELECCION_MEJOR_RESPUESTA';
+        } else if (['FALSO_VERDADERO', 'VERDADERO_O_FALSO_SIMPLE', 'VF_SIMPLE'].includes(tipoClave)
+            || tipoClave.includes('VERDADERO_O_FALSO_SIMPLE') || tipoClave.includes('FALSO_VERDADERO')) {
+          tipoNorm = 'VERDADERO_O_FALSO_SIMPLE';
+        } else if (['PREGUNTA_CON_CLAVE', 'VERDADERO_O_FALSO_COMPLEJAS', 'VF_COMPLEJAS'].includes(tipoClave)
+            || tipoClave.includes('VERDADERO_O_FALSO_COMPLEJAS') || tipoClave.includes('PREGUNTA_CON_CLAVE')) {
+          tipoNorm = 'VERDADERO_O_FALSO_COMPLEJAS';
+        } else if (['RESPUESTA_COMPUESTA', 'RESPUESTA_PREMISAS_ABCD', 'RESPUESTA_A_B_AMBAS_NINGUNA'].includes(tipoClave)
+            || tipoClave.includes('RESPUESTA_A_B_AMBAS_NINGUNA') || tipoClave.includes('RESPUESTA_COMPUESTA') || tipoClave.includes('PREMISAS')) {
+          tipoNorm = 'RESPUESTA_PREMISAS_ABCD';
+        } else if (['ITEMS_AGRUPADOS_POR_CASO_CLINICO_O_PROBLEMA', 'CASO_CLINICO_TRONCO', 'CASO_CLINICO'].includes(tipoClave)
+            || tipoClave.includes('ITEMS_AGRUPADOS')) {
+          tipoNorm = 'CASO_CLINICO_TRONCO';
+        } else if (['PROBLEMA', 'SUBPROBLEMA', 'SUBITEM_CASO', 'SUBITEM_DE_CASO_O_PROBLEMA'].includes(tipoClave)
+            || tipoClave.includes('SUBITEM')) {
+          tipoNorm = 'SUBITEM_CASO';
+        } else if (['EMPAREJAMIENTO_AMPLIADO', 'EMPAREJAMIENTO_DE_CONCEPTOS', 'EMPAREJAMIENTO_TRONCO'].includes(tipoClave)) {
+          tipoNorm = 'EMPAREJAMIENTO_TRONCO';
+        } else if (['EMPAREJAMIENTO', 'OPCION_EMPAREJAMIENTO', 'OPCION_DE_EMPAREJAMIENTO_AMPLIADO'].includes(tipoClave)
+            || tipoClave.includes('OPCION_DE_EMPAREJAMIENTO') || tipoClave.includes('OPCION_EMPAREJAMIENTO')) {
+          tipoNorm = 'OPCION_EMPAREJAMIENTO';
         } else {
           tipoNorm = 'TIPO_NO_RECONOCIDO';
         }
 
         // Normalizar Respuesta Correcta (extraer letra principal A-E)
         let respNorm = this.normalizarRespuestaCorrectaExcel(respRaw, tipoNorm);
-        if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'VERDADERO') respNorm = 'A';
-        else if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'FALSO') respNorm = 'B';
 
         // Normalizar Dificultad (1, 2, 3)
         let difNorm: '1' | '2' | '3' = '2';
@@ -4271,7 +4519,6 @@ export class BancoPreguntasComponent implements OnInit {
         if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE') {
           if (!opA) opA = 'Verdadero';
           if (!opB) opB = 'Falso';
-          if (!respNorm) respNorm = 'A';
         } else if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD') {
           if (!opA) opA = 'A. Si la primera es verdadera';
           if (!opB) opB = 'B. Si la segunda es verdadera';
@@ -4304,12 +4551,26 @@ export class BancoPreguntasComponent implements OnInit {
           errores.push('Una opción supera el máximo de 2000 caracteres');
         }
 
+        const filaMadreCaso = tipoNorm === 'CASO_CLINICO_TRONCO';
+        const filaMadreEmparejamiento = tipoNorm === 'EMPAREJAMIENTO_TRONCO';
+        const sinRespuestaDirecta = filaMadreCaso || filaMadreEmparejamiento;
+
+        if (sinRespuestaDirecta) {
+          if (respRaw) {
+            errores.push(filaMadreCaso
+              ? 'La fila madre de caso no debe llevar opciones ni respuesta correcta'
+              : 'Emparejamiento madre no debe llevar respuesta correcta');
+          }
+        } else if (!respRaw) {
+          errores.push('Falta respuesta correcta');
+        }
+
         if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE') {
-          if (!['A', 'B'].includes(respNorm)) {
+          if (respRaw && !['A', 'B'].includes(respNorm)) {
             errores.push('Respuesta en V/F debe ser A (Verdadero) o B (Falso)');
           }
         } else if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD') {
-          if (!['A', 'B', 'C', 'D'].includes(respNorm)) {
+          if (respRaw && !['A', 'B', 'C', 'D'].includes(respNorm)) {
             errores.push('Respuesta en premisas debe ser A, B, C o D');
           }
           if (!this.enunciadoPremisasValido(enunciadoRaw)) {
@@ -4319,14 +4580,14 @@ export class BancoPreguntasComponent implements OnInit {
           if (!opA || !opB || !opC || !opD) {
             errores.push('Requiere las 4 proposiciones (1 a 4) en incisos A-D');
           }
-          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+          if (respRaw && !['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
             errores.push('Respuesta en V/F complejas debe ser clave A-E');
           }
         } else if (tipoNorm === 'SELECCION_MEJOR_RESPUESTA' || tipoNorm === 'SUBITEM_CASO') {
           if (!opA || !opB || !opC || !opD || !opE) {
             errores.push('Requiere 5 opciones completas (incisos A al E)');
           }
-          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+          if (respRaw && !['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
             errores.push('Respuesta debe ser una letra entre A y E');
           }
         } else if (tipoNorm === 'EMPAREJAMIENTO_TRONCO') {
@@ -4334,9 +4595,8 @@ export class BancoPreguntasComponent implements OnInit {
           if (activas < 2 || activas > 5) {
             errores.push('El enunciado principal debe tener entre 2 y 5 opciones de referencia en las columnas A a E');
           }
-          if (respRaw) errores.push('Emparejamiento madre no debe llevar respuesta correcta');
         } else if (tipoNorm === 'OPCION_EMPAREJAMIENTO') {
-          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+          if (respRaw && !['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
             errores.push('Respuesta de emparejamiento debe ser la letra asignada (A-E)');
           }
         }
@@ -4350,8 +4610,10 @@ export class BancoPreguntasComponent implements OnInit {
         if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD' && opE) {
           errores.push(`${tipoNorm} no permite opción E`);
         }
-        if (tipoNorm === 'CASO_CLINICO_TRONCO' && (opA || opB || opC || opD || opE || respRaw)) {
-          errores.push('La fila madre de caso no debe llevar opciones ni respuesta correcta');
+        if (tipoNorm === 'CASO_CLINICO_TRONCO' && (opA || opB || opC || opD || opE)) {
+          if (!errores.includes('La fila madre de caso no debe llevar opciones ni respuesta correcta')) {
+            errores.push('La fila madre de caso no debe llevar opciones ni respuesta correcta');
+          }
         }
         if (tipoNorm === 'OPCION_EMPAREJAMIENTO' && (opA || opB || opC || opD || opE)) {
           errores.push('La opción de emparejamiento no debe llevar opciones A-E');
@@ -4418,7 +4680,7 @@ export class BancoPreguntasComponent implements OnInit {
           opcion_d: opD,
           opcion_e: opE,
           opciones: { A: opA, B: opB, C: opC, D: opD, E: opE },
-          respuesta_correcta: respNorm,
+          respuesta_correcta: respNorm || (sinRespuestaDirecta ? 'A' : ''),
           dificultad: difNorm,
           peso: pesoParsed,
           observaciones: valido ? 'OK' : errores.join(', '),
@@ -4451,6 +4713,11 @@ export class BancoPreguntasComponent implements OnInit {
 
   private normalizarRespuestaCorrectaExcel(valor: string, tipo: string): string {
     const respuesta = (valor || '').trim().toUpperCase();
+    if (tipo === 'VERDADERO_O_FALSO_SIMPLE') {
+      if (respuesta === 'VERDADERO' || respuesta === 'V' || respuesta === 'A') return 'A';
+      if (respuesta === 'FALSO' || respuesta === 'F' || respuesta === 'B') return 'B';
+      return '';
+    }
     if (/^[A-E]$/.test(respuesta)) return respuesta;
     if (tipo !== 'VERDADERO_O_FALSO_COMPLEJAS') return '';
     const respuestaConDescripcion = respuesta.match(/^([A-E])\s*[:.)-]\s*.+$/);
@@ -4850,11 +5117,12 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       // pendiente; para documentos de varias páginas se habilita únicamente
       // al llegar al final del contenedor real de páginas.
       setTimeout(() => this._comprobarFinPrevisualizacion(), 0);
-    } catch (error) {
+    } catch (error: any) {
       console.error('[BancoPreguntasComponent] No se pudo generar la previsualización PDF:', error);
       this.dialogPrevisualizacionPdf.set(false);
       this._liberarPdfPreview();
-      this._mostrarToast('No se pudo generar el PDF oficial de previsualización.', 'error');
+      const detalleError = error?.error?.mensaje || error?.error?.message || (typeof error?.error === 'string' ? error.error : null) || error?.message || 'No se pudo generar el PDF oficial de previsualización.';
+      this._mostrarToast(detalleError, 'error');
     }
   }
 
@@ -5515,6 +5783,8 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
         const sede = this.sedeSeleccionada();
         const carrera = this.carreraSeleccionada();
         if (rol && sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
+        this._cargarBancoPersistido();
+        if (rol) this._notificacionesService.limpiarObservacion(rol.id);
         this._mostrarToast(`Banco ${resultado.bancoPreguntasId} validado y registrado en PostgreSQL.`);
       },
       error: err => {

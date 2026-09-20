@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { EvaluacionesStorageService } from '../../../core/services/evaluaciones-storage.service';
@@ -47,10 +47,10 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
               [attr.aria-expanded]="menuNotificacionesAbierto()"
               (click)="toggleMenuNotificaciones()"
               class="relative inline-flex items-center justify-center h-9 w-9 rounded-xl border border-border bg-card text-foreground hover:bg-primary/5 transition-colors cursor-pointer">
-              <i class="pi pi-bell text-sm" [class.text-primary]="notificacionesService.noLeidasCount() > 0"></i>
-              @if (notificacionesService.noLeidasCount() > 0) {
+              <i class="pi pi-bell text-sm" [class.text-primary]="notificacionesService.totalAlertasCount() > 0"></i>
+              @if (notificacionesService.totalAlertasCount() > 0) {
                 <span class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white shadow-xs animate-pulse">
-                  {{ notificacionesService.noLeidasCount() }}
+                  {{ notificacionesService.totalAlertasCount() }}
                 </span>
               }
             </button>
@@ -61,9 +61,9 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
                   <div class="flex items-center gap-2">
                     <i class="pi pi-bell text-primary text-sm font-bold"></i>
                     <h3 class="text-xs font-extrabold text-foreground">Notificaciones</h3>
-                    @if (notificacionesService.noLeidasCount() > 0) {
+                    @if (notificacionesService.totalAlertasCount() > 0) {
                       <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-black text-rose-700">
-                        {{ notificacionesService.noLeidasCount() }} nuevas
+                        {{ notificacionesService.totalAlertasCount() }} pendientes
                       </span>
                     }
                   </div>
@@ -91,7 +91,11 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
                         [ngClass]="{
                           'bg-muted/40': notif.leida,
                           'bg-rose-50/70': !notif.leida && notif.nivel === 'error',
-                          'border-rose-200': !notif.leida && notif.nivel === 'error'
+                          'border-rose-200': !notif.leida && notif.nivel === 'error',
+                          'bg-amber-50/70': !notif.leida && notif.nivel === 'warning',
+                          'border-amber-300': !notif.leida && notif.nivel === 'warning',
+                          'bg-emerald-50/70': !notif.leida && notif.nivel === 'success',
+                          'border-emerald-200': !notif.leida && notif.nivel === 'success'
                         }"
                         class="p-2.5 rounded-xl border border-border transition-all cursor-pointer hover:shadow-xs hover:border-primary/40">
                         <div class="flex items-start gap-2.5">
@@ -100,14 +104,23 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
                             [class.text-rose-700]="notif.nivel === 'error'"
                             [class.bg-amber-100]="notif.nivel === 'warning'"
                             [class.text-amber-800]="notif.nivel === 'warning'"
+                            [class.bg-emerald-100]="notif.nivel === 'success'"
+                            [class.text-emerald-800]="notif.nivel === 'success'"
                             class="h-7 w-7 rounded-lg flex items-center justify-center shrink-0">
-                            <i class="pi text-xs" [class.pi-exclamation-triangle]="notif.nivel === 'error'" [class.pi-info-circle]="notif.nivel !== 'error'"></i>
+                            <i class="pi text-xs"
+                               [class.pi-exclamation-triangle]="notif.nivel === 'error'"
+                               [class.pi-pencil]="notif.tipo === 'NOTAS_SIN_CARTILLA_PENDIENTES'"
+                               [class.pi-check-circle]="notif.nivel === 'success'"
+                               [class.pi-info-circle]="notif.nivel !== 'error' && notif.nivel !== 'success' && notif.tipo !== 'NOTAS_SIN_CARTILLA_PENDIENTES'"></i>
                           </div>
                           <div class="min-w-0 flex-1">
                             <div class="flex items-center justify-between gap-1 mb-0.5">
                               <span class="text-xs font-black text-foreground truncate">{{ notif.titulo }}</span>
                               @if (!notif.leida) {
-                                <span class="h-2 w-2 rounded-full bg-rose-600 shrink-0"></span>
+                                <span class="h-2 w-2 rounded-full shrink-0"
+                                      [class.bg-rose-600]="notif.nivel === 'error'"
+                                      [class.bg-amber-500]="notif.nivel === 'warning'"
+                                      [class.bg-emerald-600]="notif.nivel === 'success'"></span>
                               }
                             </div>
                             @if (notif.materiaNombre) {
@@ -205,7 +218,7 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
     </header>
   `
 })
-export class TopbarComponent {
+export class TopbarComponent implements OnInit {
   public readonly storage = inject(EvaluacionesStorageService);
   private readonly _authService = inject(AuthService);
   private readonly _router = inject(Router);
@@ -213,6 +226,10 @@ export class TopbarComponent {
   public readonly notificacionesService = inject(NotificacionesService);
   public readonly menuVistaAbierto = signal(false);
   public readonly menuNotificacionesAbierto = signal(false);
+
+  public ngOnInit(): void {
+    this.notificacionesService.cargarNotificaciones();
+  }
 
   public toggleMenuNotificaciones(): void {
     const estado = !this.menuNotificacionesAbierto();

@@ -30,7 +30,7 @@ interface EstadoMetrica {
   icon: string;
 }
 
-type DashboardEtapa = EtapaEvaluacion | 'Validado' | 'Confirmado' | 'Suspendido';
+type DashboardEtapa = EtapaEvaluacion | 'Validado' | 'Validado y Verificado' | 'Confirmado' | 'Suspendido';
 
 interface DashboardRolConfig {
   titulo: string;
@@ -904,7 +904,7 @@ export class DashboardComponent implements OnInit {
       parcial: item.tipoParcial,
       hora: item.horario,
       conCartilla: item.modalidad === 'PRESENCIAL_CARTILLA',
-      etapa: this.mapearEstado(item.estadoFlujo)
+      etapa: item.estadoFlujo === 'VALIDADO' && item.estadoVerificacion === 'VERIFICADO' ? 'Validado y Verificado' : this.mapearEstado(item.estadoFlujo)
     }));
   });
 
@@ -912,6 +912,7 @@ export class DashboardComponent implements OnInit {
     switch (etapa) {
       case 'Programado': return 'bg-purple-100 text-purple-800 border border-purple-300 font-bold';
       case 'Validado': return 'bg-teal-100 text-teal-800 border border-teal-300 font-bold';
+      case 'Validado y Verificado': return 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold';
       case 'Generado': return 'bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold';
       case 'Impreso': return 'bg-blue-100 text-blue-800 border border-blue-300 font-bold';
       case 'Entregado': return 'bg-amber-100 text-amber-800 border border-amber-300 font-bold';

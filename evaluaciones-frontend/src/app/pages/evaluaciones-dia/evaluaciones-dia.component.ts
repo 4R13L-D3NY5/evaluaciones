@@ -668,22 +668,6 @@ interface CampusDisponible extends Campus {
                           </div>
                         }
 
-                        <!-- 3.1 Volver a calificar / Re-escanear OMR -->
-                        @if (puedeRecalificar(item)) {
-                          <div class="relative group/recalificar">
-                            <button
-                              (click)="abrirCalificacionOmr(item)"
-                              title="Volver a calificar / Cargar nuevo escaneado OMR"
-                              aria-label="Volver a calificar OMR"
-                              class="h-7 w-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center cursor-pointer transition-colors">
-                              <i class="pi pi-sync text-xs"></i>
-                            </button>
-                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/recalificar:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Volver a calificar / Re-escanear OMR</span>
-                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
-                            </div>
-                          </div>
-                        }
 
                         @if (puedeMostrarNotasDocente(item)) {
                           <div class="relative group/notasDocente">
@@ -1965,7 +1949,13 @@ interface CampusDisponible extends Campus {
                         <span class="font-mono text-muted-foreground">{{ estudiante.numeroOrden }}</span>
                         <span class="font-mono font-bold">{{ estudiante.codigoEstudiante }}</span>
                         <span class="truncate font-medium">{{ estudiante.nombreCompleto }}</span>
-                        <span class="text-[10px] text-muted-foreground">—</span>
+                        @if (estudiante.estadoCalificacion === 'ANULADO' || (estudiante.observacion && estudiante.observacion.includes('ANULADO'))) {
+                          <span class="inline-flex items-center gap-1 font-mono font-black text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+                            <i class="pi pi-ban text-[9px]"></i> ANULADO (0 / 0)
+                          </span>
+                        } @else {
+                          <span class="text-[10px] text-muted-foreground">{{ estudiante.observacion || '—' }}</span>
+                        }
                       </div>
                     }
                     </div>
@@ -2051,6 +2041,38 @@ interface CampusDisponible extends Campus {
                         <div><h4 class="text-xs font-black uppercase tracking-wide text-foreground">Variante {{ variante.letra }}</h4><span class="text-[10px] text-muted-foreground">Relación entre la pregunta presentada y su origen en el banco</span></div>
                         <span class="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 text-[10px] font-black uppercase">{{ evaluacionSeleccionadaPatron()?.etapa }}</span>
                       </div>
+                      <!-- Cartilla de claves oficiales de la variante -->
+                      <div class="p-4 bg-card border-b border-border">
+                        <div class="flex items-center justify-between gap-2 mb-2.5">
+                          <h5 class="text-xs font-black uppercase text-indigo-950 flex items-center gap-1.5">
+                            <i class="pi pi-check-square text-indigo-600"></i>
+                            Patrón oficial de respuestas · Claves OMR ({{ variante.totalPreguntas || 30 }} preguntas)
+                          </h5>
+                          @if (variante.preguntasAnuladas?.length) {
+                            <span class="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                              <i class="pi pi-ban text-[9px]"></i> {{ variante.preguntasAnuladas?.length }} anulada(s) tachada(s)
+                            </span>
+                          }
+                        </div>
+                        <div class="grid grid-cols-5 sm:grid-cols-10 md:grid-cols-15 gap-1.5 text-center">
+                          @for (pregunta of preguntasDeVariante(variante); track pregunta) {
+                            @if (esPreguntaAnuladaEnVariante(variante, pregunta)) {
+                              <div class="relative flex flex-col items-center justify-center p-1 rounded-lg border border-rose-300 bg-rose-50 text-rose-700 shadow-2xs overflow-hidden" title="Pregunta {{ pregunta }} ANULADA (no computa en calificación)">
+                                <span class="text-[9px] font-bold text-rose-500 line-through font-mono">{{ pregunta }}.</span>
+                                <span class="text-xs font-black text-rose-700 line-through">{{ variante.respuestas ? (variante.respuestas[pregunta] || '—') : '—' }}</span>
+                                <span class="text-[7px] font-black uppercase text-rose-600 tracking-tighter">ANULADA</span>
+                                <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 bg-rose-600 rotate-[-15deg] rounded pointer-events-none"></div>
+                              </div>
+                            } @else {
+                              <div class="flex flex-col items-center justify-center p-1 rounded-lg border border-slate-200 bg-slate-50/80 text-foreground shadow-2xs">
+                                <span class="text-[9px] font-bold text-slate-500 font-mono">{{ pregunta }}.</span>
+                                <span class="text-xs font-black text-indigo-700">{{ variante.respuestas ? (variante.respuestas[pregunta] || '—') : '—' }}</span>
+                              </div>
+                            }
+                          }
+                        </div>
+                      </div>
+
                       @if (variante.estudiantes?.length) {
                         <div class="border-t border-border bg-amber-50/70 px-4 py-3">
                           <div class="text-[10px] font-black uppercase tracking-wide text-amber-900 mb-2">
@@ -2075,7 +2097,18 @@ interface CampusDisponible extends Campus {
                               <thead><tr class="border-b border-indigo-100 text-left uppercase tracking-wide text-slate-500"><th class="px-2 py-2">N.º presentado</th><th class="px-2 py-2">N.º en banco</th><th class="px-2 py-2">Clave banco</th><th class="px-2 py-2">Clave variante</th><th class="px-2 py-2">Reactivo</th></tr></thead>
                               <tbody>
                                 @for (traza of variante.trazabilidad; track traza.numeroPresentado) {
-                                  <tr class="border-b border-slate-100 text-slate-700"><td class="px-2 py-1.5 font-mono font-black">{{ traza.numeroPresentado }}</td><td class="px-2 py-1.5 font-mono">{{ traza.numeroBanco || '—' }}</td><td class="px-2 py-1.5 font-mono font-black">{{ traza.respuestaCorrectaBanco || '—' }}</td><td class="px-2 py-1.5 font-mono font-black text-emerald-800">{{ traza.respuestaCorrectaVariante || '—' }}</td><td class="px-2 py-1.5 font-mono">{{ traza.reactivoId || '—' }}</td></tr>
+                                  <tr class="border-b border-slate-100 text-slate-700" [class.bg-rose-50]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">
+                                    <td class="px-2 py-1.5 font-mono font-black">
+                                      <span [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-700]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.numeroPresentado }}</span>
+                                      @if (traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)) {
+                                        <span class="ml-1.5 px-1.5 py-0.2 rounded bg-rose-200 text-rose-800 text-[8px] font-black uppercase">ANULADA</span>
+                                      }
+                                    </td>
+                                    <td class="px-2 py-1.5 font-mono" [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-600]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.numeroBanco || '—' }}</td>
+                                    <td class="px-2 py-1.5 font-mono font-black" [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-600]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.respuestaCorrectaBanco || '—' }}</td>
+                                    <td class="px-2 py-1.5 font-mono font-black" [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-600]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-emerald-800]="!traza.anulada && !esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.respuestaCorrectaVariante || '—' }}</td>
+                                    <td class="px-2 py-1.5 font-mono" [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-600]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.reactivoId || '—' }}</td>
+                                  </tr>
                                 }
                               </tbody>
                             </table>
@@ -2198,8 +2231,8 @@ interface CampusDisponible extends Campus {
                   }
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                  <button (click)="archivoOmrInput.click()" class="px-3 py-2 rounded-xl border border-indigo-300 bg-white text-indigo-800 text-xs font-black cursor-pointer hover:bg-indigo-100"><i class="pi pi-folder-open mr-1.5"></i>{{ archivoOmrSeleccionado() ? 'Cambiar escaneado' : 'Seleccionar PDF' }}</button>
-                  <button (click)="ejecutarCalificacionOmr()" [disabled]="procesandoCalificacionOmr() || !archivoOmrSeleccionado()" class="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="procesandoCalificacionOmr()" [class.pi-spinner]="procesandoCalificacionOmr()" [class.pi-bolt]="!procesandoCalificacionOmr()"></i> {{ procesandoCalificacionOmr() ? 'Procesando...' : 'Ejecutar OMR' }}</button>
+                  <button (click)="archivoOmrInput.click()" [disabled]="procesandoCalificacionOmr()" class="px-3 py-2 rounded-xl border border-indigo-300 bg-white text-indigo-800 text-xs font-black cursor-pointer hover:bg-indigo-100 disabled:opacity-50"><i class="pi pi-folder-open mr-1.5"></i>{{ archivoOmrSeleccionado() ? 'Cambiar escaneado' : 'Seleccionar PDF' }}</button>
+                  <button (click)="ejecutarCalificacionOmr()" [disabled]="procesandoCalificacionOmr() || !archivoOmrSeleccionado()" class="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="procesandoCalificacionOmr()" [class.pi-spinner]="procesandoCalificacionOmr()" [class.pi-bolt]="!procesandoCalificacionOmr()"></i> {{ procesandoCalificacionOmr() ? ('Procesando (' + porcentajeProgresoOmr() + '%)') : 'Ejecutar OMR' }}</button>
                 </div>
               </div>
 
@@ -2208,7 +2241,115 @@ interface CampusDisponible extends Campus {
               }
 
               @if (procesandoCalificacionOmr()) {
-                <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-2xl text-purple-700"></i><p class="mt-2">Procesando todas las páginas del PDF...</p><p class="text-[10px] font-normal mt-1">El motor OMR está leyendo código y marcajes.</p></div>
+                <div class="relative overflow-hidden rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/50 p-6 shadow-sm">
+                  <!-- Laser Scan line effect -->
+                  <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent animate-pulse"></div>
+
+                  <div class="flex flex-col md:flex-row items-center gap-6">
+                    <!-- Scanner Icon with glow halo -->
+                    <div class="relative flex items-center justify-center shrink-0">
+                      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/30 relative">
+                        <i class="pi pi-spin pi-spinner text-3xl"></i>
+                        <span class="absolute -top-1 -right-1 flex h-4 w-4">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-4 w-4 bg-purple-500"></span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Progress Info & Bar -->
+                    <div class="flex-1 w-full space-y-3">
+                      <div class="flex items-center justify-between gap-4">
+                        <div>
+                          <div class="flex items-center gap-2">
+                            <span class="text-xs font-black uppercase tracking-wider text-purple-700 bg-purple-100/80 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                              <span class="w-2 h-2 rounded-full bg-purple-600 animate-ping"></span>
+                              Motor OMR en ejecución
+                            </span>
+                            <span class="text-xs text-muted-foreground font-medium">
+                              <i class="pi pi-clock mr-1"></i>{{ formatearTiempoOmr(tiempoTranscurridoOmr()) }}
+                            </span>
+                          </div>
+                          <h4 class="text-sm font-black text-foreground mt-1.5">{{ pasoActualProgresoOmr() }}</h4>
+                        </div>
+                        <div class="text-right shrink-0">
+                          <span class="text-3xl font-black font-mono tracking-tight text-purple-800">{{ porcentajeProgresoOmr() }}%</span>
+                        </div>
+                      </div>
+
+                      <!-- Main Progress Bar -->
+                      <div class="w-full bg-purple-100/70 rounded-full h-3.5 p-0.5 border border-purple-200 overflow-hidden shadow-inner">
+                        <div class="h-full rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-500 transition-all duration-300 ease-out relative overflow-hidden flex items-center justify-end pr-1" [style.width.%]="porcentajeProgresoOmr()">
+                          <div class="absolute inset-0 bg-white/25 animate-[pulse_1.5s_infinite]"></div>
+                        </div>
+                      </div>
+
+                      <!-- Secondary Subtitle Stats -->
+                      <div class="flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+                        <span>Páginas estimadas: <strong class="text-foreground">{{ previewPaginasOmr().length || evaluacionSeleccionadaOmr()?.estudiantesInscritosCount || evaluacionSeleccionadaOmr()?.mapeoEstudiantes?.length || 'Lote completo' }}</strong></span>
+                        <span class="text-purple-600 font-semibold flex items-center gap-1">
+                          <i class="pi pi-bolt text-[10px]"></i> No cierre esta ventana mientras finaliza la lectura
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 4-Stage Progress Pipeline Checklist -->
+                  <div class="mt-6 pt-5 border-t border-purple-100/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                    <!-- Step 1 -->
+                    <div class="flex items-center gap-2 p-2 rounded-xl transition-colors" [class.bg-purple-100]="pasoProgresoOmrActivo(1)" [class.bg-emerald-50]="pasoProgresoOmrCompletado(1)">
+                      @if (pasoProgresoOmrCompletado(1)) {
+                        <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                        <span class="font-bold text-emerald-900">1. Lote preparado</span>
+                      } @else {
+                        <i class="pi pi-spin pi-spinner text-purple-600 text-sm"></i>
+                        <span class="font-bold text-purple-900">1. Carga de escaneado</span>
+                      }
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="flex items-center gap-2 p-2 rounded-xl transition-colors" [class.bg-purple-100]="pasoProgresoOmrActivo(2)" [class.bg-emerald-50]="pasoProgresoOmrCompletado(2)" [class.opacity-60]="!pasoProgresoOmrActivo(2) && !pasoProgresoOmrCompletado(2)">
+                      @if (pasoProgresoOmrCompletado(2)) {
+                        <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                        <span class="font-bold text-emerald-900">2. Códigos y variantes</span>
+                      } @else if (pasoProgresoOmrActivo(2)) {
+                        <i class="pi pi-spin pi-spinner text-purple-600 text-sm"></i>
+                        <span class="font-bold text-purple-900">2. Leyendo códigos</span>
+                      } @else {
+                        <i class="pi pi-circle text-muted-foreground text-xs"></i>
+                        <span class="text-muted-foreground">2. Códigos y variantes</span>
+                      }
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="flex items-center gap-2 p-2 rounded-xl transition-colors" [class.bg-purple-100]="pasoProgresoOmrActivo(3)" [class.bg-emerald-50]="pasoProgresoOmrCompletado(3)" [class.opacity-60]="!pasoProgresoOmrActivo(3) && !pasoProgresoOmrCompletado(3)">
+                      @if (pasoProgresoOmrCompletado(3)) {
+                        <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                        <span class="font-bold text-emerald-900">3. Grilla y alvéolos</span>
+                      } @else if (pasoProgresoOmrActivo(3)) {
+                        <i class="pi pi-spin pi-spinner text-purple-600 text-sm"></i>
+                        <span class="font-bold text-purple-900">3. Analizando alvéolos</span>
+                      } @else {
+                        <i class="pi pi-circle text-muted-foreground text-xs"></i>
+                        <span class="text-muted-foreground">3. Grilla y alvéolos</span>
+                      }
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div class="flex items-center gap-2 p-2 rounded-xl transition-colors" [class.bg-purple-100]="pasoProgresoOmrActivo(4)" [class.bg-emerald-50]="pasoProgresoOmrCompletado(4)" [class.opacity-60]="!pasoProgresoOmrActivo(4) && !pasoProgresoOmrCompletado(4)">
+                      @if (pasoProgresoOmrCompletado(4)) {
+                        <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                        <span class="font-bold text-emerald-900">4. Resultados listos</span>
+                      } @else if (pasoProgresoOmrActivo(4)) {
+                        <i class="pi pi-spin pi-spinner text-purple-600 text-sm"></i>
+                        <span class="font-bold text-purple-900">4. Consolidando reporte</span>
+                      } @else {
+                        <i class="pi pi-circle text-muted-foreground text-xs"></i>
+                        <span class="text-muted-foreground">4. Validación y notas</span>
+                      }
+                    </div>
+                  </div>
+                </div>
               } @else {
                 @if (resultadoCalificacionOmr(); as resultado) {
                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -2489,9 +2630,11 @@ interface CampusDisponible extends Campus {
                     </div>
                     @if (puedeRecalificar(evaluacionSeleccionadaNotas()!)) {
                       <button type="button" (click)="reEscanearDesdeNotas()" 
+                              title="Cargar nuevo escaneado OMR y volver a calificar"
+                              aria-label="Cargar nuevo escaneado OMR y volver a calificar"
                               class="rounded-xl border border-indigo-200 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition">
                         <i class="pi pi-upload"></i>
-                        <span>Cargar nuevo escaneado OMR</span>
+                        <span>Cargar nuevo escaneado OMR y volver a calificar</span>
                       </button>
                     }
                   </div>
@@ -2516,17 +2659,20 @@ interface CampusDisponible extends Campus {
               @if (!cargandoNotasOmr() && notasOmr().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen calificaciones OMR guardadas para esta evaluación.</div> }
               @else if (!cargandoNotasOmr()) {
                 <div class="border border-border rounded-xl overflow-hidden">
-                  <div class="grid grid-cols-[50px_1fr_90px_90px_90px_110px_90px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground items-center">
-                    <span>N°</span><span>Estudiante</span><span>Variante</span><span>/60</span><span>/100</span><span>Estado</span><span class="text-right">Acción</span>
+                  <div class="grid grid-cols-[45px_1fr_80px_85px_70px_70px_100px_80px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground items-center">
+                    <span>N°</span><span>Estudiante</span><span>Variante</span><span class="text-center">Aciertos</span><span>/60</span><span>/100</span><span>Estado</span><span class="text-right">Acción</span>
                   </div>
                   <div class="divide-y divide-border">
                     @for (nota of notasOmr(); track nota.id) {
-                      <div class="grid grid-cols-[50px_1fr_90px_90px_90px_110px_90px] gap-2 px-3 py-2.5 items-center text-xs">
+                      <div class="grid grid-cols-[45px_1fr_80px_85px_70px_70px_100px_80px] gap-2 px-3 py-2.5 items-center text-xs">
                         <span class="font-mono text-muted-foreground">{{ $index + 1 }}</span>
                         <span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span>
                         <span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span>
-                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.notaSobre60 }}</strong>
-                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.notaSobre100 }}</strong>
+                        <span class="text-center font-mono font-bold" [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'" [class.text-slate-700]="nota.estadoCalificacion !== 'ANULADO'">
+                          {{ nota.estadoCalificacion === 'ANULADO' ? ('0/' + (nota.totalReactivos ?? 28)) : ((nota.aciertos ?? 0) + '/' + (nota.totalReactivos ?? 28)) }}
+                        </span>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : (nota.notaSobre60 ?? 0) }}</strong>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : (nota.notaSobre100 ?? 0) }}</strong>
                         <span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'" [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'" [class.bg-rose-50]="nota.estadoCalificacion === 'ANULADO'" [class.px-1.5]="nota.estadoCalificacion === 'ANULADO'" [class.py-0.5]="nota.estadoCalificacion === 'ANULADO'" [class.rounded]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion }}</span>
                         <div class="text-right">
                           @if (puedeAnularExamenEstudiante()) {
@@ -3028,6 +3174,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public resultadoCalificacionOmr = signal<OmrJobResponse | null>(null);
   public mensajeCalificacionOmr = signal<string | null>(null);
   public errorCalificacionOmr = signal<boolean>(false);
+  public porcentajeProgresoOmr = signal<number>(0);
+  public pasoActualProgresoOmr = signal<string>('Iniciando procesamiento...');
+  public tiempoTranscurridoOmr = signal<number>(0);
+  private _intervaloProgresoOmr: any = null;
+  private _inicioTiempoProgresoOmr: number = 0;
   public edicionesOmr = signal<Record<number, { codigo: string }>>({});
   public edicionesRespuestasOmr = signal<Record<string, string>>({});
   public previewPaginasOmr = signal<string[]>([]);
@@ -3690,8 +3841,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public puedeGestionarCartillas(item: EvaluacionItemUI): boolean {
     if (this.esConsultaAcademica() || item.modalidad === 'VIRTUAL') return false;
-    // Las marcas se pueden preparar antes de entregar el examen. Desde
-    // Entregado en adelante la cartilla ya no debe modificarse.
+    // Administrador y Responsable de evaluaciones siempre tienen habilitado marcas y lista indistintamente del estado
+    if (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones()) {
+      return true;
+    }
     return ['Programado', 'Validado', 'Generado', 'Impreso'].includes(item.etapa);
   }
 
@@ -4303,6 +4456,16 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.cargandoPatronCalificado.set(false);
   }
 
+  public preguntasDeVariante(variante: any): number[] {
+    const total = variante?.totalPreguntas || (variante?.respuestas ? Object.keys(variante.respuestas).length : 30);
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  public esPreguntaAnuladaEnVariante(variante: any, pregunta: number): boolean {
+    if (!variante || !pregunta) return false;
+    return (variante.preguntasAnuladas || []).includes(pregunta);
+  }
+
   public imprimirPatronCalificadoDirecto(item: EvaluacionItemUI): void {
     if (!this.puedeMostrarPatronCalificado(item) || this.imprimiendoPatronCalificado()) return;
 
@@ -4500,17 +4663,26 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.cerrarDialogoAnulacionOmr();
     this.procesandoCalificacionOmr.set(false);
     this.guardandoCalificacionOmr.set(false);
+    this._detenerProgresoCalificacionOmr();
+    this.porcentajeProgresoOmr.set(0);
+    this.tiempoTranscurridoOmr.set(0);
+    this.pasoActualProgresoOmr.set('Listo para procesar');
     this.mensajeCalificacionOmr.set('Seleccione el PDF escaneado para iniciar la lectura página por página.');
     this.errorCalificacionOmr.set(false);
     this.dialogCalificacionOmr.set(true);
     this._omrService.listarAnulaciones(item.id).subscribe({
-      next: anulaciones => this.anulacionesOmr.set(anulaciones || []),
+      next: anulaciones => {
+        const list = anulaciones || [];
+        this.anulacionesOmr.set(list);
+        this.recalcularLecturasConAnulaciones(list);
+      },
       error: () => this._mostrarToast('No se pudieron consultar las excepciones de preguntas de esta evaluación.', 'error')
     });
   }
 
   public cerrarCalificacionOmr(): void {
     if (this.procesandoCalificacionOmr() || this.guardandoCalificacionOmr()) return;
+    this._detenerProgresoCalificacionOmr();
     this.dialogCalificacionOmr.set(false);
     this.evaluacionSeleccionadaOmr.set(null);
     this.archivoOmrSeleccionado.set(null);
@@ -4607,6 +4779,74 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     return this.previewPaginasOmr()[pagina - 1] || null;
   }
 
+  public formatearTiempoOmr(segundos: number): string {
+    const min = Math.floor(segundos / 60);
+    const seg = segundos % 60;
+    return `${min}:${seg < 10 ? '0' : ''}${seg}`;
+  }
+
+  public pasoProgresoOmrActivo(paso: number): boolean {
+    const p = this.porcentajeProgresoOmr();
+    if (paso === 1) return p >= 5 && p < 25;
+    if (paso === 2) return p >= 25 && p < 55;
+    if (paso === 3) return p >= 55 && p < 85;
+    if (paso === 4) return p >= 85 && p < 100;
+    return false;
+  }
+
+  public pasoProgresoOmrCompletado(paso: number): boolean {
+    const p = this.porcentajeProgresoOmr();
+    if (paso === 1) return p >= 25;
+    if (paso === 2) return p >= 55;
+    if (paso === 3) return p >= 85;
+    if (paso === 4) return p >= 100;
+    return false;
+  }
+
+  private _iniciarProgresoCalificacionOmr(): void {
+    this._detenerProgresoCalificacionOmr();
+    this.porcentajeProgresoOmr.set(6);
+    this.pasoActualProgresoOmr.set('Iniciando lote y enviando al motor OMR...');
+    this.tiempoTranscurridoOmr.set(0);
+    this._inicioTiempoProgresoOmr = Date.now();
+
+    const item = this.evaluacionSeleccionadaOmr();
+    const paginasEstimadas = Math.max(1, this.previewPaginasOmr().length || item?.estudiantesInscritosCount || item?.mapeoEstudiantes?.length || 10);
+    const tiempoEstimadoTotalMs = Math.max(7000, paginasEstimadas * 1200);
+
+    this._intervaloProgresoOmr = window.setInterval(() => {
+      const msTranscurridos = Date.now() - this._inicioTiempoProgresoOmr;
+      const segTranscurridos = Math.floor(msTranscurridos / 1000);
+      this.tiempoTranscurridoOmr.set(segTranscurridos);
+
+      const factor = msTranscurridos / tiempoEstimadoTotalMs;
+      let pct = Math.round(96 * (1 - Math.exp(-2.2 * factor)));
+      if (pct < 6) pct = 6;
+      if (pct > 96) pct = 96;
+
+      this.porcentajeProgresoOmr.set(pct);
+
+      if (pct < 25) {
+        this.pasoActualProgresoOmr.set('Subiendo escaneado y preparando páginas para análisis...');
+      } else if (pct < 55) {
+        this.pasoActualProgresoOmr.set('Identificando códigos QR, variantes y encabezados de estudiantes...');
+      } else if (pct < 85) {
+        this.pasoActualProgresoOmr.set('Escaneando alvéolos OMR y extrayendo marcajes de respuestas...');
+      } else if (pct < 95) {
+        this.pasoActualProgresoOmr.set('Contrastando respuestas con patrones de variantes oficiales...');
+      } else {
+        this.pasoActualProgresoOmr.set('Consolidando resultados y validando consistencia del lote...');
+      }
+    }, 250);
+  }
+
+  private _detenerProgresoCalificacionOmr(): void {
+    if (this._intervaloProgresoOmr) {
+      window.clearInterval(this._intervaloProgresoOmr);
+      this._intervaloProgresoOmr = null;
+    }
+  }
+
   public ejecutarCalificacionOmr(): void {
     const item = this.evaluacionSeleccionadaOmr();
     const archivo = this.archivoOmrSeleccionado();
@@ -4615,10 +4855,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.procesandoCalificacionOmr.set(true);
     this.resultadoCalificacionOmr.set(null);
     this.errorCalificacionOmr.set(false);
-    this.mensajeCalificacionOmr.set('Enviando escaneado al motor OMR...');
+    this.mensajeCalificacionOmr.set(null);
+    this._iniciarProgresoCalificacionOmr();
+
     this._omrService.procesar(item.id, archivo, this.impresoraCalificacionOmr()).subscribe({
       next: aceptado => this._esperarResultadoCalificacionOmr(aceptado.jobId),
       error: err => {
+        this._detenerProgresoCalificacionOmr();
         this.procesandoCalificacionOmr.set(false);
         this.errorCalificacionOmr.set(true);
         this.mensajeCalificacionOmr.set(err?.error?.error || err?.error?.message || 'No se pudo enviar el escaneado al motor OMR.');
@@ -4633,16 +4876,31 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
           window.setTimeout(() => this._esperarResultadoCalificacionOmr(jobId), 1200);
           return;
         }
-        this.procesandoCalificacionOmr.set(false);
-        this.resultadoCalificacionOmr.set(resultado);
-        this.edicionesOmr.set({});
-        this.paginaPreviewOmr.set(null);
-        this.paginasPreviewOcultas.set({});
-        this.tabRespuestasOmr.set({});
-        this.errorCalificacionOmr.set(resultado.estado !== 'COMPLETADO');
-        this.mensajeCalificacionOmr.set(resultado.estado === 'COMPLETADO'
-          ? 'Lectura OMR completada. Revise cada página antes de pasar la evaluación a Calificado.'
-          : resultado.mensaje || 'El motor OMR no pudo completar la lectura.');
+
+        this._detenerProgresoCalificacionOmr();
+
+        if (resultado.estado === 'COMPLETADO') {
+          this.porcentajeProgresoOmr.set(100);
+          this.pasoActualProgresoOmr.set('¡Procesamiento OMR completado con éxito!');
+          window.setTimeout(() => {
+            this.procesandoCalificacionOmr.set(false);
+            this.resultadoCalificacionOmr.set(resultado);
+            if (this.anulacionesOmr().length > 0) {
+              this.recalcularLecturasConAnulaciones(this.anulacionesOmr());
+            }
+            this.edicionesOmr.set({});
+            this.paginaPreviewOmr.set(null);
+            this.paginasPreviewOcultas.set({});
+            this.tabRespuestasOmr.set({});
+            this.errorCalificacionOmr.set(false);
+            this.mensajeCalificacionOmr.set('Lectura OMR completada. Revise cada página antes de pasar la evaluación a Calificado.');
+          }, 450);
+        } else {
+          this.procesandoCalificacionOmr.set(false);
+          this.resultadoCalificacionOmr.set(resultado);
+          this.errorCalificacionOmr.set(true);
+          this.mensajeCalificacionOmr.set(resultado.mensaje || 'El motor OMR no pudo completar la lectura.');
+        }
       },
       error: () => {
         window.setTimeout(() => this._esperarResultadoCalificacionOmr(jobId), 1500);
@@ -4802,13 +5060,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.guardandoAnulacionOmr.set(true);
         this._omrService.reactivarPregunta(item.id, anulacion.letraVariante, anulacion.numeroPregunta).subscribe({
           next: () => {
-            this.anulacionesOmr.update(items => items.filter(actual => actual.id !== anulacion.id));
+            const restantes = this.anulacionesOmr().filter(actual => actual.id !== anulacion.id);
+            this.anulacionesOmr.set(restantes);
+            this.recalcularLecturasConAnulaciones(restantes);
             this.guardandoAnulacionOmr.set(false);
             this._mostrarToast(`Pregunta ${pregunta} de la variante ${lectura.letraVariante} reactivada.`);
           },
           error: err => {
             this.guardandoAnulacionOmr.set(false);
-            this._mostrarToast(err?.error?.message || 'No se pudo reactivar la pregunta.', 'error');
+            this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo reactivar la pregunta.', 'error');
           }
         });
       });
@@ -4861,19 +5121,88 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: anulacion => {
         this._omrService.listarAnulaciones(item.id).subscribe({
-          next: items => this.anulacionesOmr.set(items || [])
+          next: items => {
+            const list = items || [];
+            this.anulacionesOmr.set(list);
+            this.recalcularLecturasConAnulaciones(list);
+          }
         });
         this.guardandoAnulacionOmr.set(false);
         this.cerrarDialogoAnulacionOmr();
-        const infoPropagada = (anulacion.anulacionesPropagadas && anulacion.anulacionesPropagadas > 1)
-          ? ` y propagada a ${anulacion.anulacionesPropagadas} variantes vinculadas`
+        const countPropagadas = anulacion.anulacionesPropagadas?.length || 0;
+        const infoPropagada = countPropagadas > 0
+          ? ` y propagada a ${countPropagadas} variante(s) vinculada(s)`
           : '';
         this._mostrarToast(`Pregunta ${seleccion.pregunta} de la variante ${seleccion.lectura.letraVariante} anulada${infoPropagada}.`);
       },
       error: err => {
         this.guardandoAnulacionOmr.set(false);
-        this._mostrarToast(err?.error?.message || 'No se pudo anular la pregunta.', 'error');
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo anular la pregunta.', 'error');
       }
+    });
+  }
+
+  private recalcularLecturasConAnulaciones(anulacionesActuales: AnulacionPreguntaOmr[]): void {
+    const mapaAnuladas = new Map<string, Set<number>>();
+    for (const an of anulacionesActuales) {
+      if (!an.activo) continue;
+      const v = (an.letraVariante || '').toUpperCase();
+      if (!mapaAnuladas.has(v)) {
+        mapaAnuladas.set(v, new Set());
+      }
+      mapaAnuladas.get(v)!.add(an.numeroPregunta);
+    }
+
+    this.resultadoCalificacionOmr.update(res => {
+      if (!res || !res.resultados) return res;
+      return {
+        ...res,
+        resultados: res.resultados.map(lectura => {
+          if (lectura.estadoCalificacion === 'ANULADO') return lectura;
+          const variante = (lectura.letraVariante || '').toUpperCase();
+          const anuladasSet = mapaAnuladas.get(variante) || new Set<number>();
+
+          const totalBase = (lectura.detalles && lectura.detalles.length > 0)
+            ? lectura.detalles.length
+            : (lectura.totalReactivos || 30);
+
+          const preguntasValidas = Array.from({ length: totalBase }, (_, i) => i + 1)
+            .filter(p => !anuladasSet.has(p));
+
+          const totalValidas = preguntasValidas.length;
+          let aciertos = 0;
+          let blancos = 0;
+          let dobles = 0;
+
+          for (const p of preguntasValidas) {
+            const resp = this.respuestaOmr(lectura, p).trim().toUpperCase();
+            const corr = this.respuestaCorrectaOmr(lectura, p).trim().toUpperCase();
+            if (!resp) {
+              blancos++;
+            } else if (resp.length > 1) {
+              dobles++;
+            } else if (corr && resp === corr) {
+              aciertos++;
+            }
+          }
+
+          const fallos = Math.max(0, totalValidas - aciertos - blancos);
+          const nota60 = totalValidas > 0 ? Math.round((aciertos * 60 / totalValidas) * 100) / 100 : 0;
+          const nota100 = totalValidas > 0 ? Math.round((aciertos * 100 / totalValidas) * 100) / 100 : 0;
+
+          return {
+            ...lectura,
+            totalReactivos: totalValidas,
+            aciertos,
+            fallos,
+            blancos,
+            doblesMarcas: dobles,
+            notaSobre60: nota60,
+            notaSobre100: nota100,
+            estadoCalificacion: nota100 >= 51 ? 'APROBADO' : 'REPROBADO'
+          };
+        })
+      };
     });
   }
 
@@ -5183,7 +5512,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       codigoEstudiante: this.codigoOmr(pagina),
       respuestas: this.respuestasOmrParaGuardar(pagina),
       ajusteManual: this.tieneAjusteManualOmr(pagina),
-      respuestasOriginales: this.respuestasOriginalesOmr(pagina)
+      respuestasOriginales: this.respuestasOriginalesOmr(pagina),
+      examenAnulado: pagina.estadoCalificacion === 'ANULADO'
     }));
     this.guardandoCalificacionOmr.set(true);
     forkJoin(ajustes.map(ajuste => this._omrService.ajustarCalificacion(item.id, ajuste))).subscribe({
@@ -5314,6 +5644,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public ngOnDestroy(): void {
+    this._detenerProgresoCalificacionOmr();
     this.cerrarEscaneadoOmr();
   }
 

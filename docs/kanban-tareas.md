@@ -114,6 +114,28 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-026 — Homogenización integral de validaciones de Banco de Preguntas entre Frontend y Backend
+
+- Prioridad: Alta
+- Área: Banco de Preguntas / Validación Excel / Compatibilidad Typst
+- Responsable: Antigravity
+- Creada: 2026-09-20
+- Fecha límite: 2026-09-20
+- Dependencias: `banco-preguntas.component.ts`, `BancoPreguntasService.java`.
+- Criterio de cierre: 1) Normalizar respuestas V/F simple reconociendo A, B, V, F, Verdadero, Falso y eliminando la asignación silenciosa a 'A'; 2) Exigir respuesta obligatoria si la celda está vacía en preguntas no macro; 3) Sincronizar catálogo de tipologías (EMPAREJAMIENTO -> OPCION_EMPAREJAMIENTO, PROBLEMA -> SUBITEM_CASO); 4) Validar sintaxis Typst de fórmulas inmediatamente al cargar el archivo con mensajes claros en texto rojo; 5) Validar opciones de preguntas hijas de emparejamiento contra las opciones definidas en la madre; 6) Exponer errores reales de compilación Typst si fallara la previsualización.
+- Notas: En progreso. Implementando homogenización de validaciones en banco-preguntas.component.ts. Homogenizacion integral de validaciones de banco de preguntas completada y compilada con exito.
+
+#### T-025 — Notificación para docente de exámenes sin cartilla con notas pendientes de registro
+
+- Prioridad: Alta
+- Área: Notificaciones / Exámenes sin cartilla / Docentes
+- Responsable: Antigravity
+- Creada: 2026-09-19
+- Fecha límite: 2026-09-19
+- Dependencias: `notificaciones.service.ts`, `topbar.component.ts`, `banco-preguntas.component.ts`.
+- Criterio de cierre: 1) Incorporar en `NotificacionesService._cargarNotificacionesDocente()` la detección de roles de examen modalidad `PRESENCIAL_SIN_CARTILLA` en estado `PENDIENTE_NOTAS`; 2) Generar alerta con tipo `NOTAS_SIN_CARTILLA_PENDIENTES` indicando que no subió notas aún, con enlace directo (`/banco-preguntas?rolId=...&abrirNotas=true`) y acción "Cargar notas"; 3) Reflejar la alerta en el contador de la campana del topbar (`totalAlertasCount`) e icono distintivo; 4) Al abrir la notificación, redirigir a `/banco-preguntas` y abrir automáticamente el modal de calificaciones; 5) Al guardar las calificaciones en `banco-preguntas`, refrescar automáticamente las notificaciones; 6) En la lista y modal del calendario del docente, destacar la insignia de "Notas pendientes" con acceso directo a calificar.
+- Notas: En progreso. Iniciando implementación técnica. Notificacion de examen sin cartilla pendiente de notas implementada en Topbar, calendario y validador de Banco de Preguntas.
+
 #### T-024 — Visibilidad y accesibilidad del botón "Aprobar y Guardar" en previsualización de examen en vista móvil
 
 - Prioridad: Alta
@@ -311,7 +333,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 7 |
 | En progreso | 0 |
-| En revisión | 13 |
+| En revisión | 15 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

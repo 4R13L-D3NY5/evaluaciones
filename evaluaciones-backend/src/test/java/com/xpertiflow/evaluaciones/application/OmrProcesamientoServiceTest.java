@@ -1,11 +1,15 @@
 package com.xpertiflow.evaluaciones.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RecalificarOmrRequestDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
+import com.xpertiflow.evaluaciones.domain.entity.AnulacionPreguntaOmr;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
+import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
@@ -201,5 +205,87 @@ class OmrProcesamientoServiceTest {
         IllegalStateException ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
                 service.consultarPatronCalificado(rolId, auth));
         assertThat(ex.getMessage()).isEqualTo("No existe un patrón persistido para esta evaluación.");
+    }
+
+    @Test
+    void anularPregunta_nuevaPregunta_guardaCorrectamenteYRecalcula() {
+        ExamenVariante varianteA = new ExamenVariante();
+        varianteA.setId("VAR-1");
+        varianteA.setRolExamenId(rolId);
+        varianteA.setLetraVariante("A");
+        varianteA.setContenidoSeguroCifrado("cifrado");
+        varianteA.setTotalPreguntas(3);
+
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+        when(varianteRepository.findByRolExamenIdAndLetraVariante(rolId, "A")).thenReturn(Optional.of(varianteA));
+        when(cifradoService.descifrarTexto(any(), any()))
+                .thenReturn("{\"patronClavesJson\":\"{\\\"1\\\":\\\"A\\\",\\\"2\\\":\\\"B\\\",\\\"3\\\":\\\"C\\\"}\"}");
+        when(anulacionRepository.findFirstByRolExamenIdAndLetraVarianteAndNumeroPreguntaOrderByIdDesc(rolId, "A", 2))
+                .thenReturn(Optional.empty());
+        when(anulacionRepository.save(any(AnulacionPreguntaOmr.class))).thenAnswer(i -> {
+            AnulacionPreguntaOmr a = i.getArgument(0);
+            a.setId(99L);
+            return a;
+        });
+        when(anulacionRepository.findByRolExamenIdAndLetraVarianteAndActivoTrueOrderByNumeroPreguntaAsc(rolId, "A"))
+                .thenReturn(List.of(AnulacionPreguntaOmr.builder().id(99L).rolExamenId(rolId).letraVariante("A").numeroPregunta(2).activo(true).build()));
+        when(calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolId))
+                .thenReturn(Collections.emptyList());
+
+        AnulacionPreguntaOmrRequestDto req = new AnulacionPreguntaOmrRequestDto();
+        req.setLetraVariante("A");
+        req.setNumeroPregunta(2);
+        req.setMotivo("Error de tipografía en el enunciado");
+        req.setPropagarVariantes(false);
+
+        AnulacionPreguntaOmrResponseDto response = service.anularPregunta(rolId, req, auth, "127.0.0.1");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(99L);
+        assertThat(response.getNumeroPregunta()).isEqualTo(2);
+        assertThat(response.getLetraVariante()).isEqualTo("A");
+        assertThat(response.isActivo()).isTrue();
+
+        ArgumentCaptor<AnulacionPreguntaOmr> anulacionCaptor = ArgumentCaptor.forClass(AnulacionPreguntaOmr.class);
+        verify(anulacionRepository).save(anulacionCaptor.capture());
+        assertThat(anulacionCaptor.getValue().isActivo()).isTrue();
+        assertThat(anulacionCaptor.getValue().getMotivo()).isEqualTo("Error de tipografía en el enunciado");
+
+        ArgumentCaptor<AuditoriaEvaluacion> auditoriaCaptor = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
+        verify(auditoriaRepository).save(auditoriaCaptor.capture());
+        assertThat(auditoriaCaptor.getValue().getAccion()).isEqualTo("PREGUNTA_OMR_ANULADA");
+    }
+
+    @Test
+    void anularPregunta_preguntaYaAnulada_lanzaIllegalArgumentException() {
+        ExamenVariante varianteA = new ExamenVariante();
+        varianteA.setId("VAR-1");
+        varianteA.setRolExamenId(rolId);
+        varianteA.setLetraVariante("A");
+        varianteA.setContenidoSeguroCifrado("cifrado");
+        varianteA.setTotalPreguntas(3);
+
+        AnulacionPreguntaOmr existente = AnulacionPreguntaOmr.builder()
+                .id(50L)
+                .rolExamenId(rolId)
+                .letraVariante("A")
+                .numeroPregunta(2)
+                .activo(true)
+                .build();
+
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+        when(varianteRepository.findByRolExamenIdAndLetraVariante(rolId, "A")).thenReturn(Optional.of(varianteA));
+        when(cifradoService.descifrarTexto(any(), any()))
+                .thenReturn("{\"patronClavesJson\":\"{\\\"1\\\":\\\"A\\\",\\\"2\\\":\\\"B\\\",\\\"3\\\":\\\"C\\\"}\"}");
+        when(anulacionRepository.findFirstByRolExamenIdAndLetraVarianteAndNumeroPreguntaOrderByIdDesc(rolId, "A", 2))
+                .thenReturn(Optional.of(existente));
+
+        AnulacionPreguntaOmrRequestDto req = new AnulacionPreguntaOmrRequestDto();
+        req.setLetraVariante("A");
+        req.setNumeroPregunta(2);
+        req.setMotivo("Error en la pregunta");
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () ->
+                service.anularPregunta(rolId, req, auth, "127.0.0.1"));
     }
 }

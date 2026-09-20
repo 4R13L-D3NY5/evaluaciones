@@ -212,7 +212,7 @@ public class OmrProcesamientoService {
                 .findFirstByRolExamenIdAndLetraVarianteAndNumeroPreguntaOrderByIdDesc(
                         rolExamenId, varianteSolicitada, numeroPregunta)
                 .orElseGet(AnulacionPreguntaOmr::new);
-        if (anulacion.isActivo()) {
+        if (anulacion.getId() != null && anulacion.isActivo()) {
             throw new IllegalArgumentException("La pregunta " + numeroPregunta + " de la variante " + varianteSolicitada + " ya está anulada.");
         }
         anulacion.setRolExamenId(rolExamenId);
@@ -678,7 +678,18 @@ public class OmrProcesamientoService {
 
         CalificacionOmr calificacion = calificacionRepository
                 .findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigoEstudiante)
-                .orElseThrow(() -> new IllegalArgumentException("Calificación no encontrada para el estudiante " + codigoEstudiante));
+                .orElseGet(() -> {
+                    MapeoEstudianteVariante mapeo = mapeoRepository.findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigoEstudiante)
+                            .orElseThrow(() -> new IllegalArgumentException("Calificación o estudiante no encontrado para el código " + codigoEstudiante));
+                    CalificacionOmr nueva = new CalificacionOmr();
+                    nueva.setRolExamenId(rolExamenId);
+                    nueva.setCodigoEstudiante(codigoEstudiante);
+                    nueva.setEstudianteNombreCompleto(nombreCompleto(mapeo));
+                    nueva.setLetraVariante(mapeo.getLetraVariante());
+                    nueva.setTotalReactivos(30);
+                    nueva.setRespuestasDetectadasJson("{}");
+                    return nueva;
+                });
 
         String usuario = usuarioValido(authentication == null ? null : authentication.getName());
 
@@ -772,7 +783,17 @@ public class OmrProcesamientoService {
                     dto.setLetra(variante.getLetraVariante());
                     dto.setTotalPreguntas(variante.getTotalPreguntas() == null ? respuestas.size() : variante.getTotalPreguntas());
                     dto.setRespuestas(respuestas);
-                    dto.setTrazabilidad(leerTrazabilidad(contenido));
+                    Set<Integer> anuladas = preguntasAnuladas(rolExamenId, variante.getLetraVariante());
+                    dto.setPreguntasAnuladas(new ArrayList<>(anuladas));
+                    List<PatronCalificadoResponseDto.TrazabilidadPreguntaDto> trazabilidad = leerTrazabilidad(contenido);
+                    if (trazabilidad != null && !anuladas.isEmpty()) {
+                        for (PatronCalificadoResponseDto.TrazabilidadPreguntaDto traza : trazabilidad) {
+                            if (traza.getNumeroPresentado() != null && anuladas.contains(traza.getNumeroPresentado())) {
+                                traza.setAnulada(true);
+                            }
+                        }
+                    }
+                    dto.setTrazabilidad(trazabilidad);
                     dto.setEstudiantes(mapeos.stream()
                             .filter(mapeo -> variante.getLetraVariante().equalsIgnoreCase(mapeo.getLetraVariante()))
                             .sorted(Comparator.comparing((MapeoEstudianteVariante mapeo) ->
