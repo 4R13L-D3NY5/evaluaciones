@@ -57,4 +57,12 @@ export class ExamenSinCartillaService {
   public guardarNotas(rolExamenId: string, notas: { codigoEstudiante: string; notaSobre60: number }[]): Observable<NotaDocente[]> {
     return this._http.post<NotaDocente[]>(`${this._baseUrl}/${rolExamenId}/notas`, { notas });
   }
+
+  public urlReporteNotasPdf(rolExamenId: string): string {
+    return `${this._baseUrl}/${rolExamenId}/reporte-notas-pdf`;
+  }
+
+  public descargarReporteNotasPdf(rolExamenId: string): Observable<Blob> {
+    return this._http.get(this.urlReporteNotasPdf(rolExamenId), { responseType: 'blob' });
+  }
 }

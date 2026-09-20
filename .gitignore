@@ -1,8 +1,6 @@
 # Dependencias Node / Angular
 **/node_modules/
 **/__pycache__/
-*.pyc
-*.pyo
 **/.angular/
 **/dist/
 **/tmp/
@@ -52,22 +50,16 @@ Thumbs.db
 bases/page-*.png
 bases/verify_*
 bases/test_*
-bases/preview_*.png
-bases/cartilla_*.png
-bases/cartilla_*.pdf
-bases/cartilla_*.typ
 
 # Artefactos generados localmente (pueden contener exámenes o ciphertext)
 /storage/*
-!/storage/.gitkeep
+/output/*
 /outputs/*
-!/outputs/.gitkeep
 /evaluaciones-workers/test_output/*
-*.tar.gz
 
 # Llaves y secretos locales de Vault (nunca versionar)
 vault/secrets/*
-!vault/secrets/.gitkeep
+!vault/secrets/README.md
 
 # Variables de entorno locales (nunca versionar)
 .env
@@ -80,11 +72,6 @@ backups/*
 backups-external/*
 !backups-external/.gitkeep
 
-# Contexto, herramientas IA y notas
-.codegraph/
-.codex-sheet-image-preview/
-.context/
-*.md
-!README.md
-
+# Framework Gentle-AI local
+gentle-ai/
 

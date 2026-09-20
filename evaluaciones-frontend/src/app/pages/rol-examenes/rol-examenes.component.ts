@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
@@ -13,6 +14,7 @@ import {
   RolExamenResponse,
   RolExamenService
 } from '../../core/services/rol-examen.service';
+import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import { catchError, firstValueFrom, forkJoin, from, map, mergeMap, of, toArray } from 'rxjs';
 
@@ -74,8 +76,15 @@ interface InstanciaImportacionItem {
             <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
               <i class="pi pi-eye"></i> Consulta por sede
             </span>
-          } @else {
-            <!-- Acciones de gestión reservadas al director y al personal autorizado -->
+          } @else if (esAdministrador()) {
+            <!-- Acciones de gestión reservadas exclusivamente al Administrador del Sistema -->
+            <button
+              (click)="abrirModalReprogramarRango()"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+              <i class="pi pi-calendar-plus"></i>
+              <span>Reprogramar por Rango (Suspensión)</span>
+            </button>
+
             <button
               (click)="abrirModalSubirExcel()"
               class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
@@ -127,10 +136,13 @@ interface InstanciaImportacionItem {
               <i class="pi pi-graduation-cap text-primary text-[10px]"></i> Carrera
             </label>
             <select 
-              [ngModel]="carreraSeleccionada()?.careerCode"
+              [ngModel]="todasCarrerasSeleccionadas() ? carreraTodasCodigo : (carreraSeleccionada()?.careerCode || '')"
               (ngModelChange)="onCarreraChange($event)"
               [disabled]="cargandoCarreras()"
               class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
+              @if (puedeListarTodasLasCarreras()) {
+                <option [value]="carreraTodasCodigo">Todas las carreras de la sede</option>
+              }
               @for (carrera of carreras(); track carrera.careerId) {
                 <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
               }
@@ -278,21 +290,23 @@ interface InstanciaImportacionItem {
               </p>
             </div>
 
-            <div class="flex items-center justify-center gap-3 pt-2">
-              <button 
-                (click)="abrirModalAnadirManual()"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
-                <i class="pi pi-plus"></i>
-                <span>Añadir Examen al Rol de Examen</span>
-              </button>
+            @if (esAdministrador()) {
+              <div class="flex items-center justify-center gap-3 pt-2">
+                <button 
+                  (click)="abrirModalAnadirManual()"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
+                  <i class="pi pi-plus"></i>
+                  <span>Añadir Examen al Rol de Examen</span>
+                </button>
 
-              <button 
-                (click)="abrirModalSubirExcel()"
-                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
-                <i class="pi pi-file-excel"></i>
-                <span>Importar Excel</span>
-              </button>
-            </div>
+                <button 
+                  (click)="abrirModalSubirExcel()"
+                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
+                  <i class="pi pi-file-excel"></i>
+                  <span>Importar Excel</span>
+                </button>
+              </div>
+            }
           </div>
 
         } @else {
@@ -408,7 +422,8 @@ interface InstanciaImportacionItem {
                       } @else {
                         <button 
                           (click)="abrirModalEditar(row)"
-                          [disabled]="!puedeEditarEliminar(row)"
+                          [disabled]="!puedeEditar(row)"
+                          [title]="getTooltipEditar(row)"
                           class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                           <i class="pi pi-calendar-plus text-[9px]"></i>
                           <span>Por Programar</span>
@@ -432,15 +447,15 @@ interface InstanciaImportacionItem {
                       <div class="inline-flex items-center gap-1.5">
                         <button 
                           (click)="abrirModalEditar(row)"
-                          [disabled]="!puedeEditarEliminar(row)"
-                          title="Editar parámetros del examen"
+                          [disabled]="!puedeEditar(row)"
+                          [title]="getTooltipEditar(row)"
                           class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                           <i class="pi pi-pencil text-xs"></i>
                         </button>
                         
                         <button 
                           (click)="eliminarExamen(row)"
-                          [disabled]="!puedeEditarEliminar(row)"
+                          [disabled]="!puedeEliminar(row)"
                           title="Eliminar del rol de examen"
                           class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                           <i class="pi pi-trash text-xs"></i>
@@ -463,13 +478,15 @@ interface InstanciaImportacionItem {
           <div class="p-3.5 border-t border-border bg-muted/20 flex items-center justify-between text-xs text-muted-foreground font-bold">
             <span>Total exámenes programados: {{ examenesFiltrados().length }}</span>
             <div class="flex items-center gap-3">
-              <button 
-                (click)="vaciarRol()" 
-                [disabled]="esVicerrector()"
-                class="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer">
-                <i class="pi pi-trash text-xs"></i>
-                <span>Vaciar Rol de Examen</span>
-              </button>
+              @if (esAdministrador()) {
+                <button 
+                  (click)="vaciarRol()" 
+                  title="Eliminar todos los exámenes PROGRAMADOS visibles"
+                  class="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer">
+                  <i class="pi pi-trash text-xs"></i>
+                  <span>Vaciar Rol de Examen</span>
+                </button>
+              }
               <span class="font-mono text-primary">Guardado en BD · Sincronizado con el servicio institucional</span>
             </div>
           </div>
@@ -741,6 +758,18 @@ interface InstanciaImportacionItem {
               </button>
             </div>
 
+            @if (esAdministrador() && itemEditando() && itemEditando()!.estado !== 'PROGRAMADO' && itemEditando()!.estado !== 'VALIDADO') {
+              <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+                <i class="pi pi-shield text-amber-600 text-base mt-0.5 shrink-0"></i>
+                <div class="space-y-0.5">
+                  <p class="font-black text-amber-950">Aviso de Auditoría Oficial (Estado {{ itemEditando()?.estado }}):</p>
+                  <p class="text-[11px] leading-relaxed text-amber-900">
+                    Como Administrador puedes modificar la fecha de este examen. La operación quedará registrada en la bitácora de auditoría asociada a tu usuario.
+                  </p>
+                </div>
+              </div>
+            }
+
             <!-- SECCIÓN 1: Selección de Materia y Grupo de SEA -->
             <div class="space-y-3">
               <div>
@@ -839,7 +868,7 @@ interface InstanciaImportacionItem {
                   <label class="block font-bold text-muted-foreground mb-1">Fecha del Examen *</label>
                   <input 
                     type="date" 
-                    min="2020-01-01"
+                    [min]="fechaMinimaReprogramacion()"
                     max="2099-12-31"
                     [(ngModel)]="formFecha" 
                     class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
@@ -899,6 +928,148 @@ interface InstanciaImportacionItem {
         </div>
       }
 
+      <!-- MODAL 4: REPROGRAMAR POR RANGO (SUSPENSIÓN) -->
+      @if (dialogReprogramarRango()) {
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto w-full p-6 shadow-2xl space-y-4 animate-scale-in">
+            
+            <div class="flex items-start justify-between border-b border-border pb-3">
+              <div class="flex items-center gap-2.5">
+                <div class="h-9 w-9 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center">
+                  <i class="pi pi-calendar-plus text-base"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Reprogramar por Rango (Suspensión)</h3>
+                  <p class="text-xs text-muted-foreground">{{ sedeSeleccionada()?.name || 'Sede institucional' }} · Programación Oficial</p>
+                </div>
+              </div>
+
+              <button (click)="cerrarModalReprogramarRango()" class="text-muted-foreground hover:text-foreground text-sm cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <div class="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 text-[11px] text-indigo-950 space-y-1">
+              <div class="flex items-center gap-1.5 font-bold text-indigo-900">
+                <i class="pi pi-info-circle"></i>
+                <span>Traslado masivo de fechas por contingencia o suspensión:</span>
+              </div>
+              <p class="leading-relaxed">
+                Selecciona la carrera y el rango de fechas que sufrió la suspensión. Los exámenes se reprogramarán correlativamente día a día (ej. 14 y 15 se trasladan al 28 y 29).
+              </p>
+            </div>
+
+            <div class="space-y-3">
+              <!-- Selección de Carrera -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Carrera a reprogramar *
+                </label>
+                <select 
+                  [ngModel]="rangoCarreraCodigo()"
+                  (ngModelChange)="rangoCarreraCodigo.set($event)"
+                  class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
+                  <option value="__TODAS_LAS_CARRERAS__">🌐 Todas las carreras de la sede (Reprogramación Institucional)</option>
+                  @for (c of carreras(); track c.careerCode) {
+                    <option [value]="c.careerCode">{{ c.careerName }} ({{ c.careerCode }})</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Rango Origen -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                    Fecha Origen Desde *
+                  </label>
+                  <input 
+                    type="date" 
+                    [ngModel]="rangoFechaDesdeOrigen()"
+                    (ngModelChange)="rangoFechaDesdeOrigen.set($event)"
+                    class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
+                </div>
+
+                <div>
+                  <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                    Fecha Origen Hasta *
+                  </label>
+                  <input 
+                    type="date" 
+                    [ngModel]="rangoFechaHastaOrigen()"
+                    (ngModelChange)="rangoFechaHastaOrigen.set($event)"
+                    class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
+                </div>
+              </div>
+
+              <!-- Nueva Fecha de Inicio -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Nueva Fecha de Inicio * (Día al que se traslada la primera fecha)
+                </label>
+                <input 
+                  type="date" 
+                  [ngModel]="rangoFechaNuevaInicio()"
+                  (ngModelChange)="rangoFechaNuevaInicio.set($event)"
+                  class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-primary">
+              </div>
+
+              <!-- Motivo -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Motivo de la Reprogramación (Queda registrado en auditoría)
+                </label>
+                <input 
+                  type="text" 
+                  [ngModel]="rangoMotivo()"
+                  (ngModelChange)="rangoMotivo.set($event)"
+                  placeholder="Ej: Suspensión de actividades por paro cívico"
+                  class="w-full bg-muted border border-border rounded-xl px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-primary">
+              </div>
+
+              <!-- Vista Previa de Traslados -->
+              @if (rangoFechaDesdeOrigen() && rangoFechaHastaOrigen()) {
+                <div class="rounded-xl border border-border bg-muted/30 p-3 space-y-2 text-xs">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Vista previa de exámenes afectados:</span>
+                    <span class="rounded-full bg-indigo-100 text-indigo-800 px-2 py-0.5 text-[10px] font-black">
+                      {{ examenesEnRangoReprogramar().length }} exámenes
+                    </span>
+                  </div>
+
+                  @if (examenesEnRangoReprogramar().length === 0) {
+                    <p class="text-[11px] text-muted-foreground italic">No hay exámenes activos en el rango de fechas indicado.</p>
+                  } @else {
+                    <div class="space-y-1 max-h-36 overflow-y-auto pr-1">
+                      @for (item of desgloseReprogramacion(); track item.fechaOriginal) {
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-card border border-border text-[11px]">
+                          <span class="font-mono text-rose-600 font-bold">{{ item.fechaOriginal }}</span>
+                          <i class="pi pi-arrow-right text-[10px] text-muted-foreground"></i>
+                          <span class="font-mono text-emerald-600 font-bold">{{ item.fechaDestino || 'Por definir' }}</span>
+                          <span class="font-bold text-muted-foreground">({{ item.cantidad }} exam.)</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="sticky bottom-0 flex justify-end gap-2 bg-card pt-3 border-t border-border">
+              <button (click)="cerrarModalReprogramarRango()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">
+                Cancelar
+              </button>
+              <button 
+                [disabled]="examenesEnRangoReprogramar().length === 0 || !rangoFechaNuevaInicio() || reprogramandoRango()"
+                (click)="procesarReprogramarRango()"
+                class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+                @if (reprogramandoRango()) { <i class="pi pi-spin pi-spinner mr-1"></i> Procesando... } @else { Confirmar Reprogramación }
+              </button>
+            </div>
+
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
@@ -915,8 +1086,66 @@ export class RolExamenesComponent implements OnInit {
   private readonly _rolService = inject(RolExamenService);
   private readonly _feedback = inject(UiFeedbackService);
   private readonly _auth = inject(AuthService);
+  private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
+  private readonly _route = inject(ActivatedRoute);
   public readonly storage = inject(EvaluacionesStorageService);
+  public readonly horasCandado72 = signal<number>(72);
+
+  // Estado del Modal de Reprogramación Masiva por Rango
+  public readonly dialogReprogramarRango = signal<boolean>(false);
+  public readonly rangoCarreraCodigo = signal<string>('__TODAS_LAS_CARRERAS__');
+  public readonly rangoFechaDesdeOrigen = signal<string>('');
+  public readonly rangoFechaHastaOrigen = signal<string>('');
+  public readonly rangoFechaNuevaInicio = signal<string>('');
+  public readonly rangoMotivo = signal<string>('Suspensión de actividades académicas');
+  public readonly reprogramandoRango = signal<boolean>(false);
+
+  public readonly examenesEnRangoReprogramar = computed(() => {
+    const desde = this.rangoFechaDesdeOrigen();
+    const hasta = this.rangoFechaHastaOrigen();
+    const carreraCod = this.rangoCarreraCodigo();
+    if (!desde || !hasta) return [];
+    return this.examenes().filter(e => {
+      const matchCarrera = !carreraCod || carreraCod === '__TODAS_LAS_CARRERAS__' || e.careerCode === carreraCod;
+      return matchCarrera && e.fecha && e.fecha >= desde && e.fecha <= hasta &&
+        e.estado !== 'CALIFICADO' && e.estado !== 'CONFIRMADO' && e.estado !== 'SUSPENDIDO';
+    });
+  });
+
+  public readonly desgloseReprogramacion = computed(() => {
+    const items = this.examenesEnRangoReprogramar();
+    const desde = this.rangoFechaDesdeOrigen();
+    const nuevaInicio = this.rangoFechaNuevaInicio();
+    if (!desde || !nuevaInicio || items.length === 0) return [];
+
+    const conteoPorFecha: Record<string, number> = {};
+    items.forEach(it => {
+      conteoPorFecha[it.fecha] = (conteoPorFecha[it.fecha] || 0) + 1;
+    });
+
+    const fDesde = new Date(desde + 'T00:00:00');
+    const fNueva = new Date(nuevaInicio + 'T00:00:00');
+
+    return Object.keys(conteoPorFecha).sort().map(fOriginal => {
+      const fOrig = new Date(fOriginal + 'T00:00:00');
+      const diffDias = Math.round((fOrig.getTime() - fDesde.getTime()) / (1000 * 3600 * 24));
+      const fDestino = new Date(fNueva.getTime() + diffDias * (1000 * 3600 * 24));
+      const destStr = fDestino.toISOString().split('T')[0];
+      return {
+        fechaOriginal: fOriginal,
+        fechaDestino: destStr,
+        cantidad: conteoPorFecha[fOriginal]
+      };
+    });
+  });
   public readonly esVicerrector = computed(() => this._auth.usuario()?.rol === 'VICERRECTOR');
+  public readonly esAdministrador = computed(() => this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA');
+  public readonly esResponsable = computed(() => this._auth.usuario()?.rol === 'RESPONSABLE_EVALUACIONES');
+  public readonly puedeListarTodasLasCarreras = computed(() => this.esAdministrador() || this.esResponsable());
+  public readonly carreraTodasCodigo = '__TODAS_LAS_CARRERAS__';
+  public readonly todasCarrerasSeleccionadas = computed(() =>
+    this.puedeListarTodasLasCarreras() && !this.carreraSeleccionada()
+  );
 
   // Estados de Datos Reales de SEA
   public sedes = signal<BranchOffice[]>([]);
@@ -1066,6 +1295,15 @@ export class RolExamenesComponent implements OnInit {
 
   public ngOnInit(): void {
     this._cargarSedes();
+    this._configuracionService.cargar().subscribe({
+      next: config => this.horasCandado72.set(config.horasCandado72 ?? 72)
+    });
+    this._route.queryParams.subscribe(params => {
+      const busqueda = params['busqueda'];
+      if (busqueda && typeof busqueda === 'string') {
+        this.busquedaMateria.set(busqueda);
+      }
+    });
   }
 
   public onSedeChange(sedeCode: string): void {
@@ -1077,6 +1315,15 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public onCarreraChange(careerCode: string): void {
+    if (this.puedeListarTodasLasCarreras() && careerCode === this.carreraTodasCodigo) {
+      this.carreraSeleccionada.set(null);
+      this.materias.set([]);
+      this.grupos.set([]);
+      this.cargando.set(false);
+      this._cargarRolesOficiales();
+      return;
+    }
+
     const carrera = this.carreras().find(c => c.careerCode === careerCode);
     if (carrera) {
       this.carreraSeleccionada.set(carrera);
@@ -1202,8 +1449,8 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public async vaciarRol(): Promise<void> {
-    if (this.esVicerrector()) {
-      this._mostrarToast('El vicerrector cuenta con acceso de consulta por sede.');
+    if (!this.esAdministrador()) {
+      this._mostrarToast('Solo el administrador del sistema puede vaciar el rol de examen.');
       return;
     }
     const programados = this.examenes().filter(item => item.estado === 'PROGRAMADO');
@@ -1222,7 +1469,7 @@ export class RolExamenesComponent implements OnInit {
     }
 
     this.cargando.set(true);
-    forkJoin(programados.map(item => this._rolService.eliminar(item.id))).subscribe({
+    this._rolService.vaciar(programados.map(item => item.id)).subscribe({
       next: () => {
         this.cargando.set(false);
         this._cargarRolesOficiales();
@@ -1258,7 +1505,13 @@ export class RolExamenesComponent implements OnInit {
       next: carreras => {
         this.carreras.set(carreras);
         this.cargandoCarreras.set(false);
-        if (carreras.length > 0) {
+        if (this.puedeListarTodasLasCarreras()) {
+          this.carreraSeleccionada.set(null);
+          this.materias.set([]);
+          this.grupos.set([]);
+          this.cargando.set(false);
+          this._cargarRolesOficiales();
+        } else if (carreras.length > 0) {
           this.carreraSeleccionada.set(carreras[0]);
           this._cargarMateriasYGrupos();
         } else {
@@ -1309,10 +1562,10 @@ export class RolExamenesComponent implements OnInit {
   private _cargarRolesOficiales(): void {
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
-    if (!sede || !carrera) return;
+    if (!sede || (!carrera && !this.todasCarrerasSeleccionadas())) return;
 
     this.cargandoRoles.set(true);
-    this._rolService.listar(sede.code, carrera.careerCode).subscribe({
+    this._rolService.listar(sede.code, carrera?.careerCode).subscribe({
       next: roles => {
         this.examenes.set(roles.map(rol => this._mapearRolResponse(rol)));
         this.cargandoRoles.set(false);
@@ -1347,6 +1600,7 @@ export class RolExamenesComponent implements OnInit {
       case 'DEVUELTO': return 'bg-amber-600 text-white';
       case 'PENDIENTE_NOTAS': return 'bg-amber-600 text-white';
       case 'CALIFICADO': return 'bg-emerald-600 text-white';
+      case 'CONFIRMADO': return 'bg-teal-700 text-white';
       case 'SUSPENDIDO': return 'bg-rose-600 text-white';
       default: return 'bg-slate-600 text-white';
     }
@@ -1392,6 +1646,10 @@ export class RolExamenesComponent implements OnInit {
 
   // Modales
   public abrirModalSubirExcel(): void {
+    if (!this.esAdministrador()) {
+      this._mostrarToast('Solo el administrador del sistema puede importar roles de examen desde Excel.');
+      return;
+    }
     this.excelCargadoNombre.set(null);
     this.excelItemsImportados.set([]);
     this.excelErroresImportacion.set([]);
@@ -1405,6 +1663,10 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public abrirModalSubirInstancias(): void {
+    if (!this.esAdministrador()) {
+      this._mostrarToast('Solo el administrador del sistema puede subir roles de segunda instancia.');
+      return;
+    }
     this.instanciasCargadasNombre.set(null);
     this.instanciasItemsImportados.set([]);
     this.instanciasErroresImportacion.set([]);
@@ -2001,6 +2263,10 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public abrirModalAnadirManual(): void {
+    if (!this.esAdministrador()) {
+      this._mostrarToast('Solo el administrador del sistema puede registrar exámenes manualmente.');
+      return;
+    }
     this.itemEditando.set(null);
     const mats = this.materias();
     if (mats.length > 0) {
@@ -2017,8 +2283,8 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public abrirModalEditar(item: RolExamenItem): void {
-    if (!this.puedeEditarEliminar(item)) {
-      this._mostrarToast('Solo se pueden editar roles de examen en estado PROGRAMADO o VALIDADO.');
+    if (!this.puedeEditar(item)) {
+      this._mostrarToast(this.getTooltipEditar(item) || 'No tienes permiso para editar este examen.');
       return;
     }
     this.itemEditando.set(item);
@@ -2052,6 +2318,18 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public guardarExamenModal(): void {
+    const edit = this.itemEditando();
+    if (!this.esAdministrador()) {
+      const hoy = new Date().toISOString().split('T')[0];
+      if (this.formFecha <= hoy) {
+        this._mostrarToast('La fecha de reprogramación debe ser posterior a la fecha actual.');
+        return;
+      }
+      if (edit && this.estaBloqueadoPorCandado(edit)) {
+        this._mostrarToast(`No se puede modificar un examen que está dentro del candado de ${this.horasCandado72()} horas.`);
+        return;
+      }
+    }
     const mat = this.formMateriaObj();
     if (!mat) {
       this._mostrarToast('Por favor selecciona una materia.');
@@ -2094,7 +2372,6 @@ export class RolExamenesComponent implements OnInit {
     }
 
     const conCartilla = this.formModalidad === 'PRESENCIAL_CARTILLA';
-    const edit = this.itemEditando();
     const item: RolExamenItem = {
       id: edit?.id || this._crearRolId(grp.groupId, this.formTipo, this.formFecha),
       seaGroupId: grp.groupId,
@@ -2151,8 +2428,8 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public async eliminarExamen(item: RolExamenItem): Promise<void> {
-    if (!this.puedeEditarEliminar(item)) {
-      this._mostrarToast('Solo se pueden eliminar roles de examen en estado PROGRAMADO o VALIDADO.');
+    if (!this.puedeEliminar(item)) {
+      this._mostrarToast('No tienes permiso para eliminar este examen.');
       return;
     }
     if (!await this._feedback.confirmar(
@@ -2171,9 +2448,135 @@ export class RolExamenesComponent implements OnInit {
     });
   }
 
+  public estaBloqueadoPorCandado(item: RolExamenItem): boolean {
+    if (!item.fecha) return false;
+    const horasCandado = this.horasCandado72();
+    let horaInicio = 8;
+    let minutoInicio = 0;
+    if (item.horario) {
+      const match = item.horario.match(/(\d{1,2}):(\d{2})/);
+      if (match) {
+        horaInicio = parseInt(match[1], 10);
+        minutoInicio = parseInt(match[2], 10);
+      }
+    }
+    const p = item.fecha.split('-').map(Number);
+    if (p.length !== 3) return false;
+    const fechaInicio = new Date(p[0], p[1] - 1, p[2], horaInicio, minutoInicio);
+    const limite = new Date(fechaInicio.getTime() - horasCandado * 3600 * 1000);
+    return new Date() >= limite;
+  }
+
+  public puedeEditar(item: RolExamenItem): boolean {
+    if (this.esVicerrector()) return false;
+    if (this.esAdministrador()) {
+      return true;
+    }
+    return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
+      && !this.estaBloqueadoPorCandado(item);
+  }
+
+  public puedeEliminar(item: RolExamenItem): boolean {
+    if (this.esVicerrector()) return false;
+    if (this.esAdministrador()) {
+      return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
+    }
+    return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
+      && !this.estaBloqueadoPorCandado(item);
+  }
+
+  public getTooltipEditar(item: RolExamenItem): string {
+    if (!this.esAdministrador() && this.estaBloqueadoPorCandado(item)) {
+      return `Bloqueado por candado de seguridad: faltan menos de ${this.horasCandado72()}h para el examen.`;
+    }
+    if (this.esAdministrador() && item.estado !== 'PROGRAMADO' && item.estado !== 'VALIDADO') {
+      return `Editar fecha de examen en estado ${item.estado} (Acción auditada)`;
+    }
+    return 'Editar parámetros del examen';
+  }
+
+  public fechaMinimaReprogramacion(): string {
+    if (this.esAdministrador()) {
+      return '2020-01-01';
+    }
+    const manana = new Date(Date.now() + 86400000);
+    return manana.toISOString().split('T')[0];
+  }
+
+  public abrirModalReprogramarRango(): void {
+    if (!this.esAdministrador()) {
+      this._mostrarToast('Solo el administrador del sistema puede reprogramar masivamente.');
+      return;
+    }
+    const c = this.carreraSeleccionada();
+    this.rangoCarreraCodigo.set(c ? c.careerCode : '__TODAS_LAS_CARRERAS__');
+    this.rangoFechaDesdeOrigen.set(this.filtroFechaDesde() || '');
+    this.rangoFechaHastaOrigen.set(this.filtroFechaHasta() || '');
+    this.rangoFechaNuevaInicio.set('');
+    this.rangoMotivo.set('Suspensión de actividades académicas');
+    this.dialogReprogramarRango.set(true);
+  }
+
+  public cerrarModalReprogramarRango(): void {
+    this.dialogReprogramarRango.set(false);
+  }
+
+  public async procesarReprogramarRango(): Promise<void> {
+    if (!this.esAdministrador()) return;
+    const sede = this.sedeSeleccionada();
+    const carreraCod = this.rangoCarreraCodigo();
+    const desde = this.rangoFechaDesdeOrigen();
+    const hasta = this.rangoFechaHastaOrigen();
+    const nueva = this.rangoFechaNuevaInicio();
+    if (!sede || !desde || !hasta || !nueva) {
+      this._mostrarToast('Por favor completa todos los campos de fechas obligatorios.');
+      return;
+    }
+    if (hasta < desde) {
+      this._mostrarToast('La fecha "Hasta" no puede ser anterior a la fecha "Desde".');
+      return;
+    }
+    const total = this.examenesEnRangoReprogramar().length;
+    if (total === 0) {
+      this._mostrarToast('No hay exámenes activos en el rango de fechas seleccionado.');
+      return;
+    }
+
+    const cObj = this.carreras().find(c => c.careerCode === carreraCod);
+    const ambitoTexto = cObj ? `la carrera ${cObj.careerName}` : 'todas las carreras de la sede';
+
+    const confirmado = await this._feedback.confirmar(
+      `¿Confirmas la reprogramación de ${total} exámenes de ${ambitoTexto}?`,
+      'Reprogramar exámenes por rango',
+      'warning',
+      'Reprogramar'
+    );
+    if (!confirmado) return;
+
+    this.reprogramandoRango.set(true);
+    this._rolService.reprogramarRango({
+      sedeCodigo: sede.code,
+      carreraCodigo: carreraCod || '__TODAS_LAS_CARRERAS__',
+      fechaDesdeOrigen: desde,
+      fechaHastaOrigen: hasta,
+      fechaNuevaInicio: nueva,
+      motivo: this.rangoMotivo().trim()
+    }).subscribe({
+      next: res => {
+        this.reprogramandoRango.set(false);
+        this.cerrarModalReprogramarRango();
+        this._mostrarToast(res.mensaje || `Se reprogramaron ${res.totalReprogramados} exámenes con éxito.`);
+        this._cargarRolesOficiales();
+      },
+      error: err => {
+        this.reprogramandoRango.set(false);
+        this._mostrarToast(this._mensajeError(err, 'No se pudo realizar la reprogramación masiva.'));
+      }
+    });
+  }
+
   public puedeEditarEliminar(item: RolExamenItem): boolean {
-    return !this.esVicerrector()
-      && (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO');
+    return this.puedeEditar(item);
   }
 
   private _toRequest(item: RolExamenItem, importacion = false): RolExamenCreateRequest {

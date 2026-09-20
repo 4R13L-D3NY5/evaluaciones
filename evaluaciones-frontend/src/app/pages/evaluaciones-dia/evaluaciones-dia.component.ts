@@ -34,7 +34,12 @@ import {
   AjustarCalificacionOmrRequest,
   OmrJobResponse,
   OmrLecturaResponse,
-  OmrProcesamientoService
+  OmrProcesamientoService,
+  VarianteVinculada,
+  ResumenVariantesVinculadas,
+  CorregirClavePatronRequest,
+  CorregirClavePatronResponse,
+  RecalificarOmrRequest
 } from '../../core/services/omr-procesamiento.service';
 import {
   GeneracionTypstRequest,
@@ -50,7 +55,7 @@ if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
 }
 
-export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Pendiente de notas' | 'Calificado';
+export type EtapaEvaluacion = 'Programado' | 'Validado' | 'Verificado' | 'Generado' | 'Impreso' | 'Entregado' | 'Devuelto' | 'Pendiente de notas' | 'Calificado' | 'Confirmado';
 
 export interface StepDef {
   key: EtapaEvaluacion;
@@ -66,6 +71,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   hashEncriptacion?: string;
   variantesGeneradas?: number;
   bancoPreguntasCargado?: boolean;
+  requiereVerificacion?: boolean;
+  estadoVerificacion?: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | null;
+  verificadoPor?: string;
+  fechaVerificacion?: string;
   fueRestablecido?: boolean;
   estadoPrevioRestablecimiento?: EtapaEvaluacion;
   motivoRestablecimiento?: string;
@@ -187,7 +196,7 @@ interface CampusDisponible extends Campus {
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
           
           @if (esEvaluacionesPorCampus()) {
-            <!-- Personal y responsables trabajan sobre un campus y sus carreras. -->
+            <!-- El personal de evaluaciones trabaja sobre un campus y sus carreras. -->
             <div>
               <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                 <i class="pi pi-building text-primary text-[10px]"></i> Campus
@@ -203,7 +212,7 @@ interface CampusDisponible extends Campus {
               </select>
             </div>
           } @else {
-            <!-- Sede institucional para responsables y demás perfiles con esta vista. -->
+            <!-- Sede institucional para administradores, responsables y demás perfiles. -->
             <div>
               <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                 <i class="pi pi-building text-primary text-[10px]"></i> Sede
@@ -230,8 +239,10 @@ interface CampusDisponible extends Campus {
               (ngModelChange)="onCarreraChange($event)"
               [disabled]="cargandoCarreras()"
               class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
-              @if (esEvaluacionesPorCampus()) {
-                <option [value]="carreraTodasCodigo">Todas las carreras del campus</option>
+              @if (puedeListarTodasLasCarreras()) {
+                <option [value]="carreraTodasCodigo">
+                  {{ esEvaluacionesPorCampus() ? 'Todas las carreras del campus' : 'Todas las carreras de la sede' }}
+                </option>
               }
               @for (carrera of carreras(); track carrera.careerId) {
                 <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
@@ -408,14 +419,26 @@ interface CampusDisponible extends Campus {
                       <div class="text-[10px] text-muted-foreground font-medium">
                         {{ carreraSeleccionada()?.careerName || item.carreraNombre }} · Sem. {{ item.semestre }}° · <strong>{{ item.grupo }}</strong>
                       </div>
-                      @if (bancoPreguntasCargado(item)) {
-                        <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
-                          <i class="pi pi-check-circle text-[9px]"></i> Banco cargado
-                        </span>
-                      } @else {
-                        <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Este examen todavía no tiene un banco de preguntas cargado">
-                          <i class="pi pi-exclamation-circle text-[9px]"></i> Sin banco
-                        </span>
+                      @if (item.modalidad !== 'PRESENCIAL_SIN_CARTILLA' && bancoPreguntasCargado(item)) {
+                        @if (item.requiereVerificacion) {
+                          @if (item.estadoVerificacion === 'VERIFICADO') {
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Banco de preguntas verificado y aprobado">
+                              <i class="pi pi-check-circle text-[9px]"></i> Banco verificado
+                            </span>
+                          } @else if (item.estadoVerificacion === 'DEVUELTO') {
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-black uppercase text-rose-700" title="Banco de preguntas devuelto con observaciones por el verificador">
+                              <i class="pi pi-exclamation-triangle text-[9px]"></i> Banco observado
+                            </span>
+                          } @else {
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Banco validado, pendiente de revisión por el verificador">
+                              <i class="pi pi-clock text-[9px]"></i> Pendiente de verificación
+                            </span>
+                          }
+                        } @else {
+                          <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
+                            <i class="pi pi-check-circle text-[9px]"></i> Banco cargado
+                          </span>
+                        }
                       }
                     </td>
 
@@ -595,22 +618,6 @@ interface CampusDisponible extends Campus {
                     <!-- Acciones -->
                     <td class="p-3.5 text-center">
                       <div class="inline-flex items-center gap-1.5">
-
-                        @if (item.modalidad === 'VIRTUAL') {
-                          <div class="relative group/salaVirtual">
-                            <button
-                              (click)="abrirSalaVirtualDesdeLista(item)"
-                              title="Restablecer examen virtual"
-                              aria-label="Restablecer examen virtual"
-                              class="h-7 w-7 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex items-center justify-center cursor-pointer transition-colors">
-                              <i class="pi pi-refresh text-xs"></i>
-                            </button>
-                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/salaVirtual:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">Restablecer examen virtual</span>
-                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
-                            </div>
-                          </div>
-                        }
                         
                         <!-- 1. Bitácora -->
                         <div class="relative group/bitacora">
@@ -660,6 +667,7 @@ interface CampusDisponible extends Campus {
                             </div>
                           </div>
                         }
+
 
                         @if (puedeMostrarNotasDocente(item)) {
                           <div class="relative group/notasDocente">
@@ -1109,49 +1117,176 @@ interface CampusDisponible extends Campus {
         <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-purple-200 rounded-2xl max-w-4xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
             <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
-              <div><p class="text-[10px] font-black uppercase tracking-widest text-purple-700">{{ salaVirtualExistente() ? 'Sala virtual ya generada' : 'Sala virtual preparada' }}</p><h3 class="text-lg font-black text-foreground">Ingreso organizado por estudiante</h3><p class="text-xs text-muted-foreground">{{ salaVirtualExistente() ? 'Se recuperaron los datos guardados de esta sala. Los accesos individuales solo se muestran al crearla por primera vez.' : 'Comparte a cada estudiante únicamente su token. Los tokens se muestran una sola vez.' }}</p></div>
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-purple-700">{{ salaVirtualExistente() ? 'Sala virtual ya generada' : 'Sala virtual preparada' }}</p>
+                <h3 class="text-lg font-black text-foreground">Gestión de Examen Virtual y Acceso</h3>
+                <p class="text-xs text-muted-foreground">Comparte la información de acceso y el enlace institucional a los estudiantes para ingresar a la evaluación.</p>
+              </div>
               <button (click)="cerrarSalaVirtual()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
             </div>
             <div class="p-5 space-y-4 overflow-y-auto">
               @if (salaVirtualCreada(); as sala) {
+                <!-- Header con datos de la materia y examen -->
+                @if (_obtenerEvaluacionSalaActual(); as evalItem) {
+                  <div class="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <span class="font-mono font-black text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded text-[11px]">{{ evalItem.codigo }}</span>
+                        <strong class="text-sm font-black text-slate-900">{{ evalItem.materia }}</strong>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800">Grupo {{ evalItem.grupo }}</span>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                        @if (evalItem.carreraNombre) { <span><i class="pi pi-book mr-1 text-[10px]"></i>{{ evalItem.carreraNombre }}</span> }
+                        @if (evalItem.docenteNombre) { <span><i class="pi pi-user mr-1 text-[10px]"></i>{{ evalItem.docenteNombre }}</span> }
+                        @if (evalItem.tipo) { <span><i class="pi pi-tag mr-1 text-[10px]"></i>{{ evalItem.tipo }}</span> }
+                        @if (evalItem.fechaDisplay || evalItem.fecha) { <span><i class="pi pi-calendar mr-1 text-[10px]"></i>{{ evalItem.fechaDisplay || evalItem.fecha }}{{ evalItem.horario ? ' · ' + evalItem.horario : '' }}</span> }
+                      </div>
+                    </div>
+                  </div>
+                }
+
                 <div class="grid gap-3 sm:grid-cols-3">
                   <div class="rounded-xl border border-purple-200 bg-purple-50 p-4"><span class="text-[10px] font-black uppercase text-purple-700">Código de sala</span><strong class="mt-1 block font-mono text-xl text-purple-950">{{ sala.codigoSala }}</strong></div>
                   <div class="rounded-xl border border-border bg-muted/40 p-4"><span class="text-[10px] font-black uppercase text-muted-foreground">Duración</span><strong class="mt-1 block text-xl text-foreground">{{ sala.duracionMinutos }} min</strong></div>
                   <div class="rounded-xl border border-border bg-muted/40 p-4"><span class="text-[10px] font-black uppercase text-muted-foreground">Estado</span><strong class="mt-1 block text-xl text-foreground">{{ sala.estado }}</strong></div>
                 </div>
-                @if (accesosVirtuales().length) {
-                  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4"><p class="text-xs font-black text-amber-950">Tokens individuales</p><p class="mt-1 text-[11px] text-amber-900">Guárdalos o entrégalos individualmente antes de cerrar esta ventana.</p><div class="mt-3 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-amber-200 text-[10px] font-black uppercase text-amber-800"><th class="p-2">Estudiante</th><th class="p-2">Token</th></tr></thead><tbody>@for (acceso of accesosVirtuales(); track acceso.codigoEstudiante) {<tr class="border-b border-amber-100"><td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td><td class="p-2 font-mono break-all">{{ acceso.token }}</td></tr>}</tbody></table></div></div>
-                } @else {
-                  <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-xs text-indigo-950">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p class="font-black">Acceso para todo el grupo</p>
-                        <p class="mt-1 max-w-2xl text-[11px] text-indigo-800">Los tokens individuales solo se muestran una vez, al crear la sala. Puedes emitir un token grupal nuevo y compartirlo junto con el código de sala.</p>
-                      </div>
-                      @if (!tokenGrupoVirtual()) {
-                        <button (click)="emitirTokenGrupoDesdeLista()" [disabled]="emitiendoTokenGrupoVirtual()" class="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-[11px] font-black text-white hover:bg-indigo-700 cursor-pointer disabled:opacity-50">
-                          <i class="pi" [class.pi-spin]="emitiendoTokenGrupoVirtual()" [class.pi-spinner]="emitiendoTokenGrupoVirtual()" [class.pi-key]="!emitiendoTokenGrupoVirtual()"></i>
-                          {{ emitiendoTokenGrupoVirtual() ? 'Emitiendo...' : 'Emitir token grupal' }}
-                        </button>
-                      }
+
+                <!-- ACCESO PARA TODO EL GRUPO (TOKEN / PIN) -->
+                <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs text-indigo-950">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p class="font-black text-sm text-indigo-950">Acceso grupal para estudiantes</p>
+                      <p class="mt-1 max-w-2xl text-[11px] text-indigo-800 leading-relaxed">
+                        Comparte la información de ingreso con los estudiantes por WhatsApp, Teams o en el aula. Al copiar, se incluye la materia, docente, código de sala, token y el link oficial.
+                      </p>
                     </div>
-                    @if (tokenGrupoVirtual(); as token) {
-                      <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-                        <div><span class="text-[10px] font-black uppercase tracking-wide text-indigo-700">Token grupal</span><div class="mt-1 break-all rounded-xl border border-indigo-200 bg-white px-3 py-2 font-mono text-sm font-black text-indigo-950">{{ token }}</div></div>
-                        <button (click)="copiarTokenGrupoDesdeLista()" class="rounded-xl border border-indigo-300 bg-white px-3 py-2 text-[11px] font-black text-indigo-700 hover:bg-indigo-100 cursor-pointer"><i class="pi pi-copy mr-1"></i>Copiar token</button>
-                      </div>
+                    @if (!tokenGrupoVirtual()) {
+                      <button (click)="emitirTokenGrupoDesdeLista()" [disabled]="emitiendoTokenGrupoVirtual()" class="shrink-0 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-black text-white hover:bg-indigo-700 cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs">
+                        <i class="pi" [class.pi-spin]="emitiendoTokenGrupoVirtual()" [class.pi-spinner]="emitiendoTokenGrupoVirtual()" [class.pi-key]="!emitiendoTokenGrupoVirtual()"></i>
+                        {{ emitiendoTokenGrupoVirtual() ? 'Emitiendo token...' : 'Emitir token grupal' }}
+                      </button>
                     }
                   </div>
+
+                  @if (tokenGrupoVirtual(); as token) {
+                    <div class="mt-3.5 rounded-xl bg-white border border-indigo-200 p-4">
+                      <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700">Token grupal / PIN de acceso</span>
+                          <div class="mt-1 font-mono text-2xl font-black text-indigo-950 tracking-widest">{{ token }}</div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <button (click)="copiarTokenGrupoDesdeLista()" class="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 text-xs font-black transition cursor-pointer shadow-sm flex items-center gap-2" title="Copiar mensaje con materia, docente, link institucional y token para enviar a los estudiantes">
+                            <i class="pi pi-copy text-sm"></i>
+                            <span>Copiar datos para estudiantes</span>
+                          </button>
+                          <button (click)="copiarSoloToken()" class="rounded-xl border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 px-3 py-2.5 text-xs font-bold transition cursor-pointer flex items-center gap-1.5" title="Copiar únicamente el PIN de 6 dígitos">
+                            <i class="pi pi-key text-xs"></i>
+                            <span>Solo PIN</span>
+                          </button>
+                          <button (click)="emitirTokenGrupoDesdeLista()" [disabled]="emitiendoTokenGrupoVirtual()" class="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2.5 text-xs font-bold transition cursor-pointer flex items-center gap-1" title="Generar un nuevo token para este grupo">
+                            <i class="pi pi-refresh text-xs"></i>
+                            <span>Renovar</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="mt-3 pt-3 border-t border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-indigo-900">
+                        <div class="flex items-center gap-1.5">
+                          <i class="pi pi-link text-indigo-600"></i>
+                          <span>Enlace para estudiantes: <a [href]="obtenerLinkExamenVirtual()" target="_blank" class="font-bold underline text-indigo-700 hover:text-indigo-900">{{ obtenerLinkExamenVirtual() }}</a></span>
+                        </div>
+                        <span class="text-muted-foreground text-[10px]">El estudiante ingresa a este enlace y completa la sala y el PIN.</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <!-- TOKENS INDIVIDUALES (OPCIONALES) -->
+                @if (accesosVirtuales().length) {
+                  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <p class="text-xs font-black text-amber-950">Tokens individuales (alternativa)</p>
+                        <p class="mt-0.5 text-[11px] text-amber-900">Tokens únicos por estudiante si se prefiere no usar el token grupal.</p>
+                      </div>
+                      <span class="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded">{{ accesosVirtuales().length }} estudiantes</span>
+                    </div>
+                    <div class="mt-3 overflow-x-auto max-h-48">
+                      <table class="w-full text-left text-xs">
+                        <thead>
+                          <tr class="border-b border-amber-200 text-[10px] font-black uppercase text-amber-800 sticky top-0 bg-amber-50">
+                            <th class="p-2">Estudiante</th>
+                            <th class="p-2">Token</th>
+                            <th class="p-2 text-right">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (acceso of accesosVirtuales(); track acceso.codigoEstudiante) {
+                            <tr class="border-b border-amber-100/70 hover:bg-amber-100/40">
+                              <td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td>
+                              <td class="p-2 font-mono break-all">{{ acceso.token }}</td>
+                              <td class="p-2 text-right">
+                                <button (click)="copiarAccesoEstudianteIndividual(acceso)" class="px-2 py-1 rounded bg-white hover:bg-amber-100 border border-amber-300 text-[10px] font-bold text-amber-900 cursor-pointer" title="Copiar mensaje de acceso para este estudiante">
+                                  <i class="pi pi-copy mr-1"></i>Copiar
+                                </button>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 }
+
                 @if (sala.participantes.length) {
-                  <div class="rounded-xl border border-border bg-muted/20 p-4"><div class="flex items-center justify-between gap-3"><p class="text-xs font-black text-foreground">Estudiantes de la sala</p><span class="text-[10px] font-black text-muted-foreground">{{ sala.participantes.length }} registrados</span></div><div class="mt-3 overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-border text-[10px] font-black uppercase text-muted-foreground"><th class="p-2">Código</th><th class="p-2">Estudiante</th><th class="p-2">Estado</th></tr></thead><tbody>@for (participante of sala.participantes; track participante.codigoEstudiante) {<tr class="border-b border-border/70"><td class="p-2 font-mono font-bold">{{ participante.codigoEstudiante }}</td><td class="p-2 font-bold">{{ participante.nombreEstudiante }}</td><td class="p-2">{{ participante.estado }}</td></tr>}</tbody></table></div></div>
+                  <div class="rounded-xl border border-border bg-muted/20 p-4">
+                    <div class="flex items-center justify-between gap-3">
+                      <p class="text-xs font-black text-foreground">Estudiantes conectados en la sala</p>
+                      <span class="text-[10px] font-black text-muted-foreground">{{ sala.participantes.length }} registrados</span>
+                    </div>
+                    <div class="mt-3 overflow-x-auto">
+                      <table class="w-full text-left text-xs">
+                        <thead>
+                          <tr class="border-b border-border text-[10px] font-black uppercase text-muted-foreground">
+                            <th class="p-2">Código</th>
+                            <th class="p-2">Estudiante</th>
+                            <th class="p-2">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (participante of sala.participantes; track participante.codigoEstudiante) {
+                            <tr class="border-b border-border/70">
+                              <td class="p-2 font-mono font-bold">{{ participante.codigoEstudiante }}</td>
+                              <td class="p-2 font-bold">{{ participante.nombreEstudiante }}</td>
+                              <td class="p-2">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                      [ngClass]="{
+                                        'bg-emerald-100 text-emerald-800': participante.estado === 'EN_EXAMEN' || participante.estado === 'CONECTADO',
+                                        'bg-amber-100 text-amber-800': participante.estado === 'ESPERANDO',
+                                        'bg-blue-100 text-blue-800': participante.estado === 'FINALIZADO' || participante.estado === 'CALIFICADO',
+                                        'bg-slate-100 text-slate-700': !['EN_EXAMEN','CONECTADO','ESPERANDO','FINALIZADO','CALIFICADO'].includes(participante.estado)
+                                      }">
+                                  {{ participante.estado }}
+                                </span>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 }
               }
             </div>
             <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2 shrink-0">
               @if (salaVirtualCreada()?.estado === 'PREPARADA') { <button (click)="abrirSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-door-open mr-1"></i> Abrir sala para estudiantes</button> }
               @else if (salaVirtualCreada()?.estado === 'ABIERTA') { <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button> }
-              @else if (salaVirtualCreada()?.estado === 'EN_CURSO' || salaVirtualCreada()?.estado === 'PAUSADA') { <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso. El tiempo lo controla el servidor.</span><button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer examen</button> }
+              @else if (salaVirtualCreada()?.estado === 'EN_CURSO' || salaVirtualCreada()?.estado === 'PAUSADA') { 
+                <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso.</span>
+                <button (click)="cerrarSalaVirtualOperativa()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50 flex items-center gap-1.5"><i class="pi pi-stop-circle"></i> Cerrar sala y calificar</button>
+                <button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer examen</button> 
+              }
               @else if (salaVirtualCreada()?.estado === 'CERRADA' || salaVirtualCreada()?.estado === 'CALIFICADA') { <span class="self-center text-[11px] font-bold text-amber-700">El examen concluyó y puede restablecerse por una incidencia.</span><button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer examen</button> }
               @else { <span class="self-center text-[11px] font-bold text-muted-foreground">La sala ya concluyó.</span> }
               <button (click)="cerrarSalaVirtual()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
@@ -1814,7 +1949,13 @@ interface CampusDisponible extends Campus {
                         <span class="font-mono text-muted-foreground">{{ estudiante.numeroOrden }}</span>
                         <span class="font-mono font-bold">{{ estudiante.codigoEstudiante }}</span>
                         <span class="truncate font-medium">{{ estudiante.nombreCompleto }}</span>
-                        <span class="text-[10px] text-muted-foreground">—</span>
+                        @if (estudiante.estadoCalificacion === 'ANULADO' || (estudiante.observacion && estudiante.observacion.includes('ANULADO'))) {
+                          <span class="inline-flex items-center gap-1 font-mono font-black text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+                            <i class="pi pi-ban text-[9px]"></i> ANULADO (0 / 0)
+                          </span>
+                        } @else {
+                          <span class="text-[10px] text-muted-foreground">{{ estudiante.observacion || '—' }}</span>
+                        }
                       </div>
                     }
                     </div>
@@ -1900,6 +2041,38 @@ interface CampusDisponible extends Campus {
                         <div><h4 class="text-xs font-black uppercase tracking-wide text-foreground">Variante {{ variante.letra }}</h4><span class="text-[10px] text-muted-foreground">Relación entre la pregunta presentada y su origen en el banco</span></div>
                         <span class="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 text-[10px] font-black uppercase">{{ evaluacionSeleccionadaPatron()?.etapa }}</span>
                       </div>
+                      <!-- Cartilla de claves oficiales de la variante -->
+                      <div class="p-4 bg-card border-b border-border">
+                        <div class="flex items-center justify-between gap-2 mb-2.5">
+                          <h5 class="text-xs font-black uppercase text-indigo-950 flex items-center gap-1.5">
+                            <i class="pi pi-check-square text-indigo-600"></i>
+                            Patrón oficial de respuestas · Claves OMR ({{ variante.totalPreguntas || 30 }} preguntas)
+                          </h5>
+                          @if (variante.preguntasAnuladas?.length) {
+                            <span class="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                              <i class="pi pi-ban text-[9px]"></i> {{ variante.preguntasAnuladas?.length }} anulada(s) tachada(s)
+                            </span>
+                          }
+                        </div>
+                        <div class="grid grid-cols-5 sm:grid-cols-10 md:grid-cols-15 gap-1.5 text-center">
+                          @for (pregunta of preguntasDeVariante(variante); track pregunta) {
+                            @if (esPreguntaAnuladaEnVariante(variante, pregunta)) {
+                              <div class="relative flex flex-col items-center justify-center p-1 rounded-lg border border-rose-300 bg-rose-50 text-rose-700 shadow-2xs overflow-hidden" title="Pregunta {{ pregunta }} ANULADA (no computa en calificación)">
+                                <span class="text-[9px] font-bold text-rose-500 line-through font-mono">{{ pregunta }}.</span>
+                                <span class="text-xs font-black text-rose-700 line-through">{{ variante.respuestas ? (variante.respuestas[pregunta] || '—') : '—' }}</span>
+                                <span class="text-[7px] font-black uppercase text-rose-600 tracking-tighter">ANULADA</span>
+                                <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 bg-rose-600 rotate-[-15deg] rounded pointer-events-none"></div>
+                              </div>
+                            } @else {
+                              <div class="flex flex-col items-center justify-center p-1 rounded-lg border border-slate-200 bg-slate-50/80 text-foreground shadow-2xs">
+                                <span class="text-[9px] font-bold text-slate-500 font-mono">{{ pregunta }}.</span>
+                                <span class="text-xs font-black text-indigo-700">{{ variante.respuestas ? (variante.respuestas[pregunta] || '—') : '—' }}</span>
+                              </div>
+                            }
+                          }
+                        </div>
+                      </div>
+
                       @if (variante.estudiantes?.length) {
                         <div class="border-t border-border bg-amber-50/70 px-4 py-3">
                           <div class="text-[10px] font-black uppercase tracking-wide text-amber-900 mb-2">
@@ -1924,7 +2097,18 @@ interface CampusDisponible extends Campus {
                               <thead><tr class="border-b border-indigo-100 text-left uppercase tracking-wide text-slate-500"><th class="px-2 py-2">N.º presentado</th><th class="px-2 py-2">N.º en banco</th><th class="px-2 py-2">Clave banco</th><th class="px-2 py-2">Clave variante</th><th class="px-2 py-2">Reactivo</th></tr></thead>
                               <tbody>
                                 @for (traza of variante.trazabilidad; track traza.numeroPresentado) {
-                                  <tr class="border-b border-slate-100 text-slate-700"><td class="px-2 py-1.5 font-mono font-black">{{ traza.numeroPresentado }}</td><td class="px-2 py-1.5 font-mono">{{ traza.numeroBanco || '—' }}</td><td class="px-2 py-1.5 font-mono font-black">{{ traza.respuestaCorrectaBanco || '—' }}</td><td class="px-2 py-1.5 font-mono font-black text-emerald-800">{{ traza.respuestaCorrectaVariante || '—' }}</td><td class="px-2 py-1.5 font-mono">{{ traza.reactivoId || '—' }}</td></tr>
+                                  <tr class="border-b border-slate-100 text-slate-700" [class.bg-rose-50]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">
+                                    <td class="px-2 py-1.5 font-mono font-black">
+                                      <span [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-700]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.numeroPresentado }}</span>
+                                      @if (traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)) {
+                                        <span class="ml-1.5 px-1.5 py-0.2 rounded bg-rose-200 text-rose-800 text-[8px] font-black uppercase">ANULADA</span>
+                                      }
+                                    </td>
+                                    <td class="px-2 py-1.5 font-mono" [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-600]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.numeroBanco || '—' }}</td>
+                                    <td class="px-2 py-1.5 font-mono font-black" [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-600]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.respuestaCorrectaBanco || '—' }}</td>
+                                    <td class="px-2 py-1.5 font-mono font-black" [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-600]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-emerald-800]="!traza.anulada && !esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.respuestaCorrectaVariante || '—' }}</td>
+                                    <td class="px-2 py-1.5 font-mono" [class.line-through]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)" [class.text-rose-600]="traza.anulada || esPreguntaAnuladaEnVariante(variante, traza.numeroPresentado)">{{ traza.reactivoId || '—' }}</td>
+                                  </tr>
                                 }
                               </tbody>
                             </table>
@@ -2020,13 +2204,13 @@ interface CampusDisponible extends Campus {
       <!-- MODAL: CALIFICACIÓN OMR PARA PASAR A CALIFICADO -->
       @if (dialogCalificacionOmr()) {
         <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div class="bg-card border border-border rounded-2xl max-w-5xl w-full max-h-[94vh] shadow-2xl overflow-hidden flex flex-col">
+          <div class="bg-card border border-border rounded-2xl max-w-7xl w-full max-h-[94vh] shadow-2xl overflow-hidden flex flex-col">
             <div class="bg-gradient-to-r from-purple-950 via-indigo-900 to-slate-950 text-white p-5 flex items-start justify-between gap-4 shrink-0">
               <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center"><i class="pi pi-check-square text-lg text-purple-200"></i></div>
                 <div>
-                  <h3 class="text-sm font-black">Calificación OMR · pasar a Calificado</h3>
-                  <p class="text-[11px] text-white/70">{{ evaluacionSeleccionadaOmr()?.codigo }} · {{ evaluacionSeleccionadaOmr()?.grupo }} · el patrón se toma de la asignación interna.</p>
+                  <h3 class="text-sm font-black">{{ (evaluacionSeleccionadaOmr()?.etapa === 'Calificado' || evaluacionSeleccionadaOmr()?.etapa === 'Confirmado') ? 'Re-escaneo OMR · Actualizar cartillas y notas' : 'Calificación OMR · pasar a Calificado' }}</h3>
+                  <p class="text-[11px] text-white/70">{{ (evaluacionSeleccionadaOmr()?.etapa === 'Calificado' || evaluacionSeleccionadaOmr()?.etapa === 'Confirmado') ? (evaluacionSeleccionadaOmr()?.codigo + ' · ' + evaluacionSeleccionadaOmr()?.grupo + ' · Cargue un nuevo PDF de escaneado para re-procesar cartillas y actualizar calificaciones.') : (evaluacionSeleccionadaOmr()?.codigo + ' · ' + evaluacionSeleccionadaOmr()?.grupo + ' · el patrón se toma de la asignación interna.') }}</p>
                 </div>
               </div>
               <button (click)="cerrarCalificacionOmr()" aria-label="Cerrar calificación OMR" title="Cerrar" class="h-8 w-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer"><i class="pi pi-times"></i></button>
@@ -2047,8 +2231,8 @@ interface CampusDisponible extends Campus {
                   }
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                  <button (click)="archivoOmrInput.click()" class="px-3 py-2 rounded-xl border border-indigo-300 bg-white text-indigo-800 text-xs font-black cursor-pointer hover:bg-indigo-100"><i class="pi pi-folder-open mr-1.5"></i>{{ archivoOmrSeleccionado() ? 'Cambiar escaneado' : 'Seleccionar PDF' }}</button>
-                  <button (click)="ejecutarCalificacionOmr()" [disabled]="procesandoCalificacionOmr() || !archivoOmrSeleccionado()" class="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="procesandoCalificacionOmr()" [class.pi-spinner]="procesandoCalificacionOmr()" [class.pi-bolt]="!procesandoCalificacionOmr()"></i> {{ procesandoCalificacionOmr() ? 'Procesando...' : 'Ejecutar OMR' }}</button>
+                  <button (click)="archivoOmrInput.click()" [disabled]="procesandoCalificacionOmr()" class="px-3 py-2 rounded-xl border border-indigo-300 bg-white text-indigo-800 text-xs font-black cursor-pointer hover:bg-indigo-100 disabled:opacity-50"><i class="pi pi-folder-open mr-1.5"></i>{{ archivoOmrSeleccionado() ? 'Cambiar escaneado' : 'Seleccionar PDF' }}</button>
+                  <button (click)="ejecutarCalificacionOmr()" [disabled]="procesandoCalificacionOmr() || !archivoOmrSeleccionado()" class="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="procesandoCalificacionOmr()" [class.pi-spinner]="procesandoCalificacionOmr()" [class.pi-bolt]="!procesandoCalificacionOmr()"></i> {{ procesandoCalificacionOmr() ? ('Procesando (' + porcentajeProgresoOmr() + '%)') : 'Ejecutar OMR' }}</button>
                 </div>
               </div>
 
@@ -2057,7 +2241,115 @@ interface CampusDisponible extends Campus {
               }
 
               @if (procesandoCalificacionOmr()) {
-                <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-2xl text-purple-700"></i><p class="mt-2">Procesando todas las páginas del PDF...</p><p class="text-[10px] font-normal mt-1">El motor OMR está leyendo código y marcajes.</p></div>
+                <div class="relative overflow-hidden rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/50 p-6 shadow-sm">
+                  <!-- Laser Scan line effect -->
+                  <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent animate-pulse"></div>
+
+                  <div class="flex flex-col md:flex-row items-center gap-6">
+                    <!-- Scanner Icon with glow halo -->
+                    <div class="relative flex items-center justify-center shrink-0">
+                      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/30 relative">
+                        <i class="pi pi-spin pi-spinner text-3xl"></i>
+                        <span class="absolute -top-1 -right-1 flex h-4 w-4">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-4 w-4 bg-purple-500"></span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Progress Info & Bar -->
+                    <div class="flex-1 w-full space-y-3">
+                      <div class="flex items-center justify-between gap-4">
+                        <div>
+                          <div class="flex items-center gap-2">
+                            <span class="text-xs font-black uppercase tracking-wider text-purple-700 bg-purple-100/80 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                              <span class="w-2 h-2 rounded-full bg-purple-600 animate-ping"></span>
+                              Motor OMR en ejecución
+                            </span>
+                            <span class="text-xs text-muted-foreground font-medium">
+                              <i class="pi pi-clock mr-1"></i>{{ formatearTiempoOmr(tiempoTranscurridoOmr()) }}
+                            </span>
+                          </div>
+                          <h4 class="text-sm font-black text-foreground mt-1.5">{{ pasoActualProgresoOmr() }}</h4>
+                        </div>
+                        <div class="text-right shrink-0">
+                          <span class="text-3xl font-black font-mono tracking-tight text-purple-800">{{ porcentajeProgresoOmr() }}%</span>
+                        </div>
+                      </div>
+
+                      <!-- Main Progress Bar -->
+                      <div class="w-full bg-purple-100/70 rounded-full h-3.5 p-0.5 border border-purple-200 overflow-hidden shadow-inner">
+                        <div class="h-full rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-500 transition-all duration-300 ease-out relative overflow-hidden flex items-center justify-end pr-1" [style.width.%]="porcentajeProgresoOmr()">
+                          <div class="absolute inset-0 bg-white/25 animate-[pulse_1.5s_infinite]"></div>
+                        </div>
+                      </div>
+
+                      <!-- Secondary Subtitle Stats -->
+                      <div class="flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+                        <span>Páginas estimadas: <strong class="text-foreground">{{ previewPaginasOmr().length || evaluacionSeleccionadaOmr()?.estudiantesInscritosCount || evaluacionSeleccionadaOmr()?.mapeoEstudiantes?.length || 'Lote completo' }}</strong></span>
+                        <span class="text-purple-600 font-semibold flex items-center gap-1">
+                          <i class="pi pi-bolt text-[10px]"></i> No cierre esta ventana mientras finaliza la lectura
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 4-Stage Progress Pipeline Checklist -->
+                  <div class="mt-6 pt-5 border-t border-purple-100/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                    <!-- Step 1 -->
+                    <div class="flex items-center gap-2 p-2 rounded-xl transition-colors" [class.bg-purple-100]="pasoProgresoOmrActivo(1)" [class.bg-emerald-50]="pasoProgresoOmrCompletado(1)">
+                      @if (pasoProgresoOmrCompletado(1)) {
+                        <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                        <span class="font-bold text-emerald-900">1. Lote preparado</span>
+                      } @else {
+                        <i class="pi pi-spin pi-spinner text-purple-600 text-sm"></i>
+                        <span class="font-bold text-purple-900">1. Carga de escaneado</span>
+                      }
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="flex items-center gap-2 p-2 rounded-xl transition-colors" [class.bg-purple-100]="pasoProgresoOmrActivo(2)" [class.bg-emerald-50]="pasoProgresoOmrCompletado(2)" [class.opacity-60]="!pasoProgresoOmrActivo(2) && !pasoProgresoOmrCompletado(2)">
+                      @if (pasoProgresoOmrCompletado(2)) {
+                        <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                        <span class="font-bold text-emerald-900">2. Códigos y variantes</span>
+                      } @else if (pasoProgresoOmrActivo(2)) {
+                        <i class="pi pi-spin pi-spinner text-purple-600 text-sm"></i>
+                        <span class="font-bold text-purple-900">2. Leyendo códigos</span>
+                      } @else {
+                        <i class="pi pi-circle text-muted-foreground text-xs"></i>
+                        <span class="text-muted-foreground">2. Códigos y variantes</span>
+                      }
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="flex items-center gap-2 p-2 rounded-xl transition-colors" [class.bg-purple-100]="pasoProgresoOmrActivo(3)" [class.bg-emerald-50]="pasoProgresoOmrCompletado(3)" [class.opacity-60]="!pasoProgresoOmrActivo(3) && !pasoProgresoOmrCompletado(3)">
+                      @if (pasoProgresoOmrCompletado(3)) {
+                        <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                        <span class="font-bold text-emerald-900">3. Grilla y alvéolos</span>
+                      } @else if (pasoProgresoOmrActivo(3)) {
+                        <i class="pi pi-spin pi-spinner text-purple-600 text-sm"></i>
+                        <span class="font-bold text-purple-900">3. Analizando alvéolos</span>
+                      } @else {
+                        <i class="pi pi-circle text-muted-foreground text-xs"></i>
+                        <span class="text-muted-foreground">3. Grilla y alvéolos</span>
+                      }
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div class="flex items-center gap-2 p-2 rounded-xl transition-colors" [class.bg-purple-100]="pasoProgresoOmrActivo(4)" [class.bg-emerald-50]="pasoProgresoOmrCompletado(4)" [class.opacity-60]="!pasoProgresoOmrActivo(4) && !pasoProgresoOmrCompletado(4)">
+                      @if (pasoProgresoOmrCompletado(4)) {
+                        <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
+                        <span class="font-bold text-emerald-900">4. Resultados listos</span>
+                      } @else if (pasoProgresoOmrActivo(4)) {
+                        <i class="pi pi-spin pi-spinner text-purple-600 text-sm"></i>
+                        <span class="font-bold text-purple-900">4. Consolidando reporte</span>
+                      } @else {
+                        <i class="pi pi-circle text-muted-foreground text-xs"></i>
+                        <span class="text-muted-foreground">4. Validación y notas</span>
+                      }
+                    </div>
+                  </div>
+                </div>
               } @else {
                 @if (resultadoCalificacionOmr(); as resultado) {
                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -2071,38 +2363,184 @@ interface CampusDisponible extends Campus {
                 <div class="border border-border rounded-xl overflow-hidden divide-y divide-border">
                   @for (lectura of resultado.resultados ?? []; track lectura.pagina) {
                     <div class="p-3 space-y-2">
-                      <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div class="flex items-center gap-2 text-xs font-black"><span class="bg-muted rounded-lg px-2 py-1">Página {{ lectura.pagina }}</span><span [class.text-emerald-700]="lectura.estado === 'CALIFICADO'" [class.text-amber-700]="lectura.estado !== 'CALIFICADO'">{{ lectura.estado === 'CALIFICADO' ? 'Código y patrón validados' : 'Código no reconocido' }}</span></div>
-                        <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground"><span>Marcajes: {{ cantidadRespuestasLeidas(lectura) }}/{{ lectura.totalReactivos || 30 }}</span><span class="px-2 py-0.5 rounded border" [class.border-emerald-200]="!!lectura.grilla" [class.text-emerald-700]="!!lectura.grilla" [class.border-amber-200]="!lectura.grilla" [class.text-amber-700]="!lectura.grilla">{{ lectura.grilla ? 'Grilla detectada' : 'Grilla no detectada' }}</span></div>
+                      <div class="flex flex-wrap items-center justify-between gap-2 bg-muted/40 px-3 py-2 rounded-lg">
+                        <div class="flex items-center gap-2 text-xs font-black">
+                          <span class="bg-muted rounded-lg px-2.5 py-1 text-foreground font-mono">Página {{ lectura.pagina }}</span>
+                          <span [class.text-emerald-700]="lectura.estado === 'CALIFICADO'" [class.text-amber-700]="lectura.estado !== 'CALIFICADO'" class="flex items-center gap-1 font-extrabold">
+                            <i class="pi" [class.pi-check-circle]="lectura.estado === 'CALIFICADO'" [class.pi-exclamation-triangle]="lectura.estado !== 'CALIFICADO'"></i>
+                            {{ lectura.estado === 'CALIFICADO' ? 'Código y patrón validados' : 'Código no reconocido' }}
+                          </span>
+                        </div>
+                        <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+                          <span>Marcajes: <strong class="text-foreground">{{ cantidadRespuestasLeidas(lectura) }}</strong>/{{ lectura.totalReactivos || 30 }}</span>
+                          <span class="px-2 py-0.5 rounded border font-bold" [class.border-emerald-300]="!!lectura.grilla" [class.bg-emerald-50]="!!lectura.grilla" [class.text-emerald-800]="!!lectura.grilla" [class.border-amber-300]="!lectura.grilla" [class.bg-amber-50]="!lectura.grilla" [class.text-amber-800]="!lectura.grilla">
+                            {{ lectura.grilla ? 'Grilla detectada' : 'Grilla no detectada' }}
+                          </span>
+                        </div>
                       </div>
-                      <div class="grid grid-cols-1 lg:grid-cols-[minmax(250px,0.9fr)_minmax(400px,1.1fr)] gap-3 items-start">
-                        <div class="rounded-xl border border-sky-200 bg-slate-950/95 p-2">
-                          <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-white/80"><i class="pi pi-image mr-1 text-sky-300"></i>Escaneado · página {{ lectura.pagina }}</span><button (click)="alternarPreviewPaginaOmr(lectura.pagina)" [disabled]="cargandoPreviewOmr() || !previewPaginaOmr(lectura.pagina)" class="px-2 py-1 rounded-md border border-white/20 text-white/80 text-[10px] font-black cursor-pointer hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"><i class="pi mr-1" [class.pi-eye]="paginaPreviewOmr() !== lectura.pagina" [class.pi-eye-slash]="paginaPreviewOmr() === lectura.pagina"></i>{{ paginaPreviewOmr() === lectura.pagina ? 'Ocultar' : 'Mostrar' }}</button></div>
-                          @if (paginaPreviewOmr() === lectura.pagina && previewPaginaOmr(lectura.pagina)) {
-                            <div class="flex justify-center overflow-auto max-h-[34rem]"><img [src]="previewPaginaOmr(lectura.pagina)" [alt]="'Página escaneada ' + lectura.pagina" class="max-w-full h-auto object-contain rounded-lg shadow-lg" /></div>
-                            <div class="text-center text-[10px] text-white/70 mt-1.5">Compare aquí cada número y marcaje con la lectura.</div>
+
+                      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                        <!-- Lado izquierdo: Cartilla escaneada -->
+                        <div class="lg:col-span-5 rounded-xl border border-sky-200 bg-slate-950/95 p-3">
+                          <div class="mb-2 flex items-center justify-between gap-2 border-b border-white/10 pb-2">
+                            <span class="text-[10px] font-black uppercase text-white/90">
+                              <i class="pi pi-image mr-1.5 text-sky-300"></i>Cartilla escaneada · página {{ lectura.pagina }}
+                            </span>
+                            <span class="text-[10px] font-mono text-white/60">Pág. {{ lectura.pagina }}</span>
+                          </div>
+                          @if (previewPaginaOmr(lectura.pagina)) {
+                            <div class="flex justify-center overflow-auto max-h-[46rem] bg-slate-900/50 rounded-lg p-1">
+                              <img [src]="previewPaginaOmr(lectura.pagina)" [alt]="'Cartilla escaneada página ' + lectura.pagina" class="max-w-full h-auto object-contain rounded-md shadow-lg" />
+                            </div>
+                            <div class="text-center text-[10px] text-white/70 mt-2 font-medium">Cartilla física escaneada · página {{ lectura.pagina }}</div>
                           } @else if (cargandoPreviewOmr()) {
-                            <div class="py-14 text-center text-xs text-white/80"><i class="pi pi-spin pi-spinner text-xl text-sky-300"></i><p class="mt-2">Preparando página escaneada...</p></div>
+                            <div class="py-16 text-center text-xs text-white/80"><i class="pi pi-spin pi-spinner text-2xl text-sky-300"></i><p class="mt-2 font-bold">Cargando previsualización del escaneado...</p></div>
                           } @else {
-                            <div class="py-14 text-center text-xs text-white/70"><i class="pi pi-eye text-xl text-sky-300"></i><p class="mt-2">Presione “Mostrar” para ver esta página.</p></div>
+                            <div class="py-16 text-center text-xs text-white/70"><i class="pi pi-image text-2xl text-sky-300"></i><p class="mt-2">Sin imagen de escaneado disponible.</p></div>
                           }
                         </div>
 
-                        <div class="space-y-2 min-w-0">
-                          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
-                            <div class="col-span-2 rounded-lg bg-muted/50 p-2"><label class="block text-muted-foreground uppercase font-bold">Código del estudiante</label><input [value]="codigoOmr(lectura)" (input)="editarCodigoOmr(lectura, $any($event.target).value)" inputmode="numeric" maxlength="30" class="mt-1 w-full rounded-md border border-indigo-200 bg-white px-2 py-1 font-mono text-xs font-black text-foreground outline-none focus:border-indigo-500" placeholder="Ingrese código manualmente" /><button (click)="recalibrarPaginaOmr(lectura)" [disabled]="!codigoOmr(lectura) || recalibrandoOmr()[lectura.pagina]" class="mt-2 w-full rounded-md bg-indigo-700 px-2 py-1.5 text-[10px] font-black text-white cursor-pointer hover:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed"><i class="pi mr-1" [class.pi-spin]="recalibrandoOmr()[lectura.pagina]" [class.pi-spinner]="recalibrandoOmr()[lectura.pagina]" [class.pi-refresh]="!recalibrandoOmr()[lectura.pagina]"></i>{{ recalibrandoOmr()[lectura.pagina] ? 'Validando...' : 'Validar código y recalibrar' }}</button></div>
-                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Estado código</span><strong [class.text-emerald-700]="lectura.codigoValidado" [class.text-amber-700]="!lectura.codigoValidado">{{ lectura.codigoValidado ? 'Detectado / validado' : 'Pendiente de validar' }}</strong></div>
-                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Variante</span><strong class="text-indigo-700">{{ lectura.letraVariante ? 'TIPO ' + lectura.letraVariante : '—' }}</strong></div>
-                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">OCR candidato</span><strong class="font-mono text-foreground">{{ (lectura.codigoOcr || []).join(', ') || '—' }}</strong></div>
-                            <div class="rounded-lg bg-muted/50 p-2"><span class="block text-muted-foreground uppercase font-bold">Aciertos / Nota</span><strong class="text-emerald-700">{{ lectura.aciertos ?? 0 }} · {{ lectura.notaSobre60 ?? 0 }}/60</strong></div>
-                          </div>
-                          <div class="rounded-lg border border-border bg-card p-2">
-                            <div class="mb-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase text-muted-foreground">Respuesta del estudiante vs patrón oficial</span><span class="text-[10px] text-muted-foreground">— blanco · AB doble</span></div>
-                            <div class="grid grid-cols-2 gap-1.5">
-                              @for (pregunta of preguntasOmr(lectura); track pregunta) {
-                                <div class="flex min-w-0 items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 text-[10px]" [class.border-rose-300]="preguntaAnuladaOmr(lectura, pregunta)" [class.bg-rose-50]="preguntaAnuladaOmr(lectura, pregunta)" [title]="'Respuesta del estudiante: ' + (respuestaOmr(lectura, pregunta) || 'blanco') + ' · Patrón oficial: ' + (respuestaCorrectaOmr(lectura, pregunta) || 'sin patrón')"><span class="w-5 shrink-0 font-mono font-black text-muted-foreground">{{ pregunta }}</span>@if (puedeAjustarIncisosOmr()) { <select [value]="respuestaOmr(lectura, pregunta)" (change)="editarRespuestaOmr(lectura, pregunta, $any($event.target).value)" class="min-w-0 flex-1 rounded bg-white px-1 py-0.5 font-mono text-[9px] font-black text-indigo-700 outline-none" title="Ajustar inciso leído"><option value="">Est.: —</option><option value="A">Est.: A</option><option value="B">Est.: B</option><option value="C">Est.: C</option><option value="D">Est.: D</option><option value="E">Est.: E</option></select> } @else { <span class="min-w-0 flex-1 rounded bg-white px-1.5 py-0.5 font-mono text-[9px] font-black text-indigo-700" title="Respuesta marcada por el estudiante">Est.: {{ respuestaOmr(lectura, pregunta) || '—' }}</span> }<span class="min-w-0 flex-1 rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-[9px] font-black text-indigo-900" title="Respuesta del patrón oficial">Patrón: {{ respuestaCorrectaOmr(lectura, pregunta) || '—' }}</span><span class="w-14 shrink-0 text-right text-[9px] font-black" [class.text-emerald-700]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.text-rose-700]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA' || estadoPreguntaOmr(lectura, pregunta) === 'ANULADA'" [class.text-amber-700]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.text-slate-500]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.text-indigo-700]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'">{{ etiquetaEstadoPreguntaOmr(lectura, pregunta) }}</span>@if (puedeGestionarAnulacionOmr()) { <button type="button" (click)="gestionarAnulacionOmr(lectura, pregunta)" class="h-5 w-5 shrink-0 rounded border text-[9px] cursor-pointer" [class.border-rose-300]="preguntaAnuladaOmr(lectura, pregunta)" [class.text-rose-700]="preguntaAnuladaOmr(lectura, pregunta)" [class.border-slate-300]="!preguntaAnuladaOmr(lectura, pregunta)" [class.text-slate-500]="!preguntaAnuladaOmr(lectura, pregunta)" [title]="preguntaAnuladaOmr(lectura, pregunta) ? 'Reactivar pregunta' : 'Anular pregunta'"><i class="pi" [class.pi-replay]="preguntaAnuladaOmr(lectura, pregunta)" [class.pi-ban]="!preguntaAnuladaOmr(lectura, pregunta)"></i></button> }</div>
-                              }
+                        <!-- Lado derecho: Datos de estudiante + Respuestas y patrones -->
+                        <div class="lg:col-span-7 space-y-2 min-w-0">
+                          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px]">
+                            <div class="rounded-lg bg-muted/50 p-2">
+                              <label class="block text-muted-foreground uppercase font-bold">Código del estudiante</label>
+                              <input [value]="codigoOmr(lectura)" (input)="editarCodigoOmr(lectura, $any($event.target).value)" inputmode="numeric" maxlength="30" class="mt-1 w-full rounded-md border border-indigo-200 bg-white px-2 py-1 font-mono text-xs font-black text-foreground outline-none focus:border-indigo-500" placeholder="Ingrese código manualmente" />
+                              <div class="flex gap-1.5 mt-2">
+                                <button (click)="recalibrarPaginaOmr(lectura)" [disabled]="!codigoOmr(lectura) || recalibrandoOmr()[lectura.pagina]" class="flex-1 rounded-md bg-indigo-700 px-2 py-1.5 text-[10px] font-black text-white cursor-pointer hover:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                                  <i class="pi mr-1" [class.pi-spin]="recalibrandoOmr()[lectura.pagina]" [class.pi-spinner]="recalibrandoOmr()[lectura.pagina]" [class.pi-refresh]="!recalibrandoOmr()[lectura.pagina]"></i>{{ recalibrandoOmr()[lectura.pagina] ? 'Validando...' : 'Validar y recalibrar' }}
+                                </button>
+                                @if (puedeAnularExamenEstudiante() && lectura.codigoEstudiante) {
+                                  <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: lectura.codigoEstudiante, nombre: lectura.estudianteNombre || undefined, anulado: lectura.estadoCalificacion === 'ANULADO', pagina: lectura.pagina })" class="rounded-md border px-2 py-1.5 text-[10px] font-black cursor-pointer transition-colors" [class.border-rose-300]="lectura.estadoCalificacion !== 'ANULADO'" [class.bg-rose-50]="lectura.estadoCalificacion !== 'ANULADO'" [class.text-rose-700]="lectura.estadoCalificacion !== 'ANULADO'" [class.hover:bg-rose-100]="lectura.estadoCalificacion !== 'ANULADO'" [class.border-slate-300]="lectura.estadoCalificacion === 'ANULADO'" [class.bg-slate-100]="lectura.estadoCalificacion === 'ANULADO'" [class.text-slate-700]="lectura.estadoCalificacion === 'ANULADO'" [class.hover:bg-slate-200]="lectura.estadoCalificacion === 'ANULADO'" [title]="lectura.estadoCalificacion === 'ANULADO' ? 'Restaurar examen' : 'Anular examen'">
+                                    <i class="pi" [class.pi-ban]="lectura.estadoCalificacion !== 'ANULADO'" [class.pi-replay]="lectura.estadoCalificacion === 'ANULADO'"></i> {{ lectura.estadoCalificacion === 'ANULADO' ? 'Restaurar' : 'Anular' }}
+                                  </button>
+                                }
+                              </div>
                             </div>
+                            <div class="rounded-lg bg-muted/50 p-2 flex flex-col justify-between">
+                              <div>
+                                <span class="block text-muted-foreground uppercase font-bold">Estudiante / Estado</span>
+                                <div class="mt-1 font-extrabold text-foreground text-xs truncate" [title]="lectura.estudianteNombre || 'No identificado'">
+                                  {{ lectura.estudianteNombre || 'Estudiante no identificado' }}
+                                </div>
+                              </div>
+                              <div class="mt-2">
+                                <span class="inline-flex items-center gap-1 font-bold text-[10px]" [class.text-emerald-700]="lectura.codigoValidado" [class.text-amber-700]="!lectura.codigoValidado">
+                                  <i class="pi" [class.pi-check-circle]="lectura.codigoValidado" [class.pi-exclamation-triangle]="!lectura.codigoValidado"></i>
+                                  {{ lectura.codigoValidado ? 'Detectado / validado' : 'Pendiente de validar' }}
+                                </span>
+                              </div>
+                            </div>
+                            <div class="rounded-lg bg-muted/50 p-2 flex flex-col justify-between">
+                              <span class="block text-muted-foreground uppercase font-bold">Aciertos / Nota</span>
+                              <div class="mt-1">
+                                @if (lectura.estadoCalificacion === 'ANULADO') {
+                                  <span class="inline-block px-2 py-1 rounded bg-rose-600 text-white font-black text-[10px] uppercase tracking-wider">ANULADO (0/60)</span>
+                                } @else {
+                                  <div class="text-base font-black text-emerald-700">
+                                    {{ lectura.notaSobre60 ?? 0 }}<span class="text-xs text-muted-foreground font-bold">/60</span>
+                                  </div>
+                                  <span class="text-[10px] font-bold text-muted-foreground">
+                                    {{ lectura.aciertos ?? 0 }} correctas de {{ lectura.totalReactivos || 30 }}
+                                  </span>
+                                }
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="rounded-lg border border-border bg-card p-2.5">
+                            <div class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
+                              <div class="flex items-center gap-1.5">
+                                <button type="button"
+                                        (click)="cambiarTabRespuestas(lectura.pagina, '1-40')"
+                                        class="px-3 py-1 rounded-lg text-xs font-black cursor-pointer transition-colors"
+                                        [class.bg-indigo-600]="tabActualRespuestas(lectura.pagina) === '1-40'"
+                                        [class.text-white]="tabActualRespuestas(lectura.pagina) === '1-40'"
+                                        [class.bg-muted]="tabActualRespuestas(lectura.pagina) !== '1-40'"
+                                        [class.text-muted-foreground]="tabActualRespuestas(lectura.pagina) !== '1-40'">
+                                  Preguntas 1 al 40
+                                </button>
+                                <button type="button"
+                                        (click)="cambiarTabRespuestas(lectura.pagina, '41-60')"
+                                        class="px-3 py-1 rounded-lg text-xs font-black cursor-pointer transition-colors"
+                                        [class.bg-indigo-600]="tabActualRespuestas(lectura.pagina) === '41-60'"
+                                        [class.text-white]="tabActualRespuestas(lectura.pagina) === '41-60'"
+                                        [class.bg-muted]="tabActualRespuestas(lectura.pagina) !== '41-60'"
+                                        [class.text-muted-foreground]="tabActualRespuestas(lectura.pagina) !== '41-60'">
+                                  Preguntas 41 al 60
+                                  @if (preguntasColumna3(lectura).length > 0) {
+                                    <span class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-indigo-200 text-indigo-900 font-extrabold">{{ preguntasColumna3(lectura).length }}</span>
+                                  }
+                                </button>
+                              </div>
+                              <span class="text-[10px] text-muted-foreground hidden sm:inline">— blanco · AB doble marca · clic en Patrón para corregir error docente</span>
+                            </div>
+
+                            @if (tabActualRespuestas(lectura.pagina) === '1-40') {
+                              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+                                <div class="space-y-1 rounded-lg border border-border/60 bg-muted/10 p-2">
+                                  <div class="text-[10px] font-black uppercase text-indigo-900 px-1 pb-1 border-b border-border/50 flex items-center justify-between">
+                                    <span>Columna 1 (1 al 20)</span>
+                                    <span class="font-mono text-muted-foreground text-[9px]">{{ preguntasColumna1(lectura).length }} reactivos</span>
+                                  </div>
+                                  <div class="space-y-1 mt-1">
+                                    @for (pregunta of preguntasColumna1(lectura); track pregunta) {
+                                      <div class="flex items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-xs transition-colors hover:bg-muted/40" [class.border-purple-300]="preguntaAnuladaOmr(lectura, pregunta)" [class.bg-purple-50]="preguntaAnuladaOmr(lectura, pregunta)">
+                                        <div class="flex items-center gap-1.5 shrink-0"><span class="w-5 h-5 rounded bg-muted flex items-center justify-center font-mono font-black text-[10px] text-muted-foreground">{{ pregunta }}</span></div>
+                                        <div class="flex items-center gap-1 min-w-0"><span class="text-[10px] font-extrabold text-muted-foreground">Est:</span>@if (puedeAjustarIncisosOmr()) { <select [value]="respuestaOmr(lectura, pregunta)" (change)="editarRespuestaOmr(lectura, pregunta, $any($event.target).value)" class="w-10 h-6 text-center font-mono font-black text-xs rounded border border-indigo-200 bg-white text-indigo-900 cursor-pointer shadow-2xs outline-none focus:ring-1 focus:ring-indigo-500" title="Ajustar respuesta leída"><option value="">—</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option></select> } @else { <span class="inline-flex items-center justify-center min-w-[1.75rem] h-6 px-1 rounded font-mono font-black text-xs" [class.bg-indigo-100]="respuestaOmr(lectura, pregunta)" [class.text-indigo-900]="respuestaOmr(lectura, pregunta)" [class.bg-slate-100]="!respuestaOmr(lectura, pregunta)" [class.text-slate-500]="!respuestaOmr(lectura, pregunta)">{{ respuestaOmr(lectura, pregunta) || '—' }}</span> }</div>
+                                        <div class="flex items-center gap-1 min-w-0"><span class="text-[10px] font-extrabold text-muted-foreground">Pat:</span>@if (puedeEditarClaveOficial()) { <button type="button" (click)="abrirEdicionClave(lectura, pregunta)" class="inline-flex items-center gap-1 px-1.5 h-6 rounded font-mono font-black text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 cursor-pointer transition-colors" title="Clic para corregir clave oficial docente ante error de marcaje"><span>{{ respuestaCorrectaOmr(lectura, pregunta) || '—' }}</span><i class="pi pi-pencil text-[8px] text-indigo-500"></i></button> } @else { <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded font-mono font-black text-xs bg-indigo-50 text-indigo-900">{{ respuestaCorrectaOmr(lectura, pregunta) || '—' }}</span> }</div>
+                                        <div class="shrink-0 flex items-center gap-1"><span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase" [class.text-emerald-700]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.bg-emerald-50]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.text-rose-700]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.bg-rose-50]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.text-purple-700]="estadoPreguntaOmr(lectura, pregunta) === 'ANULADA'" [class.bg-purple-50]="estadoPreguntaOmr(lectura, pregunta) === 'ANULADA'" [class.text-amber-700]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.bg-amber-50]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.text-slate-500]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.bg-slate-100]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.text-indigo-700]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'" [class.bg-indigo-50]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'">{{ etiquetaEstadoPreguntaOmr(lectura, pregunta) }}</span>@if (puedeGestionarAnulacionOmr()) { <button type="button" (click)="gestionarAnulacionOmr(lectura, pregunta)" class="h-6 w-6 rounded border flex items-center justify-center text-[10px] cursor-pointer transition-colors" [class.border-purple-300]="preguntaAnuladaOmr(lectura, pregunta)" [class.bg-purple-50]="preguntaAnuladaOmr(lectura, pregunta)" [class.text-purple-700]="preguntaAnuladaOmr(lectura, pregunta)" [class.border-slate-300]="!preguntaAnuladaOmr(lectura, pregunta)" [class.text-slate-500]="!preguntaAnuladaOmr(lectura, pregunta)" [class.hover:bg-rose-50]="!preguntaAnuladaOmr(lectura, pregunta)" [class.hover:text-rose-700]="!preguntaAnuladaOmr(lectura, pregunta)" [title]="preguntaAnuladaOmr(lectura, pregunta) ? 'Reactivar pregunta' : 'Anular pregunta (con propagación a variantes)'"><i class="pi" [class.pi-replay]="preguntaAnuladaOmr(lectura, pregunta)" [class.pi-ban]="!preguntaAnuladaOmr(lectura, pregunta)"></i></button> }</div>
+                                      </div>
+                                    } @empty {
+                                      <div class="py-4 text-center text-xs text-muted-foreground font-bold">Sin preguntas en rango 1–20</div>
+                                    }
+                                  </div>
+                                </div>
+
+                                <div class="space-y-1 rounded-lg border border-border/60 bg-muted/10 p-2">
+                                  <div class="text-[10px] font-black uppercase text-indigo-900 px-1 pb-1 border-b border-border/50 flex items-center justify-between">
+                                    <span>Columna 2 (21 al 40)</span>
+                                    <span class="font-mono text-muted-foreground text-[9px]">{{ preguntasColumna2(lectura).length }} reactivos</span>
+                                  </div>
+                                  <div class="space-y-1 mt-1">
+                                    @for (pregunta of preguntasColumna2(lectura); track pregunta) {
+                                      <div class="flex items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-xs transition-colors hover:bg-muted/40" [class.border-purple-300]="preguntaAnuladaOmr(lectura, pregunta)" [class.bg-purple-50]="preguntaAnuladaOmr(lectura, pregunta)">
+                                        <div class="flex items-center gap-1.5 shrink-0"><span class="w-5 h-5 rounded bg-muted flex items-center justify-center font-mono font-black text-[10px] text-muted-foreground">{{ pregunta }}</span></div>
+                                        <div class="flex items-center gap-1 min-w-0"><span class="text-[10px] font-extrabold text-muted-foreground">Est:</span>@if (puedeAjustarIncisosOmr()) { <select [value]="respuestaOmr(lectura, pregunta)" (change)="editarRespuestaOmr(lectura, pregunta, $any($event.target).value)" class="w-10 h-6 text-center font-mono font-black text-xs rounded border border-indigo-200 bg-white text-indigo-900 cursor-pointer shadow-2xs outline-none focus:ring-1 focus:ring-indigo-500" title="Ajustar respuesta leída"><option value="">—</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option></select> } @else { <span class="inline-flex items-center justify-center min-w-[1.75rem] h-6 px-1 rounded font-mono font-black text-xs" [class.bg-indigo-100]="respuestaOmr(lectura, pregunta)" [class.text-indigo-900]="respuestaOmr(lectura, pregunta)" [class.bg-slate-100]="!respuestaOmr(lectura, pregunta)" [class.text-slate-500]="!respuestaOmr(lectura, pregunta)">{{ respuestaOmr(lectura, pregunta) || '—' }}</span> }</div>
+                                        <div class="flex items-center gap-1 min-w-0"><span class="text-[10px] font-extrabold text-muted-foreground">Pat:</span>@if (puedeEditarClaveOficial()) { <button type="button" (click)="abrirEdicionClave(lectura, pregunta)" class="inline-flex items-center gap-1 px-1.5 h-6 rounded font-mono font-black text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 cursor-pointer transition-colors" title="Clic para corregir clave oficial docente ante error de marcaje"><span>{{ respuestaCorrectaOmr(lectura, pregunta) || '—' }}</span><i class="pi pi-pencil text-[8px] text-indigo-500"></i></button> } @else { <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded font-mono font-black text-xs bg-indigo-50 text-indigo-900">{{ respuestaCorrectaOmr(lectura, pregunta) || '—' }}</span> }</div>
+                                        <div class="shrink-0 flex items-center gap-1"><span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase" [class.text-emerald-700]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.bg-emerald-50]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.text-rose-700]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.bg-rose-50]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.text-purple-700]="estadoPreguntaOmr(lectura, pregunta) === 'ANULADA'" [class.bg-purple-50]="estadoPreguntaOmr(lectura, pregunta) === 'ANULADA'" [class.text-amber-700]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.bg-amber-50]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.text-slate-500]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.bg-slate-100]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.text-indigo-700]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'" [class.bg-indigo-50]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'">{{ etiquetaEstadoPreguntaOmr(lectura, pregunta) }}</span>@if (puedeGestionarAnulacionOmr()) { <button type="button" (click)="gestionarAnulacionOmr(lectura, pregunta)" class="h-6 w-6 rounded border flex items-center justify-center text-[10px] cursor-pointer transition-colors" [class.border-purple-300]="preguntaAnuladaOmr(lectura, pregunta)" [class.bg-purple-50]="preguntaAnuladaOmr(lectura, pregunta)" [class.text-purple-700]="preguntaAnuladaOmr(lectura, pregunta)" [class.border-slate-300]="!preguntaAnuladaOmr(lectura, pregunta)" [class.text-slate-500]="!preguntaAnuladaOmr(lectura, pregunta)" [class.hover:bg-rose-50]="!preguntaAnuladaOmr(lectura, pregunta)" [class.hover:text-rose-700]="!preguntaAnuladaOmr(lectura, pregunta)" [title]="preguntaAnuladaOmr(lectura, pregunta) ? 'Reactivar pregunta' : 'Anular pregunta (con propagación a variantes)'"><i class="pi" [class.pi-replay]="preguntaAnuladaOmr(lectura, pregunta)" [class.pi-ban]="!preguntaAnuladaOmr(lectura, pregunta)"></i></button> }</div>
+                                      </div>
+                                    } @empty {
+                                      <div class="py-4 text-center text-xs text-muted-foreground font-bold">Sin preguntas en rango 21–40</div>
+                                    }
+                                  </div>
+                                </div>
+                              </div>
+                            }
+
+                            @if (tabActualRespuestas(lectura.pagina) === '41-60') {
+                              <div class="space-y-1 rounded-lg border border-border/60 bg-muted/10 p-2 max-w-xl">
+                                <div class="text-[10px] font-black uppercase text-indigo-900 px-1 pb-1 border-b border-border/50 flex items-center justify-between">
+                                  <span>Columna 3 (41 al 60)</span>
+                                  <span class="font-mono text-muted-foreground text-[9px]">{{ preguntasColumna3(lectura).length }} reactivos</span>
+                                </div>
+                                <div class="space-y-1 mt-1">
+                                  @for (pregunta of preguntasColumna3(lectura); track pregunta) {
+                                    <div class="flex items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-xs transition-colors hover:bg-muted/40" [class.border-purple-300]="preguntaAnuladaOmr(lectura, pregunta)" [class.bg-purple-50]="preguntaAnuladaOmr(lectura, pregunta)">
+                                      <div class="flex items-center gap-1.5 shrink-0"><span class="w-5 h-5 rounded bg-muted flex items-center justify-center font-mono font-black text-[10px] text-muted-foreground">{{ pregunta }}</span></div>
+                                      <div class="flex items-center gap-1 min-w-0"><span class="text-[10px] font-extrabold text-muted-foreground">Est:</span>@if (puedeAjustarIncisosOmr()) { <select [value]="respuestaOmr(lectura, pregunta)" (change)="editarRespuestaOmr(lectura, pregunta, $any($event.target).value)" class="w-10 h-6 text-center font-mono font-black text-xs rounded border border-indigo-200 bg-white text-indigo-900 cursor-pointer shadow-2xs outline-none focus:ring-1 focus:ring-indigo-500" title="Ajustar respuesta leída"><option value="">—</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option></select> } @else { <span class="inline-flex items-center justify-center min-w-[1.75rem] h-6 px-1 rounded font-mono font-black text-xs" [class.bg-indigo-100]="respuestaOmr(lectura, pregunta)" [class.text-indigo-900]="respuestaOmr(lectura, pregunta)" [class.bg-slate-100]="!respuestaOmr(lectura, pregunta)" [class.text-slate-500]="!respuestaOmr(lectura, pregunta)">{{ respuestaOmr(lectura, pregunta) || '—' }}</span> }</div>
+                                      <div class="flex items-center gap-1 min-w-0"><span class="text-[10px] font-extrabold text-muted-foreground">Pat:</span>@if (puedeEditarClaveOficial()) { <button type="button" (click)="abrirEdicionClave(lectura, pregunta)" class="inline-flex items-center gap-1 px-1.5 h-6 rounded font-mono font-black text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 cursor-pointer transition-colors" title="Clic para corregir clave oficial docente ante error de marcaje"><span>{{ respuestaCorrectaOmr(lectura, pregunta) || '—' }}</span><i class="pi pi-pencil text-[8px] text-indigo-500"></i></button> } @else { <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded font-mono font-black text-xs bg-indigo-50 text-indigo-900">{{ respuestaCorrectaOmr(lectura, pregunta) || '—' }}</span> }</div>
+                                      <div class="shrink-0 flex items-center gap-1"><span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase" [class.text-emerald-700]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.bg-emerald-50]="estadoPreguntaOmr(lectura, pregunta) === 'CORRECTA'" [class.text-rose-700]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.bg-rose-50]="estadoPreguntaOmr(lectura, pregunta) === 'INCORRECTA'" [class.text-purple-700]="estadoPreguntaOmr(lectura, pregunta) === 'ANULADA'" [class.bg-purple-50]="estadoPreguntaOmr(lectura, pregunta) === 'ANULADA'" [class.text-amber-700]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.bg-amber-50]="estadoPreguntaOmr(lectura, pregunta) === 'DOBLE_MARCA'" [class.text-slate-500]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.bg-slate-100]="estadoPreguntaOmr(lectura, pregunta) === 'EN_BLANCO'" [class.text-indigo-700]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'" [class.bg-indigo-50]="estadoPreguntaOmr(lectura, pregunta) === 'LEIDA'">{{ etiquetaEstadoPreguntaOmr(lectura, pregunta) }}</span>@if (puedeGestionarAnulacionOmr()) { <button type="button" (click)="gestionarAnulacionOmr(lectura, pregunta)" class="h-6 w-6 rounded border flex items-center justify-center text-[10px] cursor-pointer transition-colors" [class.border-purple-300]="preguntaAnuladaOmr(lectura, pregunta)" [class.bg-purple-50]="preguntaAnuladaOmr(lectura, pregunta)" [class.text-purple-700]="preguntaAnuladaOmr(lectura, pregunta)" [class.border-slate-300]="!preguntaAnuladaOmr(lectura, pregunta)" [class.text-slate-500]="!preguntaAnuladaOmr(lectura, pregunta)" [class.hover:bg-rose-50]="!preguntaAnuladaOmr(lectura, pregunta)" [class.hover:text-rose-700]="!preguntaAnuladaOmr(lectura, pregunta)" [title]="preguntaAnuladaOmr(lectura, pregunta) ? 'Reactivar pregunta' : 'Anular pregunta (con propagación a variantes)'"><i class="pi" [class.pi-replay]="preguntaAnuladaOmr(lectura, pregunta)" [class.pi-ban]="!preguntaAnuladaOmr(lectura, pregunta)"></i></button> }</div>
+                                    </div>
+                                  } @empty {
+                                    <div class="py-6 text-center text-xs text-muted-foreground font-semibold">
+                                      <i class="pi pi-info-circle mr-1.5 text-indigo-500"></i>
+                                      Esta evaluación no contiene preguntas en el rango 41–60 (reactivos programados: {{ lectura.totalReactivos || 30 }}).
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            }
                           </div>
                         </div>
                       </div>
@@ -2117,7 +2555,7 @@ interface CampusDisponible extends Campus {
             <div class="p-4 border-t border-border flex flex-wrap items-center justify-end gap-2 shrink-0">
               <button (click)="cerrarCalificacionOmr()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cerrar</button>
               @if (resultadoCalificacionOmr(); as resultado) {
-                <button (click)="confirmarCalificacion(resultado)" [disabled]="!todasPaginasCalificadas(resultado) || guardandoCalificacionOmr()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="guardandoCalificacionOmr()" [class.pi-spinner]="guardandoCalificacionOmr()" [class.pi-check]="!guardandoCalificacionOmr()"></i> {{ guardandoCalificacionOmr() ? 'Guardando ajustes...' : 'Guardar resultados y pasar a Calificado' }}</button>
+                <button (click)="confirmarCalificacion(resultado)" [disabled]="!todasPaginasCalificadas(resultado) || guardandoCalificacionOmr()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="guardandoCalificacionOmr()" [class.pi-spinner]="guardandoCalificacionOmr()" [class.pi-check]="!guardandoCalificacionOmr()"></i> {{ guardandoCalificacionOmr() ? 'Guardando ajustes...' : ((evaluacionSeleccionadaOmr()?.etapa === 'Calificado' || evaluacionSeleccionadaOmr()?.etapa === 'Confirmado') ? 'Guardar y actualizar calificaciones' : 'Guardar resultados y pasar a Calificado') }}</button>
               }
             </div>
           </div>
@@ -2136,6 +2574,31 @@ interface CampusDisponible extends Campus {
               @if (preguntaSeleccionadaAnulacionOmr(); as seleccion) {
                 <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-950"><strong>Variante {{ seleccion.lectura.letraVariante || '—' }} · Pregunta {{ seleccion.pregunta }}</strong><p class="mt-1 text-xs">La respuesta se conservará para auditoría, pero dejará de contar en la nota.</p></div>
               }
+
+              @if (cargandoVariantesVinculadasAnulacion()) {
+                <div class="py-2 text-center text-xs text-muted-foreground">
+                  <i class="pi pi-spin pi-spinner mr-1"></i> Buscando variantes vinculadas...
+                </div>
+              } @else if (variantesVinculadasAnulacion().length > 0) {
+                <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 text-xs text-indigo-950 space-y-2">
+                  <div class="font-bold flex items-center gap-1.5 text-indigo-900">
+                    <i class="pi pi-link text-indigo-700"></i>
+                    Variantes vinculadas detectadas (mismo reactivo de banco):
+                  </div>
+                  <div class="flex flex-wrap gap-1.5">
+                    @for (v of variantesVinculadasAnulacion(); track v.letraVariante) {
+                      <span class="px-2 py-0.5 rounded bg-white border border-indigo-200 font-mono font-bold text-[10px] text-indigo-900">
+                        Variante {{ v.letraVariante }} · Pregunta {{ v.numeroPregunta }}
+                      </span>
+                    }
+                  </div>
+                  <label class="flex items-center gap-2 cursor-pointer font-bold text-indigo-950 pt-1">
+                    <input type="checkbox" [ngModel]="propagarAnulacionOmr()" (ngModelChange)="propagarAnulacionOmr.set($event)" class="rounded text-indigo-600 h-4 w-4" />
+                    <span>Propagar anulación a las demás variantes vinculadas</span>
+                  </label>
+                </div>
+              }
+
               <label class="block text-xs font-black text-foreground">Motivo <span class="text-rose-600">*</span><textarea [(ngModel)]="motivoAnulacionOmr" rows="4" maxlength="500" placeholder="Ej. Error de impresión, pregunta ambigua..." class="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-rose-400" [disabled]="guardandoAnulacionOmr()"></textarea></label>
               <p class="text-[10px] text-muted-foreground">Este registro quedará en la bitácora con el usuario y la fecha. Solo el administrador y el responsable de evaluaciones pueden realizar esta acción.</p>
             </div>
@@ -2155,13 +2618,24 @@ interface CampusDisponible extends Campus {
                 <section class="mb-4 rounded-xl border border-border bg-muted/20 p-4" aria-label="Escaneados guardados">
                   <h4 class="text-sm font-black text-foreground">Escaneados de la evaluación</h4>
                   <p class="mt-1 text-xs text-muted-foreground">Consulta el archivo original completo y recorre sus páginas. Las notas permanecen guardadas.</p>
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    @for (archivo of escaneadosNotasOmr(); track archivo.id) {
-                      <button type="button" (click)="verEscaneadoOmr(archivo.id)" class="rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary hover:bg-muted cursor-pointer" [attr.aria-pressed]="escaneadoOmrSeleccionado() === archivo.id">
-                        <i class="pi pi-eye mr-1"></i> Ver escaneado {{ $index + 1 }} · {{ archivo.estudiantes }} estudiante(s)
+                  <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap gap-2">
+                      @for (archivo of escaneadosNotasOmr(); track archivo.id) {
+                        <button type="button" (click)="verEscaneadoOmr(archivo.id)" class="rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary hover:bg-muted cursor-pointer" [attr.aria-pressed]="escaneadoOmrSeleccionado() === archivo.id">
+                          <i class="pi pi-eye mr-1"></i> Ver escaneado {{ $index + 1 }} · {{ archivo.estudiantes }} estudiante(s)
+                        </button>
+                      } @empty {
+                        <p class="text-xs text-muted-foreground">Estas calificaciones no tienen un escaneado asociado.</p>
+                      }
+                    </div>
+                    @if (puedeRecalificar(evaluacionSeleccionadaNotas()!)) {
+                      <button type="button" (click)="reEscanearDesdeNotas()" 
+                              title="Cargar nuevo escaneado OMR y volver a calificar"
+                              aria-label="Cargar nuevo escaneado OMR y volver a calificar"
+                              class="rounded-xl border border-indigo-200 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition">
+                        <i class="pi pi-upload"></i>
+                        <span>Cargar nuevo escaneado OMR y volver a calificar</span>
                       </button>
-                    } @empty {
-                      <p class="text-xs text-muted-foreground">Estas calificaciones no tienen un escaneado asociado.</p>
                     }
                   </div>
                   @if (cargandoEscaneadoOmr()) {
@@ -2183,9 +2657,236 @@ interface CampusDisponible extends Campus {
                 </section>
               }
               @if (!cargandoNotasOmr() && notasOmr().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen calificaciones OMR guardadas para esta evaluación.</div> }
-              @else if (!cargandoNotasOmr()) { <div class="border border-border rounded-xl overflow-hidden"><div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Variante</span><span>/60</span><span>/100</span><span>Estado</span></div><div class="divide-y divide-border">@for (nota of notasOmr(); track nota.id) {<div class="grid grid-cols-[50px_1fr_90px_90px_90px_100px] gap-2 px-3 py-2.5 items-center text-xs"><span class="font-mono text-muted-foreground">{{ $index + 1 }}</span><span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span><span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span><strong>{{ nota.notaSobre60 }}</strong><strong>{{ nota.notaSobre100 }}</strong><span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="nota.estadoCalificacion !== 'APROBADO'">{{ nota.estadoCalificacion }}</span></div>}</div></div> }
+              @else if (!cargandoNotasOmr()) {
+                <div class="border border-border rounded-xl overflow-hidden">
+                  <div class="grid grid-cols-[45px_1fr_80px_85px_70px_70px_100px_80px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground items-center">
+                    <span>N°</span><span>Estudiante</span><span>Variante</span><span class="text-center">Aciertos</span><span>/60</span><span>/100</span><span>Estado</span><span class="text-right">Acción</span>
+                  </div>
+                  <div class="divide-y divide-border">
+                    @for (nota of notasOmr(); track nota.id) {
+                      <div class="grid grid-cols-[45px_1fr_80px_85px_70px_70px_100px_80px] gap-2 px-3 py-2.5 items-center text-xs">
+                        <span class="font-mono text-muted-foreground">{{ $index + 1 }}</span>
+                        <span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span>
+                        <span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span>
+                        <span class="text-center font-mono font-bold" [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'" [class.text-slate-700]="nota.estadoCalificacion !== 'ANULADO'">
+                          {{ nota.estadoCalificacion === 'ANULADO' ? ('0/' + (nota.totalReactivos ?? 28)) : ((nota.aciertos ?? 0) + '/' + (nota.totalReactivos ?? 28)) }}
+                        </span>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : (nota.notaSobre60 ?? 0) }}</strong>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : (nota.notaSobre100 ?? 0) }}</strong>
+                        <span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'" [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'" [class.bg-rose-50]="nota.estadoCalificacion === 'ANULADO'" [class.px-1.5]="nota.estadoCalificacion === 'ANULADO'" [class.py-0.5]="nota.estadoCalificacion === 'ANULADO'" [class.rounded]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion }}</span>
+                        <div class="text-right">
+                          @if (puedeAnularExamenEstudiante()) {
+                            @if (nota.estadoCalificacion === 'ANULADO') {
+                              <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: nota.codigoEstudiante, nombre: nota.estudianteNombreCompleto, anulado: true, calificacionId: nota.id })" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">Restaurar</button>
+                            } @else {
+                              <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: nota.codigoEstudiante, nombre: nota.estudianteNombreCompleto, anulado: false, calificacionId: nota.id })" class="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">Anular</button>
+                            }
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
             </div>
             <div class="p-4 border-t border-border flex justify-end shrink-0"><button (click)="cerrarNotasOmr()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: RECALIFICACIÓN OMR -->
+      @if (dialogRecalificarOmr()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-indigo-200 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-indigo-700">Proceso extraordinario</p>
+                <h3 class="text-lg font-black text-foreground">Volver a calificar (Recalificación OMR)</h3>
+                <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaRecalificar()?.codigo }} · {{ evaluacionSeleccionadaRecalificar()?.materia }} · {{ evaluacionSeleccionadaRecalificar()?.grupo }}</p>
+              </div>
+              <button type="button" (click)="cerrarModalRecalificar()" [disabled]="guardandoRecalificarOmr()" class="text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 space-y-4">
+              <div class="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3.5 text-xs text-indigo-950 space-y-2">
+                <div class="font-bold flex items-center gap-1.5 text-indigo-900">
+                  <i class="pi pi-info-circle text-indigo-700"></i>
+                  Recalibración de calificaciones existentes
+                </div>
+                <p class="text-[11px] text-indigo-900/90 leading-relaxed">
+                  Esta acción volverá a calcular las notas de todas las cartillas procesadas utilizando la clave oficial vigente y las excepciones registradas (preguntas anuladas o claves corregidas).
+                </p>
+                <p class="text-[11px] font-semibold text-indigo-950">
+                  Su usuario y la fecha quedarán registrados en la bitácora oficial de auditoría.
+                </p>
+              </div>
+
+              <label class="block text-xs font-black text-foreground">
+                Motivo de la recalificación <span class="text-rose-600">*</span>
+                <textarea [ngModel]="motivoRecalificarOmr()" (ngModelChange)="motivoRecalificarOmr.set($event)" rows="3" maxlength="500" placeholder="Ej. Actualización de clave oficial por corrección docente, anulación de reactivo..." class="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-indigo-500" [disabled]="guardandoRecalificarOmr()"></textarea>
+              </label>
+            </div>
+            <div class="p-4 border-t border-border flex justify-end gap-2">
+              <button type="button" (click)="cerrarModalRecalificar()" [disabled]="guardandoRecalificarOmr()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer disabled:opacity-50">
+                Cancelar
+              </button>
+              <button type="button" (click)="confirmarRecalificar()" [disabled]="guardandoRecalificarOmr() || motivoRecalificarOmr().trim().length < 5" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black cursor-pointer disabled:opacity-50">
+                <i class="pi mr-1.5" [class.pi-spin]="guardandoRecalificarOmr()" [class.pi-spinner]="guardandoRecalificarOmr()" [class.pi-sync]="!guardandoRecalificarOmr()"></i>
+                {{ guardandoRecalificarOmr() ? 'Recalificando...' : 'Confirmar Recalificación' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: CORREGIR CLAVE OFICIAL DOCENTE -->
+      @if (dialogEditarClaveOmr()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-[70] animate-fade-in">
+          <div class="bg-card border border-indigo-200 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-indigo-700">Corrección de clave de respuestas</p>
+                <h3 class="text-lg font-black text-foreground">Editar respuesta correcta oficial</h3>
+                <p class="text-xs text-muted-foreground">Corrija el inciso oficial ante error docente. Se recalcularán las notas automáticamente.</p>
+              </div>
+              <button type="button" (click)="cerrarEdicionClave()" [disabled]="guardandoEdicionClaveOmr()" class="text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 space-y-4">
+              @if (preguntaSeleccionadaClaveOmr(); as sel) {
+                <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 text-xs text-indigo-950 flex items-center justify-between">
+                  <div>
+                    <span class="font-extrabold uppercase">Variante {{ sel.variante }} · Pregunta {{ sel.numeroPregunta }}</span>
+                    <p class="text-[11px] text-muted-foreground mt-0.5">Clave docente actual: <strong class="text-indigo-900 font-mono text-sm">{{ sel.claveActual || '—' }}</strong></p>
+                  </div>
+                  <span class="px-2 py-1 rounded-md bg-indigo-100 text-indigo-800 font-bold text-[10px]">Docente</span>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-black text-foreground mb-2">Seleccione la nueva clave oficial correcta:</label>
+                  <div class="flex items-center gap-2">
+                    @for (inciso of ['A', 'B', 'C', 'D', 'E']; track inciso) {
+                      <button type="button"
+                              (click)="nuevaClaveOmr.set(inciso)"
+                              class="w-11 h-11 rounded-xl font-mono font-black text-base border cursor-pointer transition-all flex items-center justify-center shadow-2xs"
+                              [class.bg-indigo-600]="nuevaClaveOmr() === inciso"
+                              [class.text-white]="nuevaClaveOmr() === inciso"
+                              [class.border-indigo-600]="nuevaClaveOmr() === inciso"
+                              [class.scale-105]="nuevaClaveOmr() === inciso"
+                              [class.bg-white]="nuevaClaveOmr() !== inciso"
+                              [class.text-foreground]="nuevaClaveOmr() !== inciso"
+                              [class.border-border]="nuevaClaveOmr() !== inciso"
+                              [class.hover:border-indigo-300]="nuevaClaveOmr() !== inciso">
+                        {{ inciso }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                @if (cargandoVariantesVinculadasClave()) {
+                  <div class="py-2 text-center text-xs text-muted-foreground">
+                    <i class="pi pi-spin pi-spinner mr-1"></i> Buscando variantes vinculadas...
+                  </div>
+                } @else if (variantesVinculadasClave().length > 0) {
+                  <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 text-xs text-indigo-950 space-y-2">
+                    <div class="font-bold flex items-center gap-1.5 text-indigo-900">
+                      <i class="pi pi-link text-indigo-700"></i>
+                      Variantes vinculadas detectadas (mismo reactivo de banco):
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                      @for (v of variantesVinculadasClave(); track v.letraVariante) {
+                        <span class="px-2 py-0.5 rounded bg-white border border-indigo-200 font-mono font-bold text-[10px] text-indigo-900">
+                          Variante {{ v.letraVariante }} · Pregunta {{ v.numeroPregunta }} (Clave: {{ v.claveActual || '—' }})
+                        </span>
+                      }
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer font-bold text-indigo-950 pt-1">
+                      <input type="checkbox" [ngModel]="propagarClaveOmr()" (ngModelChange)="propagarClaveOmr.set($event)" class="rounded text-indigo-600 h-4 w-4" />
+                      <span>Propagar nueva clave a las demás variantes vinculadas</span>
+                    </label>
+                  </div>
+                }
+
+                <label class="block text-xs font-black text-foreground">
+                  Motivo de la corrección <span class="text-rose-600">*</span>
+                  <textarea [ngModel]="motivoEdicionClaveOmr()" (ngModelChange)="motivoEdicionClaveOmr.set($event)" rows="3" maxlength="500" placeholder="Ej. Error en cartilla docente, opción correcta verificada con la cátedra..." class="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-indigo-500" [disabled]="guardandoEdicionClaveOmr()"></textarea>
+                </label>
+                <p class="text-[10px] text-muted-foreground">La bitácora registrará el usuario, la clave anterior y la nueva, junto con la IP y fecha.</p>
+              }
+            </div>
+            <div class="p-4 border-t border-border flex justify-end gap-2">
+              <button type="button" (click)="cerrarEdicionClave()" [disabled]="guardandoEdicionClaveOmr()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer disabled:opacity-50">
+                Cancelar
+              </button>
+              <button type="button" (click)="confirmarEdicionClave()" [disabled]="guardandoEdicionClaveOmr() || !nuevaClaveOmr() || motivoEdicionClaveOmr().trim().length < 5" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black cursor-pointer disabled:opacity-50">
+                <i class="pi mr-1.5" [class.pi-spin]="guardandoEdicionClaveOmr()" [class.pi-spinner]="guardandoEdicionClaveOmr()" [class.pi-check]="!guardandoEdicionClaveOmr()"></i>
+                {{ guardandoEdicionClaveOmr() ? 'Guardando...' : 'Guardar y Recalcular' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: ANULACIÓN INDIVIDUAL DE EXAMEN DE ESTUDIANTE -->
+      @if (dialogAnularExamenEstudiante()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-[75] animate-fade-in">
+          <div class="bg-card border border-rose-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-rose-700">Estado de examen individual</p>
+                <h3 class="text-lg font-black text-foreground">{{ estudianteSeleccionadoAnulacion()?.anulado ? 'Restaurar examen' : 'Anular examen' }}</h3>
+                <p class="text-xs text-muted-foreground">{{ estudianteSeleccionadoAnulacion()?.codigo }} · {{ estudianteSeleccionadoAnulacion()?.nombre || 'Estudiante' }}</p>
+              </div>
+              <button type="button" (click)="cerrarAnulacionExamenEstudiante()" [disabled]="guardandoAnulacionExamenEstudiante()" class="text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 space-y-4">
+              @if (estudianteSeleccionadoAnulacion()?.anulado) {
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs text-emerald-950 space-y-1">
+                  <div class="font-bold flex items-center gap-1.5 text-emerald-900">
+                    <i class="pi pi-refresh text-emerald-700"></i>
+                    Restauración de examen
+                  </div>
+                  <p class="text-[11px] text-emerald-900/90 leading-relaxed">
+                    El examen volverá a ser evaluado con los marcajes leídos y el patrón oficial, restaurando su nota real.
+                  </p>
+                </div>
+              } @else {
+                <div class="rounded-xl border border-rose-200 bg-rose-50/60 p-3 text-xs text-rose-950 space-y-1">
+                  <div class="font-bold flex items-center gap-1.5 text-rose-900">
+                    <i class="pi pi-ban text-rose-700"></i>
+                    Anulación de examen
+                  </div>
+                  <p class="text-[11px] text-rose-900/90 leading-relaxed">
+                    El examen quedará en estado <strong>ANULADO</strong> con nota <strong>0/60</strong>. Las respuestas se mantendrán registradas para efectos de auditoría.
+                  </p>
+                </div>
+
+                <label class="block text-xs font-black text-foreground">
+                  Motivo de anulación <span class="text-rose-600">*</span>
+                  <textarea [ngModel]="motivoAnulacionExamenEstudiante()" (ngModelChange)="motivoAnulacionExamenEstudiante.set($event)" rows="3" maxlength="500" placeholder="Ej. Intento de suplantación, cartilla adulterada, plagio comprobado..." class="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-rose-500" [disabled]="guardandoAnulacionExamenEstudiante()"></textarea>
+                </label>
+              }
+            </div>
+            <div class="p-4 border-t border-border flex justify-end gap-2">
+              <button type="button" (click)="cerrarAnulacionExamenEstudiante()" [disabled]="guardandoAnulacionExamenEstudiante()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer disabled:opacity-50">
+                Cancelar
+              </button>
+              <button type="button"
+                      (click)="confirmarAnulacionExamenEstudiante()"
+                      [disabled]="guardandoAnulacionExamenEstudiante() || (!estudianteSeleccionadoAnulacion()?.anulado && motivoAnulacionExamenEstudiante().trim().length < 5)"
+                      class="px-4 py-2 rounded-xl text-white text-xs font-black cursor-pointer disabled:opacity-50"
+                      [class.bg-rose-600]="!estudianteSeleccionadoAnulacion()?.anulado"
+                      [class.hover:bg-rose-700]="!estudianteSeleccionadoAnulacion()?.anulado"
+                      [class.bg-emerald-600]="estudianteSeleccionadoAnulacion()?.anulado"
+                      [class.hover:bg-emerald-700]="estudianteSeleccionadoAnulacion()?.anulado">
+                <i class="pi mr-1.5" [class.pi-spin]="guardandoAnulacionExamenEstudiante()" [class.pi-spinner]="guardandoAnulacionExamenEstudiante()" [class.pi-check]="!guardandoAnulacionExamenEstudiante()"></i>
+                {{ guardandoAnulacionExamenEstudiante() ? 'Guardando...' : (estudianteSeleccionadoAnulacion()?.anulado ? 'Confirmar Restauración' : 'Confirmar Anulación') }}
+              </button>
+            </div>
           </div>
         </div>
       }
@@ -2200,7 +2901,13 @@ interface CampusDisponible extends Campus {
               @else if (resultadosVirtuales().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen resultados para esta sala.</div> }
               @else { <div class="space-y-3">@for (resultado of resultadosVirtuales(); track resultado.intentoId) {<article class="rounded-xl border border-border bg-muted/20 p-4"><div class="flex flex-wrap items-center justify-between gap-3"><div><strong class="text-sm text-foreground">{{ resultado.codigoEstudiante }} · {{ resultado.nombreEstudiante }}</strong><p class="mt-1 text-[10px] font-black uppercase text-cyan-700">Variante {{ resultado.letraVariante || '—' }} · {{ resultado.estado }}</p></div><div class="flex gap-4 text-xs"><span><small class="block text-[10px] text-muted-foreground">Aciertos</small><b>{{ resultado.aciertos ?? 0 }}/30</b></span><span><small class="block text-[10px] text-muted-foreground">Nota /30</small><b>{{ resultado.notaSobre30 || '0.00' }}</b></span><span><small class="block text-[10px] text-muted-foreground">Nota /100</small><b>{{ resultado.notaSobre100 || '0.00' }}</b></span></div></div><div class="mt-3 flex flex-wrap gap-1.5">@for (respuesta of resultado.respuestas; track respuesta.numeroPregunta) {<span class="rounded-lg border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-black text-cyan-900">{{ respuesta.numeroPregunta }}: {{ respuesta.respuesta }}</span>} @if (!resultado.respuestas.length) {<span class="text-[11px] text-muted-foreground">Sin respuestas marcadas</span>}</div></article>}</div> }
             </div>
-            <div class="p-4 border-t border-border flex justify-end shrink-0"><button (click)="cerrarResultadosVirtuales()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
+            <div class="p-4 border-t border-border flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <button (click)="exportarResultadosVirtualesExcel()" [disabled]="!resultadosVirtuales().length" class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs transition">
+                <i class="pi pi-file-excel"></i>
+                <span>Exportar calificaciones (.xlsx)</span>
+              </button>
+              <button (click)="cerrarResultadosVirtuales()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button>
+            </div>
           </div>
         </div>
       }
@@ -2305,7 +3012,12 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     () => this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
   );
   public readonly esEvaluacionesPorCampus = computed(
-    () => this.esPersonalEvaluaciones() || this.esResponsableEvaluaciones()
+    () => this.esPersonalEvaluaciones()
+  );
+  public readonly puedeListarTodasLasCarreras = computed(
+    () => this.esPersonalEvaluaciones()
+      || this.esResponsableEvaluaciones()
+      || this.esAdministradorSistema()
   );
   public readonly carreraTodasCodigo = '__TODAS_LAS_CARRERAS__';
   public todasCarrerasSeleccionadas = signal(false);
@@ -2462,17 +3174,60 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public resultadoCalificacionOmr = signal<OmrJobResponse | null>(null);
   public mensajeCalificacionOmr = signal<string | null>(null);
   public errorCalificacionOmr = signal<boolean>(false);
+  public porcentajeProgresoOmr = signal<number>(0);
+  public pasoActualProgresoOmr = signal<string>('Iniciando procesamiento...');
+  public tiempoTranscurridoOmr = signal<number>(0);
+  private _intervaloProgresoOmr: any = null;
+  private _inicioTiempoProgresoOmr: number = 0;
   public edicionesOmr = signal<Record<number, { codigo: string }>>({});
   public edicionesRespuestasOmr = signal<Record<string, string>>({});
   public previewPaginasOmr = signal<string[]>([]);
   public cargandoPreviewOmr = signal<boolean>(false);
   public paginaPreviewOmr = signal<number | null>(null);
+  public paginasPreviewOcultas = signal<Record<number, boolean>>({});
+  public tabRespuestasOmr = signal<Record<number, '1-40' | '41-60'>>({});
   public recalibrandoOmr = signal<Record<number, boolean>>({});
   public anulacionesOmr = signal<AnulacionPreguntaOmr[]>([]);
   public dialogAnulacionOmr = signal(false);
   public preguntaSeleccionadaAnulacionOmr = signal<{ lectura: OmrLecturaResponse; pregunta: number } | null>(null);
   public motivoAnulacionOmr = '';
   public guardandoAnulacionOmr = signal(false);
+  public propagarAnulacionOmr = signal<boolean>(true);
+  public variantesVinculadasAnulacion = signal<VarianteVinculada[]>([]);
+  public cargandoVariantesVinculadasAnulacion = signal<boolean>(false);
+
+  // Recalificación OMR
+  public dialogRecalificarOmr = signal<boolean>(false);
+  public evaluacionSeleccionadaRecalificar = signal<EvaluacionItemUI | null>(null);
+  public motivoRecalificarOmr = signal<string>('');
+  public guardandoRecalificarOmr = signal<boolean>(false);
+
+  // Edición de clave patrón oficial (corrección de clave docente)
+  public dialogEditarClaveOmr = signal<boolean>(false);
+  public preguntaSeleccionadaClaveOmr = signal<{
+    lectura?: OmrLecturaResponse;
+    variante: string;
+    numeroPregunta: number;
+    claveActual: string;
+  } | null>(null);
+  public nuevaClaveOmr = signal<string>('');
+  public propagarClaveOmr = signal<boolean>(true);
+  public motivoEdicionClaveOmr = signal<string>('');
+  public variantesVinculadasClave = signal<VarianteVinculada[]>([]);
+  public cargandoVariantesVinculadasClave = signal<boolean>(false);
+  public guardandoEdicionClaveOmr = signal<boolean>(false);
+
+  // Anulación individual de examen de estudiante
+  public dialogAnularExamenEstudiante = signal<boolean>(false);
+  public estudianteSeleccionadoAnulacion = signal<{
+    codigo: string;
+    nombre?: string;
+    anulado: boolean;
+    pagina?: number;
+    calificacionId?: number;
+  } | null>(null);
+  public motivoAnulacionExamenEstudiante = signal<string>('');
+  public guardandoAnulacionExamenEstudiante = signal<boolean>(false);
 
   // Consulta de notas ya persistidas.
   public dialogNotasOmr = signal<boolean>(false);
@@ -2506,6 +3261,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public dialogSalaVirtual = signal<boolean>(false);
   public salaVirtualCreada = signal<SalaVirtualOperacion | null>(null);
   public salaVirtualExistente = signal<boolean>(false);
+  public evaluacionSeleccionadaSala = signal<EvaluacionItemUI | null>(null);
   public accesosVirtuales = signal<AccesoVirtualGenerado[]>([]);
   public tokenGrupoVirtual = signal<string | null>(null);
   public emitiendoTokenGrupoVirtual = signal<boolean>(false);
@@ -2731,7 +3487,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public onCarreraChange(careerCode: string): void {
-    if (this.esEvaluacionesPorCampus() && careerCode === this.carreraTodasCodigo) {
+    if (this.puedeListarTodasLasCarreras() && careerCode === this.carreraTodasCodigo) {
       this.todasCarrerasSeleccionadas.set(true);
       this.carreraSeleccionada.set(null);
       this._cargarEvaluaciones();
@@ -2833,7 +3589,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.carreras.set(carrerasVisibles);
         this.cargandoCarreras.set(false);
         if (carrerasVisibles.length > 0) {
-          if (this.esEvaluacionesPorCampus()) {
+          if (this.puedeListarTodasLasCarreras()) {
             this.todasCarrerasSeleccionadas.set(true);
             this.carreraSeleccionada.set(null);
           } else {
@@ -2904,7 +3660,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const sede = this.sedeSeleccionada();
     const carrera = this.carreraSeleccionada();
     const campus = this.campusSeleccionado();
-    const todasCarreras = this.esEvaluacionesPorCampus() && this.todasCarrerasSeleccionadas();
+    const todasCarreras = this.puedeListarTodasLasCarreras() && this.todasCarrerasSeleccionadas();
     if (!sede || (!carrera && !todasCarreras) || (this.esEvaluacionesPorCampus() && !campus)) return;
 
     this.cargando.set(true);
@@ -2951,10 +3707,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const conCartilla = modalidad === 'PRESENCIAL_CARTILLA';
     const etapaMapeada = this._mapearEtapa(rol.estadoFlujo);
     const registroAnterior = this.evaluaciones().find(item => item.id === rol.id);
-    // Compatibilidad con generaciones virtuales antiguas: aunque hayan
-    // quedado como GENERADO, operativamente esperan una sala y no un PDF.
-    const etapa = modalidad === 'VIRTUAL' && etapaMapeada === 'Generado'
-      ? 'Validado'
+    // Para evaluaciones virtuales: si ya cuenta con variantes generadas o se
+    // encuentra en GENERADO, operativamente se ubica en 'Generado' (Sala Virtual).
+    const etapa = modalidad === 'VIRTUAL' && (etapaMapeada === 'Generado' || (etapaMapeada === 'Validado' && (rol.variantesGeneradasCount || 0) > 0))
+      ? 'Generado'
       : etapaMapeada;
 
     return {
@@ -2992,7 +3748,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       etapa,
       hora: rol.horario.split('-')[0]?.trim() || '08:15',
       variantesGeneradas: rol.variantesGeneradasCount,
-      bancoPreguntasCargado: rol.bancoPreguntasCargado
+      bancoPreguntasCargado: rol.bancoPreguntasCargado,
+      requiereVerificacion: rol.requiereVerificacion,
+      estadoVerificacion: rol.estadoVerificacion,
+      verificadoPor: rol.verificadoPor,
+      fechaVerificacion: rol.fechaVerificacion
     };
   }
 
@@ -3014,6 +3774,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       case 'DEVUELTO': return 'Devuelto';
       case 'PENDIENTE_NOTAS': return 'Pendiente de notas';
       case 'CALIFICADO': return 'Calificado';
+      case 'CONFIRMADO': return 'Confirmado';
       default: return 'Programado';
     }
   }
@@ -3029,7 +3790,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
    * PERSONAL_EVALUACIONES. La hora oficial continúa siendo la del servidor.
    */
   public politicaTemporalBloqueada(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): boolean {
-    if (!this.esPersonalEvaluaciones() || !['Generado', 'Entregado'].includes(pasoKey)) return false;
+    if (!this.esPersonalEvaluaciones() || item.modalidad === 'VIRTUAL' || !['Generado', 'Entregado'].includes(pasoKey)) return false;
     const inicio = this.inicioExamenLocal(item);
     if (!inicio) return true;
     const configuracion = this._configuracionEvaluaciones.configuracion();
@@ -3080,14 +3841,16 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public puedeGestionarCartillas(item: EvaluacionItemUI): boolean {
     if (this.esConsultaAcademica() || item.modalidad === 'VIRTUAL') return false;
-    // Las marcas se pueden preparar antes de entregar el examen. Desde
-    // Entregado en adelante la cartilla ya no debe modificarse.
+    // Administrador y Responsable de evaluaciones siempre tienen habilitado marcas y lista indistintamente del estado
+    if (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones()) {
+      return true;
+    }
     return ['Programado', 'Validado', 'Generado', 'Impreso'].includes(item.etapa);
   }
 
   public puedeMostrarConfiguracion(item: EvaluacionItemUI): boolean {
     return !this.esConsultaAcademica() && (item.modalidad === 'VIRTUAL'
-      ? ['Validado', 'Calificado'].includes(item.etapa)
+      ? ['Validado', 'Generado', 'Calificado'].includes(item.etapa)
       : ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa));
   }
 
@@ -3095,11 +3858,19 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     return (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones())
       && !this.esConsultaAcademica()
       && item.modalidad !== 'PRESENCIAL_SIN_CARTILLA'
-      && ['Devuelto', 'Pendiente de notas', 'Calificado'].includes(item.etapa);
+      && ['Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado', 'Confirmado'].includes(item.etapa);
   }
 
   public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
-    return !this.esConsultaAcademica() && item.modalidad === 'PRESENCIAL_CARTILLA' && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
+    return !this.esConsultaAcademica() && item.modalidad === 'PRESENCIAL_CARTILLA' && ['Pendiente de notas', 'Calificado', 'Confirmado'].includes(item.etapa);
+  }
+
+  public puedeRecalificar(item: EvaluacionItemUI | null | undefined): boolean {
+    if (!item) return false;
+    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones())
+      && !this.esConsultaAcademica()
+      && item.modalidad === 'PRESENCIAL_CARTILLA'
+      && ['Calificado', 'Confirmado'].includes(item.etapa);
   }
 
   public puedeMostrarResultadosVirtuales(item: EvaluacionItemUI): boolean {
@@ -3352,11 +4123,16 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public getPasosFlujo(item: EvaluacionItemUI): StepDef[] {
     if (item.modalidad === 'VIRTUAL') {
-      return [
+      const pasosVirtual: StepDef[] = [
         { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
-        { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
-        { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
+        { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' }
       ];
+      if (item.requiereVerificacion) {
+        pasosVirtual.push({ key: 'Verificado', label: 'Verificado', icon: 'pi pi-verified' });
+      }
+      pasosVirtual.push({ key: 'Generado', label: 'Sala Virtual', icon: 'pi pi-desktop' });
+      pasosVirtual.push({ key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' });
+      return pasosVirtual;
     }
     if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
       return [
@@ -3366,6 +4142,20 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
         { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
         { key: 'Pendiente de notas', label: 'Pendiente de notas', icon: 'pi pi-upload' },
+        { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' },
+        { key: 'Confirmado', label: 'Confirmado', icon: 'pi pi-check-square' }
+      ];
+    }
+    if (item.requiereVerificacion) {
+      return [
+        { key: 'Programado', label: 'Programado', icon: 'pi pi-calendar' },
+        { key: 'Validado', label: 'Validado', icon: 'pi pi-shield' },
+        { key: 'Verificado', label: 'Verificado', icon: 'pi pi-verified' },
+        { key: 'Generado', label: 'Generado', icon: 'pi pi-bolt' },
+        { key: 'Impreso', label: 'Impreso', icon: 'pi pi-print' },
+        { key: 'Entregado', label: 'Entregado', icon: 'pi pi-send' },
+        { key: 'Devuelto', label: 'Devuelto', icon: 'pi pi-replay' },
+        { key: 'Pendiente de notas', label: 'Pendiente de calificación', icon: 'pi pi-upload' },
         { key: 'Calificado', label: 'Calificado', icon: 'pi pi-check-circle' }
       ];
     }
@@ -3398,11 +4188,41 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
     }
 
+    // Manejo específico del paso Verificado
+    if (pasoKey === 'Verificado') {
+      if (item.etapa === 'Programado') {
+        return 'bg-muted/40 text-muted-foreground/40 border border-transparent cursor-not-allowed';
+      }
+      if (item.estadoVerificacion === 'VERIFICADO' || (currentIdx > pasos.indexOf('Verificado') && currentIdx !== -1)) {
+        return 'bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold hover:bg-emerald-100';
+      }
+      if (item.estadoVerificacion === 'DEVUELTO') {
+        return 'bg-rose-50 text-rose-700 border border-rose-300 font-bold hover:bg-rose-100 animate-pulse';
+      }
+      return 'bg-amber-50 text-amber-700 border border-amber-300 font-bold hover:bg-amber-100';
+    }
+
+    // Bloqueo preventivo de Generado si requiere verificación y no está verificado
+    if (pasoKey === 'Generado'
+        && item.requiereVerificacion
+        && item.estadoVerificacion !== 'VERIFICADO') {
+      return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
+    }
+
+    // Si ya está verificado y está en etapa Validado, Generado es el siguiente paso listo
+    if (pasoKey === 'Generado'
+        && item.requiereVerificacion
+        && item.estadoVerificacion === 'VERIFICADO'
+        && item.etapa === 'Validado') {
+      return 'bg-card text-purple-700 border border-purple-300 hover:bg-purple-100 font-bold animate-pulse hover:animate-none';
+    }
+
+    // Progreso estándar
     if (pasoIdx < currentIdx) {
       return 'bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold hover:bg-emerald-100';
     } else if (pasoIdx === currentIdx) {
       return 'bg-purple-700 text-white font-black shadow-xs ring-2 ring-purple-300 scale-105';
-    } else if (pasoIdx === currentIdx + 1) {
+    } else if (pasoIdx === currentIdx + 1 && (!item.requiereVerificacion || item.estadoVerificacion === 'VERIFICADO')) {
       return 'bg-card text-purple-700 border border-purple-300 hover:bg-purple-100 font-bold animate-pulse hover:animate-none';
     } else {
       return 'bg-muted/40 text-muted-foreground/40 border border-transparent cursor-not-allowed';
@@ -3413,6 +4233,19 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const pasos = this.getPasosFlujo(item).map(p => p.key);
     const currentIdx = pasos.indexOf(item.etapa);
     const pasoIdx = pasos.indexOf(st.key);
+
+    if (st.key === 'Verificado') {
+      if (item.estadoVerificacion === 'VERIFICADO' || (currentIdx > pasos.indexOf('Verificado') && currentIdx !== -1)) {
+        return 'pi pi-check';
+      }
+      if (item.estadoVerificacion === 'DEVUELTO') {
+        return 'pi pi-exclamation-triangle';
+      }
+      if (item.etapa === 'Validado') {
+        return 'pi pi-clock';
+      }
+      return 'pi pi-verified';
+    }
 
     if (pasoIdx < currentIdx) {
       return 'pi pi-check';
@@ -3426,12 +4259,43 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const pasoIdx = pasos.indexOf(st.key);
     const actividad = this.auditoriaDeEtapa(item, st.key);
 
+    if (st.key === 'Verificado') {
+      if (item.estadoVerificacion === 'VERIFICADO' || (currentIdx > pasos.indexOf('Verificado') && currentIdx !== -1)) {
+        const por = item.verificadoPor ? ` por ${item.verificadoPor}` : '';
+        return `Examen verificado y aprobado${por}. Listo para generar`;
+      }
+      if (item.estadoVerificacion === 'DEVUELTO') {
+        return 'Banco observado: El verificador devolvió el banco con observaciones. El docente titular debe corregirlas.';
+      }
+      if (item.etapa === 'Validado') {
+        return 'Pendiente de verificación: En espera de revisión por el verificador designado.';
+      }
+      return 'Verificación académica requerida antes de generar.';
+    }
+
+    if (st.key === 'Generado'
+        && item.requiereVerificacion
+        && item.estadoVerificacion !== 'VERIFICADO') {
+      if (item.estadoVerificacion === 'DEVUELTO') {
+        return 'Bloqueado: El examen presenta observaciones y fue devuelto al docente titular.';
+      }
+      return 'Bloqueado: El examen debe ser verificado antes de generar el documento oficial.';
+    }
+
     if (pasoIdx <= currentIdx && actividad) {
       return `Completado: ${this.formatearFechaHoraAuditoria(actividad.fechaEvento)} · ${actividad.usuario || 'Sistema'}`;
     }
     if (pasoIdx < currentIdx) return `Completado: ${st.label}`;
-    if (pasoIdx === currentIdx) return `Estado actual: ${st.label}`;
-    if (pasoIdx === currentIdx + 1) {
+    if (pasoIdx === currentIdx) {
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Generado') {
+        return 'Gestionar sala virtual y monitorear examen';
+      }
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') {
+        return 'Examen virtual concluido y calificado. Clic para ver notas';
+      }
+      return `Estado actual: ${st.label}`;
+    }
+    if (pasoIdx === currentIdx + 1 || (item.requiereVerificacion && item.estadoVerificacion === 'VERIFICADO' && st.key === 'Generado')) {
       if (this.validacionPorBancoBloqueada(item, st.key)) {
         return 'Este estado se asigna automáticamente cuando el docente carga y se valida el banco de preguntas';
       }
@@ -3442,10 +4306,20 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         return 'Confirma primero la impresión de las marcas OMR y de la lista de estudiantes';
       }
       if (st.key === 'Validado') return 'Clic para Validar y Encriptar Examen de Docente';
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Generado') {
+        return (item.variantesGeneradas && item.variantesGeneradas > 0)
+          ? 'Gestionar sala virtual y proyectar tokens'
+          : 'Clic para preparar examen y generar sala virtual';
+      }
+      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') {
+        return 'Concluir examen y registrar calificaciones automáticas';
+      }
       if (st.key === 'Generado') return 'Clic para generar el examen PDF';
-      if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') return 'Preparar sala virtual, variantes y tokens de acceso';
       if (st.key === 'Pendiente de notas') return 'Habilita la carga de notas del docente o el procesamiento OMR';
       return `Clic para avanzar a: ${st.label}`;
+    }
+    if (item.modalidad === 'VIRTUAL' && st.key === 'Calificado') {
+      return 'Se califica automáticamente al concluir el examen en la sala virtual';
     }
     return `Pendiente: ${st.label}`;
   }
@@ -3477,10 +4351,44 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (pasoKey === 'Verificado') {
+      if (item.estadoVerificacion === 'VERIFICADO') {
+        this._mostrarToast(`Examen verificado y aprobado${item.verificadoPor ? ' por ' + item.verificadoPor : ''}. Listo para generar.`, 'success');
+      } else if (item.estadoVerificacion === 'DEVUELTO') {
+        this._mostrarToast('El banco de preguntas presenta observaciones del verificador y fue devuelto al docente titular.', 'error');
+      } else {
+        this._mostrarToast('El examen se encuentra en espera de dictamen por el docente verificador.', 'info');
+      }
+      return;
+    }
+
+    if (pasoKey === 'Generado'
+        && item.requiereVerificacion
+        && item.estadoVerificacion !== 'VERIFICADO') {
+      this._mostrarToast(item.estadoVerificacion === 'DEVUELTO'
+        ? 'El examen presenta observaciones y fue devuelto al docente titular. Debe subsanarse antes de generar.'
+        : 'El examen debe ser verificado antes de generar el documento oficial.', 'warning');
+      return;
+    }
+
     if (pasoKey === 'Impreso'
         && item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
         && item.etapa === 'Validado') {
       this.abrirConfirmacionImpresionSinCartilla(item);
+      return;
+    }
+
+    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Generado') {
+      this.abrirSalaVirtualDesdeLista(item);
+      return;
+    }
+
+    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado') {
+      if (item.etapa === 'Calificado') {
+        this.abrirResultadosVirtuales(item);
+        return;
+      }
+      this.abrirSalaVirtualDesdeLista(item);
       return;
     }
 
@@ -3489,14 +4397,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (item.modalidad === 'VIRTUAL' && pasoKey === 'Calificado' && item.etapa === 'Validado') {
-      this.abrirModalParametrizacion(item);
-      return;
-    }
-
-    if (pasoKey === 'Calificado' && item.etapa === 'Pendiente de notas' && item.modalidad === 'PRESENCIAL_CARTILLA') {
-      this.abrirCalificacionOmr(item);
-      return;
+    if (pasoKey === 'Calificado' && item.modalidad === 'PRESENCIAL_CARTILLA') {
+      if (item.etapa === 'Calificado' || item.etapa === 'Confirmado') {
+        this.abrirNotasOmr(item);
+        return;
+      }
+      if (item.etapa === 'Pendiente de notas' || item.etapa === 'Devuelto') {
+        this.abrirCalificacionOmr(item);
+        return;
+      }
     }
 
     if (pasoKey === 'Calificado' && item.etapa === 'Pendiente de notas' && item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
@@ -3547,6 +4456,16 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.cargandoPatronCalificado.set(false);
   }
 
+  public preguntasDeVariante(variante: any): number[] {
+    const total = variante?.totalPreguntas || (variante?.respuestas ? Object.keys(variante.respuestas).length : 30);
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  public esPreguntaAnuladaEnVariante(variante: any, pregunta: number): boolean {
+    if (!variante || !pregunta) return false;
+    return (variante.preguntasAnuladas || []).includes(pregunta);
+  }
+
   public imprimirPatronCalificadoDirecto(item: EvaluacionItemUI): void {
     if (!this.puedeMostrarPatronCalificado(item) || this.imprimiendoPatronCalificado()) return;
 
@@ -3567,7 +4486,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       error: async err => {
         ventana?.close();
         this.imprimiendoPatronCalificado.set(false);
-        let mensaje = 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido devuelto.';
+        let mensaje = 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido entregado o devuelto.';
         if (err?.error instanceof Blob) {
           try {
             const raw = await err.error.text();
@@ -3589,7 +4508,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public etiquetaCarreraSeleccionada(): string {
-    return this.todasCarrerasSeleccionadas() ? 'Todas las carreras del campus' : (this.carreraSeleccionada()?.careerName || '—');
+    return this.todasCarrerasSeleccionadas()
+      ? (this.esEvaluacionesPorCampus() ? 'Todas las carreras del campus' : 'Todas las carreras de la sede')
+      : (this.carreraSeleccionada()?.careerName || '—');
   }
 
   public onCampusChange(key: string): void {
@@ -3705,24 +4626,29 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const estados: Record<EtapaEvaluacion, RolExamenResponse['estadoFlujo']> = {
       'Programado': 'PROGRAMADO',
       'Validado': 'VALIDADO',
+      'Verificado': 'VALIDADO',
       'Generado': 'GENERADO',
       'Impreso': 'IMPRESO',
       'Entregado': 'ENTREGADO',
       'Devuelto': 'DEVUELTO',
       'Pendiente de notas': 'PENDIENTE_NOTAS',
-      'Calificado': 'CALIFICADO'
+      'Calificado': 'CALIFICADO',
+      'Confirmado': 'CONFIRMADO'
     };
     return estados[etapa];
   }
 
   private etiquetaPaso(item: EvaluacionItemUI, etapa: EtapaEvaluacion): string {
+    if (item.modalidad === 'VIRTUAL' && etapa === 'Generado') {
+      return 'Sala Virtual';
+    }
     return item.modalidad === 'PRESENCIAL_CARTILLA' && etapa === 'Pendiente de notas'
       ? 'Pendiente de calificación'
       : etapa;
   }
 
   public abrirCalificacionOmr(item: EvaluacionItemUI): void {
-    if (item.etapa !== 'Devuelto' && item.etapa !== 'Pendiente de notas') return;
+    if (item.etapa !== 'Devuelto' && item.etapa !== 'Pendiente de notas' && item.etapa !== 'Calificado' && item.etapa !== 'Confirmado') return;
     this.evaluacionSeleccionadaOmr.set(item);
     this.archivoOmrSeleccionado.set(null);
     this.impresoraCalificacionOmr.set('');
@@ -3737,17 +4663,26 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.cerrarDialogoAnulacionOmr();
     this.procesandoCalificacionOmr.set(false);
     this.guardandoCalificacionOmr.set(false);
+    this._detenerProgresoCalificacionOmr();
+    this.porcentajeProgresoOmr.set(0);
+    this.tiempoTranscurridoOmr.set(0);
+    this.pasoActualProgresoOmr.set('Listo para procesar');
     this.mensajeCalificacionOmr.set('Seleccione el PDF escaneado para iniciar la lectura página por página.');
     this.errorCalificacionOmr.set(false);
     this.dialogCalificacionOmr.set(true);
     this._omrService.listarAnulaciones(item.id).subscribe({
-      next: anulaciones => this.anulacionesOmr.set(anulaciones || []),
+      next: anulaciones => {
+        const list = anulaciones || [];
+        this.anulacionesOmr.set(list);
+        this.recalcularLecturasConAnulaciones(list);
+      },
       error: () => this._mostrarToast('No se pudieron consultar las excepciones de preguntas de esta evaluación.', 'error')
     });
   }
 
   public cerrarCalificacionOmr(): void {
     if (this.procesandoCalificacionOmr() || this.guardandoCalificacionOmr()) return;
+    this._detenerProgresoCalificacionOmr();
     this.dialogCalificacionOmr.set(false);
     this.evaluacionSeleccionadaOmr.set(null);
     this.archivoOmrSeleccionado.set(null);
@@ -3757,6 +4692,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.edicionesRespuestasOmr.set({});
     this.previewPaginasOmr.set([]);
     this.paginaPreviewOmr.set(null);
+    this.paginasPreviewOcultas.set({});
+    this.tabRespuestasOmr.set({});
     this.cargandoPreviewOmr.set(false);
     this.recalibrandoOmr.set({});
     this.anulacionesOmr.set([]);
@@ -3771,6 +4708,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.edicionesRespuestasOmr.set({});
     this.previewPaginasOmr.set([]);
     this.paginaPreviewOmr.set(null);
+    this.paginasPreviewOcultas.set({});
+    this.tabRespuestasOmr.set({});
     this.errorCalificacionOmr.set(false);
     this.mensajeCalificacionOmr.set(archivo ? 'Archivo listo para procesar.' : 'Seleccione el PDF escaneado para iniciar la lectura.');
 
@@ -3821,12 +4760,91 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     return paginas;
   }
 
+  public alternarPreviewPagina(pagina: number): void {
+    this.paginasPreviewOcultas.update(actual => ({
+      ...actual,
+      [pagina]: !actual[pagina]
+    }));
+  }
+
+  public esPreviewVisible(pagina: number): boolean {
+    return !this.paginasPreviewOcultas()[pagina];
+  }
+
   public alternarPreviewPaginaOmr(pagina: number): void {
-    this.paginaPreviewOmr.update(actual => actual === pagina ? null : pagina);
+    this.alternarPreviewPagina(pagina);
   }
 
   public previewPaginaOmr(pagina: number): string | null {
     return this.previewPaginasOmr()[pagina - 1] || null;
+  }
+
+  public formatearTiempoOmr(segundos: number): string {
+    const min = Math.floor(segundos / 60);
+    const seg = segundos % 60;
+    return `${min}:${seg < 10 ? '0' : ''}${seg}`;
+  }
+
+  public pasoProgresoOmrActivo(paso: number): boolean {
+    const p = this.porcentajeProgresoOmr();
+    if (paso === 1) return p >= 5 && p < 25;
+    if (paso === 2) return p >= 25 && p < 55;
+    if (paso === 3) return p >= 55 && p < 85;
+    if (paso === 4) return p >= 85 && p < 100;
+    return false;
+  }
+
+  public pasoProgresoOmrCompletado(paso: number): boolean {
+    const p = this.porcentajeProgresoOmr();
+    if (paso === 1) return p >= 25;
+    if (paso === 2) return p >= 55;
+    if (paso === 3) return p >= 85;
+    if (paso === 4) return p >= 100;
+    return false;
+  }
+
+  private _iniciarProgresoCalificacionOmr(): void {
+    this._detenerProgresoCalificacionOmr();
+    this.porcentajeProgresoOmr.set(6);
+    this.pasoActualProgresoOmr.set('Iniciando lote y enviando al motor OMR...');
+    this.tiempoTranscurridoOmr.set(0);
+    this._inicioTiempoProgresoOmr = Date.now();
+
+    const item = this.evaluacionSeleccionadaOmr();
+    const paginasEstimadas = Math.max(1, this.previewPaginasOmr().length || item?.estudiantesInscritosCount || item?.mapeoEstudiantes?.length || 10);
+    const tiempoEstimadoTotalMs = Math.max(7000, paginasEstimadas * 1200);
+
+    this._intervaloProgresoOmr = window.setInterval(() => {
+      const msTranscurridos = Date.now() - this._inicioTiempoProgresoOmr;
+      const segTranscurridos = Math.floor(msTranscurridos / 1000);
+      this.tiempoTranscurridoOmr.set(segTranscurridos);
+
+      const factor = msTranscurridos / tiempoEstimadoTotalMs;
+      let pct = Math.round(96 * (1 - Math.exp(-2.2 * factor)));
+      if (pct < 6) pct = 6;
+      if (pct > 96) pct = 96;
+
+      this.porcentajeProgresoOmr.set(pct);
+
+      if (pct < 25) {
+        this.pasoActualProgresoOmr.set('Subiendo escaneado y preparando páginas para análisis...');
+      } else if (pct < 55) {
+        this.pasoActualProgresoOmr.set('Identificando códigos QR, variantes y encabezados de estudiantes...');
+      } else if (pct < 85) {
+        this.pasoActualProgresoOmr.set('Escaneando alvéolos OMR y extrayendo marcajes de respuestas...');
+      } else if (pct < 95) {
+        this.pasoActualProgresoOmr.set('Contrastando respuestas con patrones de variantes oficiales...');
+      } else {
+        this.pasoActualProgresoOmr.set('Consolidando resultados y validando consistencia del lote...');
+      }
+    }, 250);
+  }
+
+  private _detenerProgresoCalificacionOmr(): void {
+    if (this._intervaloProgresoOmr) {
+      window.clearInterval(this._intervaloProgresoOmr);
+      this._intervaloProgresoOmr = null;
+    }
   }
 
   public ejecutarCalificacionOmr(): void {
@@ -3837,10 +4855,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.procesandoCalificacionOmr.set(true);
     this.resultadoCalificacionOmr.set(null);
     this.errorCalificacionOmr.set(false);
-    this.mensajeCalificacionOmr.set('Enviando escaneado al motor OMR...');
+    this.mensajeCalificacionOmr.set(null);
+    this._iniciarProgresoCalificacionOmr();
+
     this._omrService.procesar(item.id, archivo, this.impresoraCalificacionOmr()).subscribe({
       next: aceptado => this._esperarResultadoCalificacionOmr(aceptado.jobId),
       error: err => {
+        this._detenerProgresoCalificacionOmr();
         this.procesandoCalificacionOmr.set(false);
         this.errorCalificacionOmr.set(true);
         this.mensajeCalificacionOmr.set(err?.error?.error || err?.error?.message || 'No se pudo enviar el escaneado al motor OMR.');
@@ -3855,19 +4876,63 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
           window.setTimeout(() => this._esperarResultadoCalificacionOmr(jobId), 1200);
           return;
         }
-        this.procesandoCalificacionOmr.set(false);
-        this.resultadoCalificacionOmr.set(resultado);
-        this.edicionesOmr.set({});
-        this.paginaPreviewOmr.set(resultado.resultados?.[0]?.pagina ?? null);
-        this.errorCalificacionOmr.set(resultado.estado !== 'COMPLETADO');
-        this.mensajeCalificacionOmr.set(resultado.estado === 'COMPLETADO'
-          ? 'Lectura OMR completada. Revise cada página antes de pasar la evaluación a Calificado.'
-          : resultado.mensaje || 'El motor OMR no pudo completar la lectura.');
+
+        this._detenerProgresoCalificacionOmr();
+
+        if (resultado.estado === 'COMPLETADO') {
+          this.porcentajeProgresoOmr.set(100);
+          this.pasoActualProgresoOmr.set('¡Procesamiento OMR completado con éxito!');
+          window.setTimeout(() => {
+            this.procesandoCalificacionOmr.set(false);
+            this.resultadoCalificacionOmr.set(resultado);
+            if (this.anulacionesOmr().length > 0) {
+              this.recalcularLecturasConAnulaciones(this.anulacionesOmr());
+            }
+            this.edicionesOmr.set({});
+            this.paginaPreviewOmr.set(null);
+            this.paginasPreviewOcultas.set({});
+            this.tabRespuestasOmr.set({});
+            this.errorCalificacionOmr.set(false);
+            this.mensajeCalificacionOmr.set('Lectura OMR completada. Revise cada página antes de pasar la evaluación a Calificado.');
+          }, 450);
+        } else {
+          this.procesandoCalificacionOmr.set(false);
+          this.resultadoCalificacionOmr.set(resultado);
+          this.errorCalificacionOmr.set(true);
+          this.mensajeCalificacionOmr.set(resultado.mensaje || 'El motor OMR no pudo completar la lectura.');
+        }
       },
       error: () => {
         window.setTimeout(() => this._esperarResultadoCalificacionOmr(jobId), 1500);
       }
     });
+  }
+
+  public tabActualRespuestas(pagina: number): '1-40' | '41-60' {
+    return this.tabRespuestasOmr()[pagina] || '1-40';
+  }
+
+  public cambiarTabRespuestas(pagina: number, tab: '1-40' | '41-60'): void {
+    this.tabRespuestasOmr.update(actual => ({
+      ...actual,
+      [pagina]: tab
+    }));
+  }
+
+  public preguntasColumna1(lectura: OmrLecturaResponse): number[] {
+    return this.preguntasOmr(lectura).filter(p => p >= 1 && p <= 20);
+  }
+
+  public preguntasColumna2(lectura: OmrLecturaResponse): number[] {
+    return this.preguntasOmr(lectura).filter(p => p >= 21 && p <= 40);
+  }
+
+  public preguntasColumna3(lectura: OmrLecturaResponse): number[] {
+    return this.preguntasOmr(lectura).filter(p => p >= 41 && p <= 60);
+  }
+
+  public tienePreguntas41a60(lectura: OmrLecturaResponse): boolean {
+    return this.preguntasColumna3(lectura).length > 0;
   }
 
   public cantidadRespuestasLeidas(lectura: OmrLecturaResponse): number {
@@ -3910,8 +4975,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public puedeAjustarIncisosOmr(): boolean {
     const etapa = this.evaluacionSeleccionadaOmr()?.etapa;
-    return this.esResponsableEvaluaciones()
-      && (etapa === 'Devuelto' || etapa === 'Pendiente de notas');
+    return (this.esResponsableEvaluaciones() || this.esAdministradorSistema())
+      && (etapa === 'Devuelto' || etapa === 'Pendiente de notas' || etapa === 'Calificado' || etapa === 'Confirmado');
   }
 
   public editarRespuestaOmr(lectura: OmrLecturaResponse, pregunta: number, respuesta: string): void {
@@ -3995,13 +5060,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.guardandoAnulacionOmr.set(true);
         this._omrService.reactivarPregunta(item.id, anulacion.letraVariante, anulacion.numeroPregunta).subscribe({
           next: () => {
-            this.anulacionesOmr.update(items => items.filter(actual => actual.id !== anulacion.id));
+            const restantes = this.anulacionesOmr().filter(actual => actual.id !== anulacion.id);
+            this.anulacionesOmr.set(restantes);
+            this.recalcularLecturasConAnulaciones(restantes);
             this.guardandoAnulacionOmr.set(false);
             this._mostrarToast(`Pregunta ${pregunta} de la variante ${lectura.letraVariante} reactivada.`);
           },
           error: err => {
             this.guardandoAnulacionOmr.set(false);
-            this._mostrarToast(err?.error?.message || 'No se pudo reactivar la pregunta.', 'error');
+            this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo reactivar la pregunta.', 'error');
           }
         });
       });
@@ -4009,7 +5076,26 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }
     this.preguntaSeleccionadaAnulacionOmr.set({ lectura, pregunta });
     this.motivoAnulacionOmr = '';
+    this.propagarAnulacionOmr.set(true);
+    this.variantesVinculadasAnulacion.set([]);
+    this.cargandoVariantesVinculadasAnulacion.set(true);
     this.dialogAnulacionOmr.set(true);
+
+    const item = this.evaluacionSeleccionadaOmr();
+    if (item && lectura.letraVariante) {
+      this._omrService.consultarVariantesVinculadas(item.id, lectura.letraVariante, pregunta).subscribe({
+        next: resumen => {
+          this.variantesVinculadasAnulacion.set(resumen.variantesVinculadas || []);
+          this.cargandoVariantesVinculadasAnulacion.set(false);
+        },
+        error: () => {
+          this.variantesVinculadasAnulacion.set([]);
+          this.cargandoVariantesVinculadasAnulacion.set(false);
+        }
+      });
+    } else {
+      this.cargandoVariantesVinculadasAnulacion.set(false);
+    }
   }
 
   public cerrarDialogoAnulacionOmr(): void {
@@ -4017,6 +5103,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.dialogAnulacionOmr.set(false);
     this.preguntaSeleccionadaAnulacionOmr.set(null);
     this.motivoAnulacionOmr = '';
+    this.variantesVinculadasAnulacion.set([]);
+    this.cargandoVariantesVinculadasAnulacion.set(false);
   }
 
   public confirmarAnulacionOmr(): void {
@@ -4028,17 +5116,289 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this._omrService.anularPregunta(item.id, {
       letraVariante: seleccion.lectura.letraVariante || '',
       numeroPregunta: seleccion.pregunta,
-      motivo
+      motivo,
+      propagarVariantes: this.propagarAnulacionOmr()
     }).subscribe({
       next: anulacion => {
-        this.anulacionesOmr.update(items => [...items.filter(actual => actual.id !== anulacion.id), anulacion]);
+        this._omrService.listarAnulaciones(item.id).subscribe({
+          next: items => {
+            const list = items || [];
+            this.anulacionesOmr.set(list);
+            this.recalcularLecturasConAnulaciones(list);
+          }
+        });
         this.guardandoAnulacionOmr.set(false);
         this.cerrarDialogoAnulacionOmr();
-        this._mostrarToast(`Pregunta ${seleccion.pregunta} de la variante ${seleccion.lectura.letraVariante} anulada. Se excluirá al guardar las calificaciones.`);
+        const countPropagadas = anulacion.anulacionesPropagadas?.length || 0;
+        const infoPropagada = countPropagadas > 0
+          ? ` y propagada a ${countPropagadas} variante(s) vinculada(s)`
+          : '';
+        this._mostrarToast(`Pregunta ${seleccion.pregunta} de la variante ${seleccion.lectura.letraVariante} anulada${infoPropagada}.`);
       },
       error: err => {
         this.guardandoAnulacionOmr.set(false);
-        this._mostrarToast(err?.error?.message || 'No se pudo anular la pregunta.', 'error');
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo anular la pregunta.', 'error');
+      }
+    });
+  }
+
+  private recalcularLecturasConAnulaciones(anulacionesActuales: AnulacionPreguntaOmr[]): void {
+    const mapaAnuladas = new Map<string, Set<number>>();
+    for (const an of anulacionesActuales) {
+      if (!an.activo) continue;
+      const v = (an.letraVariante || '').toUpperCase();
+      if (!mapaAnuladas.has(v)) {
+        mapaAnuladas.set(v, new Set());
+      }
+      mapaAnuladas.get(v)!.add(an.numeroPregunta);
+    }
+
+    this.resultadoCalificacionOmr.update(res => {
+      if (!res || !res.resultados) return res;
+      return {
+        ...res,
+        resultados: res.resultados.map(lectura => {
+          if (lectura.estadoCalificacion === 'ANULADO') return lectura;
+          const variante = (lectura.letraVariante || '').toUpperCase();
+          const anuladasSet = mapaAnuladas.get(variante) || new Set<number>();
+
+          const totalBase = (lectura.detalles && lectura.detalles.length > 0)
+            ? lectura.detalles.length
+            : (lectura.totalReactivos || 30);
+
+          const preguntasValidas = Array.from({ length: totalBase }, (_, i) => i + 1)
+            .filter(p => !anuladasSet.has(p));
+
+          const totalValidas = preguntasValidas.length;
+          let aciertos = 0;
+          let blancos = 0;
+          let dobles = 0;
+
+          for (const p of preguntasValidas) {
+            const resp = this.respuestaOmr(lectura, p).trim().toUpperCase();
+            const corr = this.respuestaCorrectaOmr(lectura, p).trim().toUpperCase();
+            if (!resp) {
+              blancos++;
+            } else if (resp.length > 1) {
+              dobles++;
+            } else if (corr && resp === corr) {
+              aciertos++;
+            }
+          }
+
+          const fallos = Math.max(0, totalValidas - aciertos - blancos);
+          const nota60 = totalValidas > 0 ? Math.round((aciertos * 60 / totalValidas) * 100) / 100 : 0;
+          const nota100 = totalValidas > 0 ? Math.round((aciertos * 100 / totalValidas) * 100) / 100 : 0;
+
+          return {
+            ...lectura,
+            totalReactivos: totalValidas,
+            aciertos,
+            fallos,
+            blancos,
+            doblesMarcas: dobles,
+            notaSobre60: nota60,
+            notaSobre100: nota100,
+            estadoCalificacion: nota100 >= 51 ? 'APROBADO' : 'REPROBADO'
+          };
+        })
+      };
+    });
+  }
+
+  // --- EDICIÓN DE CLAVE PATRÓN OFICIAL (CORRECCIÓN CLAVE DOCENTE) ---
+  public puedeEditarClaveOficial(): boolean {
+    const etapa = this.evaluacionSeleccionadaOmr()?.etapa;
+    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones())
+      && (etapa === 'Devuelto' || etapa === 'Pendiente de notas' || etapa === 'Calificado' || etapa === 'Confirmado');
+  }
+
+  public abrirEdicionClave(lectura: OmrLecturaResponse, pregunta: number): void {
+    if (!this.puedeEditarClaveOficial()) return;
+    const item = this.evaluacionSeleccionadaOmr();
+    const variante = lectura.letraVariante || 'A';
+    const claveActual = this.respuestaCorrectaOmr(lectura, pregunta) || '';
+    this.preguntaSeleccionadaClaveOmr.set({
+      lectura,
+      variante,
+      numeroPregunta: pregunta,
+      claveActual
+    });
+    this.nuevaClaveOmr.set(claveActual);
+    this.propagarClaveOmr.set(true);
+    this.motivoEdicionClaveOmr.set('');
+    this.variantesVinculadasClave.set([]);
+    this.cargandoVariantesVinculadasClave.set(true);
+    this.dialogEditarClaveOmr.set(true);
+
+    if (item) {
+      this._omrService.consultarVariantesVinculadas(item.id, variante, pregunta).subscribe({
+        next: resumen => {
+          this.variantesVinculadasClave.set(resumen.variantesVinculadas || []);
+          this.cargandoVariantesVinculadasClave.set(false);
+        },
+        error: () => {
+          this.variantesVinculadasClave.set([]);
+          this.cargandoVariantesVinculadasClave.set(false);
+        }
+      });
+    } else {
+      this.cargandoVariantesVinculadasClave.set(false);
+    }
+  }
+
+  public cerrarEdicionClave(): void {
+    if (this.guardandoEdicionClaveOmr()) return;
+    this.dialogEditarClaveOmr.set(false);
+    this.preguntaSeleccionadaClaveOmr.set(null);
+    this.motivoEdicionClaveOmr.set('');
+    this.variantesVinculadasClave.set([]);
+    this.cargandoVariantesVinculadasClave.set(false);
+  }
+
+  public confirmarEdicionClave(): void {
+    const item = this.evaluacionSeleccionadaOmr();
+    const seleccion = this.preguntaSeleccionadaClaveOmr();
+    const nuevaClave = this.nuevaClaveOmr().trim().toUpperCase();
+    const motivo = this.motivoEdicionClaveOmr().trim();
+    if (!item || !seleccion || !nuevaClave || motivo.length < 5 || this.guardandoEdicionClaveOmr()) return;
+
+    this.guardandoEdicionClaveOmr.set(true);
+    this._omrService.corregirClavePatron(item.id, {
+      letraVariante: seleccion.variante,
+      numeroPregunta: seleccion.numeroPregunta,
+      nuevaClave,
+      propagarVariantes: this.propagarClaveOmr(),
+      motivo
+    }).subscribe({
+      next: resp => {
+        this.guardandoEdicionClaveOmr.set(false);
+        this.cerrarEdicionClave();
+        this._mostrarToast(resp.mensaje || 'Clave oficial actualizada y notas recalculadas con éxito.');
+        this.resultadoCalificacionOmr.update(res => {
+          if (!res || !res.resultados) return res;
+          return {
+            ...res,
+            resultados: res.resultados.map(p => {
+              if (p.letraVariante === seleccion.variante || this.propagarClaveOmr()) {
+                return {
+                  ...p,
+                  detalles: (p.detalles || []).map(d => {
+                    if (d.pregunta === seleccion.numeroPregunta) {
+                      return { ...d, respuestaCorrecta: nuevaClave };
+                    }
+                    return d;
+                  })
+                };
+              }
+              return p;
+            })
+          };
+        });
+      },
+      error: err => {
+        this.guardandoEdicionClaveOmr.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo actualizar la clave oficial.', 'error');
+      }
+    });
+  }
+
+  // --- RECALIFICACIÓN OMR (VOLVER A CALIFICAR) ---
+  public abrirModalRecalificar(item: EvaluacionItemUI): void {
+    if (!this.puedeRecalificar(item)) return;
+    this.evaluacionSeleccionadaRecalificar.set(item);
+    this.motivoRecalificarOmr.set('');
+    this.guardandoRecalificarOmr.set(false);
+    this.dialogRecalificarOmr.set(true);
+  }
+
+  public cerrarModalRecalificar(): void {
+    if (this.guardandoRecalificarOmr()) return;
+    this.dialogRecalificarOmr.set(false);
+    this.evaluacionSeleccionadaRecalificar.set(null);
+    this.motivoRecalificarOmr.set('');
+  }
+
+  public confirmarRecalificar(): void {
+    const item = this.evaluacionSeleccionadaRecalificar();
+    const motivo = this.motivoRecalificarOmr().trim();
+    if (!item || motivo.length < 5 || this.guardandoRecalificarOmr()) return;
+
+    this.guardandoRecalificarOmr.set(true);
+    this._omrService.recalificarEvaluacion(item.id, { motivo }).subscribe({
+      next: notasActualizadas => {
+        this.guardandoRecalificarOmr.set(false);
+        this.cerrarModalRecalificar();
+        this._mostrarToast(`Evaluación ${item.codigo} recalificada exitosamente (${notasActualizadas.length} calificaciones recalculadas).`);
+        if (this.dialogNotasOmr() && this.evaluacionSeleccionadaNotas()?.id === item.id) {
+          this.notasOmr.set(notasActualizadas);
+        }
+      },
+      error: err => {
+        this.guardandoRecalificarOmr.set(false);
+        this._mostrarToast(err?.error?.message || 'Error al recalificar la evaluación.', 'error');
+      }
+    });
+  }
+
+  // --- ANULACIÓN INDIVIDUAL DE EXAMEN DE ESTUDIANTE ---
+  public puedeAnularExamenEstudiante(): boolean {
+    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones());
+  }
+
+  public abrirAnulacionExamenEstudiante(estudiante: { codigo: string; nombre?: string; anulado: boolean; pagina?: number; calificacionId?: number }): void {
+    if (!this.puedeAnularExamenEstudiante()) return;
+    this.estudianteSeleccionadoAnulacion.set(estudiante);
+    this.motivoAnulacionExamenEstudiante.set('');
+    this.guardandoAnulacionExamenEstudiante.set(false);
+    this.dialogAnularExamenEstudiante.set(true);
+  }
+
+  public cerrarAnulacionExamenEstudiante(): void {
+    if (this.guardandoAnulacionExamenEstudiante()) return;
+    this.dialogAnularExamenEstudiante.set(false);
+    this.estudianteSeleccionadoAnulacion.set(null);
+    this.motivoAnulacionExamenEstudiante.set('');
+  }
+
+  public confirmarAnulacionExamenEstudiante(): void {
+    const est = this.estudianteSeleccionadoAnulacion();
+    const motivo = this.motivoAnulacionExamenEstudiante().trim();
+    const item = this.evaluacionSeleccionadaOmr() || this.evaluacionSeleccionadaNotas();
+    if (!est || !item || this.guardandoAnulacionExamenEstudiante()) return;
+
+    const anular = !est.anulado;
+    if (anular && motivo.length < 5) return;
+
+    this.guardandoAnulacionExamenEstudiante.set(true);
+    this._omrService.anularExamenEstudiante(item.id, est.codigo, anular, motivo).subscribe({
+      next: calificacion => {
+        this.guardandoAnulacionExamenEstudiante.set(false);
+        this.cerrarAnulacionExamenEstudiante();
+        this._mostrarToast(`Examen de ${est.codigo} ${anular ? 'marcado como ANULADO (0/60)' : 'restaurado y recalculado'}.`);
+
+        if (this.dialogNotasOmr()) {
+          this.notasOmr.update(notas => notas.map(n => n.codigoEstudiante === est.codigo ? calificacion : n));
+        }
+        if (this.resultadoCalificacionOmr() && est.pagina !== undefined) {
+          this.resultadoCalificacionOmr.update(res => {
+            if (!res || !res.resultados) return res;
+            return {
+              ...res,
+              resultados: res.resultados.map(p => p.pagina === est.pagina ? {
+                ...p,
+                estadoCalificacion: calificacion.estadoCalificacion,
+                notaSobre60: calificacion.notaSobre60,
+                notaSobre100: calificacion.notaSobre100,
+                aciertos: calificacion.aciertos
+              } : p)
+            };
+          });
+        }
+      },
+      error: err => {
+        this.guardandoAnulacionExamenEstudiante.set(false);
+        this._mostrarToast(err?.error?.message || 'Error al cambiar estado de anulación del examen.', 'error');
       }
     });
   }
@@ -4049,6 +5409,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       ...ediciones,
       [lectura.pagina]: { ...actual, codigo: codigo.replace(/\D/g, '') }
     }));
+  }
+
+  public seleccionarCandidatoOcr(lectura: OmrLecturaResponse, candidato: string): void {
+    const codigoLimpio = String(candidato || '').replace(/\D/g, '');
+    if (!codigoLimpio) return;
+    this.editarCodigoOmr(lectura, codigoLimpio);
+    this.recalibrarPaginaOmr(lectura);
   }
 
   public async recalibrarPaginaOmr(lectura: OmrLecturaResponse): Promise<void> {
@@ -4145,11 +5512,35 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       codigoEstudiante: this.codigoOmr(pagina),
       respuestas: this.respuestasOmrParaGuardar(pagina),
       ajusteManual: this.tieneAjusteManualOmr(pagina),
-      respuestasOriginales: this.respuestasOriginalesOmr(pagina)
+      respuestasOriginales: this.respuestasOriginalesOmr(pagina),
+      examenAnulado: pagina.estadoCalificacion === 'ANULADO'
     }));
     this.guardandoCalificacionOmr.set(true);
     forkJoin(ajustes.map(ajuste => this._omrService.ajustarCalificacion(item.id, ajuste))).subscribe({
-      next: () => this._transicionarACalificado(item),
+      next: () => {
+        if (item.etapa === 'Calificado' || item.etapa === 'Confirmado') {
+          this._omrService.recalificarEvaluacion(item.id, {
+            motivo: 'Re-escaneo OMR: nuevo lote escaneado procesado y calificaciones actualizadas'
+          }).subscribe({
+            next: () => {
+              this.guardandoCalificacionOmr.set(false);
+              this.dialogCalificacionOmr.set(false);
+              this.evaluacionSeleccionadaOmr.set(null);
+              this._mostrarToast(`${item.codigo}: calificaciones actualizadas por re-escaneo OMR con éxito.`);
+              this._cargarEvaluaciones();
+            },
+            error: () => {
+              this.guardandoCalificacionOmr.set(false);
+              this.dialogCalificacionOmr.set(false);
+              this.evaluacionSeleccionadaOmr.set(null);
+              this._mostrarToast(`${item.codigo}: cartillas ajustadas y guardadas.`);
+              this._cargarEvaluaciones();
+            }
+          });
+        } else {
+          this._transicionarACalificado(item);
+        }
+      },
       error: err => {
         this.guardandoCalificacionOmr.set(false);
         this.errorCalificacionOmr.set(true);
@@ -4190,6 +5581,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         if (this.evaluacionSeleccionadaNotas()?.id !== item.id) return;
         this.notasOmr.set(notas);
         this.cargandoNotasOmr.set(false);
+        const primerEscaneado = this.escaneadosNotasOmr()[0];
+        if (primerEscaneado) {
+          this.verEscaneadoOmr(primerEscaneado.id);
+        }
       },
       error: () => {
         this.cargandoNotasOmr.set(false);
@@ -4203,6 +5598,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.dialogNotasOmr.set(false);
     this.evaluacionSeleccionadaNotas.set(null);
     this.notasOmr.set([]);
+  }
+
+  public reEscanearDesdeNotas(): void {
+    const item = this.evaluacionSeleccionadaNotas();
+    if (!item) return;
+    this.cerrarNotasOmr();
+    this.abrirCalificacionOmr(item);
   }
 
   public verEscaneadoOmr(calificacionId: number): void {
@@ -4242,6 +5644,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public ngOnDestroy(): void {
+    this._detenerProgresoCalificacionOmr();
     this.cerrarEscaneadoOmr();
   }
 
@@ -4316,19 +5719,26 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public imprimirReporteNotasDocente(): void {
     const item = this.evaluacionSeleccionadaNotasDocente();
-    const notas = this.notasDocente();
     if (!item || !this.notasDocenteCompletas()) {
       this._mostrarToast('Complete todas las notas antes de imprimir el reporte.', 'error');
       return;
     }
-    const ventana = window.open('', '_blank', 'width=1000,height=750');
-    if (!ventana) {
-      this._mostrarToast('El navegador bloqueó la ventana del reporte. Permita las ventanas emergentes.', 'error');
-      return;
-    }
-    const filas = notas.map((nota, indice) => `<tr><td>${indice + 1}</td><td>${this.escapeHtml(nota.codigoEstudiante)}</td><td>${this.escapeHtml(nota.estudianteNombreCompleto)}</td><td>${nota.notaSobre60 ?? '—'}</td><td>${nota.notaSobre100 ?? '—'}</td></tr>`).join('');
-    ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte de notas ${this.escapeHtml(item.codigo)}</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:32px}h1{font-size:20px;margin:0 0 6px}p{color:#53627b;font-size:12px;margin:4px 0 20px}.meta{border:1px solid #d9e1ef;padding:12px;border-radius:8px;margin-bottom:18px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d9e1ef;padding:9px;text-align:left}th{background:#eef3fa;text-transform:uppercase;font-size:10px}td:nth-child(1),td:nth-child(4),td:nth-child(5){text-align:center}@media print{body{padding:0}}</style></head><body><h1>Reporte de notas — examen sin cartilla</h1><p>Sistema de Evaluaciones</p><div class="meta"><strong>${this.escapeHtml(item.codigo)} — ${this.escapeHtml(item.materia)}</strong><br>Grupo: ${this.escapeHtml(item.grupo)} · Parcial: ${this.escapeHtml(item.tipo)} · Docente: ${this.escapeHtml(item.docenteNombre || '—')}<br>Estado: ${this.escapeHtml(item.etapa)}</div><table><thead><tr><th>N°</th><th>Código</th><th>Estudiante</th><th>Nota /60</th><th>Nota /100</th></tr></thead><tbody>${filas}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
-    ventana.document.close();
+    this._sinCartillaService.descargarReporteNotasPdf(item.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if (!win) {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Planilla_Notas_${item.codigo}_${item.grupo}.pdf`;
+          a.click();
+        }
+        this._mostrarToast('Planilla oficial generada con formato institucional, firma y sello.');
+      },
+      error: err => {
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo generar la planilla PDF oficial.', 'error');
+      }
+    });
   }
 
   private escapeHtml(valor: string): string {
@@ -4338,23 +5748,88 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public abrirSalaVirtualDesdeLista(item: EvaluacionItemUI): void {
     if (item.modalidad !== 'VIRTUAL' || this.consultandoSalaVirtual()) return;
     this.consultandoSalaVirtual.set(true);
+    this.evaluacionSeleccionadaSala.set(item);
     this._http.get<SalaVirtualOperacion>(`/api/examenes-virtuales/roles/${item.id}/sala`).subscribe({
       next: sala => {
         this.consultandoSalaVirtual.set(false);
         this.salaVirtualCreada.set(sala);
         this.salaVirtualExistente.set(true);
         this.accesosVirtuales.set([]);
-        this.tokenGrupoVirtual.set(null);
-        this.abrirDialogoRestablecerSalaVirtual();
+        const tokenGuardado = this._recuperarTokenSala(sala.id);
+        this.tokenGrupoVirtual.set(tokenGuardado);
+        this.dialogSalaVirtual.set(true);
       },
       error: err => {
         this.consultandoSalaVirtual.set(false);
+        if (err?.status === 404 && (item.etapa === 'Validado' || item.etapa === 'Programado')) {
+          this._mostrarToast('El examen está validado pero aún no tiene sala virtual. Abriendo generador...', 'info');
+          this.abrirModalParametrizacion(item);
+          return;
+        }
         this._mostrarToast(
           err?.error?.message || err?.error?.error || 'Este examen todavía no tiene una sala virtual preparada.',
           'error'
         );
       }
     });
+  }
+
+  public cerrarSalaVirtualOperativa(): void {
+    const sala = this.salaVirtualCreada();
+    if (!sala || this.creandoSalaVirtual()) return;
+    this.creandoSalaVirtual.set(true);
+    this._http.post<SalaVirtualOperacion>(`/api/examenes-virtuales/salas/${sala.id}/cerrar`, {}).subscribe({
+      next: actualizada => {
+        this.salaVirtualCreada.set(actualizada);
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast('Sala virtual cerrada y calificada exitosamente.');
+        this._cargarEvaluaciones();
+      },
+      error: err => {
+        this.creandoSalaVirtual.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo cerrar la sala virtual.', 'error');
+      }
+    });
+  }
+
+  public exportarResultadosVirtualesExcel(): void {
+    const resultados = this.resultadosVirtuales();
+    if (!resultados.length) return;
+    const evaluacion = this.evaluacionSeleccionadaResultados();
+    const codigoMateria = evaluacion?.codigo || 'EXAMEN_VIRTUAL';
+
+    const data: any[][] = [
+      ['COD_EST', 'ESTUDIANTE', 'VAR', 'ACIERTOS', 'NOTA/30', 'NOTA/100', 'ESTADO', 'FECHA_ENVIO']
+    ];
+
+    resultados.forEach(r => {
+      data.push([
+        r.codigoEstudiante,
+        r.nombreEstudiante,
+        r.letraVariante || '—',
+        r.aciertos ?? 0,
+        r.notaSobre30 ? Number(r.notaSobre30) : 0,
+        r.notaSobre100 ? Number(r.notaSobre100) : 0,
+        r.estado,
+        r.enviadoEn || '—'
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 14 },
+      { wch: 35 },
+      { wch: 6 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 22 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, 'Resultados');
+    XLSX.writeFile(wb, `NOTAS_VIRTUAL_${codigoMateria}_${evaluacion?.grupo || 'G1'}.xlsx`);
+    this._mostrarToast('Reporte Excel descargado correctamente.');
   }
 
   public abrirResultadosVirtuales(item: EvaluacionItemUI): void {
@@ -4527,6 +6002,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (esVirtual && this.rolVirtualVerificadoParaGenerar !== item.id) {
       if (this.consultandoSalaVirtual()) return;
       this.consultandoSalaVirtual.set(true);
+      this.evaluacionSeleccionadaSala.set(item);
       this._http.get<SalaVirtualOperacion>(`/api/examenes-virtuales/roles/${item.id}/sala`).subscribe({
         next: sala => {
           this.consultandoSalaVirtual.set(false);
@@ -4534,7 +6010,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
           this.salaVirtualCreada.set(sala);
           this.salaVirtualExistente.set(true);
           this.accesosVirtuales.set([]);
-          this.tokenGrupoVirtual.set(null);
+          const tokenGuardado = this._recuperarTokenSala(sala.id);
+          this.tokenGrupoVirtual.set(tokenGuardado);
           this.dialogSalaVirtual.set(true);
           this._mostrarToast(`${item.codigo}: ya tiene una sala virtual generada. Se muestran sus datos disponibles.`);
         },
@@ -4631,8 +6108,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
                 `[${new Date().toLocaleTimeString()}] ✅ ${esVirtual ? 'Asignaciones estudiante-variante listas' : `${resultado.mapeos.length} cuadernillos listos`}`
               ]);
 
-              item.etapa = esVirtual ? 'Validado' : 'Generado';
-              item.estado = esVirtual ? 'VALIDADO' : 'GENERADO';
+              item.etapa = 'Generado';
+              item.estado = 'GENERADO';
               item.variantesGeneradas = cantVariantes;
               item.estudiantesInscritosCount = estudiantes.length;
               this.evaluaciones.update(items => [...items]);
@@ -4680,6 +6157,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   private crearSalaVirtual(item: EvaluacionItemUI): void {
     this.creandoSalaVirtual.set(true);
+    this.evaluacionSeleccionadaSala.set(item);
     this.errorGeneracionTypst.set(null);
     this._http.post<SalaVirtualCreada>('/api/examenes-virtuales/salas', {
       rolExamenId: item.id,
@@ -4691,10 +6169,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.salaVirtualCreada.set(creada.sala);
         this.salaVirtualExistente.set(false);
         this.accesosVirtuales.set(creada.accesos || []);
+        if (creada.tokenGrupo) {
+          this._guardarTokenSala(creada.sala.id, creada.tokenGrupo);
+        }
         this.tokenGrupoVirtual.set(creada.tokenGrupo || null);
         this.dialogQueueWorker.set(false);
         this.dialogSalaVirtual.set(true);
-        this._mostrarToast(`${item.codigo}: sala virtual preparada con tokens individuales.`);
+        this._mostrarToast(`${item.codigo}: sala virtual preparada con tokens.`);
       },
       error: err => {
         this.creandoSalaVirtual.set(false);
@@ -4754,6 +6235,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.dialogRestablecerSalaVirtual.set(false);
         this.motivoRestablecimientoSalaVirtual = '';
         this.accesosVirtuales.set([]);
+        this._limpiarTokenSala(sala.id);
         this.tokenGrupoVirtual.set(null);
         this.dialogSalaVirtual.set(true);
         this._mostrarToast('Sala restablecida. Las respuestas guardadas se conservaron; inicia nuevamente cuando estén listos.', 'info');
@@ -4800,8 +6282,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this._http.post<TokenGrupoVirtual>(`/api/examenes-virtuales/salas/${encodeURIComponent(sala.id)}/token-grupo`, {}).subscribe({
       next: respuesta => {
         this.tokenGrupoVirtual.set(respuesta.tokenGrupo);
+        this._guardarTokenSala(sala.id, respuesta.tokenGrupo);
         this.emitiendoTokenGrupoVirtual.set(false);
-        this._mostrarToast('Token grupal emitido. Compártelo junto con el código de sala.', 'info');
+        this._mostrarToast('Token grupal emitido. Ya puedes copiar la información completa para los estudiantes.', 'info');
       },
       error: err => {
         this.emitiendoTokenGrupoVirtual.set(false);
@@ -4810,17 +6293,150 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     });
   }
 
+  private _guardarTokenSala(salaId: string, token: string): void {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(`sea_token_sala_${salaId}`, token);
+      }
+    } catch (_) {}
+  }
+
+  private _recuperarTokenSala(salaId: string): string | null {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        return window.sessionStorage.getItem(`sea_token_sala_${salaId}`) || null;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  private _limpiarTokenSala(salaId: string): void {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.removeItem(`sea_token_sala_${salaId}`);
+      }
+    } catch (_) {}
+  }
+
+  public _obtenerEvaluacionSalaActual(): EvaluacionItemUI | null {
+    if (this.evaluacionSeleccionadaSala()) {
+      return this.evaluacionSeleccionadaSala();
+    }
+    const sala = this.salaVirtualCreada();
+    if (sala?.rolExamenId) {
+      const encontrada = this.evaluaciones().find(e => e.id === sala.rolExamenId);
+      if (encontrada) return encontrada;
+    }
+    return this.evaluacionSeleccionadaParaParametrizar();
+  }
+
+  public obtenerLinkExamenVirtual(): string {
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return `${window.location.origin}/examen-virtual`;
+    }
+    return 'https://planificacion.unitepc.edu.bo/examen-virtual';
+  }
+
+  public construirMensajeAccesoVirtual(): string {
+    const item = this._obtenerEvaluacionSalaActual();
+    const sala = this.salaVirtualCreada();
+    const token = this.tokenGrupoVirtual() || '';
+    const codigoSala = sala?.codigoSala || '';
+    const linkExamen = this.obtenerLinkExamenVirtual();
+
+    const lineas: (string | null)[] = [
+      '📋 *EVALUACIÓN VIRTUAL · UNITEPC*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      item?.materia ? `📚 *Materia:* ${item.codigo ? `[${item.codigo}] ` : ''}${item.materia}` : null,
+      (item?.carreraNombre || item?.careerCode) ? `🎓 *Carrera:* ${item.carreraNombre || item.careerCode}` : null,
+      item?.grupo ? `👥 *Grupo:* ${item.grupo}` : null,
+      item?.docenteNombre ? `👨‍🏫 *Docente:* ${item.docenteNombre}` : null,
+      item?.tipo ? `📝 *Evaluación:* ${item.tipo}` : null,
+      (item?.fechaDisplay || item?.fecha) ? `📅 *Fecha:* ${item.fechaDisplay || item.fecha}${item.horario ? ` (${item.horario})` : ''}` : null,
+      sala?.duracionMinutos ? `⏱️ *Duración:* ${sala.duracionMinutos} minutos` : null,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '🌐 *ENLACE DE ACCESO:*',
+      linkExamen,
+      '',
+      '🔑 *DATOS PARA INGRESAR:*',
+      codigoSala ? `• *Código de Sala:* ${codigoSala}` : null,
+      token ? `• *PIN / Token:* ${token}` : null,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      'ℹ️ *Instrucciones para el estudiante:*',
+      `1. Ingresa al enlace: ${linkExamen}`,
+      '2. Introduce tu Código de Estudiante (matrícula institucional).',
+      codigoSala && token
+        ? `3. Introduce el Código de Sala (${codigoSala}) y el PIN (${token}).`
+        : '3. Introduce el Código de Sala y el PIN proporcionados por tu docente.',
+      '4. Presiona "Ingresar" y espera en la sala de espera hasta que el docente inicie la evaluación.'
+    ];
+
+    return lineas.filter(l => l !== null).join('\n');
+  }
+
   public copiarTokenGrupoDesdeLista(): void {
+    const texto = this.construirMensajeAccesoVirtual();
+    if (!navigator.clipboard?.writeText) {
+      this._mostrarToast('No se pudo acceder al portapapeles. Copia manualmente los datos.', 'error');
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(
+      () => this._mostrarToast('Información de acceso copiada para compartir con los estudiantes.', 'info'),
+      () => this._mostrarToast('No se pudo copiar automáticamente. Por favor, selecciona y copia los datos.', 'error')
+    );
+  }
+
+  public copiarSoloToken(): void {
     const token = this.tokenGrupoVirtual();
     if (!token) return;
-    const escritura = navigator.clipboard?.writeText(token);
-    if (!escritura) {
+    if (!navigator.clipboard?.writeText) {
       this._mostrarToast('Selecciona el token y cópialo manualmente.', 'error');
       return;
     }
-    escritura.then(
-      () => this._mostrarToast('Token grupal copiado.', 'info'),
-      () => this._mostrarToast('No se pudo copiar automáticamente. Selecciona el token y cópialo.', 'error')
+    navigator.clipboard.writeText(token).then(
+      () => this._mostrarToast('PIN de acceso copiado al portapapeles.', 'info'),
+      () => this._mostrarToast('No se pudo copiar el token.', 'error')
+    );
+  }
+
+  public copiarAccesoEstudianteIndividual(acceso: AccesoVirtualGenerado): void {
+    const item = this._obtenerEvaluacionSalaActual();
+    const sala = this.salaVirtualCreada();
+    const codigoSala = sala?.codigoSala || '';
+    const linkExamen = this.obtenerLinkExamenVirtual();
+
+    const lineas: (string | null)[] = [
+      '📋 *ACCESO A EVALUACIÓN VIRTUAL · UNITEPC*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      item?.materia ? `📚 *Materia:* ${item.codigo ? `[${item.codigo}] ` : ''}${item.materia}` : null,
+      item?.carreraNombre ? `🎓 *Carrera:* ${item.carreraNombre}` : null,
+      item?.grupo ? `👥 *Grupo:* ${item.grupo}` : null,
+      item?.docenteNombre ? `👨‍🏫 *Docente:* ${item.docenteNombre}` : null,
+      item?.tipo ? `📝 *Evaluación:* ${item.tipo}` : null,
+      `👤 *Estudiante:* ${acceso.nombreEstudiante} (${acceso.codigoEstudiante})`,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '🌐 *ENLACE DE ACCESO:*',
+      linkExamen,
+      '',
+      '🔑 *DATOS PARA INGRESAR:*',
+      codigoSala ? `• *Código de Sala:* ${codigoSala}` : null,
+      `• *Token Personal:* ${acceso.token}`,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      'ℹ️ *Instrucciones:*',
+      `1. Ingresa al enlace: ${linkExamen}`,
+      `2. Introduce tu Código de Estudiante (${acceso.codigoEstudiante}).`,
+      `3. Introduce el Código de Sala (${codigoSala}) y tu Token Personal (${acceso.token}).`,
+      '4. Presiona "Ingresar" y espera el inicio del examen.'
+    ];
+
+    const texto = lineas.filter(l => l !== null).join('\n');
+    if (!navigator.clipboard?.writeText) {
+      this._mostrarToast('No se pudo acceder al portapapeles.', 'error');
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(
+      () => this._mostrarToast(`Acceso individual copiado para ${acceso.nombreEstudiante}.`, 'info'),
+      () => this._mostrarToast('No se pudo copiar el acceso.', 'error')
     );
   }
 

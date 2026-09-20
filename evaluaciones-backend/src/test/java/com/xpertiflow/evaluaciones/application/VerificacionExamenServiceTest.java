@@ -131,6 +131,103 @@ class VerificacionExamenServiceTest {
         });
     }
 
+    @Test
+    void obtenerDetalleNoAsignaNumeroDePreguntaATroncoDeEmparejamientoYNumeraCorrelativoSubitems() {
+        RolExamen rol = rolAvanzado();
+        rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
+        BancoPreguntas banco = banco("BANCO-1", rol.getId());
+        VerificacionExamen verificacion = new VerificacionExamen();
+        verificacion.setRolExamenId(rol.getId());
+        verificacion.setBancoPreguntasId(banco.getId());
+        verificacion.setEstado("PENDIENTE");
+
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(politicaService.aplica(rol)).thenReturn(true);
+        when(accesoAcademicoService.puedeAcceder(rol, authentication)).thenReturn(true);
+        when(bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rol.getId()))
+                .thenReturn(Optional.of(banco));
+        when(verificacionRepository.findByRolExamenId(rol.getId())).thenReturn(Optional.of(verificacion));
+        when(historialRepository.findByRolExamenIdOrderByFechaDevolucionDescIdDesc(rol.getId()))
+                .thenReturn(List.of());
+
+        when(cifradoService.descifrarTexto(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("banco:BANCO-1:rol:ROL-1")))
+                .thenReturn("["
+                        + "{\"numeroOrden\":1,\"tipoReactivo\":\"EMPAREJAMIENTO_TRONCO\","
+                        + "\"dificultad\":null,\"enunciado\":\"Instruccion emparejamiento\","
+                        + "\"opcionesJson\":\"[{\\\"letra\\\":\\\"A\\\",\\\"texto\\\":\\\"Concepto A\\\"},{\\\"letra\\\":\\\"B\\\",\\\"texto\\\":\\\"Concepto B\\\"}]\","
+                        + "\"respuestaCorrecta\":\"A\"},"
+                        + "{\"numeroOrden\":2,\"tipoReactivo\":\"OPCION_EMPAREJAMIENTO\","
+                        + "\"dificultad\":\"FACIL\",\"enunciado\":\"Definicion 1\","
+                        + "\"opcionesJson\":\"[]\","
+                        + "\"respuestaCorrecta\":\"A\"},"
+                        + "{\"numeroOrden\":3,\"tipoReactivo\":\"OPCION_EMPAREJAMIENTO\","
+                        + "\"dificultad\":\"MEDIO\",\"enunciado\":\"Definicion 2\","
+                        + "\"opcionesJson\":\"[]\","
+                        + "\"respuestaCorrecta\":\"B\"}"
+                        + "]");
+
+        var detalle = service.obtenerDetalle(rol.getId(), authentication);
+
+        assertThat(detalle.getEstadoVerificacion()).isEqualTo("VALIDADO");
+        assertThat(detalle.getPreguntas()).hasSize(3);
+
+        var tronco = detalle.getPreguntas().get(0);
+        assertThat(tronco.getTipoReactivo()).isEqualTo("EMPAREJAMIENTO_TRONCO");
+        assertThat(tronco.getNumeroPregunta()).isNull();
+        assertThat(tronco.getEsEnunciadoContexto()).isTrue();
+        assertThat(tronco.getDificultad()).isNull();
+        assertThat(tronco.getRespuestaCorrecta()).isNull();
+
+        var sub1 = detalle.getPreguntas().get(1);
+        assertThat(sub1.getTipoReactivo()).isEqualTo("OPCION_EMPAREJAMIENTO");
+        assertThat(sub1.getNumeroPregunta()).isEqualTo(1);
+        assertThat(sub1.getEsEnunciadoContexto()).isFalse();
+        assertThat(sub1.getRespuestaCorrecta()).isEqualTo("A");
+
+        var sub2 = detalle.getPreguntas().get(2);
+        assertThat(sub2.getTipoReactivo()).isEqualTo("OPCION_EMPAREJAMIENTO");
+        assertThat(sub2.getNumeroPregunta()).isEqualTo(2);
+        assertThat(sub2.getEsEnunciadoContexto()).isFalse();
+        assertThat(sub2.getRespuestaCorrecta()).isEqualTo("B");
+    }
+
+    @Test
+    void listarOmiteExamenDevueltoYRetornaSoloValidados() {
+        RolExamen rolDevuelto = rolAvanzado();
+        rolDevuelto.setId("ROL-DEV");
+        rolDevuelto.setEstadoFlujo(EstadoFlujo.VALIDADO);
+        BancoPreguntas bancoDev = banco("BANCO-DEV", "ROL-DEV");
+        VerificacionExamen verDev = new VerificacionExamen();
+        verDev.setRolExamenId("ROL-DEV");
+        verDev.setBancoPreguntasId("BANCO-DEV");
+        verDev.setEstado("DEVUELTO");
+
+        RolExamen rolValido = rolAvanzado();
+        rolValido.setId("ROL-OK");
+        rolValido.setEstadoFlujo(EstadoFlujo.VALIDADO);
+        BancoPreguntas bancoOk = banco("BANCO-OK", "ROL-OK");
+        VerificacionExamen verOk = new VerificacionExamen();
+        verOk.setRolExamenId("ROL-OK");
+        verOk.setBancoPreguntasId("BANCO-OK");
+        verOk.setEstado("PENDIENTE");
+
+        when(rolRepository.findByEstadoFlujo(EstadoFlujo.VALIDADO)).thenReturn(List.of(rolDevuelto, rolValido));
+        when(politicaService.aplica(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(accesoAcademicoService.puedeAcceder(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(authentication))).thenReturn(true);
+        when(bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc("ROL-DEV")).thenReturn(Optional.of(bancoDev));
+        when(bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc("ROL-OK")).thenReturn(Optional.of(bancoOk));
+        when(verificacionRepository.findByRolExamenId("ROL-DEV")).thenReturn(Optional.of(verDev));
+        when(verificacionRepository.findByRolExamenId("ROL-OK")).thenReturn(Optional.of(verOk));
+
+        var resultados = service.listar("FECHA_EXAMEN_DESC", null, null, null, null,
+                null, null, null, authentication);
+
+        assertThat(resultados).hasSize(1);
+        assertThat(resultados.get(0).getRolExamenId()).isEqualTo("ROL-OK");
+        assertThat(resultados.get(0).getEstadoVerificacion()).isEqualTo("VALIDADO");
+    }
+
     private RolExamen rolAvanzado() {
         return RolExamen.builder()
                 .id("ROL-1")

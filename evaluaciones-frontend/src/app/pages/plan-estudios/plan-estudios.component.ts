@@ -12,6 +12,7 @@ import { forkJoin, Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
+type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
 
 @Component({
   selector: 'sea-plan-estudios',
@@ -158,6 +159,40 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                 class="rounded text-amber-500 focus:ring-amber-500 h-4 w-4">
               <span class="text-muted-foreground">Ocultar sin asignar</span>
             </label>
+
+            <!-- Filtro de tipo de grupo: TA es la clase teórica oficial. -->
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-[10px] font-extrabold uppercase text-muted-foreground whitespace-nowrap">Tipo de grupo:</span>
+
+              <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrar por tipo de grupo">
+                <button
+                  type="button"
+                  [attr.aria-pressed]="filtroTipoGrupo() === 'todos'"
+                  [class]="filtroTipoGrupo() === 'todos' ? 'bg-primary text-white shadow-xs' : 'bg-muted text-muted-foreground hover:text-foreground'"
+                  (click)="filtroTipoGrupo.set('todos')"
+                  class="font-bold text-xs px-3 py-1.5 rounded-lg transition-colors">
+                  Todos los grupos
+                </button>
+
+                <button
+                  type="button"
+                  [attr.aria-pressed]="filtroTipoGrupo() === 'teorico'"
+                  [class]="filtroTipoGrupo() === 'teorico' ? 'bg-primary text-white shadow-xs' : 'bg-muted text-muted-foreground hover:text-foreground'"
+                  (click)="filtroTipoGrupo.set('teorico')"
+                  class="font-bold text-xs px-3 py-1.5 rounded-lg transition-colors">
+                  Teóricos (TA)
+                </button>
+
+                <button
+                  type="button"
+                  [attr.aria-pressed]="filtroTipoGrupo() === 'practico'"
+                  [class]="filtroTipoGrupo() === 'practico' ? 'bg-primary text-white shadow-xs' : 'bg-muted text-muted-foreground hover:text-foreground'"
+                  (click)="filtroTipoGrupo.set('practico')"
+                  class="font-bold text-xs px-3 py-1.5 rounded-lg transition-colors">
+                  Prácticos
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Tabs de Seguimiento de Examen (Pills interactivas) -->
@@ -335,6 +370,11 @@ type PlanParcialClave = '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA';
                                 <span class="text-[10px] text-primary font-bold">
                                   <i class="pi pi-users text-[9px]"></i> {{ asig.grupo }}
                                 </span>
+                                @if (asig.grupo) {
+                                  <span class="text-[9px] font-black uppercase tracking-wide text-muted-foreground">
+                                    {{ tipoGrupoEtiqueta(asig) }}
+                                  </span>
+                                }
                               </div>
                             </div>
                           } @else {
@@ -556,6 +596,7 @@ export class PlanEstudiosComponent implements OnInit {
   public filtroPlanCurricular = signal('todos');
   public busquedaTexto = signal('');
   public ocultarSinAsignar = signal(false);
+  public filtroTipoGrupo = signal<PlanTipoGrupo>('teorico');
   public readonly esVicerrector = computed(() => this.auth.usuario()?.rol === 'VICERRECTOR');
 
     public parcialActivo = signal<'1P' | '2P' | 'FINAL' | '2DA_INSTANCIA'>('1P');
@@ -572,8 +613,8 @@ export class PlanEstudiosComponent implements OnInit {
 
   private _expandedSemestres = signal<number[]>([1, 2, 3]);
 
-  public totalPlan = computed(() => this.planSemestres().reduce((total, semestre) => total + semestre.asignaturas.length, 0));
-  public totalAsignadas = computed(() => this.planSemestres().reduce(
+  public totalPlan = computed(() => this.semestresFiltrados().reduce((total, semestre) => total + semestre.asignaturas.length, 0));
+  public totalAsignadas = computed(() => this.semestresFiltrados().reduce(
     (total, semestre) => total + semestre.asignaturas.filter(asignatura => asignatura.asignada).length, 0
   ));
   public totalSinAsignar = computed(() => this.totalPlan() - this.totalAsignadas());
@@ -873,6 +914,7 @@ export class PlanEstudiosComponent implements OnInit {
       docenteCi: docentesCi.join(' · ') || rolPrincipal?.docenteCi || '',
       grupo: gruposMostrar || rolPrincipal?.grupo || grupoPrincipal?.code || '',
       asignada: gruposUnicos.length > 0 || roles.length > 0,
+      tipoClase: grupoPrincipal?.classType?.trim() || roles.find(item => item.tipoClase?.trim())?.tipoClase?.trim() || '',
       esMateriaComun: false,
       conCartilla: roles.some(rol => rol.modalidad === 'PRESENCIAL_CARTILLA'),
       progresoDoc: 0,
@@ -952,6 +994,23 @@ export class PlanEstudiosComponent implements OnInit {
     return (valor || '').trim().toLowerCase();
   }
 
+  private clasificarTipoGrupo(item: PlanEstudioItem): Exclude<PlanTipoGrupo, 'todos'> | 'sin_clasificar' {
+    const tipo = this.normalizarTexto(item.tipoClase)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (!tipo) return 'sin_clasificar';
+    // SEA identifica la clase teórica con TA. Los demás tipos informados
+    // (TP, PR, laboratorio, etc.) se consideran prácticos para el seguimiento.
+    return tipo === 'ta' || tipo.includes('teor') ? 'teorico' : 'practico';
+  }
+
+  public tipoGrupoEtiqueta(item: PlanEstudioItem): string {
+    const tipo = this.clasificarTipoGrupo(item);
+    if (tipo === 'teorico') return `Teórico · ${item.tipoClase || 'TA'}`;
+    if (tipo === 'practico') return `Práctico · ${item.tipoClase}`;
+    return 'Tipo no informado';
+  }
+
   private mapEstadoLegacy(estado: string): 'Calificado' | 'Devuelto' | 'Pendiente' | 'Generado' {
     if (estado === 'GENERADO' || estado === 'IMPRESO' || estado === 'ENTREGADO') return 'Generado';
     if (estado === 'DEVUELTO') return 'Devuelto';
@@ -973,6 +1032,16 @@ export class PlanEstudiosComponent implements OnInit {
     let list = this.planSemestres();
     const planSeleccionado = this.filtroPlanCurricular().trim().toLowerCase();
     const query = this.busquedaTexto().trim().toLowerCase();
+    const tipoGrupoSeleccionado = this.filtroTipoGrupo();
+
+    if (tipoGrupoSeleccionado !== 'todos') {
+      list = list.map(sem => ({
+        ...sem,
+        asignaturas: sem.asignaturas.filter(asignatura =>
+          this.clasificarTipoGrupo(asignatura) === tipoGrupoSeleccionado
+        )
+      })).filter(sem => sem.asignaturas.length > 0);
+    }
 
     if (planSeleccionado && planSeleccionado !== 'todos') {
       list = list.map(sem => ({

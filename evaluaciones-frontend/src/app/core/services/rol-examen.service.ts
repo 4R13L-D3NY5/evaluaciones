@@ -21,7 +21,7 @@ export interface RolExamenResponse {
   tipoParcial: string;
   version: number;
   modalidad: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';
-  estadoFlujo: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'PENDIENTE_NOTAS' | 'CALIFICADO' | 'SUSPENDIDO';
+  estadoFlujo: 'PROGRAMADO' | 'VALIDADO' | 'GENERADO' | 'IMPRESO' | 'ENTREGADO' | 'DEVUELTO' | 'PENDIENTE_NOTAS' | 'CALIFICADO' | 'CONFIRMADO' | 'SUSPENDIDO';
   semana: number;
   dia: string;
   fecha: string;
@@ -32,6 +32,10 @@ export interface RolExamenResponse {
   estudiantesInscritosCount: number;
   variantesGeneradasCount: number;
   bancoPreguntasCargado: boolean;
+  requiereVerificacion?: boolean;
+  estadoVerificacion?: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | null;
+  verificadoPor?: string;
+  fechaVerificacion?: string;
   hashEncriptacion?: string;
   fechaValidacion?: string;
   fechaGeneracion?: string;
@@ -93,6 +97,21 @@ export interface AuditoriaRolExamen {
   ipOrigen?: string;
   detallesJson?: string;
   fechaEvento?: string;
+}
+
+export interface ReprogramarRangoRequest {
+  sedeCodigo: string;
+  carreraCodigo: string;
+  fechaDesdeOrigen: string;
+  fechaHastaOrigen: string;
+  fechaNuevaInicio: string;
+  motivo?: string;
+}
+
+export interface ReprogramarRangoResponse {
+  totalReprogramados: number;
+  mensaje: string;
+  examenesActualizados: RolExamenResponse[];
 }
 
 /**
@@ -179,6 +198,16 @@ export class RolExamenService {
     );
   }
 
+  /** Elimina en una sola operación los roles PROGRAMADOS seleccionados. */
+  public vaciar(ids: string[]): Observable<void> {
+    return this._http.delete<void>(`${this._baseUrl}/vaciar`, { body: ids }).pipe(
+      catchError(err => {
+        console.error('[RolExamenService] Error al vaciar los roles de examen:', err);
+        return throwError(() => err);
+      })
+    );
+  }
+
   /**
    * Transiciona el estado de un rol de examen.
    */
@@ -204,6 +233,15 @@ export class RolExamenService {
     return this._http.get<AuditoriaRolExamen[]>(`${this._baseUrl}/${id}/auditoria`).pipe(
       catchError(err => {
         console.error(`[RolExamenService] Error al cargar la bitácora del rol ${id}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public reprogramarRango(request: ReprogramarRangoRequest): Observable<ReprogramarRangoResponse> {
+    return this._http.post<ReprogramarRangoResponse>(`${this._baseUrl}/reprogramar-rango`, request).pipe(
+      catchError(err => {
+        console.error('[RolExamenService] Error al reprogramar rango masivo:', err);
         return throwError(() => err);
       })
     );

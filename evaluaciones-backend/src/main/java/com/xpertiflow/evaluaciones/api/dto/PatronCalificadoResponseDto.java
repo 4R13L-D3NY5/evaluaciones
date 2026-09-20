@@ -24,6 +24,7 @@ public class PatronCalificadoResponseDto {
         private Map<String, String> respuestas;
         private List<TrazabilidadPreguntaDto> trazabilidad;
         private List<EstudiantePatronDto> estudiantes;
+        private List<Integer> preguntasAnuladas;
     }
 
     @Data
@@ -39,5 +40,6 @@ public class PatronCalificadoResponseDto {
         private String reactivoId;
         private String respuestaCorrectaBanco;
         private String respuestaCorrectaVariante;
+        private Boolean anulada;
     }
 }

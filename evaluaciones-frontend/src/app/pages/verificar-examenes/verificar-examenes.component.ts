@@ -26,8 +26,8 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       </div>
 
       <nav class="flex w-fit gap-1 rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Vistas de verificación">
-        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'revision'" (click)="cambiarVista('revision')" [class.bg-card]="vistaActual === 'revision'" [class.text-primary]="vistaActual === 'revision'" [class.shadow-xs]="vistaActual === 'revision'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-search mr-2"></i>Por verificar@if (examenes().length) { <span class="ml-1">({{ examenes().length }})</span> }</button>
-        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'aprobados'" (click)="cambiarVista('aprobados')" [class.bg-card]="vistaActual === 'aprobados'" [class.text-primary]="vistaActual === 'aprobados'" [class.shadow-xs]="vistaActual === 'aprobados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-check-circle mr-2"></i>Aprobados</button>
+        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'revision'" (click)="cambiarVista('revision')" [class.bg-card]="vistaActual === 'revision'" [class.text-primary]="vistaActual === 'revision'" [class.shadow-xs]="vistaActual === 'revision'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-search mr-2"></i>Por verificar (Validados)@if (examenes().length) { <span class="ml-1 font-black">({{ examenes().length }})</span> }</button>
+        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'aprobados'" (click)="cambiarVista('aprobados')" [class.bg-card]="vistaActual === 'aprobados'" [class.text-primary]="vistaActual === 'aprobados'" [class.shadow-xs]="vistaActual === 'aprobados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-check-circle mr-2"></i>Verificados (Aprobados)</button>
       </nav>
 
       <div class="grid grid-cols-1 gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs md:grid-cols-3 lg:grid-cols-4">
@@ -38,7 +38,13 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Fecha examen · hasta<input type="date" [(ngModel)]="fechaHasta" (ngModelChange)="cambiarRangoFechas()" [min]="fechaDesde || null" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"></label>
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Parcial<select [(ngModel)]="tipoParcial" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">Todos</option><option>1er Parcial</option><option>2do Parcial</option><option>Examen Final</option><option>2da Instancia</option></select></label>
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Modalidad<select [(ngModel)]="modalidad" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">Todas</option><option value="PRESENCIAL_CARTILLA">Con cartilla</option><option value="VIRTUAL">Virtual</option></select></label>
-        @if (vistaActual === 'revision') { <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado<select [(ngModel)]="estado" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">Pendientes y devueltos</option><option value="PENDIENTE">Pendiente</option><option value="DEVUELTO">Devuelto</option></select></label> }
+        @if (vistaActual === 'revision') {
+          <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado
+            <div class="mt-1 flex h-[34px] items-center rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-xs font-bold text-purple-700">
+              <i class="pi pi-shield mr-1.5"></i>Validados (por verificar)
+            </div>
+          </label>
+        }
       </div>
 
       @if (errorCatalogos) { <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900"><i class="pi pi-exclamation-triangle mr-2"></i>{{ errorCatalogos }}</div> }
@@ -46,11 +52,11 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
 
       @if (vistaActual === 'revision') {
       @if (cargando()) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground"><i class="pi pi-spin pi-spinner mr-2"></i>Cargando exámenes validados...</div> }
-      @else if (!examenes().length) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">No hay exámenes pendientes de verificación en tu alcance.</div> }
+      @else if (!examenes().length) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">No hay exámenes validados pendientes de verificación en tu alcance.</div> }
       @else {
         <div class="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
           <table class="w-full min-w-[1200px] text-left text-xs"><thead class="bg-muted/50 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground"><tr><th class="p-3">Fecha examen</th><th class="p-3">Sede / carrera</th><th class="p-3">Asignatura</th><th class="p-3">Grupo</th><th class="p-3">Docente</th><th class="p-3">Subido</th><th class="p-3">Versión</th><th class="p-3">Modalidad</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead>
-            <tbody class="divide-y divide-border">@for (examen of examenes(); track examen.rolExamenId) {<tr class="hover:bg-muted/20"><td class="p-3 font-bold">{{ examen.fechaExamen | date:'dd/MM/yyyy' }}<span class="block font-normal text-muted-foreground">{{ examen.horario }}</span></td><td class="p-3"><strong>{{ examen.sedeCodigo || '—' }}</strong><span class="block text-muted-foreground">{{ examen.sedeNombre || 'Sede no registrada' }}</span><span class="block text-muted-foreground">{{ examen.carreraCodigo }} · {{ examen.carreraNombre }}</span></td><td class="p-3"><strong>{{ examen.materiaCodigo }}</strong><span class="block max-w-[220px] truncate text-muted-foreground">{{ examen.materiaNombre }}</span></td><td class="p-3 font-black">{{ examen.grupo }}</td><td class="p-3">{{ examen.docenteNombre }}</td><td class="p-3 text-muted-foreground">{{ examen.fechaSubida | date:'dd/MM/yyyy HH:mm' }}</td><td class="p-3 font-mono font-bold">{{ examen.version }}</td><td class="p-3">{{ etiquetaModalidad(examen.modalidad) }}</td><td class="p-3"><span [class]="examen.estadoVerificacion === 'DEVUELTO' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'" class="rounded-full px-2 py-1 text-[10px] font-black">{{ examen.estadoVerificacion }}</span></td><td class="p-3 text-right"><button type="button" class="rounded-lg bg-purple-700 px-3 py-2 text-[11px] font-black text-white hover:bg-purple-800" (click)="abrir(examen)"><i class="pi pi-search mr-1"></i>Revisar</button></td></tr>}</tbody></table>
+            <tbody class="divide-y divide-border">@for (examen of examenes(); track examen.rolExamenId) {<tr class="hover:bg-muted/20"><td class="p-3 font-bold">{{ examen.fechaExamen | date:'dd/MM/yyyy' }}<span class="block font-normal text-muted-foreground">{{ examen.horario }}</span></td><td class="p-3"><strong>{{ examen.sedeCodigo || '—' }}</strong><span class="block text-muted-foreground">{{ examen.sedeNombre || 'Sede no registrada' }}</span><span class="block text-muted-foreground">{{ examen.carreraCodigo }} · {{ examen.carreraNombre }}</span></td><td class="p-3"><strong>{{ examen.materiaCodigo }}</strong><span class="block max-w-[220px] truncate text-muted-foreground">{{ examen.materiaNombre }}</span></td><td class="p-3 font-black">{{ examen.grupo }}</td><td class="p-3">{{ examen.docenteNombre }}</td><td class="p-3 text-muted-foreground">{{ examen.fechaSubida | date:'dd/MM/yyyy HH:mm' }}</td><td class="p-3 font-mono font-bold">{{ examen.version }}</td><td class="p-3">{{ etiquetaModalidad(examen.modalidad) }}</td><td class="p-3"><span class="rounded-full bg-purple-100 text-purple-800 px-2.5 py-1 text-[10px] font-black tracking-wide">{{ examen.estadoVerificacion === 'PENDIENTE' ? 'VALIDADO' : examen.estadoVerificacion }}</span></td><td class="p-3 text-right"><button type="button" class="rounded-lg bg-purple-700 px-3 py-2 text-[11px] font-black text-white hover:bg-purple-800" (click)="abrir(examen)"><i class="pi pi-search mr-1"></i>Revisar</button></td></tr>}</tbody></table>
         </div>
       }
 
@@ -69,7 +75,13 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
             <div class="flex-1 overflow-y-auto p-5">
               <div class="mb-4 flex flex-wrap items-center gap-2">
                 <button type="button" class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white disabled:opacity-50" [disabled]="procesando()" (click)="previsualizar()"><i class="pi pi-file-pdf mr-2"></i>{{ procesando() ? 'Generando...' : 'Previsualizar examen completo' }}</button>
-                <span class="rounded-xl bg-muted px-3 py-2 text-[11px] text-muted-foreground">{{ detalle()!.preguntas.length }} preguntas · incluye clave separada</span>
+                <span class="rounded-xl bg-muted px-3 py-2 text-[11px] font-semibold text-muted-foreground">
+                  {{ totalRespondibles() }} preguntas evaluables
+                  @if (totalTroncos() > 0) {
+                    <span class="font-normal">(+ {{ totalTroncos() }} enunciados/casos de contexto)</span>
+                  }
+                  · incluye clave separada
+                </span>
               </div>
               @if (detalle()!.historialDevoluciones.length) {
                 <section class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -82,7 +94,7 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                         @if (revision.observacionesGenerales) { <p class="mb-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-950"><strong>Observación general:</strong> {{ revision.observacionesGenerales }}</p> }
                         @for (item of revision.preguntasObservadas; track item.numeroPregunta) {
                           <article class="mb-3 last:mb-0 rounded-lg border border-border p-3">
-                            <p class="mb-2 text-xs font-black">Pregunta {{ item.numeroPregunta }}</p>
+                            <p class="mb-2 text-xs font-black">Pregunta / Reactivo {{ item.numeroPregunta }}</p>
                             <p class="mb-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-800"><strong>Observación:</strong> {{ item.observacion }}</p>
                             <div class="grid gap-3 md:grid-cols-2">
                               <div class="rounded-lg bg-muted/40 p-3">
@@ -115,22 +127,213 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
               }
               @if (detalle()!.observacionesGenerales) { <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>Observaciones anteriores:</strong> {{ detalle()!.observacionesGenerales }}</div> }
               <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 p-3">
-                <span class="text-xs font-bold text-muted-foreground">Mostrando {{ preguntasParaRevision().length }} de {{ detalle()!.preguntas.length }} preguntas</span>
+                <span class="text-xs font-bold text-muted-foreground">Mostrando {{ preguntasParaRevision().length }} registros ({{ totalRespondibles() }} preguntas evaluables)</span>
                 @if (preguntasParaRevision().length < detalle()!.preguntas.length) {
                   <button type="button" class="text-xs font-bold text-primary underline" (click)="mostrarTodasPreguntas = !mostrarTodasPreguntas">{{ mostrarTodasPreguntas ? 'Enfocar preguntas observadas' : 'Mostrar examen completo' }}</button>
                 }
               </div>
-              <div class="space-y-3">
+              <div class="space-y-4">
                 @for (pregunta of preguntasParaRevision(); track pregunta.numeroOriginal) {
-                  <article class="rounded-xl border border-border bg-background p-4">
-                    <div class="flex items-start gap-3"><span class="rounded-lg bg-purple-100 px-2 py-1 text-xs font-black text-purple-800">{{ pregunta.tipoReactivo }} ({{ pregunta.numeroOriginal }})</span><span class="rounded-full bg-muted px-2 py-1 text-[10px] font-bold text-muted-foreground">D{{ pregunta.dificultad }}</span></div>
-                    <p [seaMathContent]="pregunta.enunciado" class="mt-3 whitespace-pre-wrap text-sm font-semibold text-foreground"></p>
-                    @if (imagenDataUrl(pregunta.imagenBase64); as imagen) { <img [src]="imagen" [alt]="'Imagen de la pregunta ' + pregunta.numeroOriginal" class="mt-3 max-h-80 max-w-full rounded-lg border border-border object-contain"> }
-                    @if (pregunta.respuestaCorrecta) { <p class="mt-3 inline-flex rounded-lg bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">Clave correcta: {{ pregunta.respuestaCorrecta }}</p> }
-                    @if (pregunta.opciones.length) { <div class="mt-2 grid gap-1 text-xs text-muted-foreground md:grid-cols-2">@for (opcion of pregunta.opciones; track opcion.letra) { <div [class.font-bold]="esOpcionCorrecta(pregunta, opcion)" [class.text-emerald-700]="esOpcionCorrecta(pregunta, opcion)"><strong>{{ opcion.letra }})</strong> <span [seaMathContent]="opcion.texto"></span> @if (esOpcionCorrecta(pregunta, opcion)) {<i class="pi pi-check ml-1" aria-label="Respuesta correcta"></i>}</div> }</div> }
-                    @if (pregunta.observacion) { <p class="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-800"><strong>Observación enviada:</strong> {{ pregunta.observacion }}</p> }
-                    <textarea [(ngModel)]="observacionesPreguntas[pregunta.numeroOriginal]" rows="2" placeholder="Nueva observación si aún requiere corrección" class="mt-3 w-full rounded-lg border border-border bg-card p-2 text-xs"></textarea>
-                  </article>
+                  @if (esTronco(pregunta)) {
+                    <!-- ENUNCIADO DE REFERENCIA / CONTEXTO (TRONCO) -->
+                    <article class="rounded-2xl border-2 border-indigo-200/80 bg-indigo-50/20 p-4 shadow-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2">
+                        <div class="flex items-center gap-2">
+                          @if (pregunta.tipoReactivo === 'EMPAREJAMIENTO_TRONCO') {
+                            <span class="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-black text-white tracking-wide">
+                              <i class="pi pi-link mr-1"></i>EMPAREJAMIENTO AMPLIADO · MATRIZ DE REFERENCIA
+                            </span>
+                          } @else {
+                            <span class="rounded-lg bg-indigo-700 px-2.5 py-1 text-xs font-black text-white tracking-wide">
+                              <i class="pi pi-book mr-1"></i>CASO CLÍNICO O PROBLEMA · CONTEXTO
+                            </span>
+                          }
+                          <span class="rounded-full bg-slate-200/80 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
+                            Enunciado de referencia (No evaluable)
+                          </span>
+                        </div>
+                        <span class="text-[10px] font-semibold text-muted-foreground">Registro #{{ pregunta.numeroOriginal }}</span>
+                      </div>
+
+                      <p [seaMathContent]="pregunta.enunciado" class="mt-3 whitespace-pre-wrap text-sm font-medium text-foreground leading-relaxed"></p>
+
+                      @if (imagenDataUrl(pregunta.imagenBase64); as imagen) {
+                        <img [src]="imagen" [alt]="'Imagen de referencia #' + pregunta.numeroOriginal" class="mt-3 max-h-80 max-w-full rounded-lg border border-border object-contain">
+                      }
+
+                      @if (pregunta.tipoReactivo === 'EMPAREJAMIENTO_TRONCO' && pregunta.opciones.length) {
+                        <div class="mt-4 rounded-xl border border-blue-200 bg-blue-50/50 p-3">
+                          <p class="text-[10px] font-extrabold uppercase tracking-wider text-blue-950 mb-2">
+                            <i class="pi pi-list mr-1"></i>Opciones maestras de referencia (para asociar en las preguntas siguientes):
+                          </p>
+                          <div class="grid gap-2 sm:grid-cols-2 text-xs">
+                            @for (opcion of pregunta.opciones; track opcion.letra) {
+                              <div class="flex items-start gap-2 rounded-lg bg-card p-2.5 border border-blue-100 shadow-xs">
+                                <span class="rounded bg-blue-100 px-1.5 py-0.5 font-black text-blue-900">{{ opcion.letra }}</span>
+                                <span [seaMathContent]="opcion.texto" class="flex-1 text-foreground"></span>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      }
+
+                      @if (pregunta.observacion) {
+                        <p class="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-800 border border-rose-200">
+                          <strong>Observación enviada:</strong> {{ pregunta.observacion }}
+                        </p>
+                      }
+                      <textarea [(ngModel)]="observacionesPreguntas[pregunta.numeroOriginal]" rows="2" placeholder="Observación sobre este enunciado o caso si requiere corrección..." class="mt-3 w-full rounded-lg border border-border bg-card p-2 text-xs"></textarea>
+                    </article>
+                  } @else {
+                    <!-- PREGUNTA RESPONDIBLE EVALUABLE -->
+                    <article class="rounded-xl border border-border bg-background p-4 shadow-xs">
+                      <div class="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+                        <div class="flex items-center gap-2">
+                          <span class="rounded-lg bg-purple-100 px-2.5 py-1 text-xs font-black text-purple-900">
+                            Pregunta {{ numeroPreguntaVisible(pregunta) }}
+                          </span>
+                          <span class="text-xs font-bold text-muted-foreground">
+                            · {{ etiquetaTipo(pregunta) }}
+                          </span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          @if (pregunta.dificultad) {
+                            <span class="rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                              Dificultad {{ pregunta.dificultad }}
+                            </span>
+                          }
+                          <span class="text-[10px] text-muted-foreground">Ref. #{{ pregunta.numeroOriginal }}</span>
+                        </div>
+                      </div>
+
+                      <p [seaMathContent]="pregunta.enunciado" class="mt-3 whitespace-pre-wrap text-sm font-semibold text-foreground"></p>
+
+                      @if (imagenDataUrl(pregunta.imagenBase64); as imagen) {
+                        <img [src]="imagen" [alt]="'Imagen de la pregunta ' + numeroPreguntaVisible(pregunta)" class="mt-3 max-h-80 max-w-full rounded-lg border border-border object-contain">
+                      }
+
+                      <!-- PRESENTACIÓN ESPECÍFICA POR TIPOLOGÍA -->
+                      @if (pregunta.tipoReactivo === 'VERDADERO_O_FALSO_COMPLEJAS') {
+                        <!-- Proposiciones 1, 2, 3, 4 -->
+                        <div class="mt-3 rounded-xl border border-border bg-muted/20 p-3">
+                          <p class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-2">
+                            Proposiciones formuladas:
+                          </p>
+                          <div class="space-y-1.5 text-xs">
+                            @for (prop of proposicionesVfComplejas(pregunta); track prop.numero) {
+                              <div class="flex items-start gap-2 bg-card p-2 rounded-lg border border-border/60">
+                                <span class="font-black text-purple-700 w-5">{{ prop.numero }})</span>
+                                <span [seaMathContent]="prop.texto" class="flex-1 font-medium text-foreground"></span>
+                              </div>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- Alternativas fijas A-E de decisión -->
+                        <div class="mt-3">
+                          <p class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1.5">
+                            Alternativas institucionales y clave de respuesta:
+                          </p>
+                          <div class="grid gap-1.5 sm:grid-cols-2 text-xs">
+                            @for (alt of alternativasVfComplejas; track alt.letra) {
+                              <div class="flex items-center justify-between p-2.5 rounded-lg border transition-colors"
+                                   [class.bg-emerald-50]="esClaveVfCompleja(pregunta, alt.letra)"
+                                   [class.border-emerald-300]="esClaveVfCompleja(pregunta, alt.letra)"
+                                   [class.text-emerald-950]="esClaveVfCompleja(pregunta, alt.letra)"
+                                   [class.font-bold]="esClaveVfCompleja(pregunta, alt.letra)"
+                                   [class.bg-card]="!esClaveVfCompleja(pregunta, alt.letra)"
+                                   [class.border-border]="!esClaveVfCompleja(pregunta, alt.letra)">
+                                <div>
+                                  <span class="rounded bg-muted px-1.5 py-0.5 font-black mr-1" [class.bg-emerald-200]="esClaveVfCompleja(pregunta, alt.letra)">{{ alt.letra }}</span>
+                                  <span>{{ alt.texto }}</span>
+                                </div>
+                                @if (esClaveVfCompleja(pregunta, alt.letra)) {
+                                  <span class="flex items-center text-[10px] font-black uppercase text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded ml-2">
+                                    <i class="pi pi-check mr-1"></i>Clave
+                                  </span>
+                                }
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      } @else if (pregunta.tipoReactivo === 'RESPUESTA_PREMISAS_ABCD') {
+                        <!-- Alternativas fijas A-D de premisas -->
+                        <div class="mt-3">
+                          <p class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1.5">
+                            Alternativas de evaluación y clave correcta:
+                          </p>
+                          <div class="grid gap-1.5 sm:grid-cols-2 text-xs">
+                            @for (opcion of opcionesPremisasAbcd(pregunta); track opcion.letra) {
+                              <div class="flex items-center justify-between p-2.5 rounded-lg border transition-colors"
+                                   [class.bg-emerald-50]="opcion.correcta"
+                                   [class.border-emerald-300]="opcion.correcta"
+                                   [class.text-emerald-950]="opcion.correcta"
+                                   [class.font-bold]="opcion.correcta"
+                                   [class.bg-card]="!opcion.correcta"
+                                   [class.border-border]="!opcion.correcta">
+                                <div>
+                                  <span class="rounded bg-muted px-1.5 py-0.5 font-black mr-1" [class.bg-emerald-200]="opcion.correcta">{{ opcion.letra }}</span>
+                                  <span [seaMathContent]="opcion.texto"></span>
+                                </div>
+                                @if (opcion.correcta) {
+                                  <span class="flex items-center text-[10px] font-black uppercase text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded ml-2">
+                                    <i class="pi pi-check mr-1"></i>Clave
+                                  </span>
+                                }
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      } @else if (pregunta.tipoReactivo === 'VERDADERO_O_FALSO') {
+                        <!-- V/F Simple: no muestra opciones impresas, solo la clave limpia -->
+                        @if (pregunta.respuestaCorrecta) {
+                          <div class="mt-3">
+                            <span class="inline-flex items-center rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                              <i class="pi pi-check-circle mr-1.5 text-emerald-600"></i>
+                              Respuesta correcta: {{ pregunta.respuestaCorrecta === 'A' ? 'A (Verdadero)' : pregunta.respuestaCorrecta === 'B' ? 'B (Falso)' : pregunta.respuestaCorrecta }}
+                            </span>
+                          </div>
+                        }
+                      } @else {
+                        <!-- Selección simple, subítem de caso, emparejamiento con opciones regulares -->
+                        @if (pregunta.respuestaCorrecta) {
+                          <div class="mt-3">
+                            <span class="inline-flex items-center rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                              <i class="pi pi-check-circle mr-1.5 text-emerald-600"></i>
+                              Clave correcta: {{ pregunta.respuestaCorrecta }}
+                            </span>
+                          </div>
+                        }
+                        @if (pregunta.opciones.length) {
+                          <div class="mt-2 grid gap-1.5 text-xs text-muted-foreground sm:grid-cols-2">
+                            @for (opcion of pregunta.opciones; track opcion.letra) {
+                              <div class="flex items-center justify-between p-2 rounded-lg border transition-colors"
+                                   [class.border-emerald-300]="esOpcionCorrecta(pregunta, opcion)"
+                                   [class.bg-emerald-50]="esOpcionCorrecta(pregunta, opcion)"
+                                   [class.text-emerald-950]="esOpcionCorrecta(pregunta, opcion)"
+                                   [class.font-bold]="esOpcionCorrecta(pregunta, opcion)"
+                                   [class.border-border]="!esOpcionCorrecta(pregunta, opcion)"
+                                   [class.bg-card]="!esOpcionCorrecta(pregunta, opcion)">
+                                <div>
+                                  <strong>{{ opcion.letra }})</strong> <span [seaMathContent]="opcion.texto"></span>
+                                </div>
+                                @if (esOpcionCorrecta(pregunta, opcion)) {
+                                  <i class="pi pi-check text-emerald-700 ml-1" aria-label="Respuesta correcta"></i>
+                                }
+                              </div>
+                            }
+                          </div>
+                        }
+                      }
+
+                      @if (pregunta.observacion) {
+                        <p class="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-800 border border-rose-200">
+                          <strong>Observación enviada:</strong> {{ pregunta.observacion }}
+                        </p>
+                      }
+                      <textarea [(ngModel)]="observacionesPreguntas[pregunta.numeroOriginal]" rows="2" placeholder="Nueva observación si aún requiere corrección" class="mt-3 w-full rounded-lg border border-border bg-card p-2 text-xs"></textarea>
+                    </article>
+                  }
                 }
               </div>
             </div>
@@ -228,6 +431,101 @@ export class VerificarExamenesComponent implements OnDestroy {
     this.cargar();
   }
   public cambiarRangoFechas(): void { this.cargar(); }
+  public readonly alternativasVfComplejas = [
+    { letra: 'A', texto: '1, 2 y 3 son verdaderas' },
+    { letra: 'B', texto: '1 y 3 son verdaderas' },
+    { letra: 'C', texto: '2 y 4 son verdaderas' },
+    { letra: 'D', texto: 'Solo 4 es verdadera' },
+    { letra: 'E', texto: 'Todas son verdaderas' }
+  ];
+
+  public esTronco(pregunta: VerificacionPregunta): boolean {
+    if (pregunta.esEnunciadoContexto != null) {
+      return pregunta.esEnunciadoContexto;
+    }
+    const tipo = (pregunta.tipoReactivo || '').toUpperCase();
+    return tipo === 'EMPAREJAMIENTO_TRONCO' || tipo === 'CASO_CLINICO_TRONCO';
+  }
+
+  public totalRespondibles(): number {
+    const preguntas = this.detalle()?.preguntas || [];
+    return preguntas.filter(p => !this.esTronco(p)).length;
+  }
+
+  public totalTroncos(): number {
+    const preguntas = this.detalle()?.preguntas || [];
+    return preguntas.filter(p => this.esTronco(p)).length;
+  }
+
+  public numeroPreguntaVisible(pregunta: VerificacionPregunta): number | null {
+    if (this.esTronco(pregunta)) return null;
+    if (pregunta.numeroPregunta != null) return pregunta.numeroPregunta;
+    const preguntas = this.detalle()?.preguntas || [];
+    let num = 0;
+    for (const p of preguntas) {
+      if (!this.esTronco(p)) {
+        num++;
+        if (p.numeroOriginal === pregunta.numeroOriginal) return num;
+      }
+    }
+    return pregunta.numeroOriginal;
+  }
+
+  public etiquetaTipo(pregunta: VerificacionPregunta): string {
+    switch (pregunta.tipoReactivo) {
+      case 'EMPAREJAMIENTO_TRONCO':
+        return 'Matriz de Emparejamiento';
+      case 'CASO_CLINICO_TRONCO':
+        return 'Caso Clínico o Problema';
+      case 'OPCION_EMPAREJAMIENTO':
+        return 'Emparejamiento';
+      case 'SUBITEM_CASO':
+        return 'Subítem de Caso';
+      case 'VERDADERO_O_FALSO':
+        return 'Verdadero o Falso Simple';
+      case 'VERDADERO_O_FALSO_COMPLEJAS':
+        return 'Verdadero o Falso Compleja';
+      case 'RESPUESTA_PREMISAS_ABCD':
+        return 'Premisas A/B/Ambas/Ninguna';
+      case 'SELECCION_SIMPLE':
+        return 'Selección Múltiple';
+      default:
+        return pregunta.tipoReactivo || 'Pregunta';
+    }
+  }
+
+  public proposicionesVfComplejas(pregunta: VerificacionPregunta): { numero: number; texto: string }[] {
+    const letras = ['A', 'B', 'C', 'D'];
+    return letras.map((letra, index) => {
+      const op = pregunta.opciones.find(o => o.letra?.toUpperCase() === letra);
+      let texto = op?.texto || '';
+      texto = texto.replace(/^\s*[1-4][\.\)\-\:\s]+\s*/, '').trim();
+      return { numero: index + 1, texto };
+    }).filter(p => p.texto.length > 0);
+  }
+
+  public esClaveVfCompleja(pregunta: VerificacionPregunta, letra: string): boolean {
+    return (pregunta.respuestaCorrecta || '').trim().toUpperCase() === letra.toUpperCase();
+  }
+
+  public opcionesPremisasAbcd(pregunta: VerificacionPregunta): { letra: string; texto: string; correcta: boolean }[] {
+    const claves: string[] = (pregunta.respuestaCorrecta || '').toUpperCase().match(/[A-D]+/g) || [];
+    const defaults: Record<string, string> = {
+      'A': 'Si la primera es verdadera',
+      'B': 'Si la segunda es verdadera',
+      'C': 'Si ambas son verdaderas',
+      'D': 'Si ninguna es verdadera'
+    };
+    return ['A', 'B', 'C', 'D'].map(letra => {
+      const op = pregunta.opciones.find(o => o.letra?.toUpperCase() === letra);
+      let texto = op?.texto?.trim() || defaults[letra];
+      texto = texto.replace(new RegExp(`^\\s*${letra}[\\.\\)\\-\\:\\s]+\\s*`, 'i'), '').trim();
+      if (!texto) texto = defaults[letra];
+      const correcta = op?.correcta || claves.includes(letra);
+      return { letra, texto, correcta };
+    });
+  }
+
   public preguntasParaRevision(): VerificacionPregunta[] {
     const detalle = this.detalle();
     if (!detalle || this.mostrarTodasPreguntas) return detalle?.preguntas || [];
@@ -240,7 +538,11 @@ export class VerificarExamenesComponent implements OnDestroy {
     }
     return detalle.preguntas;
   }
+
   public esOpcionCorrecta(pregunta: VerificacionPregunta, opcion: VerificacionPregunta['opciones'][number]): boolean {
+    if (pregunta.tipoReactivo === 'VERDADERO_O_FALSO_COMPLEJAS') {
+      return false;
+    }
     const claves: string[] = (pregunta.respuestaCorrecta || '').toUpperCase().match(/[A-Z0-9]+/g) || [];
     return opcion.correcta || (!!opcion.letra && claves.includes(opcion.letra.trim().toUpperCase()));
   }

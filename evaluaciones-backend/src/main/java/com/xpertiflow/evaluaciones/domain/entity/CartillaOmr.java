@@ -45,4 +45,16 @@ public class CartillaOmr {
 
     @Column(name = "impresa_en")
     private LocalDateTime impresaEn;
+
+    @Transient
+    private String estadoCalificacion;
+
+    @Transient
+    private String observacion;
+
+    @Transient
+    private java.math.BigDecimal notaSobre60;
+
+    @Transient
+    private java.math.BigDecimal notaSobre100;
 }

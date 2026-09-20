@@ -563,10 +563,6 @@ public class GeneracionTypstService {
 
         // 5. Transicionar a GENERADO usando la maquina de estados existente
         if (rol.getEstadoFlujo() == EstadoFlujo.VALIDADO) {
-            if (rol.getModalidad() == ModalidadExamen.VIRTUAL) {
-                log.info("Rol virtual {} preparado: se conservan variantes y asignaciones en VALIDADO, sin PDF", rolExamenId);
-                return;
-            }
             TransicionEstadoRequestDto transicion = TransicionEstadoRequestDto.builder()
                     .nuevoEstado(EstadoFlujo.GENERADO)
                     .usuario("Sistema")

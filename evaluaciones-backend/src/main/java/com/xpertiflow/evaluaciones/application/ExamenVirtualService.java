@@ -1,5 +1,6 @@
 package com.xpertiflow.evaluaciones.application;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertiflow.evaluaciones.api.dto.virtual.*;
@@ -72,7 +73,7 @@ public class ExamenVirtualService {
         sala.setGraciaIngresoMinutos(Optional.ofNullable(request.getGraciaIngresoMinutos()).orElse(10));
         sala.setPermiteReconexion(Optional.ofNullable(request.getPermiteReconexion()).orElse(true));
         sala.setCreadoPor(usuario == null ? "Sistema" : usuario);
-        String tokenGrupo = generarToken();
+        String tokenGrupo = generarPinGrupo();
         sala.setTokenGrupoHash(hashToken(tokenGrupo));
         sala.setTokenGrupoEmitidoEn(ahora);
         salaRepository.save(sala);
@@ -112,7 +113,7 @@ public class ExamenVirtualService {
         if (!Set.of("PREPARADA", "ABIERTA", "EN_CURSO", "PAUSADA").contains(sala.getEstado())) {
             throw new RuntimeException("Solo se puede generar un acceso grupal mientras la sala esté disponible");
         }
-        String token = generarToken();
+        String token = generarPinGrupo();
         boolean yaExistia = sala.getTokenGrupoHash() != null;
         sala.setTokenGrupoHash(hashToken(token));
         sala.setTokenGrupoEmitidoEn(LocalDateTime.now());
@@ -261,7 +262,7 @@ public class ExamenVirtualService {
 
         RolExamen rol = rolRepository.findById(sala.getRolExamenId()).orElse(null);
         if (rol != null && rol.getModalidad() == ModalidadExamen.VIRTUAL
-                && rol.getEstadoFlujo() == EstadoFlujo.VALIDADO) {
+                && (rol.getEstadoFlujo() == EstadoFlujo.VALIDADO || rol.getEstadoFlujo() == EstadoFlujo.GENERADO)) {
             rolExamenService.transicionarEstado(rol.getId(), com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto.builder()
                     .nuevoEstado(EstadoFlujo.CALIFICADO)
                     .usuario(usuario == null ? "Sistema" : usuario)
@@ -321,13 +322,18 @@ public class ExamenVirtualService {
             throw new RuntimeException("La sala no está habilitada para recibir estudiantes");
         }
         String tokenSesion = request.getToken().trim();
+        String tokenNormalizado = tokenSesion.replaceAll("[\\s-]+", "");
         String tokenHash = hashToken(tokenSesion);
-        Optional<IntentoExamenVirtual> intentoPorPersona = intentoRepository.findBySalaIdAndTokenHash(sala.getId(), tokenHash);
+        String tokenHashNorm = hashToken(tokenNormalizado);
+        Optional<IntentoExamenVirtual> intentoPorPersona = intentoRepository.findBySalaIdAndTokenHash(sala.getId(), tokenHash)
+                .or(() -> intentoRepository.findBySalaIdAndTokenHash(sala.getId(), tokenHashNorm));
         IntentoExamenVirtual intento;
         if (intentoPorPersona.isPresent()) {
             intento = intentoPorPersona.get();
         } else {
-            if (sala.getTokenGrupoHash() == null || !sala.getTokenGrupoHash().equals(tokenHash)) {
+            boolean coincideGrupo = sala.getTokenGrupoHash() != null &&
+                    (sala.getTokenGrupoHash().equals(tokenHash) || sala.getTokenGrupoHash().equals(tokenHashNorm));
+            if (!coincideGrupo) {
                 throw new RuntimeException("El código de sala o el token no son válidos");
             }
             if (request.getCodigoEstudiante() == null || request.getCodigoEstudiante().isBlank()) {
@@ -374,6 +380,7 @@ public class ExamenVirtualService {
         IntentoExamenVirtual intento = autenticarIntento(token);
         SalaExamenVirtual sala = obtenerSala(intento.getSalaId());
         verificarTiempo(sala, intento);
+        sincronizarInicioIntento(sala, intento);
         if (!"EN_CURSO".equals(intento.getEstado()) || !"EN_CURSO".equals(sala.getEstado())) {
             throw new RuntimeException("El intento no está en curso");
         }
@@ -402,7 +409,8 @@ public class ExamenVirtualService {
         IntentoExamenVirtual intento = autenticarIntento(token);
         SalaExamenVirtual sala = obtenerSala(intento.getSalaId());
         if (Set.of("ENVIADO", "CALIFICADO").contains(intento.getEstado())) return intento;
-        if (!Set.of("EN_CURSO", "PAUSADA").contains(intento.getEstado())) {
+        sincronizarInicioIntento(sala, intento);
+        if (!Set.of("EN_CURSO", "PAUSADA").contains(intento.getEstado()) && !"EN_CURSO".equals(sala.getEstado())) {
             throw new RuntimeException("El intento aún no puede enviarse");
         }
         calificar(intento);
@@ -428,14 +436,20 @@ public class ExamenVirtualService {
         ExamenVariante variante = varianteRepository.findById(intento.getVarianteId())
                 .orElseThrow(() -> new RuntimeException("Variante no encontrada"));
         try {
-            Map<String, String> patron = objectMapper.readValue(variante.getPatronClavesJson(), Map.class);
+            Map<String, String> patron = obtenerPatronClaves(variante);
             Map<Integer, String> respuestas = new HashMap<>();
             for (RespuestaExamenVirtual r : respuestaRepository.findByIntentoIdOrderByNumeroPreguntaAsc(intento.getId())) {
                 respuestas.put(r.getNumeroPregunta(), r.getRespuesta());
             }
             int aciertos = 0;
             for (Map.Entry<String, String> clave : patron.entrySet()) {
-                if (clave.getValue().equalsIgnoreCase(respuestas.getOrDefault(Integer.valueOf(clave.getKey()), ""))) aciertos++;
+                try {
+                    Integer numPregunta = Integer.valueOf(clave.getKey());
+                    String respEstudiante = respuestas.getOrDefault(numPregunta, "");
+                    if (clave.getValue() != null && clave.getValue().equalsIgnoreCase(respEstudiante.trim())) {
+                        aciertos++;
+                    }
+                } catch (NumberFormatException ignored) {}
             }
             int total = Math.max(patron.size(), 1);
             intento.setAciertos(aciertos);
@@ -443,6 +457,33 @@ public class ExamenVirtualService {
             intento.setNotaSobre100(BigDecimal.valueOf(aciertos * 100.0 / total).setScale(2, RoundingMode.HALF_UP));
         } catch (Exception ex) {
             throw new RuntimeException("No se pudo calificar la variante virtual", ex);
+        }
+    }
+
+    private Map<String, String> obtenerPatronClaves(ExamenVariante variante) {
+        if (variante.getPatronClavesJson() != null && !variante.getPatronClavesJson().isBlank()) {
+            try {
+                return objectMapper.readValue(variante.getPatronClavesJson(),
+                        new TypeReference<LinkedHashMap<String, String>>() {});
+            } catch (Exception ignored) {}
+        }
+        try {
+            String contenidoSeguro = descifrarContenidoVariante(variante);
+            JsonNode paquete = objectMapper.readTree(contenidoSeguro);
+            JsonNode patronNode = paquete.path("patronClavesJson");
+            if (patronNode.isMissingNode() || patronNode.isNull()) {
+                return Map.of();
+            }
+            if (patronNode.isTextual()) {
+                String patronJson = patronNode.asText("");
+                if (patronJson.isBlank()) return Map.of();
+                return objectMapper.readValue(patronJson,
+                        new TypeReference<LinkedHashMap<String, String>>() {});
+            }
+            return objectMapper.convertValue(patronNode,
+                    new TypeReference<LinkedHashMap<String, String>>() {});
+        } catch (Exception ex) {
+            throw new RuntimeException("No se pudo obtener el patrón de claves de la variante", ex);
         }
     }
 
@@ -478,6 +519,11 @@ public class ExamenVirtualService {
         dto.setCuentaRegresivaSegundos(cuentaRegresivaRestante(sala));
         dto.setTiempoRestanteSegundos(tiempoRestante(sala));
         dto.setPreguntas("EN_CURSO".equals(sala.getEstado()) && examenIniciado(sala) ? construirPreguntas(variante) : List.of());
+        Map<Integer, String> guardadas = new HashMap<>();
+        for (RespuestaExamenVirtual r : respuestaRepository.findByIntentoIdOrderByNumeroPreguntaAsc(intento.getId())) {
+            guardadas.put(r.getNumeroPregunta(), r.getRespuesta());
+        }
+        dto.setRespuestasGuardadas(guardadas);
         return dto;
     }
 
@@ -633,6 +679,7 @@ public class ExamenVirtualService {
     }
 
     private String generarCodigoSala() { String codigo; do { codigo = "SALA-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT); } while (salaRepository.findByCodigoSala(codigo).isPresent()); return codigo; }
+    private String generarPinGrupo() { return String.format("%06d", secureRandom.nextInt(1_000_000)); }
     private String generarToken() { byte[] bytes = new byte[32]; secureRandom.nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
     private String hashToken(String token) { try { byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)); StringBuilder out = new StringBuilder(); for (byte b : digest) out.append(String.format("%02x", b)); return out.toString(); } catch (Exception ex) { throw new IllegalStateException(ex); } }
     private String nombreCompleto(MapeoEstudianteVariante m) { return String.join(" ", Arrays.asList(m.getNombres(), m.getApellidoPaterno(), m.getApellidoMaterno())).replaceAll("\\s+", " ").trim(); }

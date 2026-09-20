@@ -57,6 +57,7 @@ public class ExamenSinCartillaService {
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AppProperties appProperties;
     private final BancoCifradoService cifradoService;
+    private final ReporteNotasSinCartillaPdfService reporteNotasPdfService;
 
     @Transactional(readOnly = true)
     public DocumentoSinCartillaResponseDto obtenerDocumento(String rolExamenId, Authentication authentication) {
@@ -212,6 +213,17 @@ public class ExamenSinCartillaService {
                 .ipOrigen("127.0.0.1")
                 .build());
         return listarNotas(rolExamenId, authentication);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generarReporteNotasPdf(String rolExamenId, Authentication authentication) {
+        RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
+        List<NotaDocenteResponseDto> notas = listarNotas(rolExamenId, authentication);
+        try {
+            return reporteNotasPdfService.generar(rol, notas);
+        } catch (IOException e) {
+            throw new IllegalStateException("No se pudo generar la planilla PDF oficial de notas: " + e.getMessage(), e);
+        }
     }
 
     public byte[] descargarDocumento(String rolExamenId, Authentication authentication) {

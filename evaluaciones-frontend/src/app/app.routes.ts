@@ -34,7 +34,7 @@ export const routes: Routes = [
       { path: 'servicios-sea', component: CatalogoUnitepcComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Servicios académicos - Sistema de Evaluaciones' },
       { path: 'plan-estudios', component: PlanEstudiosComponent, canActivate: [roleGuard(['DIRECTOR_CARRERA', 'VICERRECTOR'])], title: 'Plan de Estudios - Sistema de Evaluaciones' },
       { path: 'evaluaciones-dia', component: EvaluacionesDiaComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR', 'DOCENTE'])], title: 'Lista de Evaluaciones por Día - Sistema de Evaluaciones' },
-      { path: 'salas-virtuales', component: SalaVirtualComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'DOCENTE'])], title: 'Salas virtuales - Sistema de Evaluaciones' },
+      { path: 'salas-virtuales', component: SalaVirtualComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE'])], title: 'Salas virtuales - Sistema de Evaluaciones' },
       { path: 'calificacion-omr', component: CalificacionOmrComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Calificación OMR - Sistema de Evaluaciones' },
       { path: 'banco-preguntas', component: BancoPreguntasComponent, canActivate: [roleGuard(['DOCENTE'])], title: 'Validador de Banco de Preguntas - Sistema de Evaluaciones' },
       { path: 'administracion-evaluaciones', component: AdministracionEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Administración - Sistema de Evaluaciones' },

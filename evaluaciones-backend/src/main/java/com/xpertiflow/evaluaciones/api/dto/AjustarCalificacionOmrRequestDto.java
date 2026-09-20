@@ -25,4 +25,10 @@ public class AjustarCalificacionOmrRequestDto {
     private Map<String, String> respuestasOriginales;
 
     private String usuario;
+
+    /** Indica si el examen individual de este estudiante fue marcado como anulado. */
+    private Boolean examenAnulado;
+
+    /** Motivo por el cual se anuló el examen del estudiante. */
+    private String motivoAnulacionExamen;
 }

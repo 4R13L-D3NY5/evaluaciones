@@ -30,9 +30,11 @@ export interface VerificacionExamenLista {
 export interface VerificacionOpcion { letra: string; texto: string; correcta: boolean; }
 export interface VerificacionPregunta {
   numeroOriginal: number;
+  numeroPregunta?: number | null;
+  esEnunciadoContexto?: boolean;
   identificadorOriginal: string;
   tipoReactivo: string;
-  dificultad: number;
+  dificultad?: number | string;
   nivelDificultad?: string;
   grupoContexto?: string;
   enunciado: string;

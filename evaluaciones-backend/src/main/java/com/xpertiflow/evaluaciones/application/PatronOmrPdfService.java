@@ -144,10 +144,14 @@ public class PatronOmrPdfService {
                                  PatronCalificadoResponseDto.VariantePatronDto variante,
                                  List<PatronCalificadoResponseDto.EstudiantePatronDto> estudiantes,
                                  float top, FuentesPdf fuentes) throws IOException {
+        List<Integer> anuladas = variante.getPreguntasAnuladas() == null ? List.of() : variante.getPreguntasAnuladas();
+        String textoAnuladas = !anuladas.isEmpty()
+                ? " · " + anuladas.size() + " anulada(s) tachada(s)"
+                : "";
         texto(contenido, "VARIANTE " + seguro(variante.getLetra()) + " · "
                         + (variante.getTotalPreguntas() == null ? 0 : variante.getTotalPreguntas())
-                        + " preguntas · Generado: " + FECHA_HORA.format(LocalDateTime.now()),
-                MARGIN, top + 12, fuentes.negrita(), 8, new java.awt.Color(55, 43, 125));
+                        + " preguntas" + textoAnuladas + " · Generado: " + FECHA_HORA.format(LocalDateTime.now()),
+                MARGIN, top + 12, fuentes.negrita(), 8, !anuladas.isEmpty() ? new java.awt.Color(185, 28, 28) : new java.awt.Color(55, 43, 125));
         float altoTabla = dibujarTabla(contenido, variante, top + 22, fuentes);
         if (!estudiantes.isEmpty()) {
             dibujarListaEstudiantes(contenido, estudiantes, top + 22 + altoTabla + 8, fuentes);
@@ -282,15 +286,47 @@ public class PatronOmrPdfService {
         }
         contenido.stroke();
 
+        Set<Integer> anuladas = variante.getPreguntasAnuladas() == null
+                ? Set.of()
+                : new java.util.HashSet<>(variante.getPreguntasAnuladas());
+
+        // Resaltar celdas de preguntas anuladas con fondo suave rojizo
+        for (int pregunta = 1; pregunta <= total; pregunta++) {
+            if (anuladas.contains(pregunta)) {
+                int indice = pregunta - 1;
+                int columna = indice % columnas;
+                int fila = indice / columnas;
+                float x = MARGIN + columna * cellWidth;
+                float cellY = PAGE_HEIGHT - (top + (fila + 1) * rowHeight);
+                contenido.setNonStrokingColor(new java.awt.Color(254, 226, 226));
+                contenido.addRect(x + 0.5f, cellY + 0.5f, cellWidth - 1f, rowHeight - 1f);
+                contenido.fill();
+            }
+        }
+
         for (int pregunta = 1; pregunta <= total; pregunta++) {
             int indice = pregunta - 1;
             int columna = indice % columnas;
             int fila = indice / columnas;
             float x = MARGIN + columna * cellWidth;
             float y = top + fila * rowHeight + 18;
-            texto(contenido, pregunta + ".", x + 3, y, fuentes.negrita(), 7, java.awt.Color.DARK_GRAY);
-            texto(contenido, seguro(respuestas.getOrDefault(String.valueOf(pregunta), "—")),
-                    x + cellWidth - 9, y, fuentes.negrita(), 9, new java.awt.Color(55, 43, 125));
+            boolean esAnulada = anuladas.contains(pregunta);
+            if (esAnulada) {
+                texto(contenido, pregunta + ".", x + 3, y, fuentes.negrita(), 7, new java.awt.Color(185, 28, 28));
+                texto(contenido, seguro(respuestas.getOrDefault(String.valueOf(pregunta), "—")),
+                        x + cellWidth - 9, y, fuentes.negrita(), 9, new java.awt.Color(185, 28, 28));
+                // Tachar la celda completa con línea roja
+                contenido.setStrokingColor(new java.awt.Color(220, 38, 38));
+                contenido.setLineWidth(1.4f);
+                float yLinea = PAGE_HEIGHT - (top + fila * rowHeight + 14);
+                contenido.moveTo(x + 2, yLinea);
+                contenido.lineTo(x + cellWidth - 2, yLinea);
+                contenido.stroke();
+            } else {
+                texto(contenido, pregunta + ".", x + 3, y, fuentes.negrita(), 7, java.awt.Color.DARK_GRAY);
+                texto(contenido, seguro(respuestas.getOrDefault(String.valueOf(pregunta), "—")),
+                        x + cellWidth - 9, y, fuentes.negrita(), 9, new java.awt.Color(55, 43, 125));
+            }
         }
         return filas * rowHeight;
     }

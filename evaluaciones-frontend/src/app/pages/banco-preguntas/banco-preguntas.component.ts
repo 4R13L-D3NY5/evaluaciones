@@ -11,7 +11,10 @@ import { ConfiguracionEvaluacionesService } from '../../core/services/configurac
 import { AuthService } from '../../core/services/auth.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { PrevisualizacionTypstRequest } from '../../core/models/generacion-typst.model';
-import { DocumentoSinCartilla, ExamenSinCartillaService } from '../../core/services/examen-sin-cartilla.service';
+import { DocumentoSinCartilla, ExamenSinCartillaService, NotaDocente } from '../../core/services/examen-sin-cartilla.service';
+import { ActivatedRoute } from '@angular/router';
+import { NotificacionesService } from '../../core/services/notificaciones.service';
+import { OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { firstValueFrom, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -319,7 +322,15 @@ export interface DiaCalendario {
                   <i [class]="rolPuedeCargarBanco() ? 'pi pi-database' : 'pi pi-lock'"></i>
                   <span><strong>Rol de examen oficial:</strong> {{ rol.id }} · {{ rol.fechaDisplay }}</span>
                 </div>
-                <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
+                <div>
+                  @if (esExamenVerificado()) {
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-xs">
+                      <i class="pi pi-check-circle"></i> Validado y Verificado
+                    </span>
+                  } @else {
+                    <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
+                  }
+                </div>
               </div>
               @if (cargandoBancoPersistido()) {
                 <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700">
@@ -328,11 +339,33 @@ export interface DiaCalendario {
               } @else {
                 @if (bancoPersistido(); as banco) {
                   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-950">
-                    <div class="flex items-start gap-2">
-                      <i class="pi pi-check-circle mt-0.5 text-emerald-700"></i>
+                    <div class="flex items-start gap-2.5">
+                      <i [class]="esExamenVerificado() ? 'pi pi-check-circle mt-0.5 text-emerald-600 text-base' : 'pi pi-check-circle mt-0.5 text-emerald-700'"></i>
                       <div>
-                        <strong class="block uppercase">Banco de preguntas cargado</strong>
-                        <span class="text-[10px]">{{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · Validado</span>
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <strong class="uppercase font-black">Banco de preguntas cargado</strong>
+                          @if (esExamenVerificado()) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-400 text-emerald-800 px-2 py-0.5 text-[10px] font-black uppercase">
+                              <i class="pi pi-check text-[10px]"></i> Verificado
+                            </span>
+                          } @else if (esExamenDevuelto()) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 border border-rose-400 text-rose-800 px-2 py-0.5 text-[10px] font-black uppercase">
+                              <i class="pi pi-exclamation-triangle text-[10px]"></i> Observado
+                            </span>
+                          } @else if (esExamenPendienteVerificacion()) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-400 text-amber-800 px-2 py-0.5 text-[10px] font-black uppercase">
+                              <i class="pi pi-clock text-[10px]"></i> Pendiente de verificación
+                            </span>
+                          }
+                        </div>
+                        <span class="text-[10px] text-emerald-900/80">
+                          {{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · 
+                          @if (esExamenVerificado()) {
+                            <strong class="text-emerald-800 font-bold">Validado y Verificado</strong>
+                          } @else {
+                            <span>Validado</span>
+                          }
+                        </span>
                       </div>
                     </div>
                     @if (rolPuedeEliminarBanco()) {
@@ -359,43 +392,179 @@ export interface DiaCalendario {
           @if (rolExamenActivo()) {
             @if (esSinCartillaActivo()) {
             <!-- Flujo específico: examen presencial sin cartilla -->
-            <div class="bg-card border border-emerald-200 rounded-2xl p-6 shadow-xs space-y-5">
-              <div class="flex items-start gap-3 border-b border-emerald-100 pb-4">
-                <div class="h-11 w-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl shrink-0">
-                  <i class="pi pi-file-edit"></i>
-                </div>
-                <div>
-                  <h3 class="text-base font-black text-foreground">Cargar examen sin cartilla</h3>
-                  <p class="text-xs text-muted-foreground mt-1">El docente debe subir el examen oficial en formato .doc o .docx. Al registrarlo, el rol de examen queda en <strong>Validado</strong> para que Evaluaciones gestione su impresión y entrega.</p>
+            @if (rolExamenActivo()?.estadoFlujo === 'PENDIENTE_NOTAS') {
+              <div class="bg-card border-2 border-indigo-300 rounded-2xl p-6 shadow-md space-y-4 bg-gradient-to-r from-indigo-50/70 to-purple-50/70 animate-fade-in">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div class="flex items-start gap-3">
+                    <div class="h-12 w-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-2xl shrink-0 shadow-md">
+                      <i class="pi pi-file-edit"></i>
+                    </div>
+                    <div>
+                      <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-300 mb-1">
+                        Etapa: Pendiente de Calificación
+                      </span>
+                      <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 mb-1 ml-2">
+                        <i class="pi pi-exclamation-triangle text-[9px] mr-1"></i> No subió notas aún
+                      </span>
+                      <h3 class="text-base font-black text-foreground">Registro de Calificaciones Oficiales</h3>
+                      <p class="text-xs text-muted-foreground mt-0.5">El examen presencial ya fue aplicado a los estudiantes. Como docente titular, registra las calificaciones sobre <strong>60 puntos</strong>. Al concluir, el examen pasará a <strong>Calificado</strong> y se generará la planilla oficial para firma y sello.</p>
+                    </div>
+                  </div>
+                  <button (click)="abrirNotasDocente()" class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer shrink-0 transition-transform hover:scale-105">
+                    <i class="pi pi-pencil"></i>
+                    <span>Cargar y Calificar Notas</span>
+                  </button>
                 </div>
               </div>
-
-              @if (documentoSinCartilla(); as documento) {
-                  <div class="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-950">
-                    <div class="flex items-start gap-2">
-                      <i class="pi pi-check-circle text-emerald-700 mt-0.5"></i>
-                      <div><strong class="block">Documento registrado y validado</strong><span class="text-[10px]">{{ documento.nombreArchivo }} · {{ formatearTamanoDocumento(documento.tamanoBytes) }} · {{ documento.cargadoPor }}</span></div>
+            } @else if (rolExamenActivo()?.estadoFlujo === 'CALIFICADO') {
+              <div class="bg-card border-2 border-emerald-300 rounded-2xl p-6 shadow-md space-y-4 bg-gradient-to-r from-emerald-50/70 to-teal-50/70 animate-fade-in">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div class="flex items-start gap-3">
+                    <div class="h-12 w-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-2xl shrink-0 shadow-md">
+                      <i class="pi pi-check-circle"></i>
                     </div>
-                  <div class="flex flex-wrap gap-2">
-                    <button (click)="abrirDocumentoSinCartilla()" class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-[10px] font-black text-emerald-800 hover:bg-emerald-100 cursor-pointer"><i class="pi pi-download mr-1"></i> Descargar examen</button>
-                    @if (rolPuedeCargarBanco()) {
-                      <button (click)="eliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-[10px] font-black text-rose-700 hover:bg-rose-50 cursor-pointer disabled:opacity-50"><i class="pi pi-trash mr-1"></i> Eliminar examen</button>
-                    }
+                    <div>
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Etapa: Calificado
+                        </span>
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                          Pendiente de Respaldo Físico
+                        </span>
+                      </div>
+                      <h3 class="text-base font-black text-foreground">Evaluación Calificada — Trámite Institucional</h3>
+                      <p class="text-xs text-muted-foreground mt-0.5">Las notas fueron consolidadas. <strong>Imprime la planilla oficial, fírmala, séllala y preséntala a la Unidad de Evaluaciones</strong> para su confirmación y archivo formal.</p>
+                    </div>
                   </div>
+                  <div class="flex flex-wrap gap-2.5 shrink-0">
+                    <button (click)="imprimirReporteNotasSinCartilla()" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-105">
+                      <i class="pi pi-print"></i>
+                      <span>Imprimir Planilla Oficial</span>
+                    </button>
+                    <button (click)="abrirNotasDocente()" class="px-4 py-3 rounded-xl border border-border bg-white text-foreground hover:bg-muted text-xs font-bold flex items-center gap-2 cursor-pointer shadow-2xs">
+                      <i class="pi pi-list"></i>
+                      <span>Ver Notas</span>
+                    </button>
                   </div>
+                </div>
+              </div>
+            } @else if (rolExamenActivo()?.estadoFlujo === 'CONFIRMADO') {
+              <div class="bg-card border-2 border-teal-300 rounded-2xl p-6 shadow-md space-y-4 bg-gradient-to-r from-teal-50/70 to-emerald-50/70 animate-fade-in">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div class="flex items-start gap-3">
+                    <div class="h-12 w-12 rounded-xl bg-teal-700 text-white flex items-center justify-center text-2xl shrink-0 shadow-md">
+                      <i class="pi pi-verified"></i>
+                    </div>
+                    <div>
+                      <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-teal-100 text-teal-800 border border-teal-300 mb-1">
+                        Etapa: Confirmado ✓
+                      </span>
+                      <h3 class="text-base font-black text-foreground">Evaluación y Respaldo Físico Confirmados</h3>
+                      <p class="text-xs text-muted-foreground mt-0.5">La Unidad de Evaluaciones recepcionó y validó la planilla oficial con tu firma y sello. El registro de este examen se encuentra formalmente cerrado.</p>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-2.5 shrink-0">
+                    <button (click)="imprimirReporteNotasSinCartilla()" class="px-4 py-2.5 rounded-xl border border-teal-300 bg-white text-teal-800 hover:bg-teal-50 text-xs font-black flex items-center gap-2 cursor-pointer shadow-2xs">
+                      <i class="pi pi-print"></i>
+                      <span>Reimprimir Planilla</span>
+                    </button>
+                    <button (click)="abrirNotasDocente()" class="px-4 py-2.5 rounded-xl border border-border bg-white text-foreground hover:bg-muted text-xs font-bold flex items-center gap-2 cursor-pointer shadow-2xs">
+                      <i class="pi pi-list"></i>
+                      <span>Ver Notas</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            } @else {
+              <!-- Flujo de carga y reemplazo de documento .doc/.docx (PROGRAMADO, VALIDADO, IMPRESO, etc.) -->
+              <div class="bg-card border border-emerald-200 rounded-2xl p-6 shadow-xs space-y-5">
+                <div class="flex items-start gap-3 border-b border-emerald-100 pb-4">
+                  <div class="h-11 w-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl shrink-0">
+                    <i class="pi pi-file-edit"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-base font-black text-foreground">Examen sin cartilla (Modalidad Presencial)</h3>
+                    <p class="text-xs text-muted-foreground mt-1">El docente debe subir el examen oficial en formato .doc o .docx. Al registrarlo, el rol de examen queda en <strong>Validado</strong> para que Evaluaciones gestione su impresión y entrega.</p>
+                  </div>
+                </div>
+
+                @if (documentoSinCartilla(); as documento) {
+                    <div class="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-950">
+                      <div class="flex items-start gap-2">
+                        <i class="pi pi-check-circle text-emerald-700 mt-0.5"></i>
+                        <div><strong class="block">Documento registrado y validado</strong><span class="text-[10px]">{{ documento.nombreArchivo }} · {{ formatearTamanoDocumento(documento.tamanoBytes) }} · {{ documento.cargadoPor }}</span></div>
+                      </div>
+                    <div class="flex flex-wrap gap-2">
+                      <button (click)="abrirDocumentoSinCartilla()" class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-[10px] font-black text-emerald-800 hover:bg-emerald-100 cursor-pointer"><i class="pi pi-download mr-1"></i> Descargar examen</button>
+                      @if (rolPuedeCargarBanco()) {
+                        <button (click)="abrirEliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-[10px] font-black text-rose-700 hover:bg-rose-50 cursor-pointer disabled:opacity-50"><i class="pi pi-trash mr-1"></i> Eliminar examen</button>
+                      }
+                    </div>
+                    </div>
+                }
+
+                @if (rolPuedeCargarBanco()) {
+                  <div (click)="triggerFileInput()" (dragover)="onDragOver($event)" (drop)="onDropFile($event)" class="border-2 border-dashed border-emerald-300 hover:border-emerald-600 rounded-2xl p-8 text-center space-y-3 bg-emerald-50/40 hover:bg-emerald-50 transition-all cursor-pointer">
+                    <div class="h-14 w-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto"><i class="pi pi-file-word"></i></div>
+                    <div><div class="text-sm font-black text-foreground">{{ archivoSinCartillaSeleccionado()?.name || 'Haz clic para seleccionar el examen .doc o .docx' }}</div><p class="text-xs text-muted-foreground mt-1">Máximo 5 MB. El documento debe estar configurado en tamaño oficio: 8,5 × 13 pulgadas.</p></div>
+                  </div>
+
+                  <div class="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                    <button (click)="limpiarArchivoSinCartilla()" [disabled]="!archivoSinCartillaSeleccionado() || cargandoDocumentoSinCartilla()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer disabled:opacity-40">Limpiar</button>
+                    <button (click)="subirDocumentoSinCartilla()" [disabled]="!archivoSinCartillaSeleccionado() || cargandoDocumentoSinCartilla()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="cargandoDocumentoSinCartilla()" [class.pi-spinner]="cargandoDocumentoSinCartilla()" [class.pi-check]="!cargandoDocumentoSinCartilla()"></i> {{ cargandoDocumentoSinCartilla() ? 'Subiendo y validando...' : 'Subir y validar examen' }}</button>
+                  </div>
+                } @else {
+                  <div class="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900 flex items-center gap-2">
+                    <i class="pi pi-info-circle text-amber-700"></i>
+                    <span>El examen se encuentra en etapa <strong>{{ rolExamenActivo()?.estadoFlujo }}</strong>. Cuando concluya la entrega y devolución del examen, podrás calificar las notas en este espacio.</span>
+                  </div>
+                }
+              </div>
+            }
+            } @else {
+              @if (puedeDescargarPatronDocente()) {
+                <!-- Tarjeta Oficial: Descarga de Patrón de Respuestas para Estudiantes -->
+                <div class="bg-card border-2 border-indigo-400 dark:border-indigo-600 rounded-2xl p-6 shadow-md space-y-4 bg-gradient-to-r from-indigo-50/90 via-purple-50/80 to-blue-50/90 animate-fade-in">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-start gap-3.5">
+                      <div class="h-12 w-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-2xl shrink-0 shadow-md">
+                        <i class="pi pi-file-pdf"></i>
+                      </div>
+                      <div>
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-300">
+                            Etapa: {{ rolExamenActivo()?.estadoFlujo }}
+                          </span>
+                          <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Patrón Oficial Disponible
+                          </span>
+                        </div>
+                        <h3 class="text-base font-black text-foreground">Patrón Oficial de Respuestas (Variantes del Examen)</h3>
+                        <p class="text-xs text-muted-foreground mt-0.5 max-w-2xl leading-relaxed">
+                          El examen ha sido entregado a los estudiantes. Puedes descargar el documento PDF oficial con la clave de respuestas de todas las variantes generadas (A, B, C, D...) para compartir y resolver dudas con los estudiantes de tu grupo asignado.
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                      <button 
+                        (click)="descargarPatronOficialDocente(false)" 
+                        [disabled]="descargandoPatronOficial()"
+                        class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="pi" [class.pi-spin]="descargandoPatronOficial()" [class.pi-spinner]="descargandoPatronOficial()" [class.pi-download]="!descargandoPatronOficial()"></i>
+                        <span>{{ descargandoPatronOficial() ? 'Descargando PDF...' : 'Descargar Patrón Oficial (PDF)' }}</span>
+                      </button>
+                      <button 
+                        (click)="descargarPatronOficialDocente(true)" 
+                        [disabled]="descargandoPatronOficial()"
+                        class="px-4 py-3 rounded-xl border border-indigo-300 bg-white hover:bg-indigo-50 text-indigo-800 text-xs font-black flex items-center gap-2 shadow-2xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="pi pi-external-link"></i>
+                        <span>Ver en Visor</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               }
 
-              <div (click)="triggerFileInput()" (dragover)="onDragOver($event)" (drop)="onDropFile($event)" [class]="rolPuedeCargarBanco() ? 'border-2 border-dashed border-emerald-300 hover:border-emerald-600 rounded-2xl p-8 text-center space-y-3 bg-emerald-50/40 hover:bg-emerald-50 transition-all cursor-pointer' : 'border-2 border-dashed border-amber-300 rounded-2xl p-8 text-center space-y-3 bg-amber-50/60 opacity-80 cursor-not-allowed'">
-                <div class="h-14 w-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto"><i class="pi pi-file-word"></i></div>
-                <div><div class="text-sm font-black text-foreground">{{ archivoSinCartillaSeleccionado()?.name || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar el examen .doc o .docx' : 'Carga bloqueada: restablezca el rol de examen a Validado') }}</div><p class="text-xs text-muted-foreground mt-1">Máximo 5 MB. El documento debe estar configurado en tamaño oficio: 8,5 × 13 pulgadas.</p></div>
-              </div>
-
-              <div class="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-                <button (click)="limpiarArchivoSinCartilla()" [disabled]="!archivoSinCartillaSeleccionado() || cargandoDocumentoSinCartilla()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer disabled:opacity-40">Limpiar</button>
-                <button (click)="subirDocumentoSinCartilla()" [disabled]="!archivoSinCartillaSeleccionado() || !rolPuedeCargarBanco() || cargandoDocumentoSinCartilla()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="cargandoDocumentoSinCartilla()" [class.pi-spinner]="cargandoDocumentoSinCartilla()" [class.pi-check]="!cargandoDocumentoSinCartilla()"></i> {{ cargandoDocumentoSinCartilla() ? 'Subiendo y validando...' : 'Subir y validar examen' }}</button>
-              </div>
-            </div>
-            } @else {
           <!-- Zona Principal de Validación y Acciones de Aprobación -->
           <div class="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
             
@@ -500,6 +669,21 @@ export interface DiaCalendario {
               </div>
             } @else if (bancoPersistido()?.estadoVerificacion === 'PENDIENTE') {
               <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><i class="pi pi-clock mr-2"></i>Banco validado. Está pendiente de revisión por el verificador antes de generar el examen.</div>
+            } @else if (esExamenVerificado()) {
+              <div class="rounded-xl border border-emerald-300 bg-emerald-50/90 p-4 text-xs text-emerald-950 flex items-start gap-3 shadow-2xs">
+                <div class="h-8 w-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 border border-emerald-300">
+                  <i class="pi pi-check-circle text-base"></i>
+                </div>
+                <div class="space-y-1">
+                  <div class="font-black uppercase tracking-wide text-emerald-950 flex items-center gap-2">
+                    <span>Examen Validado y Verificado</span>
+                    <span class="bg-emerald-200 text-emerald-900 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Conforme ✓</span>
+                  </div>
+                  <p class="text-emerald-900/90 font-medium leading-relaxed">
+                    El banco de preguntas ha sido revisado y verificado oficialmente por la dirección académica. La evaluación se encuentra aprobada y lista para el proceso institucional.
+                  </p>
+                </div>
+              </div>
             }
 
             <!-- Zona Drag and Drop con Input Interactivo -->
@@ -513,7 +697,7 @@ export interface DiaCalendario {
               </div>
               <div>
                 <div class="text-sm font-black text-foreground">
-                  {{ nombreArchivoCargado() || (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol de examen debe estar PROGRAMADO o VALIDADO') }}
+                  {{ nombreArchivoCargado() || (bancoPersistido()?.estadoVerificacion === 'DEVUELTO' ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) corregido o arrástralo aquí' : (esExamenVerificado() ? 'Banco validado y verificado: puedes arrastrar un nuevo archivo si necesitas reemplazarlo' : (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol de examen debe estar PROGRAMADO o VALIDADO'))) }}
                 </div>
                 <p class="text-xs text-muted-foreground mt-1">
                   Validación instantánea de tipos de preguntas, cuotas de dificultad y fórmulas matemáticas/químicas.
@@ -910,6 +1094,12 @@ export interface DiaCalendario {
                             </span>
                           </div>
 
+                          @if (esSinCartillaPendienteNotas(ex)) {
+                            <div class="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-1.5 py-0.5 rounded text-[8.5px] flex items-center gap-1">
+                              <i class="pi pi-pencil text-[8px] text-amber-700"></i> No subió notas aún
+                            </div>
+                          }
+
                           <!-- Materia y Código -->
                           <div class="font-black text-foreground leading-tight">
                             [{{ ex.codigo }}] {{ ex.materia }}
@@ -1002,13 +1192,29 @@ export interface DiaCalendario {
                           <span [class]="getEstadoBadgeClass(ex.estado)" class="font-black px-2.5 py-0.5 rounded-full text-[10px] uppercase">
                             {{ ex.estado }}
                           </span>
+                          @if (esSinCartillaPendienteNotas(ex)) {
+                            <div class="mt-1">
+                              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                <i class="pi pi-pencil text-[8px]"></i> No subió notas aún
+                              </span>
+                            </div>
+                          }
                         </td>
                         <td class="p-3.5 text-right">
-                          <button 
-                            (click)="irAValidarExamenDesdeCalendario(ex)"
-                            class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer">
-                            Validar Banco
-                          </button>
+                          <div class="flex items-center justify-end gap-1.5">
+                            @if (esSinCartillaPendienteNotas(ex)) {
+                              <button 
+                                (click)="irACalificarExamenDesdeCalendario(ex)"
+                                class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-xs">
+                                <i class="pi pi-pencil text-[9px]"></i> Cargar Notas
+                              </button>
+                            }
+                            <button 
+                              (click)="irAValidarExamenDesdeCalendario(ex)"
+                              class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                              Validar Banco
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     }
@@ -1318,6 +1524,16 @@ export interface DiaCalendario {
                 </div>
               </div>
 
+              @if (esSinCartillaPendienteNotas(examenSeleccionadoModal())) {
+                <div class="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-950 text-xs flex items-start gap-2.5">
+                  <i class="pi pi-exclamation-triangle text-amber-700 text-sm mt-0.5 shrink-0"></i>
+                  <div class="flex-1">
+                    <span class="font-black block">Atención: No has subido las notas aún</span>
+                    <span class="text-[11px] text-amber-800">Este examen no utiliza cartilla óptica y concluyó su aplicación. Debes registrar las calificaciones de tus estudiantes para generar la planilla oficial.</span>
+                  </div>
+                </div>
+              }
+
               <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-[11px] leading-relaxed">
                 <i class="pi pi-info-circle text-blue-700 mr-1"></i>
                 Para este examen se requiere un banco validado de <strong>{{ getResumenCuota(examenSeleccionadoModal()!.tipo) }}</strong>.
@@ -1325,21 +1541,154 @@ export interface DiaCalendario {
 
             </div>
 
-            <div class="bg-muted/30 border-t border-border p-4 flex items-center justify-between">
+            <div class="bg-muted/30 border-t border-border p-4 flex flex-wrap items-center justify-between gap-2">
               <button 
                 (click)="examenSeleccionadoModal.set(null)"
                 class="px-4 py-2 bg-muted text-foreground rounded-xl text-xs font-bold hover:bg-muted/80">
                 Cerrar
               </button>
 
-              <button 
-                (click)="irAValidarExamenDesdeCalendario(examenSeleccionadoModal()!)"
-                class="px-5 py-2 bg-purple-700 text-white rounded-xl text-xs font-black hover:bg-purple-800 flex items-center gap-2 shadow-xs cursor-pointer">
-                <i class="pi pi-verified text-xs"></i>
-                <span>Ir a Validar Banco para este Examen</span>
+              <div class="flex flex-wrap items-center gap-2">
+                @if (esSinCartillaPendienteNotas(examenSeleccionadoModal())) {
+                  <button 
+                    (click)="irACalificarExamenDesdeCalendario(examenSeleccionadoModal()!)"
+                    class="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-black hover:bg-amber-700 flex items-center gap-2 shadow-xs cursor-pointer transition-transform hover:scale-105">
+                    <i class="pi pi-pencil text-xs"></i>
+                    <span>Cargar Notas de este Examen</span>
+                  </button>
+                }
+                @if (puedeDescargarPatronCronograma(examenSeleccionadoModal())) {
+                  <button 
+                    (click)="descargarPatronCronograma(examenSeleccionadoModal()!, false)" 
+                    [disabled]="descargandoPatronOficial()"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 flex items-center gap-2 shadow-xs cursor-pointer transition-transform hover:scale-105 disabled:opacity-50">
+                    <i class="pi" [class.pi-spin]="descargandoPatronOficial()" [class.pi-spinner]="descargandoPatronOficial()" [class.pi-download]="!descargandoPatronOficial()"></i>
+                    <span>Descargar Patrón Oficial (PDF)</span>
+                  </button>
+                }
+                <button 
+                  (click)="irAValidarExamenDesdeCalendario(examenSeleccionadoModal()!)"
+                  class="px-5 py-2 bg-purple-700 text-white rounded-xl text-xs font-black hover:bg-purple-800 flex items-center gap-2 shadow-xs cursor-pointer">
+                  <i class="pi pi-verified text-xs"></i>
+                  <span>Ir a Banco para este Examen</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      }
+
+      <!-- ================================================================= -->
+      <!-- MODAL: REGISTRO Y REPORTE DE NOTAS DOCENTE (SIN CARTILLA) -->
+      <!-- ================================================================= -->
+      @if (dialogNotasDocente()) {
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-5 flex items-center justify-between gap-3 border-b border-slate-700 shrink-0">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 text-xl shrink-0">
+                  <i class="pi pi-file-edit"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-black">Planilla Oficial de Calificaciones · Examen Sin Cartilla</h3>
+                  <p class="text-xs text-slate-300 font-mono">
+                    {{ rolExamenActivo()?.materiaCodigo }} — {{ rolExamenActivo()?.materiaNombre }} · Grupo {{ rolExamenActivo()?.grupo }} · {{ rolExamenActivo()?.tipoParcial }}
+                  </p>
+                </div>
+              </div>
+              <button (click)="cerrarNotasDocente()" class="text-white/70 hover:text-white p-1 text-base cursor-pointer">
+                <i class="pi pi-times"></i>
               </button>
             </div>
 
+            <div class="p-6 overflow-y-auto space-y-4 flex-1">
+              <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs text-indigo-950">
+                <i class="pi pi-info-circle mr-1.5 text-indigo-700"></i>
+                @if (rolExamenActivo()?.estadoFlujo === 'PENDIENTE_NOTAS') {
+                  <span>Registre la calificación sobre <strong>60 puntos</strong> de cada estudiante oficial del grupo. El sistema calculará en tiempo real su equivalencia sobre <strong>100 puntos</strong>. Al guardar todas las notas, el examen pasará a <strong>Calificado</strong> y se generará la planilla oficial con firma y sello.</span>
+                } @else {
+                  <span>Planilla de notas registrada oficialmente. Las calificaciones se encuentran consolidadas a partir de la nómina oficial institucional.</span>
+                }
+              </div>
+
+              @if (cargandoNotasDocente()) {
+                <div class="py-12 text-center text-xs font-bold text-muted-foreground">
+                  <i class="pi pi-spin pi-spinner text-2xl text-indigo-600"></i>
+                  <p class="mt-2">Consultando nómina oficial y calificaciones registradas...</p>
+                </div>
+              } @else if (notasDocente().length === 0) {
+                <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-6 text-center text-xs text-amber-900 font-medium">
+                  No se encontraron estudiantes oficiales registrados para este grupo.
+                </div>
+              } @else {
+                <div class="border border-border rounded-xl overflow-hidden shadow-2xs">
+                  <div class="grid grid-cols-[55px_130px_1fr_130px_130px] gap-3 bg-muted/70 px-4 py-3 text-[10px] font-black uppercase text-muted-foreground border-b border-border">
+                    <span>N°</span>
+                    <span>Código</span>
+                    <span>Estudiante</span>
+                    <span class="text-center">Nota / 60</span>
+                    <span class="text-center">Nota / 100</span>
+                  </div>
+                  <div class="divide-y divide-border max-h-[48vh] overflow-y-auto">
+                    @for (nota of notasDocente(); track nota.codigoEstudiante; let idx = $index) {
+                      <div class="grid grid-cols-[55px_130px_1fr_130px_130px] gap-3 px-4 py-2.5 items-center text-xs hover:bg-muted/30 transition-colors">
+                        <span class="font-mono text-muted-foreground font-bold">{{ idx + 1 }}</span>
+                        <span class="font-mono font-bold text-foreground">{{ nota.codigoEstudiante }}</span>
+                        <span class="text-[11px] font-medium text-foreground uppercase truncate" [title]="nota.estudianteNombreCompleto">{{ nota.estudianteNombreCompleto }}</span>
+                        <div class="flex justify-center">
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="60" 
+                            step="0.01" 
+                            [value]="nota.notaSobre60 ?? ''" 
+                            (input)="editarNotaDocente(nota.codigoEstudiante, $any($event.target).value)" 
+                            [disabled]="rolExamenActivo()?.estadoFlujo !== 'PENDIENTE_NOTAS' || guardandoNotasDocente()" 
+                            class="w-24 text-center rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 font-mono text-xs font-black text-indigo-950 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed" 
+                            placeholder="0–60" />
+                        </div>
+                        <div class="flex justify-center">
+                          <span class="w-24 text-center rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 font-mono text-xs font-black text-emerald-800">
+                            {{ nota.notaSobre100 !== null && nota.notaSobre100 !== undefined ? nota.notaSobre100 : '—' }}
+                          </span>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="p-4 border-t border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div class="text-xs text-muted-foreground flex items-center gap-2">
+                <span class="font-black text-foreground">{{ notasDocenteConCarga() }}</span> de <span class="font-bold">{{ notasDocente().length }}</span> notas completadas
+                @if (notasDocenteCompletas()) {
+                  <span class="text-emerald-700 bg-emerald-100 text-[10px] font-black px-2 py-0.5 rounded-full uppercase ml-1">Completas ✓</span>
+                }
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                @if (rolExamenActivo()?.estadoFlujo === 'CALIFICADO' || rolExamenActivo()?.estadoFlujo === 'CONFIRMADO') {
+                  <button (click)="imprimirReporteNotasSinCartilla()" class="px-4 py-2 rounded-xl border border-indigo-300 bg-white hover:bg-indigo-50 text-indigo-800 text-xs font-black flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                    <i class="pi pi-print"></i>
+                    <span>Imprimir Planilla Oficial</span>
+                  </button>
+                }
+                <button (click)="cerrarNotasDocente()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">
+                  Cerrar
+                </button>
+                @if (rolExamenActivo()?.estadoFlujo === 'PENDIENTE_NOTAS') {
+                  <button 
+                    (click)="guardarNotasDocente()" 
+                    [disabled]="!notasDocenteCompletas() || guardandoNotasDocente()" 
+                    class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="pi" [class.pi-spin]="guardandoNotasDocente()" [class.pi-spinner]="guardandoNotasDocente()" [class.pi-check]="!guardandoNotasDocente()"></i>
+                    <span>{{ guardandoNotasDocente() ? 'Guardando...' : 'Guardar y Calificar Examen' }}</span>
+                  </button>
+                }
+              </div>
+            </div>
           </div>
         </div>
       }
@@ -1348,31 +1697,31 @@ export interface DiaCalendario {
       <!-- MODAL: PREVISUALIZACIÓN DEL EXAMEN EN FORMATO PDF OFICIAL -->
       <!-- ================================================================= -->
       @if (dialogPrevisualizacionPdf()) {
-        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div class="bg-card border border-border rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto flex flex-col max-h-[92vh]">
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-xl sm:rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto flex flex-col h-[94dvh] sm:h-auto sm:max-h-[92vh] max-h-[96dvh]">
             
             <!-- Barra Superior del Visor PDF (Estilo Lector de Documentos) -->
-            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-700/60 shrink-0">
-              <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-xl bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-400 text-xl shrink-0">
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-3 sm:p-4 flex items-center justify-between gap-2 sm:gap-3 border-b border-slate-700/60 shrink-0">
+              <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div class="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-400 text-base sm:text-xl shrink-0">
                   <i class="pi pi-file-pdf"></i>
                 </div>
-                <div>
-                  <div class="flex items-center gap-2">
-                    <h3 class="text-base font-black">Previsualización de Cuadernillo de Examen (Formato oficial)</h3>
-                    <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
-                      Excel actual · {{ preguntasValidasContablesParaPdf().length }} preguntas
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <h3 class="text-xs sm:text-base font-black truncate max-w-[190px] xs:max-w-[280px] sm:max-w-none">Previsualización de Cuadernillo</h3>
+                    <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-mono text-[8px] sm:text-[9px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full uppercase shrink-0">
+                      {{ preguntasValidasContablesParaPdf().length }} preguntas
                     </span>
                   </div>
-                  <p class="text-xs text-slate-300 font-mono">
-                    {{ parcialActivo() | uppercase }} · {{ nombreArchivoCargado() || 'Excel actual' }} · UNA COLUMNA
+                  <p class="text-[10px] sm:text-xs text-slate-300 font-mono truncate max-w-[220px] xs:max-w-[300px] sm:max-w-none">
+                    {{ parcialActivo() | uppercase }} · {{ nombreArchivoCargado() || 'Excel actual' }} · 1 COLUMNA
                   </p>
                 </div>
               </div>
 
               <!-- El PDF de validación siempre se genera en una sola columna. -->
-              <div class="flex flex-wrap items-center gap-2">
-                <button (click)="cerrarModalPrevisualizacionPdf()" class="text-white/80 hover:text-white p-1 text-base cursor-pointer ml-1">
+              <div class="flex items-center gap-2 shrink-0">
+                <button (click)="cerrarModalPrevisualizacionPdf()" class="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 text-base sm:text-lg cursor-pointer transition-colors" title="Cerrar previsualización">
                   <i class="pi pi-times"></i>
                 </button>
               </div>
@@ -1380,9 +1729,9 @@ export interface DiaCalendario {
 
             <!-- PDF real generado con las reglas oficiales, renderizado por el
                  componente para poder controlar el desplazamiento completo. -->
-            <div id="area-scroll-banco-pdf" (scroll)="onScrollDocumentoPdf($event)" class="p-4 sm:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 min-h-[65vh] max-h-[72vh]">
+            <div id="area-scroll-banco-pdf" (scroll)="onScrollDocumentoPdf($event)" class="p-2 sm:p-6 md:p-8 overflow-y-auto bg-slate-200/90 dark:bg-slate-900/90 flex-1 min-h-0">
               @if (pdfPreviewPages().length > 0) {
-                <div class="w-full flex flex-col items-center gap-6">
+                <div class="w-full flex flex-col items-center gap-4 sm:gap-6">
                   @for (page of pdfPreviewPages(); track $index) {
                     <div class="w-full max-w-[900px] bg-white shadow-xl border border-slate-300 rounded-sm overflow-hidden">
                       <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-[10px] font-mono text-slate-500 text-right">
@@ -1393,9 +1742,9 @@ export interface DiaCalendario {
                   }
                 </div>
               } @else if (pdfPreviewUrl()) {
-                <div class="h-[65vh] flex items-center justify-center text-slate-600">Renderizando páginas del PDF oficial...</div>
+                <div class="h-64 sm:h-96 flex items-center justify-center text-slate-600 font-medium text-xs sm:text-sm">Renderizando páginas del PDF oficial...</div>
               } @else {
-                <div class="h-[65vh] flex items-center justify-center text-slate-600">Generando PDF oficial...</div>
+                <div class="h-64 sm:h-96 flex items-center justify-center text-slate-600 font-medium text-xs sm:text-sm">Generando PDF oficial...</div>
               }
             </div>
 
@@ -1642,34 +1991,36 @@ export interface DiaCalendario {
             </div>
 
             <!-- Pie del Modal con Acción de Aprobación de Banco Requerida -->
-            <div class="bg-card border-t border-border p-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs shrink-0">
-              <div class="flex items-center gap-2 text-center sm:text-left">
+            <div class="bg-card border-t border-border p-2.5 sm:p-4 flex flex-col sm:flex-row justify-between items-center gap-2.5 sm:gap-3 text-xs shrink-0 shadow-lg">
+              <div class="w-full sm:w-auto flex items-center justify-center sm:justify-start">
                 @if (!documentoRecorridoCompleto()) {
-                  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 font-bold">
-                    <i class="pi pi-arrow-down animate-bounce text-xs"></i>
-                    <span>Debes visualizar y recorrer las {{ pdfPreviewPages().length || 'todas las' }} páginas del PDF oficial hasta el final para habilitar la validación y el registro.</span>
+                  <div class="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 font-bold text-[11px] sm:text-xs">
+                    <i class="pi pi-arrow-down animate-bounce text-xs shrink-0"></i>
+                    <span>Desplázate hasta el final de las {{ pdfPreviewPages().length || 'todas las' }} páginas para habilitar la aprobación.</span>
                   </div>
                 } @else {
-                  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 font-bold">
-                    <i class="pi pi-check-circle text-emerald-600 text-sm"></i>
-                    <span>PDF oficial real generado en Oficio, una columna y revisado hasta el final. Ya puedes validar y registrar.</span>
+                  <div class="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 font-bold text-[11px] sm:text-xs">
+                    <i class="pi pi-check-circle text-emerald-600 text-sm shrink-0"></i>
+                    <span>PDF oficial revisado hasta el final. Listo para validar y registrar.</span>
                   </div>
                 }
               </div>
 
-              <div class="flex items-center gap-2.5">
+              <div class="w-full sm:w-auto flex items-center justify-end gap-2 sm:gap-2.5">
                 <button 
                   (click)="cerrarModalPrevisualizacionPdf()"
-                  class="px-4 py-2.5 bg-muted hover:bg-border text-foreground rounded-xl font-bold transition-colors cursor-pointer">
+                  class="px-3 sm:px-4 py-2 sm:py-2.5 bg-muted hover:bg-border text-foreground rounded-xl font-bold transition-colors cursor-pointer text-xs sm:text-sm shrink-0">
                   Cerrar
                 </button>
 
                 <button 
                   [disabled]="!pdfPrevisualizadoYConforme() || !documentoRecorridoCompleto() || !rolExamenActivo() || !archivoExcelSeleccionado() || cargandoBanco() || pdfPreviewPages().length === 0"
                   (click)="aprobarDiagramacionPdf()"
-                  class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-                  <i class="pi pi-check-circle text-sm"></i>
-                  <span>{{ cargandoBanco() ? 'Guardando en PostgreSQL...' : 'Aprobar y Guardar Banco de Preguntas' }}</span>
+                  class="flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm">
+                  <i class="pi pi-check-circle text-sm shrink-0"></i>
+                  <span class="truncate">
+                    {{ cargandoBanco() ? 'Guardando en PostgreSQL...' : 'Aprobar y Guardar' }}<span class="hidden sm:inline"> Banco de Preguntas</span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -2335,6 +2686,64 @@ export interface DiaCalendario {
         </div>
       }
 
+      <!-- MODAL: ELIMINAR EXAMEN SIN CARTILLA -->
+      @if (dialogEliminarDocumentoSinCartilla()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" (click)="cerrarEliminarDocumentoSinCartilla()">
+          <div class="bg-card border border-rose-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden" (click)="$event.stopPropagation()">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <div class="h-9 w-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                  <i class="pi pi-trash text-base"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Eliminar examen sin cartilla</h3>
+                  <p class="text-xs text-muted-foreground">{{ asignaturaNombreCompleto() }} · {{ grupoSeleccionado() }} · {{ parcialActivo() }}</p>
+                </div>
+              </div>
+              <button (click)="cerrarEliminarDocumentoSinCartilla()" class="text-muted-foreground hover:text-foreground cursor-pointer" title="Cerrar">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+              <div class="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-rose-900 leading-relaxed space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-rose-950">
+                  <i class="pi pi-exclamation-triangle text-rose-600"></i> ¿Deseas eliminar este examen?
+                </div>
+                <p>
+                  Se eliminará el documento cargado y el rol volverá al estado <strong>PROGRAMADO</strong> para permitir registrar un nuevo examen.
+                </p>
+              </div>
+
+              @if (documentoSinCartilla(); as doc) {
+                <div class="rounded-xl border border-border bg-muted/40 p-3 space-y-1">
+                  <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Documento actual:</span>
+                  <div class="text-xs font-black text-foreground flex items-center gap-2 break-all">
+                    <i class="pi pi-file-word text-rose-600 shrink-0"></i>
+                    <span>{{ doc.nombreArchivo }}</span>
+                  </div>
+                  <div class="text-[10px] text-muted-foreground">
+                    {{ formatearTamanoDocumento(doc.tamanoBytes) }} · Registrado por {{ doc.cargadoPor }}
+                  </div>
+                </div>
+              }
+
+              <p class="text-muted-foreground leading-relaxed">
+                Esta acción no se puede deshacer. Los estudiantes o el personal no podrán consultar este archivo una vez eliminado.
+              </p>
+            </div>
+            <div class="p-4 border-t border-border flex justify-end gap-2">
+              <button (click)="cerrarEliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                Cancelar
+              </button>
+              <button (click)="confirmarEliminarDocumentoSinCartilla()" [disabled]="cargandoDocumentoSinCartilla()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs">
+                <i class="pi" [class.pi-spin]="cargandoDocumentoSinCartilla()" [class.pi-spinner]="cargandoDocumentoSinCartilla()" [class.pi-trash]="!cargandoDocumentoSinCartilla()"></i>
+                {{ cargandoDocumentoSinCartilla() ? 'Eliminando...' : 'Sí, eliminar examen' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
@@ -2356,16 +2765,34 @@ export class BancoPreguntasComponent implements OnInit {
   private readonly _auth = inject(AuthService);
   private readonly _generacionTypst = inject(GeneracionTypstService);
   private readonly _sinCartillaService = inject(ExamenSinCartillaService);
+  private readonly _omrService = inject(OmrProcesamientoService);
+  private readonly _route = inject(ActivatedRoute);
+  private readonly _notificacionesService = inject(NotificacionesService);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
   @ViewChild('imageInput') public imageInputRef!: ElementRef<HTMLInputElement>;
+
+  public descargandoPatronOficial = signal<boolean>(false);
 
   // Archivo Excel original para subir al backend
   public archivoExcelSeleccionado = signal<File | null>(null);
   public archivoSinCartillaSeleccionado = signal<File | null>(null);
   public documentoSinCartilla = signal<DocumentoSinCartilla | null>(null);
   public cargandoDocumentoSinCartilla = signal<boolean>(false);
+  public dialogEliminarDocumentoSinCartilla = signal<boolean>(false);
   private readonly maxDocumentoSinCartillaBytes = 5 * 1024 * 1024;
+
+  public dialogNotasDocente = signal<boolean>(false);
+  public cargandoNotasDocente = signal<boolean>(false);
+  public guardandoNotasDocente = signal<boolean>(false);
+  public notasDocente = signal<NotaDocente[]>([]);
+  public notasDocenteConCarga = computed(() => {
+    return this.notasDocente().filter(n => n.notaSobre60 !== null && n.notaSobre60 !== undefined && !isNaN(Number(n.notaSobre60))).length;
+  });
+  public notasDocenteCompletas = computed(() => {
+    const notas = this.notasDocente();
+    return notas.length > 0 && notas.every(n => n.notaSobre60 !== null && n.notaSobre60 !== undefined && !isNaN(Number(n.notaSobre60)));
+  });
 
   // Pestaña activa: 'validador' (default) o 'calendario'
   public tabActiva = signal<'validador' | 'calendario'>('validador');
@@ -2447,6 +2874,8 @@ export class BancoPreguntasComponent implements OnInit {
     const rol = this.rolExamenActivo();
     if (!rol) return false;
     const estado = rol.estadoFlujo;
+    const estadoVerif = rol.estadoVerificacion || this.bancoPersistido()?.estadoVerificacion;
+    if (estadoVerif === 'DEVUELTO') return true;
     return estado === 'PROGRAMADO' || estado === 'VALIDADO';
   });
 
@@ -2460,6 +2889,8 @@ export class BancoPreguntasComponent implements OnInit {
 
   public rolPuedeEliminarBanco = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
+    const estadoVerif = this.rolExamenActivo()?.estadoVerificacion || this.bancoPersistido()?.estadoVerificacion;
+    if (estadoVerif === 'DEVUELTO') return true;
     return this.bancoPersistido() !== null && (estado === 'PROGRAMADO' || estado === 'VALIDADO');
   });
 
@@ -2481,6 +2912,15 @@ export class BancoPreguntasComponent implements OnInit {
         this._cargarSedes();
       }
     });
+
+    this._route.queryParamMap.subscribe(params => {
+      const rolId = params.get('rolId');
+      if (rolId && this.sedes().length > 0 && this.examenRolSeleccionadoId() !== rolId) {
+        this._cargarPorRolId(rolId);
+      } else if (rolId && params.get('abrirNotas') === 'true' && this.examenRolSeleccionadoId() === rolId) {
+        this.abrirNotasDocente();
+      }
+    });
   }
 
   private _cargarSedes(): void {
@@ -2496,12 +2936,73 @@ export class BancoPreguntasComponent implements OnInit {
         this.carreraSeleccionada.set(null);
         this.asignaturaSeleccionada.set(null);
         this.grupoSeleccionado.set('');
-        const sedeInicial = this._gateway.resolverSedeInicial(data);
-        if (sedeInicial) {
-          this.seleccionarSede(sedeInicial);
+        const rolIdParam = this._route.snapshot.queryParamMap.get('rolId');
+        if (rolIdParam) {
+          this._cargarPorRolId(rolIdParam);
+        } else {
+          const sedeInicial = this._gateway.resolverSedeInicial(data);
+          if (sedeInicial) {
+            this.seleccionarSede(sedeInicial);
+          }
         }
       },
       error: () => this.cargandoSedes.set(false)
+    });
+  }
+
+  private _cargarPorRolId(rolId: string): void {
+    this._rolService.obtenerPorId(rolId).subscribe({
+      next: rol => {
+        this.tabActiva.set('validador');
+        const tipoParcialDisplay = rol.tipoParcial === 'Final' ? 'Examen Final' : rol.tipoParcial;
+        this.parcialActivo.set(tipoParcialDisplay as any);
+        this.examenRolSeleccionadoId.set(rol.id);
+
+        const sede = this.sedes().find(s => s.code === rol.sedeCodigo);
+        if (sede) {
+          this.sedeSeleccionada.set(sede);
+          this.cargandoCarreras.set(true);
+          this._gateway.getCareers(sede.code).subscribe({
+            next: carreras => {
+              this.carreras.set(carreras);
+              this.cargandoCarreras.set(false);
+              const carrera = carreras.find(c => c.careerCode === rol.carreraCodigo) || carreras[0];
+              if (carrera) {
+                this.carreraSeleccionada.set(carrera);
+                this._cargarRolesOficiales(sede.code, carrera.careerCode);
+                this.cargandoAsignaturas.set(true);
+                this._gateway.getCourses(sede.code, carrera.careerId).subscribe({
+                  next: asignaturas => {
+                    this.asignaturas.set(asignaturas);
+                    this.cargandoAsignaturas.set(false);
+                    const asig = asignaturas.find(a => a.courseCode === rol.materiaCodigo);
+                    if (asig) {
+                      this.asignaturaSeleccionada.set(asig);
+                      this._cargarGruposDeMateria(asig.syllabusCourseId, rol.grupo);
+                    }
+                    this.grupoSeleccionado.set(rol.grupo);
+                    setTimeout(() => {
+                      this.examenRolSeleccionadoId.set(rol.id);
+                      this._cargarBancoPersistido();
+                      if (this._route.snapshot.queryParamMap.get('abrirNotas') === 'true') {
+                        setTimeout(() => {
+                          this.abrirNotasDocente();
+                        }, 400);
+                      }
+                    }, 300);
+                  },
+                  error: () => this.cargandoAsignaturas.set(false)
+                });
+              }
+            },
+            error: () => this.cargandoCarreras.set(false)
+          });
+        }
+      },
+      error: () => {
+        const sedeInicial = this._gateway.resolverSedeInicial(this.sedes());
+        if (sedeInicial) this.seleccionarSede(sedeInicial);
+      }
     });
   }
 
@@ -2713,6 +3214,21 @@ export class BancoPreguntasComponent implements OnInit {
   public bancoPersistido = signal<BancoPreguntasResponse | null>(null);
   public bancoRegistrado = signal<boolean>(false);
   public observacionesVerificacionPreguntas = computed(() => Object.entries(this.bancoPersistido()?.observacionesVerificacionPreguntas || {}));
+  public esExamenVerificado = computed(() => {
+    const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
+    const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
+    return estadoBanco === 'VERIFICADO' || estadoRol === 'VERIFICADO';
+  });
+  public esExamenDevuelto = computed(() => {
+    const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
+    const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
+    return estadoBanco === 'DEVUELTO' || estadoRol === 'DEVUELTO';
+  });
+  public esExamenPendienteVerificacion = computed(() => {
+    const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
+    const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
+    return estadoBanco === 'PENDIENTE' || estadoRol === 'PENDIENTE';
+  });
   public cargandoBancoPersistido = signal<boolean>(false);
   public dialogEliminarBancoPersistido = signal<boolean>(false);
   public confirmacionEliminarBancoPersistido = '';
@@ -2866,9 +3382,25 @@ export class BancoPreguntasComponent implements OnInit {
     this._mostrarToast(`Redirigido al Validador para: ${ex.materia} (${ex.tipo}).`);
   }
 
+  public esSinCartillaPendienteNotas(ex: ExamenDocenteCronograma | null): boolean {
+    if (!ex || ex.conCartilla) return false;
+    const st = (ex.estado || '').toLowerCase().trim();
+    return st === 'pendiente_notas' || st === 'pendiente de notas';
+  }
+
+  public irACalificarExamenDesdeCalendario(ex: ExamenDocenteCronograma): void {
+    this.irAValidarExamenDesdeCalendario(ex);
+    setTimeout(() => {
+      this.abrirNotasDocente();
+    }, 450);
+  }
+
   private _mapearRolACronograma(rol: RolExamenResponse): ExamenDocenteCronograma {
     const tipo = rol.tipoParcial === 'Final' ? 'Examen Final' : rol.tipoParcial;
-    const estado = rol.estadoFlujo.charAt(0) + rol.estadoFlujo.slice(1).toLowerCase();
+    const esVerificado = rol.estadoVerificacion === 'VERIFICADO';
+    const estado = esVerificado && rol.estadoFlujo === 'VALIDADO'
+      ? 'Validado y Verificado'
+      : (rol.estadoFlujo.charAt(0) + rol.estadoFlujo.slice(1).toLowerCase());
     return {
       id: rol.id,
       codigo: rol.materiaCodigo,
@@ -3049,8 +3581,11 @@ export class BancoPreguntasComponent implements OnInit {
       const camposLargos = opciones.filter(opcion => opcion.valor.length > 2000).map(opcion => opcion.campo);
       return { regla: 'Opciones A–E', problema: `${camposLargos.join(', ')} supera(n) los 2.000 caracteres.`, correccion: 'Resume la alternativa manteniendo una sola idea y un texto legible para el cuadernillo.' };
     }
+    if (error === 'Falta respuesta correcta') {
+      return { regla: 'Respuesta correcta', problema: 'La celda de respuesta correcta está vacía.', correccion: 'Escribe la letra de la opción correcta (A–E) o A/B (o V/F) para Verdadero/Falso.' };
+    }
     if (error === 'Respuesta en V/F debe ser A (Verdadero) o B (Falso)') {
-      return { regla: 'Respuesta correcta', problema: 'La tipología Verdadero o Falso solo admite A o B.', correccion: 'Registra A para Verdadero o B para Falso y deja vacías las opciones C, D y E.' };
+      return { regla: 'Respuesta correcta', problema: 'La tipología Verdadero o Falso solo admite A (o V) o B (o F).', correccion: 'Registra A para Verdadero o B para Falso y deja vacías las opciones C, D y E.' };
     }
     if (error.includes('Respuesta en premisas')) {
       return { regla: 'Respuesta correcta', problema: 'La tipología de premisas solo admite las claves A, B, C o D.', correccion: 'Registra una de esas cuatro letras y verifica las dos premisas.' };
@@ -3099,6 +3634,9 @@ export class BancoPreguntasComponent implements OnInit {
     if (error.includes('opción de emparejamiento no debe')) {
       return { regla: 'Fila hija de emparejamiento', problema: 'La fila hija contiene valores en opcion_a a opcion_e.', correccion: 'Deja vacías las opciones A–E y coloca la clave únicamente en respuesta_correcta.' };
     }
+    if (error.includes('no tiene una opción activa en el enunciado principal')) {
+      return { regla: 'Respuesta de emparejamiento', problema: `${error}.`, correccion: 'Verifica que la clave de respuesta en la fila hija corresponda a una de las opciones con texto (A a E) definidas en la fila madre de su grupo.' };
+    }
     if (error.includes('no tiene una opción activa')) {
       return { regla: 'Respuesta correcta', problema: `${error}.`, correccion: 'Completa la opción indicada o cambia respuesta_correcta a una letra que tenga texto.' };
     }
@@ -3117,11 +3655,23 @@ export class BancoPreguntasComponent implements OnInit {
     if (error.startsWith('Peso inválido')) {
       return { regla: 'Columna peso', problema: 'El valor de peso no cumple el formato permitido.', correccion: 'Usa un número mayor que 0, hasta 100 y con máximo dos decimales.' };
     }
+    if (error.includes('delimitadores de fórmula $ sin cerrar')) {
+      return { regla: 'Fórmula matemática', problema: 'La celda contiene un número impar de signos de dólar ($).', correccion: 'Asegúrate de cerrar cada expresión matemática con otro signo $, por ejemplo: $x = 10$.' };
+    }
     if (error.includes('expresión matemática incompatible')) {
       return { regla: 'Fórmula matemática', problema: 'La expresión contiene delimitadores $ anidados o agrupadores desbalanceados para Typst.', correccion: 'No coloques signos $ dentro de otro bloque $...$. Usa un solo bloque matemático balanceado o escribe la fórmula como texto plano.' };
     }
     if (error.includes('comando de fórmula')) {
       return { regla: 'Compatibilidad Typst', problema: `${error}.`, correccion: 'Usa únicamente los comandos compatibles con la plantilla: \\times, \\cdot, \\rightarrow, \\to, \\pm y \\equiv. Para raíces y potencias usa la sintaxis Typst sin barra, por ejemplo sqrt(...) o x^2.' };
+    }
+    if (error.includes('barra invertida sin un comando')) {
+      return { regla: 'Compatibilidad Typst', problema: 'Contiene una barra invertida (\\) suelta o sin comando reconocido.', correccion: 'Elimina las barras invertidas innecesarias o usa únicamente los comandos permitidos: \\times, \\cdot, \\rightarrow, \\to, \\pm o \\equiv.' };
+    }
+    if (error.includes('error de fórmula')) {
+      return { regla: 'Error de fórmula Excel', problema: `${error}.`, correccion: 'Corrige la fórmula en Excel para que no devuelva error de cálculo o pega el texto como valor estático.' };
+    }
+    if (error.includes('caracteres de control no permitidos')) {
+      return { regla: 'Caracteres no permitidos', problema: 'La celda contiene caracteres de control invisibles o no imprimibles.', correccion: 'Limpia el texto copiándolo en el Bloc de notas antes de pegarlo en la celda de Excel.' };
     }
     if (error.includes('fórmula inválida')) {
       return { regla: 'Fórmula o contenido', problema: 'El enunciado u opción contiene un error de Excel, caracteres no permitidos o signos $ desbalanceados.', correccion: 'Corrige la fórmula o cierra correctamente cada expresión entre signos $.' };
@@ -3230,6 +3780,24 @@ export class BancoPreguntasComponent implements OnInit {
           this.agregarErrorEstructural(hijo, `Esta fila debe aparecer inmediatamente después del enunciado principal del grupo '${grupo}'. No dejes otras filas entre ambos`);
         }
       }
+
+      if (tipoPrincipal === 'EMPAREJAMIENTO_TRONCO') {
+        const opcionesMadre: Record<string, string | undefined> = {
+          A: principal.opcion_a,
+          B: principal.opcion_b,
+          C: principal.opcion_c,
+          D: principal.opcion_d,
+          E: principal.opcion_e
+        };
+        for (const hijo of hijos) {
+          if (hijo.respuesta_correcta && !opcionesMadre[hijo.respuesta_correcta]?.trim()) {
+            this.agregarErrorEstructural(
+              hijo,
+              `La respuesta ${hijo.respuesta_correcta} no tiene una opción activa en el enunciado principal del grupo '${grupo}'`
+            );
+          }
+        }
+      }
     }
   }
 
@@ -3321,6 +3889,8 @@ export class BancoPreguntasComponent implements OnInit {
 
   public getEstadoBadgeClass(estado: string): string {
     switch (estado) {
+      case 'Validado y Verificado':
+      case 'Verificado': return 'bg-emerald-100 text-emerald-800 border border-emerald-300';
       case 'Programado': return 'bg-blue-100 text-blue-800 border border-blue-200';
       case 'Generado': return 'bg-purple-100 text-purple-800 border border-purple-200';
       case 'Impreso': return 'bg-indigo-100 text-indigo-800 border border-indigo-200';
@@ -3568,13 +4138,27 @@ export class BancoPreguntasComponent implements OnInit {
     window.open(this._sinCartillaService.urlDocumento(rol.id), '_blank');
   }
 
-  public eliminarDocumentoSinCartilla(): void {
+  public abrirEliminarDocumentoSinCartilla(): void {
     const rol = this.rolExamenActivo();
     if (!rol || !this.documentoSinCartilla() || !this.rolPuedeCargarBanco()) {
       this._mostrarToast('El examen sin cartilla solo se puede eliminar antes de GENERADO.', 'error');
       return;
     }
-    if (!window.confirm('Se eliminará el examen sin cartilla y el rol volverá a PROGRAMADO. ¿Deseas continuar?')) return;
+    this.dialogEliminarDocumentoSinCartilla.set(true);
+  }
+
+  public cerrarEliminarDocumentoSinCartilla(): void {
+    if (this.cargandoDocumentoSinCartilla()) return;
+    this.dialogEliminarDocumentoSinCartilla.set(false);
+  }
+
+  public confirmarEliminarDocumentoSinCartilla(): void {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.documentoSinCartilla() || !this.rolPuedeCargarBanco()) {
+      this._mostrarToast('El examen sin cartilla solo se puede eliminar antes de GENERADO.', 'error');
+      this.cerrarEliminarDocumentoSinCartilla();
+      return;
+    }
 
     this.cargandoDocumentoSinCartilla.set(true);
     this._sinCartillaService.eliminarDocumento(rol.id).subscribe({
@@ -3582,6 +4166,7 @@ export class BancoPreguntasComponent implements OnInit {
         this.documentoSinCartilla.set(null);
         this.archivoSinCartillaSeleccionado.set(null);
         this.cargandoDocumentoSinCartilla.set(false);
+        this.dialogEliminarDocumentoSinCartilla.set(false);
         this._mostrarToast('Examen sin cartilla eliminado. Puedes cargar un nuevo documento.');
         const sede = this.sedeSeleccionada();
         const carrera = this.carreraSeleccionada();
@@ -3594,10 +4179,214 @@ export class BancoPreguntasComponent implements OnInit {
     });
   }
 
+  public eliminarDocumentoSinCartilla(): void {
+    this.abrirEliminarDocumentoSinCartilla();
+  }
+
   public formatearTamanoDocumento(bytes: number): string {
     if (!bytes) return '0 KB';
     if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  public abrirNotasDocente(): void {
+    const rol = this.rolExamenActivo();
+    if (!rol) {
+      setTimeout(() => {
+        if (this.rolExamenActivo()) {
+          this.abrirNotasDocente();
+        }
+      }, 350);
+      return;
+    }
+    this.dialogNotasDocente.set(true);
+    this.cargandoNotasDocente.set(true);
+    this._sinCartillaService.listarNotas(rol.id).subscribe({
+      next: notas => {
+        this.notasDocente.set(notas);
+        this.cargandoNotasDocente.set(false);
+      },
+      error: err => {
+        this.cargandoNotasDocente.set(false);
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo consultar la nómina oficial.', 'error');
+      }
+    });
+  }
+
+  public cerrarNotasDocente(): void {
+    this.dialogNotasDocente.set(false);
+  }
+
+  public editarNotaDocente(codigoEstudiante: string, valorStr: string): void {
+    const valor = valorStr.trim() === '' ? null : Number(valorStr);
+    const nota60 = valor === null || isNaN(valor) ? null : Math.min(60, Math.max(0, valor));
+    const nota100 = nota60 === null ? null : Math.round(((nota60 * 100) / 60) * 100) / 100;
+    this.notasDocente.update(items =>
+      items.map(item =>
+        item.codigoEstudiante === codigoEstudiante
+          ? { ...item, notaSobre60: nota60, notaSobre100: nota100 }
+          : item
+      )
+    );
+  }
+
+  public guardarNotasDocente(): void {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.notasDocenteCompletas() || this.guardandoNotasDocente()) return;
+
+    const payload = this.notasDocente().map(n => ({
+      codigoEstudiante: n.codigoEstudiante,
+      notaSobre60: Number(n.notaSobre60)
+    }));
+
+    this.guardandoNotasDocente.set(true);
+    this._sinCartillaService.guardarNotas(rol.id, payload).subscribe({
+      next: guardadas => {
+        this.notasDocente.set(guardadas);
+        this.guardandoNotasDocente.set(false);
+        this.dialogNotasDocente.set(false);
+        this._mostrarToast('Calificaciones guardadas exitosamente. El examen pasó a Calificado. Descargando planilla oficial...');
+        this._notificacionesService.limpiarNotasPendientes(rol.id);
+        const sede = this.sedeSeleccionada();
+        const carrera = this.carreraSeleccionada();
+        if (sede && carrera) {
+          this._cargarRolesOficiales(sede.code, carrera.careerCode);
+        }
+        this.imprimirReporteNotasSinCartilla();
+      },
+      error: err => {
+        this.guardandoNotasDocente.set(false);
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudieron guardar las notas.', 'error');
+      }
+    });
+  }
+
+  public imprimirReporteNotasSinCartilla(): void {
+    const rol = this.rolExamenActivo();
+    if (!rol) return;
+    this._sinCartillaService.descargarReporteNotasPdf(rol.id).subscribe({
+      next: blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open(blobUrl, '_blank');
+        if (!win) {
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = `Planilla_Notas_${rol.materiaCodigo}_${rol.grupo}.pdf`;
+          a.click();
+        }
+        this._mostrarToast('Planilla oficial generada. Imprime este documento para firmarlo y sellarlo.');
+      },
+      error: err => {
+        this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo generar la planilla PDF oficial.', 'error');
+      }
+    });
+  }
+
+  public puedeDescargarPatronDocente(): boolean {
+    const rol = this.rolExamenActivo();
+    if (!rol || this.esSinCartillaActivo()) return false;
+    const estados = ['ENTREGADO', 'DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO', 'CONFIRMADO'];
+    return !!rol.estadoFlujo && estados.includes(rol.estadoFlujo);
+  }
+
+  public puedeDescargarPatronCronograma(ex: ExamenDocenteCronograma | null): boolean {
+    if (!ex || !ex.conCartilla) return false;
+    const estado = (ex.estado || '').toLowerCase().trim();
+    const estados = ['entregado', 'devuelto', 'pendiente_notas', 'pendiente de notas', 'calificado', 'confirmado'];
+    return estados.includes(estado);
+  }
+
+  public descargarPatronOficialDocente(abrirEnPestana: boolean = false): void {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.puedeDescargarPatronDocente() || this.descargandoPatronOficial()) return;
+
+    this.descargandoPatronOficial.set(true);
+    this._omrService.imprimirPatronCalificado(rol.id).subscribe({
+      next: (blob: Blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        if (abrirEnPestana) {
+          const win = window.open(blobUrl, '_blank');
+          if (!win) {
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `Patron_Oficial_${rol.materiaCodigo || 'Examen'}_G${rol.grupo || '1'}.pdf`;
+            a.click();
+          }
+        } else {
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = `Patron_Oficial_${rol.materiaCodigo || 'Examen'}_G${rol.grupo || '1'}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        this.descargandoPatronOficial.set(false);
+        this._mostrarToast(abrirEnPestana ? 'Patrón oficial de respuestas abierto en visor.' : 'Patrón oficial de respuestas descargado. Puedes compartirlo con tus estudiantes.');
+      },
+      error: async err => {
+        this.descargandoPatronOficial.set(false);
+        let mensaje = 'No se pudo generar el patrón oficial de respuestas.';
+        if (err?.error instanceof Blob) {
+          try {
+            const raw = await err.error.text();
+            const parsed = JSON.parse(raw);
+            mensaje = parsed.message || parsed.error || mensaje;
+          } catch {
+            mensaje = err.message || mensaje;
+          }
+        } else {
+          mensaje = err?.error?.message || err?.error?.error || err?.message || mensaje;
+        }
+        this._mostrarToast(mensaje, 'error');
+      }
+    });
+  }
+
+  public descargarPatronCronograma(ex: ExamenDocenteCronograma, abrirEnPestana: boolean = false): void {
+    if (!ex || !this.puedeDescargarPatronCronograma(ex) || this.descargandoPatronOficial()) return;
+
+    this.descargandoPatronOficial.set(true);
+    this._omrService.imprimirPatronCalificado(ex.id).subscribe({
+      next: (blob: Blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        if (abrirEnPestana) {
+          const win = window.open(blobUrl, '_blank');
+          if (!win) {
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `Patron_Oficial_${ex.codigo || 'Examen'}_G${ex.grupo || '1'}.pdf`;
+            a.click();
+          }
+        } else {
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = `Patron_Oficial_${ex.codigo || 'Examen'}_G${ex.grupo || '1'}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        this.descargandoPatronOficial.set(false);
+        this._mostrarToast(abrirEnPestana ? 'Patrón oficial de respuestas abierto en visor.' : 'Patrón oficial de respuestas descargado correctamente.');
+      },
+      error: async err => {
+        this.descargandoPatronOficial.set(false);
+        let mensaje = 'No se pudo generar el patrón oficial de respuestas.';
+        if (err?.error instanceof Blob) {
+          try {
+            const raw = await err.error.text();
+            const parsed = JSON.parse(raw);
+            mensaje = parsed.message || parsed.error || mensaje;
+          } catch {
+            mensaje = err.message || mensaje;
+          }
+        } else {
+          mensaje = err?.error?.message || err?.error?.error || err?.message || mensaje;
+        }
+        this._mostrarToast(mensaje, 'error');
+      }
+    });
   }
 
   public async procesarArchivoExcelReal(file: File): Promise<void> {
@@ -3690,30 +4479,35 @@ export class BancoPreguntasComponent implements OnInit {
 
         // Normalizar Tipo de Pregunta Oficial UNITEPC
         let tipoNorm = '';
-        if (tipoClave.includes('VERDADERO_O_FALSO_SIMPLE') || tipoClave.includes('FALSO_VERDADERO') || tipoClave === 'VF_SIMPLE') {
-          tipoNorm = 'VERDADERO_O_FALSO_SIMPLE';
-        } else if (tipoClave.includes('VERDADERO_O_FALSO_COMPLEJAS') || tipoClave.includes('PREGUNTA_CON_CLAVE') || tipoClave === 'VF_COMPLEJAS') {
-          tipoNorm = 'VERDADERO_O_FALSO_COMPLEJAS';
-        } else if (tipoClave.includes('RESPUESTA_A_B_AMBAS_NINGUNA') || tipoClave.includes('RESPUESTA_COMPUESTA') || tipoClave.includes('PREMISAS')) {
-          tipoNorm = 'RESPUESTA_PREMISAS_ABCD';
-        } else if (tipoClave.includes('ITEMS_AGRUPADOS') || ['PROBLEMA', 'CASO_CLINICO', 'CASO_CLINICO_TRONCO'].includes(tipoClave)) {
-          tipoNorm = 'CASO_CLINICO_TRONCO';
-        } else if (tipoClave.includes('SUBITEM') || tipoClave === 'SUBPROBLEMA') {
-          tipoNorm = 'SUBITEM_CASO';
-        } else if (['EMPAREJAMIENTO_AMPLIADO', 'EMPAREJAMIENTO_DE_CONCEPTOS', 'EMPAREJAMIENTO_TRONCO', 'EMPAREJAMIENTO'].includes(tipoClave)) {
-          tipoNorm = 'EMPAREJAMIENTO_TRONCO';
-        } else if (tipoClave.includes('OPCION_DE_EMPAREJAMIENTO') || tipoClave === 'OPCION_EMPAREJAMIENTO') {
-          tipoNorm = 'OPCION_EMPAREJAMIENTO';
-        } else if (tipoClave.includes('SELECCION') || tipoClave === 'SELECCION_SIMPLE' || tipoClave === 'SELECCION_UNICA') {
+        if (['SELECCION_SIMPLE', 'SELECCION_UNICA', 'SELECCION_MEJOR_RESPUESTA', 'SELECCION_DE_LA_MEJOR_RESPUESTA'].includes(tipoClave)
+            || tipoClave.includes('SELECCION')) {
           tipoNorm = 'SELECCION_MEJOR_RESPUESTA';
+        } else if (['FALSO_VERDADERO', 'VERDADERO_O_FALSO_SIMPLE', 'VF_SIMPLE'].includes(tipoClave)
+            || tipoClave.includes('VERDADERO_O_FALSO_SIMPLE') || tipoClave.includes('FALSO_VERDADERO')) {
+          tipoNorm = 'VERDADERO_O_FALSO_SIMPLE';
+        } else if (['PREGUNTA_CON_CLAVE', 'VERDADERO_O_FALSO_COMPLEJAS', 'VF_COMPLEJAS'].includes(tipoClave)
+            || tipoClave.includes('VERDADERO_O_FALSO_COMPLEJAS') || tipoClave.includes('PREGUNTA_CON_CLAVE')) {
+          tipoNorm = 'VERDADERO_O_FALSO_COMPLEJAS';
+        } else if (['RESPUESTA_COMPUESTA', 'RESPUESTA_PREMISAS_ABCD', 'RESPUESTA_A_B_AMBAS_NINGUNA'].includes(tipoClave)
+            || tipoClave.includes('RESPUESTA_A_B_AMBAS_NINGUNA') || tipoClave.includes('RESPUESTA_COMPUESTA') || tipoClave.includes('PREMISAS')) {
+          tipoNorm = 'RESPUESTA_PREMISAS_ABCD';
+        } else if (['ITEMS_AGRUPADOS_POR_CASO_CLINICO_O_PROBLEMA', 'CASO_CLINICO_TRONCO', 'CASO_CLINICO'].includes(tipoClave)
+            || tipoClave.includes('ITEMS_AGRUPADOS')) {
+          tipoNorm = 'CASO_CLINICO_TRONCO';
+        } else if (['PROBLEMA', 'SUBPROBLEMA', 'SUBITEM_CASO', 'SUBITEM_DE_CASO_O_PROBLEMA'].includes(tipoClave)
+            || tipoClave.includes('SUBITEM')) {
+          tipoNorm = 'SUBITEM_CASO';
+        } else if (['EMPAREJAMIENTO_AMPLIADO', 'EMPAREJAMIENTO_DE_CONCEPTOS', 'EMPAREJAMIENTO_TRONCO'].includes(tipoClave)) {
+          tipoNorm = 'EMPAREJAMIENTO_TRONCO';
+        } else if (['EMPAREJAMIENTO', 'OPCION_EMPAREJAMIENTO', 'OPCION_DE_EMPAREJAMIENTO_AMPLIADO'].includes(tipoClave)
+            || tipoClave.includes('OPCION_DE_EMPAREJAMIENTO') || tipoClave.includes('OPCION_EMPAREJAMIENTO')) {
+          tipoNorm = 'OPCION_EMPAREJAMIENTO';
         } else {
           tipoNorm = 'TIPO_NO_RECONOCIDO';
         }
 
         // Normalizar Respuesta Correcta (extraer letra principal A-E)
         let respNorm = this.normalizarRespuestaCorrectaExcel(respRaw, tipoNorm);
-        if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'VERDADERO') respNorm = 'A';
-        else if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE' && respRaw === 'FALSO') respNorm = 'B';
 
         // Normalizar Dificultad (1, 2, 3)
         let difNorm: '1' | '2' | '3' = '2';
@@ -3725,7 +4519,6 @@ export class BancoPreguntasComponent implements OnInit {
         if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE') {
           if (!opA) opA = 'Verdadero';
           if (!opB) opB = 'Falso';
-          if (!respNorm) respNorm = 'A';
         } else if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD') {
           if (!opA) opA = 'A. Si la primera es verdadera';
           if (!opB) opB = 'B. Si la segunda es verdadera';
@@ -3758,12 +4551,26 @@ export class BancoPreguntasComponent implements OnInit {
           errores.push('Una opción supera el máximo de 2000 caracteres');
         }
 
+        const filaMadreCaso = tipoNorm === 'CASO_CLINICO_TRONCO';
+        const filaMadreEmparejamiento = tipoNorm === 'EMPAREJAMIENTO_TRONCO';
+        const sinRespuestaDirecta = filaMadreCaso || filaMadreEmparejamiento;
+
+        if (sinRespuestaDirecta) {
+          if (respRaw) {
+            errores.push(filaMadreCaso
+              ? 'La fila madre de caso no debe llevar opciones ni respuesta correcta'
+              : 'Emparejamiento madre no debe llevar respuesta correcta');
+          }
+        } else if (!respRaw) {
+          errores.push('Falta respuesta correcta');
+        }
+
         if (tipoNorm === 'VERDADERO_O_FALSO_SIMPLE') {
-          if (!['A', 'B'].includes(respNorm)) {
+          if (respRaw && !['A', 'B'].includes(respNorm)) {
             errores.push('Respuesta en V/F debe ser A (Verdadero) o B (Falso)');
           }
         } else if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD') {
-          if (!['A', 'B', 'C', 'D'].includes(respNorm)) {
+          if (respRaw && !['A', 'B', 'C', 'D'].includes(respNorm)) {
             errores.push('Respuesta en premisas debe ser A, B, C o D');
           }
           if (!this.enunciadoPremisasValido(enunciadoRaw)) {
@@ -3773,14 +4580,14 @@ export class BancoPreguntasComponent implements OnInit {
           if (!opA || !opB || !opC || !opD) {
             errores.push('Requiere las 4 proposiciones (1 a 4) en incisos A-D');
           }
-          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+          if (respRaw && !['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
             errores.push('Respuesta en V/F complejas debe ser clave A-E');
           }
         } else if (tipoNorm === 'SELECCION_MEJOR_RESPUESTA' || tipoNorm === 'SUBITEM_CASO') {
           if (!opA || !opB || !opC || !opD || !opE) {
             errores.push('Requiere 5 opciones completas (incisos A al E)');
           }
-          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+          if (respRaw && !['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
             errores.push('Respuesta debe ser una letra entre A y E');
           }
         } else if (tipoNorm === 'EMPAREJAMIENTO_TRONCO') {
@@ -3788,9 +4595,8 @@ export class BancoPreguntasComponent implements OnInit {
           if (activas < 2 || activas > 5) {
             errores.push('El enunciado principal debe tener entre 2 y 5 opciones de referencia en las columnas A a E');
           }
-          if (respRaw) errores.push('Emparejamiento madre no debe llevar respuesta correcta');
         } else if (tipoNorm === 'OPCION_EMPAREJAMIENTO') {
-          if (!['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
+          if (respRaw && !['A', 'B', 'C', 'D', 'E'].includes(respNorm)) {
             errores.push('Respuesta de emparejamiento debe ser la letra asignada (A-E)');
           }
         }
@@ -3804,8 +4610,10 @@ export class BancoPreguntasComponent implements OnInit {
         if (tipoNorm === 'RESPUESTA_PREMISAS_ABCD' && opE) {
           errores.push(`${tipoNorm} no permite opción E`);
         }
-        if (tipoNorm === 'CASO_CLINICO_TRONCO' && (opA || opB || opC || opD || opE || respRaw)) {
-          errores.push('La fila madre de caso no debe llevar opciones ni respuesta correcta');
+        if (tipoNorm === 'CASO_CLINICO_TRONCO' && (opA || opB || opC || opD || opE)) {
+          if (!errores.includes('La fila madre de caso no debe llevar opciones ni respuesta correcta')) {
+            errores.push('La fila madre de caso no debe llevar opciones ni respuesta correcta');
+          }
         }
         if (tipoNorm === 'OPCION_EMPAREJAMIENTO' && (opA || opB || opC || opD || opE)) {
           errores.push('La opción de emparejamiento no debe llevar opciones A-E');
@@ -3872,7 +4680,7 @@ export class BancoPreguntasComponent implements OnInit {
           opcion_d: opD,
           opcion_e: opE,
           opciones: { A: opA, B: opB, C: opC, D: opD, E: opE },
-          respuesta_correcta: respNorm,
+          respuesta_correcta: respNorm || (sinRespuestaDirecta ? 'A' : ''),
           dificultad: difNorm,
           peso: pesoParsed,
           observaciones: valido ? 'OK' : errores.join(', '),
@@ -3905,6 +4713,11 @@ export class BancoPreguntasComponent implements OnInit {
 
   private normalizarRespuestaCorrectaExcel(valor: string, tipo: string): string {
     const respuesta = (valor || '').trim().toUpperCase();
+    if (tipo === 'VERDADERO_O_FALSO_SIMPLE') {
+      if (respuesta === 'VERDADERO' || respuesta === 'V' || respuesta === 'A') return 'A';
+      if (respuesta === 'FALSO' || respuesta === 'F' || respuesta === 'B') return 'B';
+      return '';
+    }
     if (/^[A-E]$/.test(respuesta)) return respuesta;
     if (tipo !== 'VERDADERO_O_FALSO_COMPLEJAS') return '';
     const respuestaConDescripcion = respuesta.match(/^([A-E])\s*[:.)-]\s*.+$/);
@@ -4304,11 +5117,12 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       // pendiente; para documentos de varias páginas se habilita únicamente
       // al llegar al final del contenedor real de páginas.
       setTimeout(() => this._comprobarFinPrevisualizacion(), 0);
-    } catch (error) {
+    } catch (error: any) {
       console.error('[BancoPreguntasComponent] No se pudo generar la previsualización PDF:', error);
       this.dialogPrevisualizacionPdf.set(false);
       this._liberarPdfPreview();
-      this._mostrarToast('No se pudo generar el PDF oficial de previsualización.', 'error');
+      const detalleError = error?.error?.mensaje || error?.error?.message || (typeof error?.error === 'string' ? error.error : null) || error?.message || 'No se pudo generar el PDF oficial de previsualización.';
+      this._mostrarToast(detalleError, 'error');
     }
   }
 
@@ -4824,8 +5638,8 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   public onScrollDocumentoPdf(event: Event): void {
     const element = event.target as HTMLElement;
     if (!element) return;
-    // Comprobar si el scroll llegó al final o está a menos de 80px del final.
-    if (element.scrollTop + element.clientHeight >= element.scrollHeight - 80) {
+    // Comprobar si el scroll llegó al final o está a menos de 100px del final (tolerancia para móviles).
+    if (element.scrollTop + element.clientHeight >= element.scrollHeight - 100) {
       this.documentoRecorridoCompleto.set(true);
       this.pdfPrevisualizadoYConforme.set(true);
     }
@@ -4840,7 +5654,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       setTimeout(() => this._comprobarFinPrevisualizacion(), 50);
       return;
     }
-    if (element.scrollHeight <= element.clientHeight + 2) {
+    if (element.scrollHeight <= element.clientHeight + 10) {
       this.documentoRecorridoCompleto.set(true);
       this.pdfPrevisualizadoYConforme.set(true);
     }
@@ -4969,6 +5783,8 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
         const sede = this.sedeSeleccionada();
         const carrera = this.carreraSeleccionada();
         if (rol && sede && carrera) this._cargarRolesOficiales(sede.code, carrera.careerCode);
+        this._cargarBancoPersistido();
+        if (rol) this._notificacionesService.limpiarObservacion(rol.id);
         this._mostrarToast(`Banco ${resultado.bancoPreguntasId} validado y registrado en PostgreSQL.`);
       },
       error: err => {

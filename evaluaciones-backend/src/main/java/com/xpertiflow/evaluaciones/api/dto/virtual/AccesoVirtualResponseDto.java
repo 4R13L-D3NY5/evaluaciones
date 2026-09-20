@@ -27,4 +27,5 @@ public class AccesoVirtualResponseDto {
     private Long cuentaRegresivaSegundos;
     private Long tiempoRestanteSegundos;
     private List<PreguntaVirtualDto> preguntas;
+    private java.util.Map<Integer, String> respuestasGuardadas;
 }

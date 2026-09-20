@@ -2,6 +2,8 @@ package com.xpertiflow.evaluaciones.api.controller;
 
 import com.xpertiflow.evaluaciones.api.dto.AuditoriaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.CambiarModalidadRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
@@ -44,11 +46,20 @@ public class RolExamenController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA') and @accesoAcademicoService.puedeConsultarCarrera(#dto.sedeCodigo, #dto.carreraCodigo, authentication)")
-    @Operation(summary = "Crear un nuevo rol de examen")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Crear un nuevo rol de examen (solo administrador)")
     public ResponseEntity<RolExamenResponseDto> crear(@Valid @RequestBody RolExamenRequestDto dto,
                                                        Authentication authentication) {
         return ResponseEntity.status(HttpStatus.CREATED).body(rolExamenService.crear(dto, authentication));
+    }
+
+    @PostMapping("/reprogramar-rango")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Reprogramar masivamente por rango de fechas exámenes de una carrera (solo administrador)")
+    public ResponseEntity<ReprogramarRangoResponseDto> reprogramarRango(
+            @Valid @RequestBody ReprogramarRangoRequestDto dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.reprogramarRangoParaCarrera(dto, authentication));
     }
 
     @PutMapping("/{id}")
@@ -76,6 +87,14 @@ public class RolExamenController {
     @Operation(summary = "Eliminar un rol de examen programado o validado")
     public ResponseEntity<Void> eliminar(@PathVariable String id, Authentication authentication) {
         rolExamenService.eliminar(id, authentication);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/vaciar")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Vaciar los roles de examen programados seleccionados (solo administrador)")
+    public ResponseEntity<Void> vaciar(@RequestBody List<String> ids) {
+        rolExamenService.eliminarProgramados(ids);
         return ResponseEntity.noContent().build();
     }
 

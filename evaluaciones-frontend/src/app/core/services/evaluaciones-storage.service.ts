@@ -47,6 +47,7 @@ export interface PlanEstudioItem {
   docenteNombre: string;
   docenteCi: string;
   grupo: string;
+  tipoClase: string;
   asignada: boolean;
   esMateriaComun: boolean;
   conCartilla: boolean;

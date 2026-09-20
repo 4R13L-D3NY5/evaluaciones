@@ -88,4 +88,16 @@ public class ExamenSinCartillaController {
             Authentication authentication) {
         return ResponseEntity.ok(service.guardarNotas(rolExamenId, request, authentication));
     }
+
+    @GetMapping(value = "/{rolExamenId}/reporte-notas-pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    public ResponseEntity<byte[]> descargarReporteNotasPdf(@PathVariable String rolExamenId,
+                                                            Authentication authentication) {
+        byte[] pdf = service.generarReporteNotasPdf(rolExamenId, authentication);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename("planilla-notas-" + rolExamenId + ".pdf").build().toString())
+                .body(pdf);
+    }
 }

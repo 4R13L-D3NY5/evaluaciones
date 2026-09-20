@@ -3,14 +3,18 @@ package com.xpertiflow.evaluaciones.api.dto;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.enums.TipoParcial;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class RolExamenResponseDto {
 
     private String id;
@@ -41,6 +45,10 @@ public class RolExamenResponseDto {
     private Integer estudiantesInscritosCount;
     private Integer variantesGeneradasCount;
     private boolean bancoPreguntasCargado;
+    private boolean requiereVerificacion;
+    private String estadoVerificacion;
+    private String verificadoPor;
+    private LocalDateTime fechaVerificacion;
     private String hashEncriptacion;
     private LocalDateTime fechaValidacion;
     private LocalDateTime fechaGeneracion;

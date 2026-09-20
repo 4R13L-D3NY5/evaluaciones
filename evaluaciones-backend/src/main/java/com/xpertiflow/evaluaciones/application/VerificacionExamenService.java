@@ -50,7 +50,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class VerificacionExamenService {
 
-    private static final Set<String> ESTADOS_VISIBLES = Set.of("PENDIENTE", "DEVUELTO");
+    private static final Set<String> ESTADOS_VISIBLES = Set.of("PENDIENTE");
     private static final Map<String, Integer> ORDEN_TIPOS = Map.of(
             "VERDADERO_O_FALSO_SIMPLE", 1,
             "RESPUESTA_PREMISAS_ABCD", 2,
@@ -82,10 +82,15 @@ public class VerificacionExamenService {
         if (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta)) {
             throw new IllegalArgumentException("La fecha desde no puede ser posterior a la fecha hasta.");
         }
-        List<VerificacionExamenListaDto> resultado = new ArrayList<>();
-        if ("VERIFICADO".equalsIgnoreCase(estado)) {
+        String estadoNorm = estado == null ? "" : estado.trim().toUpperCase(Locale.ROOT);
+        if ("VERIFICADO".equals(estadoNorm) || "APROBADO".equals(estadoNorm)) {
             return listarAprobados(orden, sedeCodigo, carreraCodigo, tipoParcial, modalidad,
                     fechaDesde, fechaHasta, authentication);
+        }
+        List<VerificacionExamenListaDto> resultado = new ArrayList<>();
+        if ("TODOS".equals(estadoNorm)) {
+            resultado.addAll(listarAprobados(orden, sedeCodigo, carreraCodigo, tipoParcial, modalidad,
+                    fechaDesde, fechaHasta, authentication));
         }
         for (RolExamen rol : rolRepository.findByEstadoFlujo(EstadoFlujo.VALIDADO)) {
             if (!politicaService.aplica(rol)
@@ -99,8 +104,10 @@ public class VerificacionExamenService {
             BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rol.getId()).orElse(null);
             if (banco == null || !"VALIDADO".equalsIgnoreCase(banco.getEstado())) continue;
             VerificacionExamen verificacion = asegurarPendiente(rol, banco);
-            if (estado != null && !estado.isBlank()) {
-                if (!estado.equalsIgnoreCase(verificacion.getEstado())) continue;
+            if ("VALIDADO".equals(estadoNorm) || "PENDIENTE".equals(estadoNorm)) {
+                if (!"PENDIENTE".equalsIgnoreCase(verificacion.getEstado())) continue;
+            } else if (!estadoNorm.isBlank() && !"TODOS".equals(estadoNorm)) {
+                if (!estadoNorm.equalsIgnoreCase(verificacion.getEstado())) continue;
             } else if (!ESTADOS_VISIBLES.contains(verificacion.getEstado())) {
                 continue;
             }
@@ -173,11 +180,7 @@ public class VerificacionExamenService {
         List<Reactivo> reactivos = descifrarReactivos(banco);
         Map<String, String> observaciones = observaciones(verificacion);
         VerificacionExamenDetalleDto dto = mapearDetalle(rol, banco, verificacion);
-        List<VerificacionPreguntaDto> preguntasActuales = reactivos.stream()
-                .sorted(Comparator.comparingInt(this::ordenTipo).thenComparing(Reactivo::getNumeroOrden,
-                        Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(reactivo -> mapearPregunta(reactivo, observaciones.get(String.valueOf(reactivo.getNumeroOrden()))))
-                .toList();
+        List<VerificacionPreguntaDto> preguntasActuales = mapearPreguntas(reactivos, observaciones);
         dto.setPreguntas(preguntasActuales);
         dto.setHistorialDevoluciones(mapearHistorialDevoluciones(rol.getId(), reactivos));
         return dto;
@@ -386,11 +389,7 @@ public class VerificacionExamenService {
         List<Reactivo> reactivos = descifrarReactivos(banco);
         VerificacionExamenDetalleDto dto = mapearDetalle(rol, banco, verificacion);
         Map<String, String> notas = observaciones(verificacion);
-        dto.setPreguntas(reactivos.stream()
-                .sorted(Comparator.comparingInt(this::ordenTipo).thenComparing(Reactivo::getNumeroOrden,
-                        Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(reactivo -> mapearPregunta(reactivo, notas.get(String.valueOf(reactivo.getNumeroOrden()))))
-                .toList());
+        dto.setPreguntas(mapearPreguntas(reactivos, notas));
         dto.setHistorialDevoluciones(mapearHistorialDevoluciones(rolExamenId, reactivos));
         return dto;
     }
@@ -422,7 +421,8 @@ public class VerificacionExamenService {
         dto.setVersion(rol.getVersion()); dto.setModalidad(rol.getModalidad().getValor());
         dto.setFechaExamen(rol.getFecha()); dto.setHorario(rol.getHorario());
         dto.setFechaSubida(banco.getCreadoEn() == null ? banco.getFechaAprobacion() : banco.getCreadoEn());
-        dto.setDocenteNombre(rol.getDocenteNombre()); dto.setEstadoVerificacion(verificacion.getEstado());
+        dto.setDocenteNombre(rol.getDocenteNombre());
+        dto.setEstadoVerificacion("PENDIENTE".equalsIgnoreCase(verificacion.getEstado()) ? "VALIDADO" : verificacion.getEstado());
         dto.setObservacionesGenerales(verificacion.getObservacionesGenerales());
         dto.setVerificadoPor(verificacion.getVerificadoPor());
         dto.setFechaVerificacion(verificacion.getFechaVerificacion());
@@ -438,21 +438,60 @@ public class VerificacionExamenService {
         dto.setVersion(rol.getVersion()); dto.setModalidad(rol.getModalidad().getValor());
         dto.setFechaExamen(rol.getFecha()); dto.setHorario(rol.getHorario());
         dto.setFechaSubida(banco.getCreadoEn() == null ? banco.getFechaAprobacion() : banco.getCreadoEn());
-        dto.setDocenteNombre(rol.getDocenteNombre()); dto.setEstadoVerificacion(verificacion.getEstado());
+        dto.setDocenteNombre(rol.getDocenteNombre());
+        dto.setEstadoVerificacion("PENDIENTE".equalsIgnoreCase(verificacion.getEstado()) ? "VALIDADO" : verificacion.getEstado());
         dto.setObservacionesGenerales(verificacion.getObservacionesGenerales());
         dto.setVerificadoPor(verificacion.getVerificadoPor());
         dto.setFechaVerificacion(verificacion.getFechaVerificacion());
         return dto;
     }
 
+    private List<VerificacionPreguntaDto> mapearPreguntas(List<Reactivo> reactivos, Map<String, String> observaciones) {
+        List<Reactivo> reactivosOrdenados = reactivos.stream()
+                .sorted(Comparator.comparingInt(this::ordenTipo).thenComparing(Reactivo::getNumeroOrden,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        List<VerificacionPreguntaDto> resultado = new ArrayList<>();
+        int contadorPreguntas = 0;
+        for (Reactivo reactivo : reactivosOrdenados) {
+            boolean esTronco = esTroncoContexto(reactivo.getTipoReactivo());
+            Integer numeroPregunta = null;
+            if (!esTronco) {
+                contadorPreguntas++;
+                numeroPregunta = contadorPreguntas;
+            }
+            resultado.add(mapearPregunta(reactivo, observaciones.get(String.valueOf(reactivo.getNumeroOrden())),
+                    numeroPregunta, esTronco));
+        }
+        return resultado;
+    }
+
+    private boolean esTroncoContexto(String tipoReactivo) {
+        return tipoReactivo != null && (
+                "EMPAREJAMIENTO_TRONCO".equalsIgnoreCase(tipoReactivo)
+                || "CASO_CLINICO_TRONCO".equalsIgnoreCase(tipoReactivo));
+    }
+
     private VerificacionPreguntaDto mapearPregunta(Reactivo reactivo, String observacion) {
+        boolean esTronco = esTroncoContexto(reactivo.getTipoReactivo());
+        return mapearPregunta(reactivo, observacion, esTronco ? null : reactivo.getNumeroOrden(), esTronco);
+    }
+
+    private VerificacionPreguntaDto mapearPregunta(Reactivo reactivo, String observacion,
+                                                   Integer numeroPregunta, boolean esTronco) {
         VerificacionPreguntaDto dto = new VerificacionPreguntaDto();
         dto.setNumeroOriginal(reactivo.getNumeroOrden());
+        dto.setNumeroPregunta(numeroPregunta);
+        dto.setEsEnunciadoContexto(esTronco);
         dto.setIdentificadorOriginal(String.valueOf(reactivo.getNumeroOrden()));
-        dto.setTipoReactivo(reactivo.getTipoReactivo()); dto.setDificultad(reactivo.getDificultad());
-        dto.setNivelDificultad(reactivo.getNivelDificultad()); dto.setGrupoContexto(reactivo.getGrupoContexto());
-        dto.setEnunciado(reactivo.getEnunciado()); dto.setImagenBase64(reactivo.getImagenBase64());
-        dto.setRespuestaCorrecta(reactivo.getRespuestaCorrecta()); dto.setPesoPuntos(reactivo.getPesoPuntos());
+        dto.setTipoReactivo(reactivo.getTipoReactivo());
+        dto.setDificultad(esTronco ? null : reactivo.getDificultad());
+        dto.setNivelDificultad(esTronco ? null : reactivo.getNivelDificultad());
+        dto.setGrupoContexto(reactivo.getGrupoContexto());
+        dto.setEnunciado(reactivo.getEnunciado());
+        dto.setImagenBase64(reactivo.getImagenBase64());
+        dto.setRespuestaCorrecta(esTronco ? null : reactivo.getRespuestaCorrecta());
+        dto.setPesoPuntos(esTronco ? null : reactivo.getPesoPuntos());
         dto.setObservacion(observacion);
         dto.setOpciones(parsearOpciones(reactivo.getOpcionesJson(), reactivo.getRespuestaCorrecta()));
         return dto;

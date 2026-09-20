@@ -191,6 +191,7 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASSWORD:-guest}
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-sea_evaluaciones}
@@ -232,6 +233,7 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASSWORD:-guest}
       RABBITMQ_QUEUE_IN: evaluaciones.omr.procesar
       RABBITMQ_QUEUE_OUT: evaluaciones.omr.resultado
       DB_HOST: db

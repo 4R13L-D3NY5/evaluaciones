@@ -15,10 +15,10 @@ import { LayoutPreferencesService } from '../core/services/layout-preferences.se
       <sea-topbar class="shrink-0"></sea-topbar>
 
       <!-- Cuerpo: Sidebar Lateral Anclado + Contenido Principal con Scroll Independiente -->
-      <div class="flex-1 flex overflow-hidden">
+      <div class="relative min-h-0 flex-1 flex overflow-hidden">
         <sea-sidebar class="shrink-0 h-full flex flex-col"></sea-sidebar>
 
-        <main class="flex-1 min-w-0 overflow-y-auto overflow-x-auto p-4 sm:p-8 scroll-smooth">
+        <main class="min-w-0 min-h-0 flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-8 scroll-smooth">
           <div
             class="w-full min-w-0 mx-auto"
             [class.max-w-7xl]="preferencias.vistaContenido() === 'centrado'">

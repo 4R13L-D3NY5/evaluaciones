@@ -299,8 +299,20 @@ public class CartillaOmrPdfService {
                     fuentes.bold(), 7.5f);
             textoAjustado(contenido, cartilla.getNombreCompleto(), estudianteX + 8f, y,
                     fuentes.regular(), 7.5f, firmaX - estudianteX - 16f);
-            textoDesdeArriba(contenido, "________________", firmaX + 8f, y,
-                    fuentes.regular(), 6.5f);
+            boolean esAnulado = "ANULADO".equalsIgnoreCase(cartilla.getEstadoCalificacion());
+            if (esAnulado) {
+                textoDesdeArribaColor(contenido, "ANULADO", firmaX + 8f, y,
+                        fuentes.bold(), 7.5f, new Color(185, 28, 28));
+                textoDesdeArribaColor(contenido, "0 / 0  (ANULADO)", observacionesX + 6f, y,
+                        fuentes.bold(), 7f, new Color(185, 28, 28));
+            } else {
+                textoDesdeArriba(contenido, "________________", firmaX + 8f, y,
+                        fuentes.regular(), 6.5f);
+                if (cartilla.getObservacion() != null && !cartilla.getObservacion().isBlank()) {
+                    textoDesdeArriba(contenido, cartilla.getObservacion(), observacionesX + 6f, y,
+                            fuentes.regular(), 7f);
+                }
+            }
         }
     }
 
@@ -342,6 +354,16 @@ public class CartillaOmrPdfService {
                                         PDFont fuente, float tamanio) throws IOException {
         contenido.beginText();
         contenido.setNonStrokingColor(Color.WHITE);
+        contenido.setFont(fuente, tamanio);
+        contenido.newLineAtOffset(x, PAGE_HEIGHT - yDesdeArriba);
+        contenido.showText(limpiarParaFuente(valor, fuente));
+        contenido.endText();
+    }
+
+    private void textoDesdeArribaColor(PDPageContentStream contenido, String valor, float x, float yDesdeArriba,
+                                       PDFont fuente, float tamanio, Color color) throws IOException {
+        contenido.beginText();
+        contenido.setNonStrokingColor(color);
         contenido.setFont(fuente, tamanio);
         contenido.newLineAtOffset(x, PAGE_HEIGHT - yDesdeArriba);
         contenido.showText(limpiarParaFuente(valor, fuente));
