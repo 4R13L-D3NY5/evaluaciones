@@ -51,19 +51,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Criterio de cierre: Identificar la causa del error, corregir la configuración o el código correspondiente y validar que el PDF de escaneados pueda procesarse correctamente.
 - Notas: Revisar especialmente el error HTTP 413 (`Request Entity Too Large`) y la respuesta HTML que aparece como `Unexpected token '<'`.
 
-#### T-005 — Continuar y concluir el módulo de respaldos y contingencia
-
-- Prioridad: Crítica
-- Área: Respaldos / Continuidad operativa
-- Responsable: Por definir
-- Creada: 2026-09-12
-- Fecha límite: Por definir
-- Dependencias: Secreto de Restic, montajes local y externo, worker `worker-backup`, entorno aislado y respaldo compatible de Vault.
-- Plan: Diagnosticar el estado actual; generar snapshot local; copiarlo al repositorio externo; verificar integridad; probar corrupción controlada; validar retención; restaurar en una instancia aislada; comprobar PostgreSQL, `storage`, Flyway, bancos cifrados y Vault; revisar permisos, auditoría, mensajes y protección contra sobrescritura; actualizar la guía para el administrador del servidor.
-- Criterio de cierre: Respaldo, copia, verificación y restauración aislada comprobados sin afectar producción, con auditoría completa y procedimiento operativo documentado.
-- Notas: La funcionalidad base ya está implementada. La restauración no debe probarse directamente sobre producción. Ver [plan de continuación y cierre](plan-cierre-respaldos.md).
-
-
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
 - Prioridad: Media
@@ -113,6 +100,40 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 *(Sin tareas activas)*
 
 ### En revisión
+
+#### T-028 — Seguimiento de verificación para exámenes sin cartilla (alerta de documento no cargado y visualización)
+
+- Prioridad: Alta
+- Área: Verificación de Exámenes / Exámenes sin Cartilla
+- Responsable: Antigravity
+- Creada: 2026-09-20
+- Fecha límite: 2026-09-20
+- Dependencias: Módulo de verificación (`VerificacionExamenService.java`, `verificar-examenes.component.ts`), servicio y controlador de exámenes sin cartilla (`ExamenSinCartillaController.java`).
+- Criterio de cierre: 1) Incorporar los exámenes presenciales sin cartilla (`PRESENCIAL_SIN_CARTILLA`) en la pestaña de seguimiento ("Sin banco / documento") cuando estén en `PROGRAMADO` y no tengan documento cargado; 2) Mostrar indicador visual de modalidad "Sin Cartilla" y estado "Sin documento cargado"; 3) Agregar filtro de modalidad "Sin Cartilla" en el módulo de verificación; 4) Habilitar permisos al rol `VERIFICADOR` en `ExamenSinCartillaController` para consultar y descargar el documento `.doc`/`.docx`; 5) Actualizar el modal de detalles con información contextual para exámenes sin cartilla.
+- Notas: En progreso. Requerimiento solicitado por el usuario para integrar el seguimiento y control de exámenes sin cartilla en el módulo de verificadores. Seguimiento de exámenes sin cartilla integrado en módulo de verificadores: alerta de documento no cargado, filtro de modalidad Sin Cartilla, permisos de consulta y descarga para verificadores, y modal explicativo.
+
+#### T-027 — Pestaña para Verificadores: Grupos con examen programado sin banco de preguntas cargado
+
+- Prioridad: Alta
+- Área: Verificación de Exámenes / Monitoreo
+- Responsable: Por definir
+- Creada: 2026-09-20
+- Fecha límite: Por definir
+- Dependencias: Módulo de verificación de exámenes en frontend (`verificar-examenes.component.ts`) y backend (`VerificacionExamenController`, `VerificacionExamenService`).
+- Criterio de cierre: 1) Agregar una nueva pestaña "Sin banco de preguntas" en el módulo de Verificación de Exámenes; 2) Listar los grupos con examen programado para el día / rango filtrado que aún no han cargado ni validado su banco de preguntas; 3) Mostrar información detallada del grupo, asignatura, docente titular, fecha, horario, sede y carrera dentro del alcance del verificador; 4) Reflejar contador en el tab y filtros interactivos sincronizados.
+- Notas: Tarea iniciada por comando `=new` para dar visibilidad preventiva a los verificadores sobre grupos que tienen examen programado sin banco cargado. Pestaña 'Sin banco de preguntas' agregada en módulo de verificadores con indicador visual ¡Hoy!, filtros rápidos por fecha, endpoint /api/verificacion-examenes/sin-banco y modal de detalles operativos.
+
+#### T-005 — Continuar y concluir el módulo de respaldos y contingencia
+
+- Prioridad: Crítica
+- Área: Respaldos / Continuidad operativa
+- Responsable: Por definir
+- Creada: 2026-09-12
+- Fecha límite: Por definir
+- Dependencias: Secreto de Restic, montajes local y externo, worker `worker-backup`, entorno aislado y respaldo compatible de Vault.
+- Plan: Diagnosticar el estado actual; generar snapshot local; copiarlo al repositorio externo; verificar integridad; probar corrupción controlada; validar retención; restaurar en una instancia aislada; comprobar PostgreSQL, `storage`, Flyway, bancos cifrados y Vault; revisar permisos, auditoría, mensajes y protección contra sobrescritura; actualizar la guía para el administrador del servidor.
+- Criterio de cierre: Respaldo, copia, verificación y restauración aislada comprobados sin afectar producción, con auditoría completa y procedimiento operativo documentado.
+- Notas: La funcionalidad base ya está implementada. La restauración no debe probarse directamente sobre producción. Ver [plan de continuación y cierre](plan-cierre-respaldos.md). Iniciando analisis y conclusion del modulo de respaldos, restauracion aislada y sincronizacion local Modulo de respaldos concluido y certificado. Validada restauracion aislada, deteccion de corrupcion controlada (manifest SHA-256), compatibilidad con Vault Transit KMS, descarga de dump desde UI/API y scripts de exportacion e importacion local.
 
 #### T-026 — Homogenización integral de validaciones de Banco de Preguntas entre Frontend y Backend
 
@@ -331,9 +352,9 @@ _Sin tareas._
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 7 |
+| Pendientes | 6 |
 | En progreso | 0 |
-| En revisión | 15 |
+| En revisión | 18 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

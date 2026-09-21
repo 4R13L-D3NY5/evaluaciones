@@ -19,7 +19,7 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         <div>
           <div class="flex items-center gap-3">
             <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-700"><i class="pi pi-verified text-xl"></i></span>
-            <div><h1 class="text-2xl font-black tracking-tight text-foreground">{{ vistaActual === 'aprobados' ? 'Exámenes aprobados' : 'Verificar exámenes' }}</h1><p class="text-xs text-muted-foreground">{{ vistaActual === 'aprobados' ? 'Historial de exámenes aprobados por verificación dentro de tu alcance.' : 'Revisión completa de exámenes validados antes de generar el material oficial.' }}</p></div>
+            <div><h1 class="text-2xl font-black tracking-tight text-foreground">{{ vistaActual === 'sin_banco' ? 'Exámenes programados sin banco' : vistaActual === 'aprobados' ? 'Exámenes aprobados' : 'Verificar exámenes' }}</h1><p class="text-xs text-muted-foreground">{{ vistaActual === 'sin_banco' ? 'Grupos con examen programado que aún no han cargado su banco de preguntas.' : vistaActual === 'aprobados' ? 'Historial de exámenes aprobados por verificación dentro de tu alcance.' : 'Revisión completa de exámenes validados antes de generar el material oficial.' }}</p></div>
           </div>
         </div>
         <button type="button" class="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:border-primary" (click)="actualizarVista()"><i class="pi pi-refresh mr-2"></i>Actualizar</button>
@@ -28,6 +28,7 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       <nav class="flex w-fit gap-1 rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Vistas de verificación">
         <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'revision'" (click)="cambiarVista('revision')" [class.bg-card]="vistaActual === 'revision'" [class.text-primary]="vistaActual === 'revision'" [class.shadow-xs]="vistaActual === 'revision'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-search mr-2"></i>Por verificar (Validados)@if (examenes().length) { <span class="ml-1 font-black">({{ examenes().length }})</span> }</button>
         <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'aprobados'" (click)="cambiarVista('aprobados')" [class.bg-card]="vistaActual === 'aprobados'" [class.text-primary]="vistaActual === 'aprobados'" [class.shadow-xs]="vistaActual === 'aprobados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-check-circle mr-2"></i>Verificados (Aprobados)</button>
+        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'sin_banco'" (click)="cambiarVista('sin_banco')" [class.bg-card]="vistaActual === 'sin_banco'" [class.text-amber-800]="vistaActual === 'sin_banco'" [class.shadow-xs]="vistaActual === 'sin_banco'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-exclamation-triangle mr-2 text-amber-500"></i>Sin banco de preguntas@if (examenesSinBanco().length) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px]">({{ examenesSinBanco().length }})</span> }</button>
       </nav>
 
       <div class="grid grid-cols-1 gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs md:grid-cols-3 lg:grid-cols-4">
@@ -37,11 +38,17 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Fecha examen · desde<input type="date" [(ngModel)]="fechaDesde" (ngModelChange)="cambiarRangoFechas()" [max]="fechaHasta || null" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"></label>
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Fecha examen · hasta<input type="date" [(ngModel)]="fechaHasta" (ngModelChange)="cambiarRangoFechas()" [min]="fechaDesde || null" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"></label>
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Parcial<select [(ngModel)]="tipoParcial" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">Todos</option><option>1er Parcial</option><option>2do Parcial</option><option>Examen Final</option><option>2da Instancia</option></select></label>
-        <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Modalidad<select [(ngModel)]="modalidad" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">Todas</option><option value="PRESENCIAL_CARTILLA">Con cartilla</option><option value="VIRTUAL">Virtual</option></select></label>
+        <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Modalidad<select [(ngModel)]="modalidad" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">Todas</option><option value="PRESENCIAL_CARTILLA">Con cartilla</option><option value="PRESENCIAL_SIN_CARTILLA">Sin cartilla</option><option value="VIRTUAL">Virtual</option></select></label>
         @if (vistaActual === 'revision') {
           <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado
             <div class="mt-1 flex h-[34px] items-center rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-xs font-bold text-purple-700">
               <i class="pi pi-shield mr-1.5"></i>Validados (por verificar)
+            </div>
+          </label>
+        } @else if (vistaActual === 'sin_banco') {
+          <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado
+            <div class="mt-1 flex h-[34px] items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800">
+              <i class="pi pi-clock mr-1.5"></i>Programados (sin banco / doc)
             </div>
           </label>
         }
@@ -349,6 +356,227 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       @if (aprobadosInicializados) {
         <div [hidden]="vistaActual !== 'aprobados'"><sea-examenes-aprobados #panelAprobados [filtros]="filtrosCompartidos" [activo]="vistaActual === 'aprobados'" /></div>
       }
+
+      @if (vistaActual === 'sin_banco') {
+        <div class="space-y-4">
+          <div class="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-200 text-amber-900">
+                <i class="pi pi-clock text-lg"></i>
+              </span>
+              <div>
+                <h3 class="text-sm font-black text-amber-950">Monitoreo de grupos sin banco de preguntas</h3>
+                <p class="text-xs text-amber-900/90">
+                  @if (totalExamenesHoySinBanco() > 0) {
+                    <strong class="text-rose-700 font-black">¡Atención!</strong> Hay {{ totalExamenesHoySinBanco() }} grupo(s) con examen programado para <strong>HOY</strong> sin banco cargado.
+                  } @else {
+                    No hay exámenes programados para hoy sin banco dentro de tu alcance.
+                  }
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-[10px] font-extrabold uppercase text-amber-950/70 mr-1">Rango rápido:</span>
+              <button type="button" (click)="establecerRangoHoy()" [class.bg-amber-600]="esRangoHoy()" [class.text-white]="esRangoHoy()" [class.bg-card]="!esRangoHoy()" class="rounded-lg border border-amber-300 px-2.5 py-1 text-xs font-bold transition hover:border-amber-500 cursor-pointer shadow-2xs">
+                Solo hoy
+              </button>
+              <button type="button" (click)="establecerRangoSemana()" [class.bg-amber-600]="esRangoSemana()" [class.text-white]="esRangoSemana()" [class.bg-card]="!esRangoSemana()" class="rounded-lg border border-amber-300 px-2.5 py-1 text-xs font-bold transition hover:border-amber-500 cursor-pointer shadow-2xs">
+                Próximos 7 días
+              </button>
+              <button type="button" (click)="establecerRangoTodos()" [class.bg-amber-600]="esRangoTodos()" [class.text-white]="esRangoTodos()" [class.bg-card]="!esRangoTodos()" class="rounded-lg border border-amber-300 px-2.5 py-1 text-xs font-bold transition hover:border-amber-500 cursor-pointer shadow-2xs">
+                Todo el alcance
+              </button>
+            </div>
+          </div>
+
+          @if (cargandoSinBanco()) {
+            <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
+              <i class="pi pi-spin pi-spinner mr-2"></i>Cargando exámenes programados sin banco...
+            </div>
+          } @else if (!examenesSinBanco().length) {
+            <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
+              <i class="pi pi-check-circle text-emerald-600 mr-2 text-base"></i>
+              Todos los exámenes programados en el rango seleccionado ya cuentan con su banco de preguntas o no hay programaciones pendientes.
+            </div>
+          } @else {
+            <div class="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
+              <table class="w-full min-w-[1200px] text-left text-xs">
+                <thead class="bg-muted/50 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th class="p-3">Fecha examen</th>
+                    <th class="p-3">Sede / Carrera</th>
+                    <th class="p-3">Asignatura</th>
+                    <th class="p-3">Grupo · Parcial</th>
+                    <th class="p-3">Aula / Campus</th>
+                    <th class="p-3">Docente titular</th>
+                    <th class="p-3">Modalidad</th>
+                    <th class="p-3">Estado banco</th>
+                    <th class="p-3 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                  @for (examen of examenesSinBanco(); track examen.rolExamenId) {
+                    <tr class="hover:bg-muted/20" [class.bg-rose-50]="esHoy(examen.fechaExamen)">
+                      <td class="p-3 font-bold">
+                        <div class="flex items-center gap-1.5">
+                          <span>{{ examen.fechaExamen | date:'dd/MM/yyyy' }}</span>
+                          @if (esHoy(examen.fechaExamen)) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-600 text-white font-black px-2 py-0.5 text-[9px] uppercase tracking-wider shadow-2xs animate-pulse">
+                              <i class="pi pi-bell"></i>¡Hoy!
+                            </span>
+                          } @else if (diasRestantes(examen.fechaExamen) > 0) {
+                            <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold px-1.5 py-0.2 text-[9px]">
+                              En {{ diasRestantes(examen.fechaExamen) }}d
+                            </span>
+                          } @else {
+                            <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-1.5 py-0.2 text-[9px] font-bold">
+                              Pasado
+                            </span>
+                          }
+                        </div>
+                        <span class="block font-normal text-muted-foreground">{{ examen.horario }}</span>
+                      </td>
+                      <td class="p-3">
+                        <strong>{{ examen.sedeCodigo || '—' }}</strong>
+                        <span class="block text-muted-foreground">{{ examen.sedeNombre || 'Sede no registrada' }}</span>
+                        <span class="block text-muted-foreground">{{ examen.carreraCodigo }} · {{ examen.carreraNombre }}</span>
+                      </td>
+                      <td class="p-3">
+                        <strong>{{ examen.materiaCodigo }}</strong>
+                        <span class="block max-w-[220px] truncate text-muted-foreground">{{ examen.materiaNombre }}</span>
+                      </td>
+                      <td class="p-3 font-black">
+                        {{ examen.grupo }}
+                        <span class="block font-normal text-muted-foreground">{{ examen.tipoParcial }}</span>
+                      </td>
+                      <td class="p-3 text-muted-foreground">
+                        <span class="font-bold text-foreground">{{ examen.aula || 'Aula sin asignar' }}</span>
+                        <span class="block text-[11px]">{{ examen.campus || 'Campus principal' }}</span>
+                      </td>
+                      <td class="p-3">
+                        <div class="flex items-center gap-1.5">
+                          <i class="pi pi-user text-muted-foreground text-xs"></i>
+                          <span class="font-bold text-foreground">{{ examen.docenteNombre || 'Docente no asignado' }}</span>
+                        </div>
+                      </td>
+                      <td class="p-3">
+                        <span class="rounded-lg border border-border px-2 py-1 text-[11px] font-semibold"
+                              [class.bg-blue-50]="examen.modalidad === 'PRESENCIAL_SIN_CARTILLA'"
+                              [class.text-blue-800]="examen.modalidad === 'PRESENCIAL_SIN_CARTILLA'"
+                              [class.border-blue-200]="examen.modalidad === 'PRESENCIAL_SIN_CARTILLA'"
+                              [class.bg-muted]="examen.modalidad !== 'PRESENCIAL_SIN_CARTILLA'">
+                          @if (examen.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+                            <i class="pi pi-file mr-1 text-blue-600"></i>Sin Cartilla
+                          } @else {
+                            {{ etiquetaModalidad(examen.modalidad) }}
+                          }
+                        </span>
+                      </td>
+                      <td class="p-3">
+                        @if (examen.modalidad === 'PRESENCIAL_SIN_CARTILLA' || examen.estadoVerificacion === 'SIN_DOCUMENTO') {
+                          <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 text-[10px] font-black tracking-wide">
+                            <i class="pi pi-file"></i>Sin documento cargado
+                          </span>
+                        } @else {
+                          <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-800 border border-rose-200 px-2.5 py-1 text-[10px] font-black tracking-wide">
+                            <i class="pi pi-times-circle"></i>Sin banco cargado
+                          </span>
+                        }
+                      </td>
+                      <td class="p-3 text-right">
+                        <button type="button" class="rounded-lg border border-border bg-card px-3 py-2 text-[11px] font-bold text-foreground hover:border-primary hover:text-primary transition shadow-2xs cursor-pointer" (click)="abrirDetalleSinBanco(examen)">
+                          <i class="pi pi-info-circle mr-1"></i>Detalles
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+
+        @if (detalleSinBanco()) {
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" (click)="cerrarDetalleSinBanco()">
+            <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-2xl border border-amber-200" (click)="$event.stopPropagation()">
+              <div class="flex items-center justify-between border-b border-border px-5 py-4 bg-amber-50/50">
+                <div class="flex items-center gap-2.5">
+                  <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                    <i class="pi pi-clock text-lg"></i>
+                  </span>
+                  <div>
+                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+                      {{ detalleSinBanco()!.modalidad === 'PRESENCIAL_SIN_CARTILLA' ? 'Examen sin cartilla programado' : 'Examen programado sin banco' }}
+                    </p>
+                    <h2 class="text-base font-black">{{ detalleSinBanco()!.materiaCodigo }} · {{ detalleSinBanco()!.materiaNombre }}</h2>
+                  </div>
+                </div>
+                <button type="button" class="icon-button" (click)="cerrarDetalleSinBanco()"><i class="pi pi-times"></i></button>
+              </div>
+              <div class="overflow-y-auto p-5 space-y-4 text-xs">
+                <div class="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/20 p-3.5">
+                  <div>
+                    <span class="text-[10px] font-extrabold uppercase text-muted-foreground block">Grupo y Parcial</span>
+                    <strong class="text-sm font-black text-foreground">{{ detalleSinBanco()!.grupo }} · {{ detalleSinBanco()!.tipoParcial }}</strong>
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-extrabold uppercase text-muted-foreground block">Modalidad</span>
+                    <span class="font-bold text-foreground">{{ etiquetaModalidad(detalleSinBanco()!.modalidad) }}</span>
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-extrabold uppercase text-muted-foreground block">Fecha de examen</span>
+                    <strong class="text-foreground">{{ detalleSinBanco()!.fechaExamen | date:'dd/MM/yyyy' }}</strong>
+                    @if (esHoy(detalleSinBanco()!.fechaExamen)) {
+                      <span class="ml-1 rounded bg-rose-600 px-1.5 py-0.2 text-[9px] font-black text-white uppercase">¡Hoy!</span>
+                    }
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-extrabold uppercase text-muted-foreground block">Horario</span>
+                    <strong class="text-foreground">{{ detalleSinBanco()!.horario }}</strong>
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-extrabold uppercase text-muted-foreground block">Aula y Campus</span>
+                    <span class="font-semibold text-foreground">{{ detalleSinBanco()!.aula || 'Aula regular' }} · {{ detalleSinBanco()!.campus || 'Campus principal' }}</span>
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-extrabold uppercase text-muted-foreground block">Sede y Carrera</span>
+                    <span class="font-semibold text-foreground">{{ detalleSinBanco()!.sedeNombre || detalleSinBanco()!.sedeCodigo }} · {{ detalleSinBanco()!.carreraNombre }}</span>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-border bg-card p-3.5 space-y-1">
+                  <span class="text-[10px] font-extrabold uppercase text-muted-foreground block">Docente Titular Asignado</span>
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-user text-primary text-base"></i>
+                    <strong class="text-sm text-foreground">{{ detalleSinBanco()!.docenteNombre || 'Docente no asignado' }}</strong>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-amber-950 space-y-1">
+                  <p class="font-bold flex items-center gap-1.5 text-xs">
+                    <i class="pi pi-info-circle text-amber-700"></i>
+                    Estado en el flujo institucional:
+                  </p>
+                  @if (detalleSinBanco()!.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+                    <p class="text-[11px] leading-relaxed text-amber-900">
+                      Este examen es de modalidad presencial <strong>Sin Cartilla</strong>. El docente titular debe cargar el documento oficial (.doc o .docx) para que el personal de evaluaciones pueda imprimirlo. En cuanto se suba el documento, pasará al estado <strong>VALIDADO</strong>.
+                    </p>
+                  } @else {
+                    <p class="text-[11px] leading-relaxed text-amber-900">
+                      Este grupo tiene examen programado en el rol oficial, pero el docente titular aún no ha subido ni validado el banco de preguntas oficial en formato Excel. En cuanto se complete la carga, el examen avanzará al estado <strong>VALIDADO</strong> y estará listo para su revisión en la pestaña <em>"Por verificar"</em>.
+                    </p>
+                  }
+                </div>
+              </div>
+              <div class="border-t border-border bg-muted/20 p-4 flex justify-end">
+                <button type="button" class="rounded-xl bg-slate-800 hover:bg-slate-900 px-4 py-2 text-xs font-black text-white cursor-pointer" (click)="cerrarDetalleSinBanco()">
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      }
     </div>
   `
 })
@@ -361,6 +589,9 @@ export class VerificarExamenesComponent implements OnDestroy {
   private pdfObjectUrl: string | null = null;
   private solicitudCarreras = 0;
   public readonly examenes = signal<VerificacionExamenLista[]>([]);
+  public readonly examenesSinBanco = signal<VerificacionExamenLista[]>([]);
+  public readonly cargandoSinBanco = signal(false);
+  public readonly detalleSinBanco = signal<VerificacionExamenLista | null>(null);
   public readonly detalle = signal<VerificacionExamenDetalle | null>(null);
   public readonly cargando = signal(false);
   public readonly guardando = signal(false);
@@ -373,7 +604,7 @@ export class VerificarExamenesComponent implements OnDestroy {
   public filtrosCompartidos: VerificacionExamenFiltros = {};
   public mostrarTodasPreguntas = false;
   public observacionGeneral = ''; public observacionesPreguntas: Record<number, string> = {};
-  public vistaActual: 'revision' | 'aprobados' = 'revision';
+  public vistaActual: 'revision' | 'aprobados' | 'sin_banco' = 'revision';
   public aprobadosInicializados = false;
 
   constructor() {
@@ -400,23 +631,127 @@ export class VerificarExamenesComponent implements OnDestroy {
       modalidad: this.modalidad || undefined
     };
     this.filtrosCompartidos = filtros;
+
+    // Mantener sincronizado el listado y conteo de exámenes sin banco
+    this.cargarSinBanco(filtros);
+
     if (this.vistaActual === 'aprobados') {
       this.error.set(null);
       return;
     }
+    if (this.vistaActual === 'sin_banco') {
+      this.error.set(null);
+      return;
+    }
     this.cargando.set(true); this.error.set(null);
-    this.service.listar({ ...filtros, estado: this.estado || undefined }).subscribe({ next: datos => { this.examenes.set(datos); this.cargando.set(false); }, error: e => { this.cargando.set(false); this.error.set(this.mensajeError(e, 'No se pudo cargar la lista de exámenes.')); } });
+    this.service.listar({ ...filtros, estado: this.estado || undefined }).subscribe({
+      next: datos => { this.examenes.set(datos); this.cargando.set(false); },
+      error: e => { this.cargando.set(false); this.error.set(this.mensajeError(e, 'No se pudo cargar la lista de exámenes.')); }
+    });
   }
-  public cambiarVista(vista: 'revision' | 'aprobados'): void {
+
+  public cargarSinBanco(filtros: VerificacionExamenFiltros = this.filtrosCompartidos): void {
+    this.cargandoSinBanco.set(true);
+    this.service.listarSinBanco(filtros).subscribe({
+      next: datos => {
+        this.examenesSinBanco.set(datos);
+        this.cargandoSinBanco.set(false);
+      },
+      error: e => {
+        this.cargandoSinBanco.set(false);
+        if (this.vistaActual === 'sin_banco') {
+          this.error.set(this.mensajeError(e, 'No se pudieron cargar los exámenes programados sin banco.'));
+        }
+      }
+    });
+  }
+
+  public cambiarVista(vista: 'revision' | 'aprobados' | 'sin_banco'): void {
     if (this.vistaActual === vista) return;
     this.vistaActual = vista;
     this.error.set(null);
-    if (vista === 'aprobados') this.aprobadosInicializados = true;
-    else this.cargar();
+    if (vista === 'aprobados') {
+      this.aprobadosInicializados = true;
+    } else if (vista === 'sin_banco') {
+      this.cargarSinBanco();
+    } else {
+      this.cargar();
+    }
   }
+
   public actualizarVista(): void {
-    if (this.vistaActual === 'aprobados') this.panelAprobados?.cargar(this.filtrosCompartidos);
-    else this.cargar();
+    if (this.vistaActual === 'aprobados') {
+      this.panelAprobados?.cargar(this.filtrosCompartidos);
+    } else if (this.vistaActual === 'sin_banco') {
+      this.cargarSinBanco();
+    } else {
+      this.cargar();
+    }
+  }
+
+  public totalExamenesHoySinBanco(): number {
+    return this.examenesSinBanco().filter(e => this.esHoy(e.fechaExamen)).length;
+  }
+
+  public esHoy(fechaStr?: string): boolean {
+    if (!fechaStr) return false;
+    const hoyStr = this._fechaIsoLocal(new Date());
+    return fechaStr === hoyStr || fechaStr.startsWith(hoyStr);
+  }
+
+  public diasRestantes(fechaStr?: string): number {
+    if (!fechaStr) return 0;
+    const fecha = new Date(fechaStr + 'T00:00:00');
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const diffTime = fecha.getTime() - hoy.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  public esRangoHoy(): boolean {
+    const hoy = this._fechaIsoLocal(new Date());
+    return this.fechaDesde === hoy && this.fechaHasta === hoy;
+  }
+
+  public esRangoSemana(): boolean {
+    const hoy = this._fechaIsoLocal(new Date());
+    const hasta = new Date();
+    hasta.setDate(hasta.getDate() + 7);
+    return this.fechaDesde === hoy && this.fechaHasta === this._fechaIsoLocal(hasta);
+  }
+
+  public esRangoTodos(): boolean {
+    return !this.fechaDesde && !this.fechaHasta;
+  }
+
+  public establecerRangoHoy(): void {
+    const hoy = this._fechaIsoLocal(new Date());
+    this.fechaDesde = hoy;
+    this.fechaHasta = hoy;
+    this.cargar();
+  }
+
+  public establecerRangoSemana(): void {
+    const hoy = new Date();
+    const hasta = new Date(hoy);
+    hasta.setDate(hasta.getDate() + 7);
+    this.fechaDesde = this._fechaIsoLocal(hoy);
+    this.fechaHasta = this._fechaIsoLocal(hasta);
+    this.cargar();
+  }
+
+  public establecerRangoTodos(): void {
+    this.fechaDesde = '';
+    this.fechaHasta = '';
+    this.cargar();
+  }
+
+  public abrirDetalleSinBanco(examen: VerificacionExamenLista): void {
+    this.detalleSinBanco.set(examen);
+  }
+
+  public cerrarDetalleSinBanco(): void {
+    this.detalleSinBanco.set(null);
   }
   public cambiarSede(codigo: string): void {
     this.sedeCodigo = codigo || ''; this.carreraCodigo = ''; this.carreras = [];
@@ -574,7 +909,11 @@ export class VerificarExamenesComponent implements OnDestroy {
   private cargarPdf(resultado: any): void { this.procesando.set(false); const path = resultado?.variantes?.[0]?.archivoPdfPath; if (!path) { this.error.set('La previsualización terminó sin devolver un PDF.'); return; } this.generacion.descargarArchivo(path).subscribe({ next: blob => { this.cerrarPdf(); this.pdfObjectUrl = URL.createObjectURL(blob); this.pdfUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfObjectUrl)); }, error: e => this.error.set(this.mensajeError(e, 'No se pudo abrir el PDF.')) }); }
   public cerrarPdf(): void { if (this.pdfObjectUrl) URL.revokeObjectURL(this.pdfObjectUrl); this.pdfObjectUrl = null; this.pdfUrl.set(null); }
   public decidir(decision: 'APROBAR' | 'DEVOLVER'): void { const detalle = this.detalle(); if (!detalle) return; this.guardando.set(true); this.service.decidir(detalle.rolExamenId, { decision, observacionesGenerales: this.observacionGeneral, observacionesPreguntas: Object.fromEntries(Object.entries(this.observacionesPreguntas).filter(([, value]) => value?.trim())) }).subscribe({ next: actualizado => { this.detalle.set(actualizado); this.guardando.set(false); this.cargar(); if (decision === 'APROBAR') this.detalle.set(null); }, error: e => { this.guardando.set(false); this.error.set(this.mensajeError(e, decision === 'DEVOLVER' ? 'Para devolver debes registrar observaciones.' : 'No se pudo aprobar el examen.')); } }); }
-  public etiquetaModalidad(valor: string): string { return valor === 'VIRTUAL' ? 'Virtual' : 'Con cartilla'; }
+  public etiquetaModalidad(valor: string): string {
+    if (valor === 'PRESENCIAL_SIN_CARTILLA') return 'Sin Cartilla';
+    if (valor === 'VIRTUAL') return 'Virtual';
+    return 'Con cartilla';
+  }
   private mensajeError(error: any, fallback: string): string { return error?.error?.mensaje || error?.error?.message || fallback; }
   public ngOnDestroy(): void { this.cerrarPdf(); }
 }

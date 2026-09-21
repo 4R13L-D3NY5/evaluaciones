@@ -39,6 +39,20 @@ public class VerificacionExamenController {
                 estado, fechaDesde, fechaHasta, authentication));
     }
 
+    @GetMapping("/sin-banco")
+    public ResponseEntity<List<VerificacionExamenListaDto>> listarSinBanco(
+            @RequestParam(defaultValue = "FECHA_EXAMEN_ASC") String orden,
+            @RequestParam(required = false) String sedeCodigo,
+            @RequestParam(required = false) String carreraCodigo,
+            @RequestParam(required = false) String tipoParcial,
+            @RequestParam(required = false) String modalidad,
+            @RequestParam(required = false) LocalDate fechaDesde,
+            @RequestParam(required = false) LocalDate fechaHasta,
+            Authentication authentication) {
+        return ResponseEntity.ok(service.listarSinBanco(orden, sedeCodigo, carreraCodigo, tipoParcial, modalidad,
+                fechaDesde, fechaHasta, authentication));
+    }
+
     @GetMapping("/{rolExamenId}")
     public ResponseEntity<VerificacionExamenDetalleDto> obtener(
             @PathVariable String rolExamenId, Authentication authentication) {

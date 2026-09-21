@@ -21,6 +21,8 @@ public class VerificacionExamenListaDto {
     private String modalidad;
     private LocalDate fechaExamen;
     private String horario;
+    private String aula;
+    private String campus;
     private LocalDateTime fechaSubida;
     private String docenteNombre;
     private String estadoVerificacion;

@@ -185,6 +185,12 @@ def create_snapshot(backup_id):
         env = os.environ.copy()
         env["PGPASSWORD"] = DB_PASSWORD
         run(["pg_dump", "--format=custom", "--no-owner", "--no-privileges", "--file", str(dump_path), "--host", DB_HOST, "--port", str(DB_PORT), "--username", DB_USER, DB_NAME], env=env)
+        
+        # Conservar copia exportable del dump en storage/dumps para descarga directa administrativa
+        dumps_dir = STORAGE / "dumps"
+        dumps_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(dump_path, dumps_dir / f"{backup_id}.dump")
+        
         ensure_repository(LOCAL_REPO)
         result = run([RESTIC, "backup", str(staging), str(STORAGE), "--tag", f"backup:{backup_id}", "--json"], env=restic_env(LOCAL_REPO))
         snapshot_id = snapshot_id_from_output(result.stdout)
@@ -292,6 +298,50 @@ def restore_backup(backup_id):
             MAINTENANCE_MARKER.unlink(missing_ok=True)
 
 
+def extract_dump(backup_id):
+    dumps_dir = STORAGE / "dumps"
+    dumps_dir.mkdir(parents=True, exist_ok=True)
+    target = dumps_dir / f"{backup_id}.dump"
+    if target.exists() and target.stat().st_size > 0:
+        return str(target)
+    with db_connection() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT snapshot_local_id, snapshot_externo_id FROM sea_respaldos WHERE id = %s", (backup_id,))
+        row = cursor.fetchone()
+    if not row:
+        raise ValueError(f"Respaldo {backup_id} no encontrado")
+    snap_local, snap_ext = row
+    repo = LOCAL_REPO if snap_local else EXTERNAL_REPO
+    snap_id = snap_local or snap_ext
+    if not snap_id:
+        raise ValueError(f"Respaldo {backup_id} no tiene snapshot registrado")
+    temp_extract = BACKUPS / "staging" / f"extract_{backup_id}"
+    temp_extract.mkdir(parents=True, exist_ok=True)
+    try:
+        run([RESTIC, "restore", snap_id, "--target", str(temp_extract), "--include", "*/sea_evaluaciones.dump"], env=restic_env(repo))
+        found = list(temp_extract.rglob("sea_evaluaciones.dump"))
+        if not found:
+            raise RuntimeError("No se encontró sea_evaluaciones.dump en el snapshot")
+        shutil.copy2(found[0], target)
+        logger.info("Dump de base de datos extraído para %s en %s", backup_id, target)
+        return str(target)
+    finally:
+        shutil.rmtree(temp_extract, ignore_errors=True)
+
+
+def ensure_existing_dumps():
+    try:
+        with db_connection() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM sea_respaldos WHERE estado IN ('GENERADO', 'COPIADO', 'VERIFICANDO', 'VERIFICADO')")
+            rows = cursor.fetchall()
+        for (bid,) in rows:
+            dump_file = STORAGE / "dumps" / f"{bid}.dump"
+            if not dump_file.exists() or dump_file.stat().st_size == 0:
+                logger.info("Asegurando dump local exportable para respaldo %s...", bid)
+                extract_dump(bid)
+    except Exception as exc:
+        logger.warning("No se pudieron verificar los dumps existentes al iniciar: %s", exc)
+
+
 def handle(payload):
     backup_id = payload.get("backupId")
     operation = payload.get("operacion")
@@ -302,10 +352,12 @@ def handle(payload):
     if operation == "VERIFY": return verify_external(backup_id)
     if operation == "DELETE_LOCAL": return delete_local(backup_id)
     if operation == "RESTORE": return restore_backup(backup_id)
+    if operation == "EXTRACT_DUMP": return extract_dump(backup_id)
     raise ValueError(f"Operación de respaldo no reconocida: {operation}")
 
 
 def consume():
+    ensure_existing_dumps()
     credentials = pika.PlainCredentials(os.getenv("RABBITMQ_USER", "guest"), os.getenv("RABBITMQ_PASSWORD", "guest"))
     params = pika.ConnectionParameters(host=os.getenv("RABBITMQ_HOST", "rabbitmq"), port=int(os.getenv("RABBITMQ_PORT", "5672")), credentials=credentials, heartbeat=600)
     connection = pika.BlockingConnection(params)
