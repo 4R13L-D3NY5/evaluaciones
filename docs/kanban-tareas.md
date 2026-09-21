@@ -123,7 +123,7 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Fecha límite: 2026-09-20
 - Dependencias: `banco-preguntas.component.ts`, `BancoPreguntasService.java`.
 - Criterio de cierre: 1) Normalizar respuestas V/F simple reconociendo A, B, V, F, Verdadero, Falso y eliminando la asignación silenciosa a 'A'; 2) Exigir respuesta obligatoria si la celda está vacía en preguntas no macro; 3) Sincronizar catálogo de tipologías (EMPAREJAMIENTO -> OPCION_EMPAREJAMIENTO, PROBLEMA -> SUBITEM_CASO); 4) Validar sintaxis Typst de fórmulas inmediatamente al cargar el archivo con mensajes claros en texto rojo; 5) Validar opciones de preguntas hijas de emparejamiento contra las opciones definidas en la madre; 6) Exponer errores reales de compilación Typst si fallara la previsualización.
-- Notas: En progreso. Implementando homogenización de validaciones en banco-preguntas.component.ts. Homogenizacion integral de validaciones de banco de preguntas completada y compilada con exito.
+- Notas: En progreso. Implementando homogenización de validaciones en banco-preguntas.component.ts. Homogenizacion integral de validaciones de banco de preguntas completada y compilada con exito. Reflejar estado de verificacion devuelto/pendiente en tarjetas de rol y banco
 
 #### T-025 — Notificación para docente de exámenes sin cartilla con notas pendientes de registro
 
