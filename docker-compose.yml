@@ -11,7 +11,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${BIND_INTERNAL:-0.0.0.0}:${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./evaluaciones-backend/src/main/resources/db/migration/V1__init_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
@@ -34,8 +34,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "15672:15672"
+      - "${BIND_INTERNAL:-0.0.0.0}:${RABBITMQ_PORT:-5672}:5672"
+      - "${BIND_INTERNAL:-0.0.0.0}:${RABBITMQ_MGMT_PORT:-15672}:15672"
     networks:
       - eval-network
     healthcheck:
@@ -134,11 +134,12 @@ services:
       KMS_MIGRATION_ENABLED: ${KMS_MIGRATION_ENABLED:-false}
       KMS_ROTATION_ENABLED: ${KMS_ROTATION_ENABLED:-false}
       STORAGE_BASE_PATH: /app/storage
+      LOGGING_LEVEL_COM_XPERTIFLOW_EVALUACIONES: ${LOG_LEVEL_APP:-DEBUG}
       BACKUP_EXTERNAL_PATH: /app/backups-external
       BACKUP_LOCAL_REPOSITORY: /app/backups/repository
       BACKUP_EXTERNAL_REPOSITORY: /app/backups-external/repository
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "${BIND_INTERNAL:-0.0.0.0}:${SERVER_PORT:-8080}:8080"
     volumes:
       - ./storage:/app/storage
       - ./evaluaciones-frontend/src/assets/logo_unitepc_clean.png:/app/assets/logo_unitepc_clean.png:ro
@@ -164,7 +165,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PORT:-4200}:80"
+      - "${BIND_PUBLIC:-0.0.0.0}:${FRONTEND_PORT:-4200}:80"
     networks:
       - eval-network
 
@@ -191,7 +192,6 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
-      RABBITMQ_PASS: ${RABBITMQ_PASSWORD:-guest}
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-sea_evaluaciones}
@@ -233,7 +233,6 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
-      RABBITMQ_PASS: ${RABBITMQ_PASSWORD:-guest}
       RABBITMQ_QUEUE_IN: evaluaciones.omr.procesar
       RABBITMQ_QUEUE_OUT: evaluaciones.omr.resultado
       DB_HOST: db
