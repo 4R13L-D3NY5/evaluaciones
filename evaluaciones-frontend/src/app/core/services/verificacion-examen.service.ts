@@ -6,7 +6,7 @@ import { GeneracionTypstResultado } from '../models/generacion-typst.model';
 
 export interface VerificacionExamenLista {
   rolExamenId: string;
-  bancoPreguntasId: string;
+  bancoPreguntasId?: string | null;
   sedeCodigo: string;
   sedeNombre: string;
   carreraCodigo: string;
@@ -15,13 +15,15 @@ export interface VerificacionExamenLista {
   materiaNombre: string;
   grupo: string;
   tipoParcial: string;
-  version: string;
+  version: string | number;
   modalidad: string;
   fechaExamen: string;
   horario: string;
-  fechaSubida: string;
+  aula?: string;
+  campus?: string;
+  fechaSubida?: string | null;
   docenteNombre: string;
-  estadoVerificacion: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | string;
+  estadoVerificacion: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | 'SIN_BANCO' | 'SIN_DOCUMENTO' | string;
   observacionesGenerales?: string;
   verificadoPor?: string;
   fechaVerificacion?: string;
@@ -96,6 +98,14 @@ export class VerificacionExamenService {
       if (key !== 'orden' && value) params = params.set(key, value);
     });
     return this.http.get<VerificacionExamenLista[]>(this.baseUrl, { params }).pipe(catchError(this.error));
+  }
+
+  listarSinBanco(filtros: VerificacionExamenFiltros = {}): Observable<VerificacionExamenLista[]> {
+    let params = new HttpParams().set('orden', filtros['orden'] || 'FECHA_EXAMEN_ASC');
+    Object.entries(filtros).forEach(([key, value]) => {
+      if (key !== 'orden' && value) params = params.set(key, value);
+    });
+    return this.http.get<VerificacionExamenLista[]>(`${this.baseUrl}/sin-banco`, { params }).pipe(catchError(this.error));
   }
 
   obtener(rolExamenId: string): Observable<VerificacionExamenDetalle> {

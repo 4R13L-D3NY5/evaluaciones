@@ -23,6 +23,7 @@ import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaVerificacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
+import com.xpertiflow.evaluaciones.domain.repository.DocumentoExamenSinCartillaRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ReactivoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
@@ -72,6 +73,7 @@ public class VerificacionExamenService {
     private final ObjectMapper objectMapper;
     private final AccesoAcademicoService accesoAcademicoService;
     private final VerificacionPoliticaService politicaService;
+    private final DocumentoExamenSinCartillaRepository documentoSinCartillaRepository;
     private final com.xpertiflow.evaluaciones.application.generacion.GeneracionTypstService generacionTypstService;
 
     @Transactional
@@ -85,6 +87,10 @@ public class VerificacionExamenService {
         String estadoNorm = estado == null ? "" : estado.trim().toUpperCase(Locale.ROOT);
         if ("VERIFICADO".equals(estadoNorm) || "APROBADO".equals(estadoNorm)) {
             return listarAprobados(orden, sedeCodigo, carreraCodigo, tipoParcial, modalidad,
+                    fechaDesde, fechaHasta, authentication);
+        }
+        if ("SIN_BANCO".equals(estadoNorm) || "PROGRAMADO".equals(estadoNorm)) {
+            return listarSinBanco(orden, sedeCodigo, carreraCodigo, tipoParcial, modalidad,
                     fechaDesde, fechaHasta, authentication);
         }
         List<VerificacionExamenListaDto> resultado = new ArrayList<>();
@@ -152,6 +158,60 @@ public class VerificacionExamenService {
                     || !rol.getId().equals(banco.getRolExamenId())
                     || !"VALIDADO".equalsIgnoreCase(banco.getEstado())) continue;
             resultado.add(mapearLista(rol, banco, verificacion));
+        }
+        Comparator<VerificacionExamenListaDto> comparador;
+        if ("FECHA_SUBIDA_ASC".equalsIgnoreCase(orden)) {
+            comparador = Comparator.comparing(VerificacionExamenListaDto::getFechaSubida,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+        } else if ("FECHA_SUBIDA_DESC".equalsIgnoreCase(orden)) {
+            comparador = Comparator.comparing(VerificacionExamenListaDto::getFechaSubida,
+                    Comparator.nullsLast(Comparator.reverseOrder()));
+        } else if ("FECHA_EXAMEN_DESC".equalsIgnoreCase(orden)) {
+            comparador = Comparator.comparing(VerificacionExamenListaDto::getFechaExamen,
+                    Comparator.nullsLast(Comparator.reverseOrder()));
+        } else {
+            comparador = Comparator.comparing(VerificacionExamenListaDto::getFechaExamen,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+        }
+        return resultado.stream().sorted(comparador.thenComparing(VerificacionExamenListaDto::getHorario,
+                Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(VerificacionExamenListaDto::getMateriaCodigo,
+                Comparator.nullsLast(Comparator.naturalOrder()))).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<VerificacionExamenListaDto> listarSinBanco(String orden, String sedeCodigo, String carreraCodigo,
+                                                           String tipoParcial, String modalidad,
+                                                           LocalDate fechaDesde, LocalDate fechaHasta,
+                                                           Authentication authentication) {
+        if (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta)) {
+            throw new IllegalArgumentException("La fecha desde no puede ser posterior a la fecha hasta.");
+        }
+        List<VerificacionExamenListaDto> resultado = new ArrayList<>();
+        for (RolExamen rol : rolRepository.findByEstadoFlujo(EstadoFlujo.PROGRAMADO)) {
+            boolean esSinCartilla = rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA;
+            if (!esSinCartilla && !politicaService.aplica(rol)) {
+                continue;
+            }
+            if (!accesoAcademicoService.puedeAcceder(rol, authentication)) continue;
+            if (fechaDesde != null && rol.getFecha().isBefore(fechaDesde)) continue;
+            if (fechaHasta != null && rol.getFecha().isAfter(fechaHasta)) continue;
+            if (!coincideOpcional(rol.getSedeCodigo(), sedeCodigo)
+                    || !coincideOpcional(rol.getCarreraCodigo(), carreraCodigo)
+                    || !coincideOpcional(rol.getTipoParcial() == null ? null : rol.getTipoParcial().getValor(), tipoParcial)
+                    || !coincideOpcional(rol.getModalidad() == null ? null : rol.getModalidad().getValor(), modalidad)) continue;
+
+            if (esSinCartilla) {
+                boolean tieneDocumento = documentoSinCartillaRepository.findByRolExamenId(rol.getId()).isPresent();
+                if (tieneDocumento) {
+                    continue;
+                }
+            } else {
+                BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rol.getId()).orElse(null);
+                if (banco != null && ("VALIDADO".equalsIgnoreCase(banco.getEstado()) || "ENCRIPTADO".equalsIgnoreCase(banco.getEstado()))) {
+                    continue;
+                }
+            }
+            resultado.add(mapearListaSinBanco(rol));
         }
         Comparator<VerificacionExamenListaDto> comparador;
         if ("FECHA_SUBIDA_ASC".equalsIgnoreCase(orden)) {
@@ -420,12 +480,44 @@ public class VerificacionExamenService {
         dto.setGrupo(rol.getGrupo()); dto.setTipoParcial(rol.getTipoParcial().getValor());
         dto.setVersion(rol.getVersion()); dto.setModalidad(rol.getModalidad().getValor());
         dto.setFechaExamen(rol.getFecha()); dto.setHorario(rol.getHorario());
+        dto.setAula(rol.getAula()); dto.setCampus(rol.getCampus());
         dto.setFechaSubida(banco.getCreadoEn() == null ? banco.getFechaAprobacion() : banco.getCreadoEn());
         dto.setDocenteNombre(rol.getDocenteNombre());
         dto.setEstadoVerificacion("PENDIENTE".equalsIgnoreCase(verificacion.getEstado()) ? "VALIDADO" : verificacion.getEstado());
         dto.setObservacionesGenerales(verificacion.getObservacionesGenerales());
         dto.setVerificadoPor(verificacion.getVerificadoPor());
         dto.setFechaVerificacion(verificacion.getFechaVerificacion());
+        return dto;
+    }
+
+    private VerificacionExamenListaDto mapearListaSinBanco(RolExamen rol) {
+        VerificacionExamenListaDto dto = new VerificacionExamenListaDto();
+        dto.setRolExamenId(rol.getId());
+        dto.setBancoPreguntasId(null);
+        dto.setSedeCodigo(rol.getSedeCodigo());
+        dto.setSedeNombre(rol.getSedeNombre());
+        dto.setCarreraCodigo(rol.getCarreraCodigo());
+        dto.setCarreraNombre(rol.getCarreraNombre());
+        dto.setMateriaCodigo(rol.getMateriaCodigo());
+        dto.setMateriaNombre(rol.getMateriaNombre());
+        dto.setGrupo(rol.getGrupo());
+        dto.setTipoParcial(rol.getTipoParcial() == null ? null : rol.getTipoParcial().getValor());
+        dto.setVersion(rol.getVersion());
+        dto.setModalidad(rol.getModalidad() == null ? null : rol.getModalidad().getValor());
+        dto.setFechaExamen(rol.getFecha());
+        dto.setHorario(rol.getHorario());
+        dto.setAula(rol.getAula());
+        dto.setCampus(rol.getCampus());
+        dto.setFechaSubida(null);
+        dto.setDocenteNombre(rol.getDocenteNombre() != null && !rol.getDocenteNombre().isBlank()
+                ? rol.getDocenteNombre() : "Docente no asignado");
+        boolean esSinCartilla = rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA;
+        dto.setEstadoVerificacion(esSinCartilla ? "SIN_DOCUMENTO" : "SIN_BANCO");
+        dto.setObservacionesGenerales(esSinCartilla
+                ? "Examen presencial sin cartilla programado sin documento Word (.doc/.docx) cargado."
+                : "Examen programado sin banco de preguntas cargado.");
+        dto.setVerificadoPor(null);
+        dto.setFechaVerificacion(null);
         return dto;
     }
 

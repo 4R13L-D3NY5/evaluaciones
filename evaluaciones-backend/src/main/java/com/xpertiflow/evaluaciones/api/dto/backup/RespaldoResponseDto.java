@@ -19,5 +19,6 @@ public record RespaldoResponseDto(
         LocalDateTime externoCopiadoEn,
         LocalDateTime verificadoEn,
         LocalDateTime localEliminadoEn,
-        String errorMensaje) {
+        String errorMensaje,
+        Boolean dumpDisponible) {
 }

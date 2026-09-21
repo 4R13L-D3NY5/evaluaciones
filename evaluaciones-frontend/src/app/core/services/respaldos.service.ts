@@ -31,6 +31,7 @@ export interface Respaldo {
   verificadoEn?: string;
   localEliminadoEn?: string;
   errorMensaje?: string;
+  dumpDisponible?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -46,4 +47,5 @@ export class RespaldosService {
   verificar(id: string): Observable<Respaldo> { return this.http.post<Respaldo>(`${this.baseUrl}/${id}/verify`, {}); }
   eliminarLocal(id: string): Observable<Respaldo> { return this.http.delete<Respaldo>(`${this.baseUrl}/${id}/local`); }
   restaurar(id: string, confirmacion: string): Observable<Respaldo> { return this.http.post<Respaldo>(`${this.baseUrl}/${id}/restore`, { confirmacion }); }
+  descargarDump(id: string): Observable<Blob> { return this.http.get(`${this.baseUrl}/${id}/dump`, { responseType: 'blob' }); }
 }

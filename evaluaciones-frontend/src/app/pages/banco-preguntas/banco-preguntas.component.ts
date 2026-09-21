@@ -317,15 +317,23 @@ export interface DiaCalendario {
             </div>
 
             @if (rolExamenActivo(); as rol) {
-              <div [class]="rolPuedeCargarBanco() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950'">
+              <div [class]="esExamenDevuelto() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-950' : (esExamenPendienteVerificacion() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950' : (rolPuedeCargarBanco() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950'))">
                 <div class="flex items-center gap-2">
-                  <i [class]="rolPuedeCargarBanco() ? 'pi pi-database' : 'pi pi-lock'"></i>
+                  <i [class]="esExamenDevuelto() ? 'pi pi-exclamation-triangle text-rose-600' : (rolPuedeCargarBanco() ? 'pi pi-database' : 'pi pi-lock')"></i>
                   <span><strong>Rol de examen oficial:</strong> {{ rol.id }} · {{ rol.fechaDisplay }}</span>
                 </div>
                 <div>
                   @if (esExamenVerificado()) {
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-xs">
                       <i class="pi pi-check-circle"></i> Validado y Verificado
+                    </span>
+                  } @else if (esExamenDevuelto()) {
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-600 text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-xs">
+                      <i class="pi pi-exclamation-triangle"></i> Devuelto por verificación
+                    </span>
+                  } @else if (esExamenPendienteVerificacion()) {
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500 text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-xs">
+                      <i class="pi pi-clock"></i> Pendiente de verificación
                     </span>
                   } @else {
                     <span class="font-black uppercase">{{ rol.estadoFlujo }}</span>
@@ -338,9 +346,9 @@ export interface DiaCalendario {
                 </div>
               } @else {
                 @if (bancoPersistido(); as banco) {
-                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-950">
+                  <div [class]="esExamenDevuelto() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50/90 px-4 py-3 text-xs text-rose-950' : (esExamenPendienteVerificacion() ? 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-xs text-amber-950' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-950')">
                     <div class="flex items-start gap-2.5">
-                      <i [class]="esExamenVerificado() ? 'pi pi-check-circle mt-0.5 text-emerald-600 text-base' : 'pi pi-check-circle mt-0.5 text-emerald-700'"></i>
+                      <i [class]="esExamenVerificado() ? 'pi pi-check-circle mt-0.5 text-emerald-600 text-base' : (esExamenDevuelto() ? 'pi pi-exclamation-triangle mt-0.5 text-rose-600 text-base' : (esExamenPendienteVerificacion() ? 'pi pi-clock mt-0.5 text-amber-600 text-base' : 'pi pi-check-circle mt-0.5 text-emerald-700'))"></i>
                       <div>
                         <div class="flex items-center gap-2 flex-wrap">
                           <strong class="uppercase font-black">Banco de preguntas cargado</strong>
@@ -358,10 +366,14 @@ export interface DiaCalendario {
                             </span>
                           }
                         </div>
-                        <span class="text-[10px] text-emerald-900/80">
+                        <span class="text-[10px]" [class]="esExamenDevuelto() ? 'text-rose-900/90' : (esExamenPendienteVerificacion() ? 'text-amber-900/90' : 'text-emerald-900/80')">
                           {{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · 
                           @if (esExamenVerificado()) {
                             <strong class="text-emerald-800 font-bold">Validado y Verificado</strong>
+                          } @else if (esExamenDevuelto()) {
+                            <strong class="text-rose-700 font-bold">Devuelto con observaciones</strong>
+                          } @else if (esExamenPendienteVerificacion()) {
+                            <strong class="text-amber-700 font-bold">Pendiente de verificación</strong>
                           } @else {
                             <span>Validado</span>
                           }

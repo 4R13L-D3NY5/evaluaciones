@@ -34,7 +34,7 @@ public class ExamenSinCartillaController {
     private final ExamenSinCartillaService service;
 
     @GetMapping("/{rolExamenId}/documento")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE','VERIFICADOR') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     public ResponseEntity<DocumentoSinCartillaResponseDto> obtenerDocumento(@PathVariable String rolExamenId,
                                                                              Authentication authentication) {
         return ResponseEntity.ok(service.obtenerDocumento(rolExamenId, authentication));
@@ -51,7 +51,7 @@ public class ExamenSinCartillaController {
     }
 
     @GetMapping("/{rolExamenId}/documento/archivo")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE','VERIFICADOR') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     public ResponseEntity<Resource> descargarDocumento(@PathVariable String rolExamenId,
                                                         Authentication authentication) {
         var documento = service.obtenerDocumentoEntidad(rolExamenId, authentication);

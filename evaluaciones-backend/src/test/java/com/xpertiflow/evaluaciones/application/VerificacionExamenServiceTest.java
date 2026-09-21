@@ -9,6 +9,7 @@ import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.enums.TipoParcial;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaVerificacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
+import com.xpertiflow.evaluaciones.domain.repository.DocumentoExamenSinCartillaRepository;
 import com.xpertiflow.evaluaciones.domain.repository.HistorialVerificacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ReactivoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
@@ -44,6 +45,7 @@ class VerificacionExamenServiceTest {
     @Mock private BancoCifradoService cifradoService;
     @Mock private AccesoAcademicoService accesoAcademicoService;
     @Mock private VerificacionPoliticaService politicaService;
+    @Mock private DocumentoExamenSinCartillaRepository documentoSinCartillaRepository;
     @Mock private com.xpertiflow.evaluaciones.application.generacion.GeneracionTypstService generacionService;
     @Mock private Authentication authentication;
 
@@ -53,7 +55,8 @@ class VerificacionExamenServiceTest {
     void setUp() {
         service = new VerificacionExamenService(rolRepository, bancoRepository, reactivoRepository,
                 verificacionRepository, historialRepository, historialService, auditoriaRepository,
-                cifradoService, new ObjectMapper(), accesoAcademicoService, politicaService, generacionService);
+                cifradoService, new ObjectMapper(), accesoAcademicoService, politicaService,
+                documentoSinCartillaRepository, generacionService);
     }
 
     @Test
@@ -226,6 +229,53 @@ class VerificacionExamenServiceTest {
         assertThat(resultados).hasSize(1);
         assertThat(resultados.get(0).getRolExamenId()).isEqualTo("ROL-OK");
         assertThat(resultados.get(0).getEstadoVerificacion()).isEqualTo("VALIDADO");
+    }
+
+    @Test
+    void listarSinBancoRetornaExamenesProgramadosSinBancoValidado() {
+        RolExamen rolProgramado = rolAvanzado();
+        rolProgramado.setId("ROL-SIN-BANCO");
+        rolProgramado.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
+        rolProgramado.setFecha(LocalDate.of(2026, 9, 20));
+        rolProgramado.setAula("Aula 101");
+        rolProgramado.setCampus("Colonial");
+        when(rolRepository.findByEstadoFlujo(EstadoFlujo.PROGRAMADO)).thenReturn(List.of(rolProgramado));
+        when(politicaService.aplica(rolProgramado)).thenReturn(true);
+        when(accesoAcademicoService.puedeAcceder(rolProgramado, authentication)).thenReturn(true);
+        when(bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc("ROL-SIN-BANCO")).thenReturn(Optional.empty());
+
+        var resultados = service.listarSinBanco("FECHA_EXAMEN_ASC", null, null, null, null, null, null, authentication);
+
+        assertThat(resultados).hasSize(1);
+        assertThat(resultados.get(0).getRolExamenId()).isEqualTo("ROL-SIN-BANCO");
+        assertThat(resultados.get(0).getEstadoVerificacion()).isEqualTo("SIN_BANCO");
+        assertThat(resultados.get(0).getDocenteNombre()).isEqualTo(rolProgramado.getDocenteNombre());
+        assertThat(resultados.get(0).getAula()).isEqualTo("Aula 101");
+        assertThat(resultados.get(0).getCampus()).isEqualTo("Colonial");
+    }
+
+    @Test
+    void listarSinBancoIncluyeExamenSinCartillaProgramadoSinDocumento() {
+        RolExamen rolSinCartilla = rolAvanzado();
+        rolSinCartilla.setId("ROL-SIN-CARTILLA");
+        rolSinCartilla.setModalidad(ModalidadExamen.PRESENCIAL_SIN_CARTILLA);
+        rolSinCartilla.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
+        rolSinCartilla.setFecha(LocalDate.of(2026, 9, 20));
+        rolSinCartilla.setAula("Aula 202");
+        rolSinCartilla.setCampus("Sarmiento");
+        when(rolRepository.findByEstadoFlujo(EstadoFlujo.PROGRAMADO)).thenReturn(List.of(rolSinCartilla));
+        when(accesoAcademicoService.puedeAcceder(rolSinCartilla, authentication)).thenReturn(true);
+        when(documentoSinCartillaRepository.findByRolExamenId("ROL-SIN-CARTILLA")).thenReturn(Optional.empty());
+
+        var resultados = service.listarSinBanco("FECHA_EXAMEN_ASC", null, null, null, null, null, null, authentication);
+
+        assertThat(resultados).hasSize(1);
+        assertThat(resultados.get(0).getRolExamenId()).isEqualTo("ROL-SIN-CARTILLA");
+        assertThat(resultados.get(0).getEstadoVerificacion()).isEqualTo("SIN_DOCUMENTO");
+        assertThat(resultados.get(0).getModalidad()).isEqualTo("PRESENCIAL_SIN_CARTILLA");
+        assertThat(resultados.get(0).getObservacionesGenerales()).contains("sin documento Word");
+        assertThat(resultados.get(0).getAula()).isEqualTo("Aula 202");
+        assertThat(resultados.get(0).getCampus()).isEqualTo("Sarmiento");
     }
 
     private RolExamen rolAvanzado() {

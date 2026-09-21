@@ -8,6 +8,9 @@ import com.xpertiflow.evaluaciones.application.RespaldosService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -46,4 +49,12 @@ public class RespaldosController {
 
     @PostMapping("/{id}/restore")
     public ResponseEntity<RespaldoResponseDto> restaurar(@PathVariable String id, @Valid @RequestBody RestaurarRespaldoRequestDto request, org.springframework.security.core.Authentication auth, HttpServletRequest http) { return ResponseEntity.accepted().body(service.restaurar(id, request, auth.getName(), http.getRemoteAddr())); }
+
+    @GetMapping(value = "/{id}/dump", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public ResponseEntity<Resource> descargarDump(@PathVariable String id) {
+        Resource resource = service.descargarDump(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"sea_evaluaciones_" + id + ".dump\"")
+                .body(resource);
+    }
 }

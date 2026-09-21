@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.FileSystemResource;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -165,7 +167,21 @@ public class RespaldosService {
         auditoriaRepository.save(item);
     }
 
+    @Transactional(readOnly = true)
+    public Resource descargarDump(String id) {
+        Respaldo respaldo = obtener(id);
+        exigirEstado(respaldo, List.of("GENERADO", "COPIADO", "VERIFICANDO", "VERIFICADO"),
+                "Solo se puede descargar el dump de respaldos generados o verificados.");
+        Path dumpPath = Path.of(appProperties.getStorage().getBasePath(), "dumps", id + ".dump");
+        if (!Files.exists(dumpPath)) {
+            publicar(Map.of("operacion", "EXTRACT_DUMP", "backupId", id));
+            throw new IllegalStateException("El dump de base de datos se está preparando desde el snapshot seguro. Por favor intente la descarga en unos instantes.");
+        }
+        return new FileSystemResource(dumpPath);
+    }
+
     private RespaldoResponseDto toDto(Respaldo item) {
-        return new RespaldoResponseDto(item.getId(), item.getTipo(), item.getEstado(), item.getSnapshotLocalId(), item.getSnapshotExternoId(), item.getRutaLocal(), item.getRutaExterna(), item.getTamanoBytes(), item.getArchivosCount(), item.getSolicitadoPor(), item.getSolicitadoEn(), item.getIniciadoEn(), item.getFinalizadoEn(), item.getExternoCopiadoEn(), item.getVerificadoEn(), item.getLocalEliminadoEn(), item.getErrorMensaje());
+        boolean dumpExiste = Files.exists(Path.of(appProperties.getStorage().getBasePath(), "dumps", item.getId() + ".dump"));
+        return new RespaldoResponseDto(item.getId(), item.getTipo(), item.getEstado(), item.getSnapshotLocalId(), item.getSnapshotExternoId(), item.getRutaLocal(), item.getRutaExterna(), item.getTamanoBytes(), item.getArchivosCount(), item.getSolicitadoPor(), item.getSolicitadoEn(), item.getIniciadoEn(), item.getFinalizadoEn(), item.getExternoCopiadoEn(), item.getVerificadoEn(), item.getLocalEliminadoEn(), item.getErrorMensaje(), dumpExiste);
     }
 }
