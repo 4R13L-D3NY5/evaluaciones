@@ -566,7 +566,7 @@ export class AuditoriaComponent implements OnInit {
   public exportarExcel(): void {
     const lista = this.registrosFiltrados();
     if (lista.length === 0) {
-      void this.feedback.mostrar('No hay registros para exportar con los filtros actuales.', 'Atención', 'warn');
+      void this.feedback.mostrar('No hay registros para exportar con los filtros actuales.', 'Atención', 'warning');
       return;
     }
 
