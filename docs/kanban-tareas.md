@@ -90,6 +90,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-032 — Restaurar indicador visual de 'Sin banco' en Evaluaciones del Día
+
+- Prioridad: Media
+- Área: Evaluaciones del Día / Seguimiento Operativo
+- Responsable: Antigravity
+- Creada: 2026-09-22
+- Fecha límite: 2026-09-22
+- Dependencias: Ninguna.
+- Criterio de cierre: Restaurar la insignia visual `[ ! ] Sin banco` en la columna Materia / Grupo de Evaluaciones del Día cuando una evaluación con modalidad regular todavía no tiene banco de preguntas cargado.
+- Notas: En progreso técnico. Restaurada insignia Sin banco en Evaluaciones del Dia cuando una materia programada no tiene banco cargado.
+
 #### T-031 — Bloqueo estricto de eliminación y recarga de Banco de Preguntas en etapas posteriores a VALIDADO
 
 - Prioridad: Alta
@@ -387,7 +398,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 5 |
 | En progreso | 0 |
-| En revisión | 22 |
+| En revisión | 23 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 
