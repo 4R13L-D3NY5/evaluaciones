@@ -51,17 +51,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Criterio de cierre: Identificar la causa del error, corregir la configuración o el código correspondiente y validar que el PDF de escaneados pueda procesarse correctamente.
 - Notas: Revisar especialmente el error HTTP 413 (`Request Entity Too Large`) y la respuesta HTML que aparece como `Unexpected token '<'`.
 
-#### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
-
-- Prioridad: Media
-- Área: Auditoría y Bitácora
-- Responsable: Por definir
-- Creada: 2026-09-12
-- Fecha límite: Por definir
-- Dependencias: Revisar el estado actual del registro, consulta, filtros, detalle de eventos y permisos del módulo.
-- Criterio de cierre: Completar la implementación funcional y visual del módulo, validar que las acciones relevantes queden registradas y que la consulta respete los permisos establecidos.
-- Notas: Tarea creada desde el comando `=new`.
-
 #### T-010 — Optimizar el módulo de Reportes y priorizar los reportes de mayor aporte
 
 - Prioridad: Media
@@ -100,6 +89,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 *(Sin tareas activas)*
 
 ### En revisión
+
+#### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
+
+- Prioridad: Media
+- Área: Auditoría y Bitácora
+- Responsable: Por definir
+- Creada: 2026-09-12
+- Fecha límite: Por definir
+- Dependencias: Revisar el estado actual del registro, consulta, filtros, detalle de eventos y permisos del módulo.
+- Criterio de cierre: Completar la implementación funcional y visual del módulo, validar que las acciones relevantes queden registradas y que la consulta respete los permisos establecidos.
+- Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz
 
 #### T-028 — Seguimiento de verificación para exámenes sin cartilla (alerta de documento no cargado y visualización)
 
@@ -352,9 +352,9 @@ _Sin tareas._
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 6 |
+| Pendientes | 5 |
 | En progreso | 0 |
-| En revisión | 18 |
+| En revisión | 19 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 
