@@ -90,6 +90,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-031 — Bloqueo estricto de eliminación y recarga de Banco de Preguntas en etapas posteriores a VALIDADO
+
+- Prioridad: Alta
+- Área: Banco de Preguntas / Integridad del Examen
+- Responsable: Antigravity
+- Creada: 2026-09-22
+- Fecha límite: 2026-09-22
+- Dependencias: Ninguna.
+- Criterio de cierre: Bloquear completamente el botón de eliminar banco y la zona de arrastre/carga en el frontend cuando el rol de examen ha avanzado más allá de PROGRAMADO o VALIDADO, e inactivar alertas de observación previa desfasadas.
+- Notas: En progreso técnico para blindar la inmutabilidad operativa y criptográfica del banco. Implementado bloqueo estricto de eliminacion y recarga en banco-preguntas.component.ts para roles que superaron VALIDADO.
+
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
 - Prioridad: Media
@@ -376,7 +387,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 5 |
 | En progreso | 0 |
-| En revisión | 21 |
+| En revisión | 22 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 
