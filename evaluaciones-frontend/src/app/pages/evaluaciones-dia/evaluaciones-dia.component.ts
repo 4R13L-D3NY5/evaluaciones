@@ -419,24 +419,30 @@ interface CampusDisponible extends Campus {
                       <div class="text-[10px] text-muted-foreground font-medium">
                         {{ carreraSeleccionada()?.careerName || item.carreraNombre }} · Sem. {{ item.semestre }}° · <strong>{{ item.grupo }}</strong>
                       </div>
-                      @if (item.modalidad !== 'PRESENCIAL_SIN_CARTILLA' && bancoPreguntasCargado(item)) {
-                        @if (item.requiereVerificacion) {
-                          @if (item.estadoVerificacion === 'VERIFICADO') {
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Banco de preguntas verificado y aprobado">
-                              <i class="pi pi-check-circle text-[9px]"></i> Banco verificado
-                            </span>
-                          } @else if (item.estadoVerificacion === 'DEVUELTO') {
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-black uppercase text-rose-700" title="Banco de preguntas devuelto con observaciones por el verificador">
-                              <i class="pi pi-exclamation-triangle text-[9px]"></i> Banco observado
-                            </span>
+                      @if (item.modalidad !== 'PRESENCIAL_SIN_CARTILLA') {
+                        @if (bancoPreguntasCargado(item)) {
+                          @if (item.requiereVerificacion) {
+                            @if (item.estadoVerificacion === 'VERIFICADO') {
+                              <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Banco de preguntas verificado y aprobado">
+                                <i class="pi pi-check-circle text-[9px]"></i> Banco verificado
+                              </span>
+                            } @else if (item.estadoVerificacion === 'DEVUELTO') {
+                              <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-black uppercase text-rose-700" title="Banco de preguntas devuelto con observaciones por el verificador">
+                                <i class="pi pi-exclamation-triangle text-[9px]"></i> Banco observado
+                              </span>
+                            } @else {
+                              <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Banco validado, pendiente de revisión por el verificador">
+                                <i class="pi pi-clock text-[9px]"></i> Pendiente de verificación
+                              </span>
+                            }
                           } @else {
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Banco validado, pendiente de revisión por el verificador">
-                              <i class="pi pi-clock text-[9px]"></i> Pendiente de verificación
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
+                              <i class="pi pi-check-circle text-[9px]"></i> Banco cargado
                             </span>
                           }
                         } @else {
-                          <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
-                            <i class="pi pi-check-circle text-[9px]"></i> Banco cargado
+                          <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Este examen todavía no tiene un banco de preguntas cargado">
+                            <i class="pi pi-exclamation-circle text-[9px]"></i> Sin banco
                           </span>
                         }
                       }
