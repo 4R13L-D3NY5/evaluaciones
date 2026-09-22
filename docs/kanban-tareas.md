@@ -1,4 +1,4 @@
-﻿# Kanban de tareas del proyecto
+# Kanban de tareas del proyecto
 
 Tablero documental para dar seguimiento a las tareas pendientes de `evaluaciones`. Este archivo es la fuente de verdad del seguimiento operativo y puede actualizarse desde cualquier conversación que esté trabajando sobre este proyecto y esta rama.
 
@@ -100,6 +100,28 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Dependencias: Revisar el estado actual del registro, consulta, filtros, detalle de eventos y permisos del módulo.
 - Criterio de cierre: Completar la implementación funcional y visual del módulo, validar que las acciones relevantes queden registradas y que la consulta respete los permisos establecidos.
 - Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz
+
+#### T-030 — Optimización de rendimiento en Notificaciones: Endpoint ligero en backend, exclusión de administrador y sondeo eficiente
+
+- Prioridad: Alta
+- Área: Rendimiento / Notificaciones / Arquitectura
+- Responsable: Antigravity
+- Creada: 2026-09-21
+- Fecha límite: 2026-09-21
+- Dependencias: `NotificacionesController.java`, `notificaciones.service.ts`, `topbar.component.ts`.
+- Criterio de cierre: 1) Excluir al rol `ADMINISTRADOR_SISTEMA` de la campana y sondeos de notificación; 2) Crear endpoint liviano `GET /api/notificaciones/resumen` para DOCENTE y DIRECTOR que responda en <10ms sin invocar al Gateway de UNITEPC; 3) Ajustar sondeo inteligente en frontend con pausa en pestañas inactivas; 4) Aumentar la caché de grupos en backend a 10 min; 5) Verificar cero regresiones en módulos del sistema.
+- Notas: En progreso. Implementando la solución integral para erradicar la lentitud causada por el sondeo pesado de la campana de notificaciones. Implementacion tecnica concluida con exito: endpoint ligero GET /api/notificaciones/resumen (<10ms), exclusion total de administrador (campana oculta y cero sondeos), sondeo inteligente en frontend cada 3min pausado en pestanas inactivas y cache de grupos SEA ampliada a 10min.
+
+#### T-029 — Restaurar filtro de estado y visualización de correcciones del banco en módulo Verificadores
+
+- Prioridad: Alta
+- Área: Verificación de Exámenes / Interfaz y Filtros
+- Responsable: Antigravity
+- Creada: 2026-09-21
+- Fecha límite: 2026-09-21
+- Dependencias: `verificar-examenes.component.ts`, `VerificacionExamenService.java`, `VerificacionExamenController.java`.
+- Criterio de cierre: 1) Restaurar el selector interactivo de estados en la barra de herramientas del módulo de verificación permitiendo filtrar por "Validados (por verificar)", "Observados / Devueltos" y "Todos"; 2) Asegurar que el backend y frontend permitan listar y consultar los exámenes con banco observado/devuelto para los verificadores; 3) Restaurar y verificar la visibilidad del apartado/historial de correcciones en el modal de verificación cuando el docente entrega el banco de preguntas corregido tras una devolución.
+- Notas: En progreso. Investigando y restaurando el filtro de estados y el panel de correcciones/devoluciones del docente en el módulo de verificación. Filtro de estados restaurado y panel de historial de correcciones habilitado
 
 #### T-028 — Seguimiento de verificación para exámenes sin cartilla (alerta de documento no cargado y visualización)
 
@@ -354,7 +376,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 5 |
 | En progreso | 0 |
-| En revisión | 19 |
+| En revisión | 21 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

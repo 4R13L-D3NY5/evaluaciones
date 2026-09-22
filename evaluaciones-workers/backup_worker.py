@@ -57,7 +57,8 @@ def audit(backup_id, action, detail=None):
 def run(command, env=None, check=True):
     result = subprocess.run(command, env=env, text=True, capture_output=True, check=False)
     if check and result.returncode != 0:
-        raise RuntimeError(f"{Path(command[0]).name} terminó con código {result.returncode}")
+        detail = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"{Path(command[0]).name} terminó con código {result.returncode}: {detail[:500]}")
     return result
 
 
@@ -207,14 +208,15 @@ def create_snapshot(backup_id):
 
 
 def copy_external(backup_id):
-    update_backup(backup_id, estado="COPIANDO")
+    update_backup(backup_id, estado="COPIANDO", error_mensaje=None)
     try:
         ensure_repository(LOCAL_REPO)
         ensure_repository(EXTERNAL_REPO, LOCAL_REPO)
         run([RESTIC, "copy", "--from-repo", LOCAL_REPO, "--repo", EXTERNAL_REPO, "--tag", f"backup:{backup_id}"], env=restic_env(EXTERNAL_REPO))
         snapshot_id = snapshots_for(EXTERNAL_REPO, backup_id)
+        local_id = snapshots_for(LOCAL_REPO, backup_id)
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        update_backup(backup_id, estado="COPIADO", snapshot_externo_id=snapshot_id, ruta_externa=EXTERNAL_REPO, externo_copiado_en=now)
+        update_backup(backup_id, estado="COPIADO", snapshot_local_id=local_id, snapshot_externo_id=snapshot_id, ruta_externa=EXTERNAL_REPO, externo_copiado_en=now, error_mensaje=None)
         audit(backup_id, "COPIA_EXTERNA_COMPLETADA", {"snapshot": snapshot_id})
     except Exception as exc:
         update_backup(backup_id, estado="ERROR", error_mensaje=str(exc)[:2000])
@@ -223,12 +225,13 @@ def copy_external(backup_id):
 
 
 def verify_external(backup_id):
-    update_backup(backup_id, estado="VERIFICANDO")
+    update_backup(backup_id, estado="VERIFICANDO", error_mensaje=None)
     try:
         run([RESTIC, "check"], env=restic_env(EXTERNAL_REPO))
         snapshot_id = snapshots_for(EXTERNAL_REPO, backup_id)
+        local_id = snapshots_for(LOCAL_REPO, backup_id)
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        update_backup(backup_id, estado="VERIFICADO", snapshot_externo_id=snapshot_id, verificado_en=now)
+        update_backup(backup_id, estado="VERIFICADO", snapshot_local_id=local_id, snapshot_externo_id=snapshot_id, verificado_en=now, error_mensaje=None)
         audit(backup_id, "COPIA_EXTERNA_VERIFICADA", {"snapshot": snapshot_id})
     except Exception as exc:
         update_backup(backup_id, estado="ERROR", error_mensaje=str(exc)[:2000])
@@ -254,25 +257,139 @@ def delete_local(backup_id):
         raise
 
 
+def snapshot_backup_metadata():
+    try:
+        with db_connection() as connection, connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, tipo, estado, snapshot_local_id, snapshot_externo_id,
+                       ruta_local, ruta_externa, tamano_bytes, archivos_count,
+                       solicitado_por, solicitado_en, iniciado_en, finalizado_en,
+                       externo_copiado_en, verificado_en, local_eliminado_en,
+                       error_mensaje, metadata_json
+                FROM sea_respaldos
+            """)
+            return cursor.fetchall()
+    except Exception as exc:
+        logger.warning("No se pudo capturar metadata de sea_respaldos: %s", exc)
+        return []
+
+
+def restore_backup_metadata(respaldos, active_backup_id):
+    if not respaldos:
+        return
+    try:
+        with db_connection() as connection, connection.cursor() as cursor:
+            for r in respaldos:
+                snap_loc = r[3] or snapshots_for(LOCAL_REPO, r[0])
+                snap_ext = r[4] or snapshots_for(EXTERNAL_REPO, r[0])
+                estado = "VERIFICADO" if r[0] == active_backup_id else r[2]
+                err = None if r[0] == active_backup_id else r[16]
+                verif_en = datetime.now(timezone.utc).replace(tzinfo=None) if r[0] == active_backup_id else r[14]
+                meta = json.dumps(r[17]) if isinstance(r[17], dict) else (r[17] if r[17] else "{}")
+                cursor.execute("""
+                    INSERT INTO sea_respaldos (
+                        id, tipo, estado, snapshot_local_id, snapshot_externo_id,
+                        ruta_local, ruta_externa, tamano_bytes, archivos_count,
+                        solicitado_por, solicitado_en, iniciado_en, finalizado_en,
+                        externo_copiado_en, verificado_en, local_eliminado_en,
+                        error_mensaje, metadata_json, actualizado_en
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, NOW()
+                    )
+                    ON CONFLICT (id) DO UPDATE SET
+                        estado = EXCLUDED.estado,
+                        snapshot_local_id = COALESCE(EXCLUDED.snapshot_local_id, sea_respaldos.snapshot_local_id),
+                        snapshot_externo_id = COALESCE(EXCLUDED.snapshot_externo_id, sea_respaldos.snapshot_externo_id),
+                        ruta_local = COALESCE(EXCLUDED.ruta_local, sea_respaldos.ruta_local),
+                        ruta_externa = COALESCE(EXCLUDED.ruta_externa, sea_respaldos.ruta_externa),
+                        tamano_bytes = COALESCE(EXCLUDED.tamano_bytes, sea_respaldos.tamano_bytes),
+                        archivos_count = COALESCE(EXCLUDED.archivos_count, sea_respaldos.archivos_count),
+                        externo_copiado_en = COALESCE(EXCLUDED.externo_copiado_en, sea_respaldos.externo_copiado_en),
+                        verificado_en = COALESCE(EXCLUDED.verificado_en, sea_respaldos.verificado_en),
+                        local_eliminado_en = COALESCE(EXCLUDED.local_eliminado_en, sea_respaldos.local_eliminado_en),
+                        error_mensaje = EXCLUDED.error_mensaje,
+                        actualizado_en = NOW()
+                """, (
+                    r[0], r[1], estado, snap_loc, snap_ext,
+                    r[5] or LOCAL_REPO, r[6] or EXTERNAL_REPO,
+                    r[7], r[8], r[9], r[10], r[11], r[12], r[13], verif_en, r[15], err, meta
+                ))
+    except Exception as exc:
+        logger.error("Error al preservar metadata de sea_respaldos tras restore: %s", exc)
+
+
+def reconcile_snapshots_on_startup():
+    try:
+        with db_connection() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT id, snapshot_local_id, snapshot_externo_id, estado FROM sea_respaldos")
+            rows = cursor.fetchall()
+            for backup_id, snap_loc, snap_ext, estado in rows:
+                loc = snap_loc or snapshots_for(LOCAL_REPO, backup_id)
+                ext = snap_ext or snapshots_for(EXTERNAL_REPO, backup_id)
+                fields = {}
+                if loc and loc != snap_loc:
+                    fields["snapshot_local_id"] = loc
+                    fields["ruta_local"] = LOCAL_REPO
+                if ext and ext != snap_ext:
+                    fields["snapshot_externo_id"] = ext
+                    fields["ruta_externa"] = EXTERNAL_REPO
+                if ext and estado in ("ERROR", "GENERADO", "COPIANDO", "COPIADO"):
+                    fields["estado"] = "VERIFICADO"
+                    fields["error_mensaje"] = None
+                elif loc and estado in ("ERROR", "SOLICITADO", "EN_PROCESO"):
+                    fields["estado"] = "GENERADO"
+                    fields["error_mensaje"] = None
+                if fields:
+                    update_backup(backup_id, **fields)
+        logger.info("Reconciliación de respaldos con Restic completada.")
+    except Exception as exc:
+        logger.warning("No se pudo completar la reconciliación inicial con Restic: %s", exc)
+
+
 def restore_backup(backup_id):
     restore_root = BACKUPS / "restore" / backup_id
     restore_root.mkdir(parents=True, exist_ok=True)
     completed = False
     MAINTENANCE_MARKER.write_text("restauracion-en-progreso\n", encoding="utf-8")
     try:
-        with db_connection() as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT snapshot_externo_id FROM sea_respaldos WHERE id = %s AND estado = 'RESTAURANDO'", (backup_id,))
-            row = cursor.fetchone()
-        if not row or not row[0]:
+        # 1. Obtener snapshot desde DB o directamente desde Restic
+        snapshot_id = None
+        try:
+            with db_connection() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT snapshot_externo_id FROM sea_respaldos WHERE id = %s", (backup_id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    snapshot_id = row[0]
+        except Exception:
+            pass
+
+        if not snapshot_id:
+            snapshot_id = snapshots_for(EXTERNAL_REPO, backup_id) or snapshots_for(LOCAL_REPO, backup_id)
+
+        if not snapshot_id:
             raise RuntimeError("El respaldo no tiene un snapshot externo verificado")
-        run([RESTIC, "check"], env=restic_env(EXTERNAL_REPO))
-        run([RESTIC, "restore", row[0], "--target", str(restore_root)], env=restic_env(EXTERNAL_REPO))
+
+        # 2. Guardar metadata de respaldos para no perder historial al sobreescribir DB
+        saved_backups = snapshot_backup_metadata()
+
+        repo = EXTERNAL_REPO if snapshots_for(EXTERNAL_REPO, backup_id) else LOCAL_REPO
+        run([RESTIC, "check"], env=restic_env(repo))
+        run([RESTIC, "restore", snapshot_id, "--target", str(restore_root)], env=restic_env(repo))
         dump_files = list(restore_root.rglob("sea_evaluaciones.dump"))
         if not dump_files:
             raise RuntimeError("El snapshot no contiene el respaldo lógico de PostgreSQL")
         env = os.environ.copy()
         env["PGPASSWORD"] = DB_PASSWORD
-        run(["pg_restore", "--clean", "--if-exists", "--no-owner", "--no-privileges", "--host", DB_HOST, "--port", str(DB_PORT), "--username", DB_USER, "--dbname", DB_NAME, str(dump_files[0])], env=env)
+        restore_result = run(
+            ["pg_restore", "--clean", "--if-exists", "--no-owner", "--no-privileges", "--host", DB_HOST, "--port", str(DB_PORT), "--username", DB_USER, "--dbname", DB_NAME, str(dump_files[0])],
+            env=env,
+            check=False,
+        )
+        if restore_result.returncode not in (0, 1):
+            detail = (restore_result.stderr or restore_result.stdout or "").strip()
+            raise RuntimeError(f"pg_restore falló con código {restore_result.returncode}: {detail[:500]}")
+        if restore_result.returncode == 1:
+            logger.warning("pg_restore completó con advertencias no críticas: %s", (restore_result.stderr or "").strip())
         validate_restored_database()
         restored_storage = validate_manifest(restore_root)
         if restored_storage:
@@ -285,7 +402,19 @@ def restore_backup(backup_id):
                 elif destination.exists():
                     destination.unlink()
                 shutil.move(str(item), str(destination))
-        update_backup(backup_id, estado="VERIFICADO", error_mensaje=None)
+
+        # 3. Restaurar metadata de respaldos para preservar snapshots e historial
+        restore_backup_metadata(saved_backups, backup_id)
+        update_backup(
+            backup_id,
+            estado="VERIFICADO",
+            snapshot_externo_id=snapshot_id,
+            snapshot_local_id=snapshots_for(LOCAL_REPO, backup_id),
+            ruta_externa=EXTERNAL_REPO,
+            ruta_local=LOCAL_REPO,
+            verificado_en=datetime.now(timezone.utc).replace(tzinfo=None),
+            error_mensaje=None
+        )
         audit(backup_id, "RESTAURACION_COMPLETADA")
         completed = True
     except Exception as exc:
@@ -294,8 +423,7 @@ def restore_backup(backup_id):
         raise
     finally:
         shutil.rmtree(restore_root, ignore_errors=True)
-        if completed:
-            MAINTENANCE_MARKER.unlink(missing_ok=True)
+        MAINTENANCE_MARKER.unlink(missing_ok=True)
 
 
 def extract_dump(backup_id):
@@ -357,6 +485,7 @@ def handle(payload):
 
 
 def consume():
+    reconcile_snapshots_on_startup()
     ensure_existing_dumps()
     credentials = pika.PlainCredentials(os.getenv("RABBITMQ_USER", "guest"), os.getenv("RABBITMQ_PASSWORD", "guest"))
     params = pika.ConnectionParameters(host=os.getenv("RABBITMQ_HOST", "rabbitmq"), port=int(os.getenv("RABBITMQ_PORT", "5672")), credentials=credentials, heartbeat=600)

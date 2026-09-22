@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -27,6 +29,7 @@ public class AuditoriaRespaldo {
     private String actor;
 
     @Column(name = "detalle_json", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String detalleJson;
 
     @Column(name = "ip_origen", length = 45)

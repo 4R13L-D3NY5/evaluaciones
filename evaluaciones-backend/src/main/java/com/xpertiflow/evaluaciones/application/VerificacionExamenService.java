@@ -31,6 +31,7 @@ import com.xpertiflow.evaluaciones.domain.repository.HistorialVerificacionReposi
 import com.xpertiflow.evaluaciones.security.BancoCifradoService;
 import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -47,11 +48,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VerificacionExamenService {
 
-    private static final Set<String> ESTADOS_VISIBLES = Set.of("PENDIENTE");
+    private static final Set<String> ESTADOS_VISIBLES = Set.of("PENDIENTE", "DEVUELTO");
     private static final Map<String, Integer> ORDEN_TIPOS = Map.of(
             "VERDADERO_O_FALSO_SIMPLE", 1,
             "RESPUESTA_PREMISAS_ABCD", 2,
@@ -85,6 +87,12 @@ public class VerificacionExamenService {
             throw new IllegalArgumentException("La fecha desde no puede ser posterior a la fecha hasta.");
         }
         String estadoNorm = estado == null ? "" : estado.trim().toUpperCase(Locale.ROOT);
+        if ("OBSERVADO".equals(estadoNorm) || "OBSERVADOS".equals(estadoNorm) || "DEVUELTOS".equals(estadoNorm)) {
+            estadoNorm = "DEVUELTO";
+        }
+        if ("VALIDADOS".equals(estadoNorm)) {
+            estadoNorm = "PENDIENTE";
+        }
         if ("VERIFICADO".equals(estadoNorm) || "APROBADO".equals(estadoNorm)) {
             return listarAprobados(orden, sedeCodigo, carreraCodigo, tipoParcial, modalidad,
                     fechaDesde, fechaHasta, authentication);
@@ -363,15 +371,21 @@ public class VerificacionExamenService {
     }
 
     private List<Reactivo> descifrarReactivos(HistorialVerificacion historial) {
-        BancoEncryptedPayload payload = BancoEncryptedPayload.builder()
-                .ciphertext(historial.getContenidoCifrado())
-                .nonce(historial.getContenidoNonce())
-                .wrappedDataKey(historial.getContenidoDekEnvuelta())
-                .keyReference(historial.getContenidoKekReferencia())
-                .keyVersion(historial.getContenidoKekVersion())
-                .algorithm(historial.getContenidoAlgoritmo())
-                .build();
-        return descifrarReactivos(payload, historial.getBancoPreguntasId(), historial.getRolExamenId());
+        try {
+            BancoEncryptedPayload payload = BancoEncryptedPayload.builder()
+                    .ciphertext(historial.getContenidoCifrado())
+                    .nonce(historial.getContenidoNonce())
+                    .wrappedDataKey(historial.getContenidoDekEnvuelta())
+                    .keyReference(historial.getContenidoKekReferencia())
+                    .keyVersion(historial.getContenidoKekVersion())
+                    .algorithm(historial.getContenidoAlgoritmo())
+                    .build();
+            return descifrarReactivos(payload, historial.getBancoPreguntasId(), historial.getRolExamenId());
+        } catch (Exception e) {
+            log.warn("No se pudieron descifrar los reactivos del historial de verificacion id {}: {}",
+                    historial.getId(), e.getMessage());
+            return List.of();
+        }
     }
 
     private List<Reactivo> descifrarReactivos(BancoEncryptedPayload payload, String bancoId, String rolExamenId) {
@@ -487,6 +501,7 @@ public class VerificacionExamenService {
         dto.setObservacionesGenerales(verificacion.getObservacionesGenerales());
         dto.setVerificadoPor(verificacion.getVerificadoPor());
         dto.setFechaVerificacion(verificacion.getFechaVerificacion());
+        dto.setTieneHistorialDevoluciones(historialVerificacionRepository.existsByRolExamenId(rol.getId()));
         return dto;
     }
 

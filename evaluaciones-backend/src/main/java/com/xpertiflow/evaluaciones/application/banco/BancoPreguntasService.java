@@ -300,7 +300,14 @@ public class BancoPreguntasService {
 
             // Al sustituir el banco, cualquier aprobación previa deja de ser
             // válida. La nueva revisión se asociará al banco recién cargado.
+            // Si el examen venía de una devolución u observaciones, se conserva en el historial.
             verificacionRepository.findByRolExamenId(rol.getId()).ifPresent(verificacion -> {
+                if (verificacion.getBancoPreguntasId() != null) {
+                    BancoPreguntas bancoAnterior = bancoRepository.findById(verificacion.getBancoPreguntasId()).orElse(null);
+                    if (bancoAnterior != null) {
+                        historialVerificacionService.archivarDevolucion(verificacion, bancoAnterior);
+                    }
+                }
                 verificacion.setBancoPreguntasId(bancoId);
                 verificacion.setEstado("PENDIENTE");
                 verificacion.setObservacionesGenerales(null);
