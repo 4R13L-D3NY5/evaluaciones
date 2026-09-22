@@ -35,7 +35,7 @@ public class AccesoAcademicoService {
     private final UnitepcGatewayClient unitepcGatewayClient;
 
     private static final String GESTION_ACTIVA = "2-2026";
-    private static final long CACHE_SEA_MILLIS = 60_000L;
+    private static final long CACHE_SEA_MILLIS = 600_000L; // 10 minutos
     private volatile List<GroupItemDto> gruposSeaCache = List.of();
     private volatile long gruposSeaCacheAt;
     private volatile List<BranchOfficeDto> sedesSeaCache = List.of();

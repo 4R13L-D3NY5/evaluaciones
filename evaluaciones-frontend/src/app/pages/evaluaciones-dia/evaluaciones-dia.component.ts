@@ -6808,14 +6808,18 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public formatearFechaHoraAuditoria(fecha?: string): string {
     if (!fecha) return 'Fecha no disponible';
-    const valor = new Date(fecha);
+    const fechaNormalizada = fecha.includes('T') ? fecha : fecha.replace(' ', 'T');
+    const tieneZona = fechaNormalizada.endsWith('Z') || /[+-]\d{2}(:\d{2})?$/.test(fechaNormalizada);
+    const fechaIso = tieneZona ? fechaNormalizada : `${fechaNormalizada}Z`;
+    const valor = new Date(fechaIso);
     if (Number.isNaN(valor.getTime())) return fecha.replace('T', ' ');
     return new Intl.DateTimeFormat('es-BO', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'America/La_Paz'
     }).format(valor);
   }
 

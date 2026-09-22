@@ -39,7 +39,8 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
         <!-- Selector de Gestión Académica (Default II-2026) -->
         <div class="relative flex items-center gap-2 shrink-0">
           <!-- Apartado de Notificaciones (Campana) -->
-          <div class="relative">
+          @if (puedeVerNotificaciones()) {
+            <div class="relative">
             <button
               type="button"
               title="Notificaciones"
@@ -156,7 +157,8 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
                 </div>
               </div>
             }
-          </div>
+            </div>
+          }
 
           <button
             type="button"
@@ -228,7 +230,14 @@ export class TopbarComponent implements OnInit {
   public readonly menuNotificacionesAbierto = signal(false);
 
   public ngOnInit(): void {
-    this.notificacionesService.cargarNotificaciones();
+    if (this.puedeVerNotificaciones()) {
+      this.notificacionesService.cargarNotificaciones();
+    }
+  }
+
+  public puedeVerNotificaciones(): boolean {
+    const rol = this._authService.usuario()?.rol;
+    return rol === 'DOCENTE' || rol === 'DIRECTOR_CARRERA';
   }
 
   public toggleMenuNotificaciones(): void {

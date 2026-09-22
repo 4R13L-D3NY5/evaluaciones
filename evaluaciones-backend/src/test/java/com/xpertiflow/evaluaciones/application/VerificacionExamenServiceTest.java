@@ -196,7 +196,7 @@ class VerificacionExamenServiceTest {
     }
 
     @Test
-    void listarOmiteExamenDevueltoYRetornaSoloValidados() {
+    void listarPermiteFiltrarPorEstadoValidadosYObservados() {
         RolExamen rolDevuelto = rolAvanzado();
         rolDevuelto.setId("ROL-DEV");
         rolDevuelto.setEstadoFlujo(EstadoFlujo.VALIDADO);
@@ -223,12 +223,23 @@ class VerificacionExamenServiceTest {
         when(verificacionRepository.findByRolExamenId("ROL-DEV")).thenReturn(Optional.of(verDev));
         when(verificacionRepository.findByRolExamenId("ROL-OK")).thenReturn(Optional.of(verOk));
 
-        var resultados = service.listar("FECHA_EXAMEN_DESC", null, null, null, null,
+        // Sin filtro de estado: retorna ambos (validados y devueltos)
+        var todos = service.listar("FECHA_EXAMEN_DESC", null, null, null, null,
                 null, null, null, authentication);
+        assertThat(todos).hasSize(2);
 
-        assertThat(resultados).hasSize(1);
-        assertThat(resultados.get(0).getRolExamenId()).isEqualTo("ROL-OK");
-        assertThat(resultados.get(0).getEstadoVerificacion()).isEqualTo("VALIDADO");
+        // Filtro PENDIENTE / VALIDADO: solo retorna el examen pendiente
+        var soloValidados = service.listar("FECHA_EXAMEN_DESC", null, null, null, null,
+                "PENDIENTE", null, null, authentication);
+        assertThat(soloValidados).hasSize(1);
+        assertThat(soloValidados.get(0).getRolExamenId()).isEqualTo("ROL-OK");
+
+        // Filtro DEVUELTO / OBSERVADO: solo retorna el examen devuelto
+        var soloDevueltos = service.listar("FECHA_EXAMEN_DESC", null, null, null, null,
+                "DEVUELTO", null, null, authentication);
+        assertThat(soloDevueltos).hasSize(1);
+        assertThat(soloDevueltos.get(0).getRolExamenId()).isEqualTo("ROL-DEV");
+        assertThat(soloDevueltos.get(0).getEstadoVerificacion()).isEqualTo("DEVUELTO");
     }
 
     @Test

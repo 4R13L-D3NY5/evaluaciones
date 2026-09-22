@@ -21,6 +21,8 @@ public interface RolExamenRepository extends JpaRepository<RolExamen, String> {
 
     List<RolExamen> findByMateriaCodigoAndGrupo(String materiaCodigo, String grupo);
 
+    List<RolExamen> findByDocenteCi(String docenteCi);
+
     /**
      * Busca la última programación vigente del grupo y parcial.
      * SUSPENDIDO representa una baja lógica y no debe bloquear una nueva importación.

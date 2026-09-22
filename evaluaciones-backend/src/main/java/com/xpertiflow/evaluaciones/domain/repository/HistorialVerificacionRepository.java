@@ -10,4 +10,6 @@ public interface HistorialVerificacionRepository extends JpaRepository<Historial
     List<HistorialVerificacion> findByRolExamenIdOrderByFechaDevolucionDescIdDesc(String rolExamenId);
 
     boolean existsByRolExamenIdAndBancoPreguntasId(String rolExamenId, String bancoPreguntasId);
+
+    boolean existsByRolExamenId(String rolExamenId);
 }

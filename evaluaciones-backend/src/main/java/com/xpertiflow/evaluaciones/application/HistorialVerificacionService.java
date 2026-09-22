@@ -18,8 +18,13 @@ public class HistorialVerificacionService {
 
     @Transactional
     public void archivarDevolucion(VerificacionExamen verificacion, BancoPreguntas banco) {
+        boolean esDevuelto = verificacion != null && "DEVUELTO".equalsIgnoreCase(verificacion.getEstado());
+        boolean tieneObservaciones = verificacion != null && (
+                (verificacion.getObservacionesPreguntasJson() != null && !verificacion.getObservacionesPreguntasJson().isBlank() && !"{}".equals(verificacion.getObservacionesPreguntasJson()))
+                || (verificacion.getObservacionesGenerales() != null && !verificacion.getObservacionesGenerales().isBlank())
+        );
         if (verificacion == null || banco == null
-                || !"DEVUELTO".equalsIgnoreCase(verificacion.getEstado())
+                || (!esDevuelto && !tieneObservaciones)
                 || !banco.getId().equals(verificacion.getBancoPreguntasId())
                 || historialRepository.existsByRolExamenIdAndBancoPreguntasId(
                         verificacion.getRolExamenId(), banco.getId())) {

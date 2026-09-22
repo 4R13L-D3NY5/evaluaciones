@@ -41,9 +41,11 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Modalidad<select [(ngModel)]="modalidad" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">Todas</option><option value="PRESENCIAL_CARTILLA">Con cartilla</option><option value="PRESENCIAL_SIN_CARTILLA">Sin cartilla</option><option value="VIRTUAL">Virtual</option></select></label>
         @if (vistaActual === 'revision') {
           <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado
-            <div class="mt-1 flex h-[34px] items-center rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-xs font-bold text-purple-700">
-              <i class="pi pi-shield mr-1.5"></i>Validados (por verificar)
-            </div>
+            <select [(ngModel)]="estado" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs font-bold">
+              <option value="">Todos (por verificar y observados)</option>
+              <option value="PENDIENTE">Validados (por verificar)</option>
+              <option value="DEVUELTO">Observados / Devueltos</option>
+            </select>
           </label>
         } @else if (vistaActual === 'sin_banco') {
           <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado
@@ -62,8 +64,59 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       @else if (!examenes().length) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">No hay exámenes validados pendientes de verificación en tu alcance.</div> }
       @else {
         <div class="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
-          <table class="w-full min-w-[1200px] text-left text-xs"><thead class="bg-muted/50 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground"><tr><th class="p-3">Fecha examen</th><th class="p-3">Sede / carrera</th><th class="p-3">Asignatura</th><th class="p-3">Grupo</th><th class="p-3">Docente</th><th class="p-3">Subido</th><th class="p-3">Versión</th><th class="p-3">Modalidad</th><th class="p-3">Estado</th><th class="p-3 text-right">Acción</th></tr></thead>
-            <tbody class="divide-y divide-border">@for (examen of examenes(); track examen.rolExamenId) {<tr class="hover:bg-muted/20"><td class="p-3 font-bold">{{ examen.fechaExamen | date:'dd/MM/yyyy' }}<span class="block font-normal text-muted-foreground">{{ examen.horario }}</span></td><td class="p-3"><strong>{{ examen.sedeCodigo || '—' }}</strong><span class="block text-muted-foreground">{{ examen.sedeNombre || 'Sede no registrada' }}</span><span class="block text-muted-foreground">{{ examen.carreraCodigo }} · {{ examen.carreraNombre }}</span></td><td class="p-3"><strong>{{ examen.materiaCodigo }}</strong><span class="block max-w-[220px] truncate text-muted-foreground">{{ examen.materiaNombre }}</span></td><td class="p-3 font-black">{{ examen.grupo }}</td><td class="p-3">{{ examen.docenteNombre }}</td><td class="p-3 text-muted-foreground">{{ examen.fechaSubida | date:'dd/MM/yyyy HH:mm' }}</td><td class="p-3 font-mono font-bold">{{ examen.version }}</td><td class="p-3">{{ etiquetaModalidad(examen.modalidad) }}</td><td class="p-3"><span class="rounded-full bg-purple-100 text-purple-800 px-2.5 py-1 text-[10px] font-black tracking-wide">{{ examen.estadoVerificacion === 'PENDIENTE' ? 'VALIDADO' : examen.estadoVerificacion }}</span></td><td class="p-3 text-right"><button type="button" class="rounded-lg bg-purple-700 px-3 py-2 text-[11px] font-black text-white hover:bg-purple-800" (click)="abrir(examen)"><i class="pi pi-search mr-1"></i>Revisar</button></td></tr>}</tbody></table>
+          <table class="w-full min-w-[1200px] text-left text-xs">
+            <thead class="bg-muted/50 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th class="p-3">Fecha examen</th>
+                <th class="p-3">Sede / carrera</th>
+                <th class="p-3">Asignatura</th>
+                <th class="p-3">Grupo</th>
+                <th class="p-3">Docente</th>
+                <th class="p-3">Subido</th>
+                <th class="p-3">Versión</th>
+                <th class="p-3">Modalidad</th>
+                <th class="p-3">Estado</th>
+                <th class="p-3 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              @for (examen of examenes(); track examen.rolExamenId) {
+                <tr class="hover:bg-muted/20">
+                  <td class="p-3 font-bold">{{ examen.fechaExamen | date:'dd/MM/yyyy' }}<span class="block font-normal text-muted-foreground">{{ examen.horario }}</span></td>
+                  <td class="p-3"><strong>{{ examen.sedeCodigo || '—' }}</strong><span class="block text-muted-foreground">{{ examen.sedeNombre || 'Sede no registrada' }}</span><span class="block text-muted-foreground">{{ examen.carreraCodigo }} · {{ examen.carreraNombre }}</span></td>
+                  <td class="p-3"><strong>{{ examen.materiaCodigo }}</strong><span class="block max-w-[220px] truncate text-muted-foreground">{{ examen.materiaNombre }}</span></td>
+                  <td class="p-3 font-black">{{ examen.grupo }}</td>
+                  <td class="p-3">{{ examen.docenteNombre }}</td>
+                  <td class="p-3 text-muted-foreground">{{ examen.fechaSubida | date:'dd/MM/yyyy HH:mm' }}</td>
+                  <td class="p-3 font-mono font-bold">{{ examen.version }}</td>
+                  <td class="p-3">{{ etiquetaModalidad(examen.modalidad) }}</td>
+                  <td class="p-3">
+                    <div class="flex flex-col gap-1 items-start">
+                      @if (examen.estadoVerificacion === 'DEVUELTO') {
+                        <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-2.5 py-0.5 text-[10px] font-black tracking-wide border border-rose-200">
+                          <i class="pi pi-exclamation-circle mr-1"></i>DEVUELTO
+                        </span>
+                      } @else {
+                        <span class="inline-flex items-center rounded-full bg-purple-100 text-purple-800 px-2.5 py-0.5 text-[10px] font-black tracking-wide border border-purple-200">
+                          <i class="pi pi-shield mr-1"></i>{{ examen.estadoVerificacion === 'PENDIENTE' ? 'VALIDADO' : examen.estadoVerificacion }}
+                        </span>
+                      }
+                      @if (examen.tieneHistorialDevoluciones) {
+                        <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[9px] font-bold border border-amber-300" title="Reingresado con correcciones tras devolución previa">
+                          <i class="pi pi-history mr-1"></i>Corregido
+                        </span>
+                      }
+                    </div>
+                  </td>
+                  <td class="p-3 text-right">
+                    <button type="button" class="rounded-lg px-3 py-2 text-[11px] font-black text-white" [class.bg-rose-700]="examen.estadoVerificacion === 'DEVUELTO'" [class.hover:bg-rose-800]="examen.estadoVerificacion === 'DEVUELTO'" [class.bg-purple-700]="examen.estadoVerificacion !== 'DEVUELTO'" [class.hover:bg-purple-800]="examen.estadoVerificacion !== 'DEVUELTO'" (click)="abrir(examen)">
+                      <i class="pi pi-search mr-1"></i>Revisar
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
       }
 
@@ -72,7 +125,19 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
           <div class="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl" (click)="$event.stopPropagation()">
             <div class="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
-                <p class="text-[10px] font-extrabold uppercase tracking-wider text-purple-700">Revisión de examen validado</p>
+                <div class="flex items-center gap-2">
+                  <p class="text-[10px] font-extrabold uppercase tracking-wider text-purple-700">Revisión de examen</p>
+                  @if (detalle()!.estadoVerificacion === 'DEVUELTO') {
+                    <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700 border border-rose-200">DEVUELTO / OBSERVADO</span>
+                  } @else {
+                    <span class="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black text-purple-800 border border-purple-200">VALIDADO</span>
+                  }
+                  @if (detalle()!.historialDevoluciones && detalle()!.historialDevoluciones.length > 0) {
+                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-300">
+                      <i class="pi pi-history mr-1"></i>Reingresado con correcciones
+                    </span>
+                  }
+                </div>
                 <h2 class="text-lg font-black">{{ detalle()!.materiaCodigo }} · {{ detalle()!.materiaNombre }} · {{ detalle()!.grupo }}</h2>
                 <p class="text-xs text-muted-foreground">{{ detalle()!.tipoParcial }} · {{ detalle()!.version }} · {{ detalle()!.estadoVerificacion }}</p>
                 <p class="text-xs text-muted-foreground">{{ detalle()!.sedeNombre || 'Sede no registrada' }} · {{ detalle()!.carreraNombre }}</p>
@@ -90,15 +155,25 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                   · incluye clave separada
                 </span>
               </div>
-              @if (detalle()!.historialDevoluciones.length) {
-                <section class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <div class="mb-3 flex items-center gap-2 text-sm font-black text-amber-950"><i class="pi pi-history"></i>Historial de observaciones</div>
-                  <p class="mb-4 text-xs text-amber-900">Se conserva únicamente el contenido de las preguntas que tuvieron observaciones. Compara la versión devuelta con la versión actualizada.</p>
+              @if (detalle()!.historialDevoluciones && detalle()!.historialDevoluciones.length > 0) {
+                <section class="mb-5 rounded-xl border-2 border-amber-300 bg-amber-50/80 p-4 shadow-xs">
+                  <div class="mb-2 flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-sm font-black text-amber-950">
+                      <i class="pi pi-history text-amber-600 text-base"></i>
+                      <span>Historial de observaciones y correcciones del docente</span>
+                      <span class="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                        {{ detalle()!.historialDevoluciones.length }} {{ detalle()!.historialDevoluciones.length === 1 ? 'devolución registrada' : 'devoluciones registradas' }}
+                      </span>
+                    </div>
+                  </div>
+                  <p class="mb-4 text-xs text-amber-900 leading-relaxed">
+                    Este banco fue reingresado tras haber sido devuelto/observado. Se conserva la comparativa entre la <strong>Versión devuelta</strong> y la <strong>Versión corregida</strong> para cada reactivo observado:
+                  </p>
                   <div class="space-y-4">
                     @for (revision of detalle()!.historialDevoluciones; track revision.id) {
-                      <div class="rounded-lg border border-amber-200 bg-card p-3">
+                      <div class="rounded-lg border border-amber-200 bg-card p-3 shadow-2xs">
                         <p class="mb-2 text-[11px] font-bold text-muted-foreground">Devuelto {{ revision.fechaDevolucion | date:'dd/MM/yyyy HH:mm' }} · {{ revision.verificadoPor || 'Verificador' }}</p>
-                        @if (revision.observacionesGenerales) { <p class="mb-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-950"><strong>Observación general:</strong> {{ revision.observacionesGenerales }}</p> }
+                        @if (revision.observacionesGenerales) { <p class="mb-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-950"><strong>Observación general previa:</strong> {{ revision.observacionesGenerales }}</p> }
                         @for (item of revision.preguntasObservadas; track item.numeroPregunta) {
                           <article class="mb-3 last:mb-0 rounded-lg border border-border p-3">
                             <p class="mb-2 text-xs font-black">Pregunta / Reactivo {{ item.numeroPregunta }}</p>
@@ -114,8 +189,8 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                                 }
                                 @else { <p class="text-xs text-muted-foreground">No se pudo recuperar esta pregunta.</p> }
                               </div>
-                              <div class="rounded-lg bg-emerald-50 p-3">
-                                <p class="mb-1 text-[10px] font-extrabold uppercase text-emerald-800">Versión corregida</p>
+                              <div class="rounded-lg bg-emerald-50 p-3 border border-emerald-200">
+                                <p class="mb-1 text-[10px] font-extrabold uppercase text-emerald-800 font-bold">Versión corregida</p>
                                 @if (item.preguntaCorregida) {
                                   <p [seaMathContent]="item.preguntaCorregida.enunciado" class="whitespace-pre-wrap text-xs"></p>
                                   @if (imagenDataUrl(item.preguntaCorregida.imagenBase64); as imagen) { <img [src]="imagen" alt="Imagen de la pregunta corregida" class="mt-2 max-h-64 max-w-full rounded-lg border border-border object-contain"> }
@@ -135,8 +210,8 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
               @if (detalle()!.observacionesGenerales) { <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>Observaciones anteriores:</strong> {{ detalle()!.observacionesGenerales }}</div> }
               <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 p-3">
                 <span class="text-xs font-bold text-muted-foreground">Mostrando {{ preguntasParaRevision().length }} registros ({{ totalRespondibles() }} preguntas evaluables)</span>
-                @if (preguntasParaRevision().length < detalle()!.preguntas.length) {
-                  <button type="button" class="text-xs font-bold text-primary underline" (click)="mostrarTodasPreguntas = !mostrarTodasPreguntas">{{ mostrarTodasPreguntas ? 'Enfocar preguntas observadas' : 'Mostrar examen completo' }}</button>
+                @if (tieneObservacionesPrevias()) {
+                  <button type="button" class="text-xs font-bold text-primary underline cursor-pointer" (click)="mostrarTodasPreguntas = !mostrarTodasPreguntas">{{ mostrarTodasPreguntas ? 'Enfocar preguntas observadas' : 'Mostrar examen completo' }}</button>
                 }
               </div>
               <div class="space-y-4">
@@ -859,6 +934,14 @@ export class VerificarExamenesComponent implements OnDestroy {
       const correcta = op?.correcta || claves.includes(letra);
       return { letra, texto, correcta };
     });
+  }
+
+  public tieneObservacionesPrevias(): boolean {
+    const detalle = this.detalle();
+    if (!detalle) return false;
+    if (detalle.estadoVerificacion === 'DEVUELTO' && detalle.preguntas.some(p => p.observacion?.trim())) return true;
+    const ultimaDevolucion = detalle.historialDevoluciones?.[0];
+    return !!ultimaDevolucion?.preguntasObservadas?.length;
   }
 
   public preguntasParaRevision(): VerificacionPregunta[] {

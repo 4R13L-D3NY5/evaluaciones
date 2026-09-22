@@ -55,7 +55,7 @@ public class RolExamenService {
     private final VerificacionPoliticaService verificacionPoliticaService;
     private final PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
 
-    private static final long CACHE_GRUPOS_SEA_MILLIS = 60_000L;
+    private static final long CACHE_GRUPOS_SEA_MILLIS = 600_000L; // 10 minutos para proteger el gateway ante concurrencia
     private volatile List<GroupItemDto> gruposSeaCache = List.of();
     private volatile long gruposSeaCacheAt;
 

@@ -29,4 +29,5 @@ public class VerificacionExamenListaDto {
     private String observacionesGenerales;
     private String verificadoPor;
     private LocalDateTime fechaVerificacion;
+    private Boolean tieneHistorialDevoluciones;
 }
