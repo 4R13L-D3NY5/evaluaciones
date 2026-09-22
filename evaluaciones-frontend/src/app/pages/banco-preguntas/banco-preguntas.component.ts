@@ -323,7 +323,11 @@ export interface DiaCalendario {
                   <span><strong>Rol de examen oficial:</strong> {{ rol.id }} · {{ rol.fechaDisplay }}</span>
                 </div>
                 <div>
-                  @if (esExamenVerificado()) {
+                  @if (rol.estadoFlujo !== 'PROGRAMADO' && rol.estadoFlujo !== 'VALIDADO') {
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-800 text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-xs">
+                      <i class="pi pi-lock"></i> Etapa: {{ rol.estadoFlujo }}
+                    </span>
+                  } @else if (esExamenVerificado()) {
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wide shadow-xs">
                       <i class="pi pi-check-circle"></i> Validado y Verificado
                     </span>
@@ -368,7 +372,9 @@ export interface DiaCalendario {
                         </div>
                         <span class="text-[10px]" [class]="esExamenDevuelto() ? 'text-rose-900/90' : (esExamenPendienteVerificacion() ? 'text-amber-900/90' : 'text-emerald-900/80')">
                           {{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · 
-                          @if (esExamenVerificado()) {
+                          @if (rol.estadoFlujo !== 'PROGRAMADO' && rol.estadoFlujo !== 'VALIDADO') {
+                            <strong class="text-slate-800 font-bold">Banco inmutable (Examen {{ rol.estadoFlujo }})</strong>
+                          } @else if (esExamenVerificado()) {
                             <strong class="text-emerald-800 font-bold">Validado y Verificado</strong>
                           } @else if (esExamenDevuelto()) {
                             <strong class="text-rose-700 font-bold">Devuelto con observaciones</strong>
@@ -672,14 +678,14 @@ export interface DiaCalendario {
             }
 
             <!-- Zona Drag and Drop con Input Interactivo -->
-            @if (bancoPersistido()?.estadoVerificacion === 'DEVUELTO') {
+            @if (rolPuedeCargarBanco() && bancoPersistido()?.estadoVerificacion === 'DEVUELTO') {
               <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900">
                 <div class="font-black uppercase tracking-wide"><i class="pi pi-exclamation-triangle mr-2"></i>El examen fue devuelto por verificación</div>
                 @if (bancoPersistido()?.observacionesVerificacion) { <p class="mt-1">{{ bancoPersistido()?.observacionesVerificacion }}</p> }
                 @for (observacion of observacionesVerificacionPreguntas(); track observacion[0]) { <p class="mt-1"><strong>Pregunta {{ observacion[0] }}:</strong> {{ observacion[1] }}</p> }
                 <p class="mt-1 font-semibold">Corrige el archivo y reemplaza el banco mientras el rol siga habilitado para carga.</p>
               </div>
-            } @else if (bancoPersistido()?.estadoVerificacion === 'PENDIENTE') {
+            } @else if (rolPuedeCargarBanco() && bancoPersistido()?.estadoVerificacion === 'PENDIENTE') {
               <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><i class="pi pi-clock mr-2"></i>Banco validado. Está pendiente de revisión por el verificador antes de generar el examen.</div>
             } @else if (esExamenVerificado()) {
               <div class="rounded-xl border border-emerald-300 bg-emerald-50/90 p-4 text-xs text-emerald-950 flex items-start gap-3 shadow-2xs">
@@ -709,7 +715,7 @@ export interface DiaCalendario {
               </div>
               <div>
                 <div class="text-sm font-black text-foreground">
-                  {{ nombreArchivoCargado() || (bancoPersistido()?.estadoVerificacion === 'DEVUELTO' ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) corregido o arrástralo aquí' : (esExamenVerificado() ? 'Banco validado y verificado: puedes arrastrar un nuevo archivo si necesitas reemplazarlo' : (rolPuedeCargarBanco() ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí' : 'Carga bloqueada: el rol de examen debe estar PROGRAMADO o VALIDADO'))) }}
+                  {{ nombreArchivoCargado() || (!rolPuedeCargarBanco() ? 'Carga bloqueada: el rol de examen está en ' + (rolExamenActivo()?.estadoFlujo || 'etapa posterior') + ' (banco inmutable)' : (bancoPersistido()?.estadoVerificacion === 'DEVUELTO' ? 'Haz clic para seleccionar tu archivo Excel (.xlsx) corregido o arrástralo aquí' : (esExamenVerificado() ? 'Banco validado y verificado: puedes arrastrar un nuevo archivo si necesitas reemplazarlo' : 'Haz clic para seleccionar tu archivo Excel (.xlsx) o arrástralo aquí'))) }}
                 </div>
                 <p class="text-xs text-muted-foreground mt-1">
                   Validación instantánea de tipos de preguntas, cuotas de dificultad y fórmulas matemáticas/químicas.
@@ -2886,9 +2892,13 @@ export class BancoPreguntasComponent implements OnInit {
     const rol = this.rolExamenActivo();
     if (!rol) return false;
     const estado = rol.estadoFlujo;
-    const estadoVerif = rol.estadoVerificacion || this.bancoPersistido()?.estadoVerificacion;
-    if (estadoVerif === 'DEVUELTO') return true;
-    return estado === 'PROGRAMADO' || estado === 'VALIDADO';
+    // INMUTABILIDAD ESTRICTA DEL EXAMEN:
+    // Si el rol ya avanzó más allá de VALIDADO (ej. GENERADO, IMPRESO, ENTREGADO, DEVUELTO, PENDIENTE_NOTAS, CALIFICADO, CONFIRMADO),
+    // el banco de preguntas no puede ser alterado ni reemplazado bajo ninguna circunstancia.
+    if (estado !== 'PROGRAMADO' && estado !== 'VALIDADO') {
+      return false;
+    }
+    return true;
   });
 
   public esAdministradorSistema = computed(() =>
@@ -2900,10 +2910,14 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public rolPuedeEliminarBanco = computed(() => {
-    const estado = this.rolExamenActivo()?.estadoFlujo;
-    const estadoVerif = this.rolExamenActivo()?.estadoVerificacion || this.bancoPersistido()?.estadoVerificacion;
-    if (estadoVerif === 'DEVUELTO') return true;
-    return this.bancoPersistido() !== null && (estado === 'PROGRAMADO' || estado === 'VALIDADO');
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.bancoPersistido()) return false;
+    const estado = rol.estadoFlujo;
+    // El banco de preguntas solo puede ser eliminado cuando el examen está en etapa PROGRAMADO o VALIDADO.
+    if (estado !== 'PROGRAMADO' && estado !== 'VALIDADO') {
+      return false;
+    }
+    return true;
   });
 
   public ngOnInit(): void {
@@ -3227,16 +3241,22 @@ export class BancoPreguntasComponent implements OnInit {
   public bancoRegistrado = signal<boolean>(false);
   public observacionesVerificacionPreguntas = computed(() => Object.entries(this.bancoPersistido()?.observacionesVerificacionPreguntas || {}));
   public esExamenVerificado = computed(() => {
+    const estado = this.rolExamenActivo()?.estadoFlujo;
+    if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'VERIFICADO' || estadoRol === 'VERIFICADO';
   });
   public esExamenDevuelto = computed(() => {
+    const estado = this.rolExamenActivo()?.estadoFlujo;
+    if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'DEVUELTO' || estadoRol === 'DEVUELTO';
   });
   public esExamenPendienteVerificacion = computed(() => {
+    const estado = this.rolExamenActivo()?.estadoFlujo;
+    if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'PENDIENTE' || estadoRol === 'PENDIENTE';

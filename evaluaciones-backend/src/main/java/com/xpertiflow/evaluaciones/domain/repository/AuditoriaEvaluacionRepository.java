@@ -1,6 +1,7 @@
 package com.xpertiflow.evaluaciones.domain.repository;
 
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,4 +15,6 @@ public interface AuditoriaEvaluacionRepository extends JpaRepository<AuditoriaEv
 
     Optional<AuditoriaEvaluacion> findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(
             String rolExamenId, String accion);
+
+    List<AuditoriaEvaluacion> findAllByOrderByFechaEventoDesc(Pageable pageable);
 }
