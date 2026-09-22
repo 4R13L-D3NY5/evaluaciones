@@ -1,4 +1,4 @@
-# Kanban de tareas del proyecto
+﻿# Kanban de tareas del proyecto
 
 Tablero documental para dar seguimiento a las tareas pendientes de `evaluaciones`. Este archivo es la fuente de verdad del seguimiento operativo y puede actualizarse desde cualquier conversación que esté trabajando sobre este proyecto y esta rama.
 
@@ -99,7 +99,7 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Fecha límite: Por definir
 - Dependencias: Revisar el estado actual del registro, consulta, filtros, detalle de eventos y permisos del módulo.
 - Criterio de cierre: Completar la implementación funcional y visual del módulo, validar que las acciones relevantes queden registradas y que la consulta respete los permisos establecidos.
-- Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz
+- Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz Implementacion integral de Auditoria y Bitacora: endpoint unificado backend, KPIs reales, filtros y exportacion Excel Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX
 
 #### T-030 — Optimización de rendimiento en Notificaciones: Endpoint ligero en backend, exclusión de administrador y sondeo eficiente
 
