@@ -1,4 +1,4 @@
-﻿# Kanban de tareas del proyecto
+# Kanban de tareas del proyecto
 
 Tablero documental para dar seguimiento a las tareas pendientes de `evaluaciones`. Este archivo es la fuente de verdad del seguimiento operativo y puede actualizarse desde cualquier conversación que esté trabajando sobre este proyecto y esta rama.
 
@@ -89,6 +89,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 *(Sin tareas activas)*
 
 ### En revisión
+
+#### T-033 — Corrección de deriva vertical y optimización de detección de cuadrícula OMR (Preguntas 11 a 20)
+
+- Prioridad: Crítica
+- Área: Motor OMR / Calificación
+- Responsable: Antigravity
+- Creada: 2026-09-22
+- Fecha límite: 2026-09-22
+- Dependencias: `evaluaciones-workers/src/omr_engine.py`
+- Criterio de cierre: 1) Ajustar la región de interés (ROI) en Hough para incluir completamente la fila 20; 2) Implementar tolerancia e inferencia de filas faltantes ante oclusiones; 3) Corregir la fórmula y desplazamiento inicial del fallback geométrico para eliminar la deriva vertical de 5-7 px en filas 11-20; 4) Validar lectura correcta (100%) sobre todas las cartillas del PDF `ENF-323 TERAPIA INTENSIVA G1.pdf`.
+- Notas: En progreso. Diagnóstico concluido: el recorte en Hough cortaba la fila 20 en el 100% de cartillas forzando el fallback geométrico que acumulaba un desfase vertical de 5-7 px en las preguntas 11 a 20. Implementación técnica concluida: corrección de límite inferior ROI en Hough (0.995*gh) para capturar fila 20, inferencia inteligente de filas faltantes, calibración de offset (0.0605) y paso (0.04823) del fallback geométrico, radio de búsqueda ampliado a 4.0px y soporte de marcas claras inequívocas (>=48% con diferencial >=16%). Verificado en las 17 cartillas del PDF con 506/510 reactivos detectados y 0 falsos blancos.
 
 #### T-032 — Restaurar indicador visual de 'Sin banco' en Evaluaciones del Día
 
@@ -398,7 +409,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 5 |
 | En progreso | 0 |
-| En revisión | 23 |
+| En revisión | 24 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

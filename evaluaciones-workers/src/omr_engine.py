@@ -51,7 +51,7 @@ PARAMETROS_OMR_DEFECTO: dict[str, float] = {
     "zona_codigo_ancho": 0.27,
     "zona_codigo_alto": 0.06,
     "escala_ocr": 3.0,
-    "radio_busqueda_pixeles": 2.0,
+    "radio_busqueda_pixeles": 4.0,
 }
 
 
@@ -219,7 +219,10 @@ def _detectar_centros_burbujas(
     x1 = gx + int(gw * .04)
     y1 = gy + int(gh * .03)
     x2 = gx + int(gw * .98)
-    y2 = gy + int(gh * .97)
+    # Las burbujas de la fila 20 se ubican en torno al 97.6% del alto de la grilla.
+    # El recorte anterior al 97% cortaba la fila 20 por la mitad provocando que Hough
+    # la omitiera sistemáticamente. Se amplía hasta casi el borde inferior de la grilla.
+    y2 = min(gray.shape[0], gy + int(gh * 0.995))
     roi = gray[y1:y2, x1:x2]
     if roi.size == 0:
         return None
@@ -279,6 +282,25 @@ def _detectar_centros_burbujas(
         if len(grupo) >= 10
     ]
 
+    # Inferencia de filas faltantes: si Hough detectó 18 o 19 filas (por marcas pesadas
+    # de los estudiantes u oclusiones locales), no se descartan las filas válidas.
+    # Se deduce la posición faltante a partir de la distancia mediana entre filas.
+    if len(centros_x) == 15 and 18 <= len(centros_y) < 20:
+        dy_mediana = float(np.median(np.diff(centros_y))) if len(centros_y) > 1 else 0
+        if dy_mediana > 0:
+            while len(centros_y) < 20:
+                insertado = False
+                for i in range(len(centros_y) - 1):
+                    if centros_y[i + 1] - centros_y[i] > 1.6 * dy_mediana:
+                        centros_y.insert(i + 1, int(round(centros_y[i] + dy_mediana)))
+                        insertado = True
+                        break
+                if not insertado:
+                    if (centros_y[0] - gy) / float(gh) > 0.08:
+                        centros_y.insert(0, int(round(centros_y[0] - dy_mediana)))
+                    else:
+                        centros_y.append(int(round(centros_y[-1] + dy_mediana)))
+
     radios = [radio for _, _, radio in puntos_x]
     # El radio de Hough describe principalmente el borde; una ventana algo
     # mayor permite medir suficiente tinta sin tocar la burbuja contigua.
@@ -301,14 +323,15 @@ def _leer_respuestas(
         centros_x, centros_y, radio = centros
     else:
         # Fallback para escaneos con resolución o contraste insuficiente para
-        # Hough. Mantiene la geometría anterior, pero con la lectura en anillo.
+        # Hough. Mantiene la geometría calibrada con el offset real (.0605)
+        # y paso (.04823) para evitar deriva vertical acumulada en filas 11 a 20.
         radio = max(5, int(gw * .011))
         centros_x = [
             gx + int((columna + posicion) * gw / 3)
             for columna in range(3)
             for posicion in (.262, .397, .529, .657, .792)
         ]
-        centros_y = [gy + int((.055 + fila * .0482) * gh) for fila in range(20)]
+        centros_y = [gy + int((.0605 + fila * .04823) * gh) for fila in range(20)]
 
     for pregunta in range(1, 61):
         columna = (pregunta - 1) // 20
@@ -323,12 +346,17 @@ def _leer_respuestas(
         umbral_marca = float(parametros["umbral_densidad_marca"])
         umbral_doble = float(parametros["umbral_diferencial_doble"])
 
+        # Marca clara inequívoca: si la burbuja más marcada tiene al menos 48% de tinta,
+        # su diferencia contra la segunda es amplia (>= 16%) y la segunda no es una marca
+        # real (< 42%), se acepta como respuesta válida para no descartar bolígrafos claros.
+        es_marca_clara = (maximo >= 48.0 and maximo - segundo >= 16.0 and segundo < 42.0)
+
         # La clasificación debe resolver primero las múltiples marcas. Si se
         # aplica antes el diferencial de marca única, dos burbujas realmente
         # marcadas con densidades parecidas terminan convertidas en blanco.
         # Ejemplo: P13 puede producir A=74 y B=75; no es ausencia de tinta,
         # sino una doble marca que debe pasar a revisión/calificación en cero.
-        if maximo < umbral_marca:
+        if maximo < umbral_marca and not es_marca_clara:
             respuesta = ""
         elif segundo >= umbral_marca and maximo - segundo < umbral_doble:
             # Se incluyen terceras marcas próximas al máximo para no ocultar
@@ -338,7 +366,7 @@ def _leer_respuestas(
                 if densidad >= umbral_marca and maximo - densidad < umbral_doble
             ]
             respuesta = "".join(OPCIONES[indice] for indice in sorted(indices_marcados))
-        elif maximo - segundo < UMBRAL_DIFERENCIAL_MARCA:
+        elif maximo - segundo < UMBRAL_DIFERENCIAL_MARCA and not es_marca_clara:
             # Si no hay dos opciones que superen el umbral absoluto, pero la
             # diferencia es demasiado pequeña, la lectura no es confiable:
             # se conserva como blanco para revisión manual y no como respuesta
