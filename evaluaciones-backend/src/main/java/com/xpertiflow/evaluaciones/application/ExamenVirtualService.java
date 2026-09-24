@@ -141,8 +141,12 @@ public class ExamenVirtualService {
     @Transactional
     public SalaVirtualResponseDto iniciarSala(String salaId, String usuario) {
         SalaExamenVirtual sala = obtenerSala(salaId);
-        if (!"ABIERTA".equals(sala.getEstado())) {
-            throw new RuntimeException("Solo se puede iniciar una sala ABIERTA");
+        if (!Set.of("PREPARADA", "ABIERTA").contains(sala.getEstado())) {
+            throw new RuntimeException("Solo se puede iniciar una sala PREPARADA o ABIERTA");
+        }
+        if ("PREPARADA".equals(sala.getEstado())) {
+            sala.setPublicadaEn(LocalDateTime.now());
+            registrarEvento(salaId, null, "SALA_ABIERTA", usuario);
         }
         LocalDateTime ahora = LocalDateTime.now();
         int cuentaRegresiva = configuracionEvaluacionesService.obtener()
@@ -154,7 +158,7 @@ public class ExamenVirtualService {
         sala.setIniciadoPor(usuario);
         salaRepository.save(sala);
         for (IntentoExamenVirtual intento : intentoRepository.findBySalaIdOrderByCodigoEstudianteAsc(salaId)) {
-            if (Set.of("VALIDADO", "EN_ESPERA").contains(intento.getEstado())) {
+            if (Set.of("PENDIENTE", "VALIDADO", "EN_ESPERA").contains(intento.getEstado())) {
                 intento.setEstado("EN_ESPERA");
                 intento.setInicioEn(null);
                 intento.setUltimaActividadEn(ahora);

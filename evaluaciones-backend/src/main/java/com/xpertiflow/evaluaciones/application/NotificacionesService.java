@@ -136,7 +136,12 @@ public class NotificacionesService {
 
             // 3. Examen sin cartilla pendiente de notas
             boolean esSinCartilla = rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA;
-            if (esSinCartilla && rol.getEstadoFlujo() == EstadoFlujo.PENDIENTE_NOTAS) {
+            boolean habilitadoParaNotas = rol.getEstadoFlujo() == EstadoFlujo.PENDIENTE_NOTAS
+                    || rol.getEstadoFlujo() == EstadoFlujo.DEVUELTO
+                    || rol.getEstadoFlujo() == EstadoFlujo.ENTREGADO
+                    || (rol.getEstadoFlujo() == EstadoFlujo.IMPRESO
+                        && (rol.getFecha() == null || !rol.getFecha().isAfter(LocalDate.now())));
+            if (esSinCartilla && habilitadoParaNotas) {
                 String fechaStr = rol.getActualizadoEn() != null
                         ? rol.getActualizadoEn().format(DateTimeFormatter.ISO_DATE_TIME)
                         : null;

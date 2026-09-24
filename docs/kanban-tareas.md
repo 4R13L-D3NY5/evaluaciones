@@ -1,4 +1,4 @@
-# Kanban de tareas del proyecto
+﻿# Kanban de tareas del proyecto
 
 Tablero documental para dar seguimiento a las tareas pendientes de `evaluaciones`. Este archivo es la fuente de verdad del seguimiento operativo y puede actualizarse desde cualquier conversación que esté trabajando sobre este proyecto y esta rama.
 
@@ -29,6 +29,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### Pendiente
 
+#### T-036 — Flujo de rectificación y actualización administrativa de calificaciones sin cartilla
+
+- Prioridad: Media
+- Área: Calificaciones / Sin Cartilla / Evaluaciones
+- Responsable: Por definir
+- Creada: 2026-09-23
+- Fecha límite: Por definir
+- Dependencias: Por definir
+- Criterio de cierre: 1) Definir el flujo institucional para la actualización o rectificación de notas una vez que el docente ha guardado y cerrado la planilla oficial; 2) Habilitar la edición de notas exclusivamente para personal autorizado (Evaluaciones / Administrador del Sistema) o mediante solicitud de rectificación con registro de auditoría; 3) Mantener bloqueada la edición directa por parte del docente tras el guardado inicial.
+- Notas: Registrada a solicitud del usuario. El guardado por el docente permanece como definitivo; cualquier rectificación posterior se gestionará fuera del perfil docente por personal autorizado con auditoría.
+
 #### T-001 — Desplegar y validar en servidor la actualización de roles por Excel
 
 - Prioridad: Alta
@@ -40,17 +51,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Criterio de cierre: Confirmar que una programación existente en `PROGRAMADO` o `VALIDADO` se actualiza con la fecha y horario del Excel, y que los estados posteriores permanecen protegidos.
 - Notas: La corrección ya fue implementada y verificada localmente.
 
-#### T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor
-
-- Prioridad: Alta
-- Área: Calificación OMR / Servidor
-- Responsable: Por definir
-- Creada: 2026-09-12
-- Fecha límite: Por definir
-- Dependencias: Acceso a los registros del servidor y al archivo PDF que provoca el error.
-- Criterio de cierre: Identificar la causa del error, corregir la configuración o el código correspondiente y validar que el PDF de escaneados pueda procesarse correctamente.
-- Notas: Revisar especialmente el error HTTP 413 (`Request Entity Too Large`) y la respuesta HTML que aparece como `Unexpected token '<'`.
-
 #### T-010 — Optimizar el módulo de Reportes y priorizar los reportes de mayor aporte
 
 - Prioridad: Media
@@ -61,17 +61,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Dependencias: Revisar los reportes actuales, usuarios destinatarios, fuentes de datos y necesidades operativas por módulo.
 - Criterio de cierre: Identificar y priorizar los reportes de mayor valor, definir sus indicadores, filtros, niveles de detalle, exportaciones y permisos, y optimizar o implementar el conjunto priorizado.
 - Notas: Tarea creada desde el comando `=new`; considerar utilidad para dirección, responsables académicos, docentes y seguimiento operativo.
-
-#### T-011 — Generar endpoints de consulta para estudiantes según su matrícula
-
-- Prioridad: Alta
-- Área: Integración institucional / Portal del estudiante
-- Responsable: Por definir
-- Creada: 2026-09-12
-- Fecha límite: Por definir
-- Dependencias: Definir el mecanismo de autenticación del estudiante, validar la matrícula contra SEA/SISA y revisar las entidades de rol, examen, marcajes, variantes y notas.
-- Criterio de cierre: Diseñar y generar endpoints seguros para que cada estudiante consulte por su matrícula el rol de exámenes que le corresponde, el examen asignado, sus marcajes y el patrón de la variante; además, analizar y documentar qué información adicional puede compartirse, incluyendo si corresponde publicar notas.
-- Notas: No exponer bancos de preguntas, claves de respuestas ni información de otros estudiantes. La publicación de notas debe considerar estados de liberación, permisos y trazabilidad.
 
 #### T-015 — Corregir la asignación de carreras o sedes al crear usuario verificador
 
@@ -89,6 +78,61 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 *(Sin tareas activas)*
 
 ### En revisión
+
+#### T-037 — Habilitar al docente el inicio y gestión de sala para exámenes virtuales generados
+
+- Prioridad: Alta
+- Área: Examen Virtual / Sala Virtual / Perfil Docente
+- Responsable: Antigravity
+- Creada: 2026-09-23
+- Fecha límite: 2026-09-24
+- Dependencias: `ExamenVirtualService.java`, `ExamenVirtualController.java`, `banco-preguntas.component.ts`, `sala-virtual.component.ts`, `evaluaciones-dia.component.ts`.
+- Criterio de cierre: 1) Permitir que una vez que el Departamento de Evaluaciones genera el examen virtual (o prepara la sala), el docente titular pueda abrir la sala y dar inicio al examen desde su vista docente (`banco-preguntas` en el modal de detalle del examen / calendario y en `salas-virtuales`); 2) Diferenciar visualmente la modalidad VIRTUAL en el cronograma docente; 3) Permitir al docente proyectar/compartir el PIN grupal, monitorear estudiantes conectados y disparar el inicio con cuenta regresiva; 4) Validar permisos y autorizaciones en backend para rol DOCENTE; 5) Validar compilación frontend y backend y ejecutar tests unitarios.
+- Notas: En progreso. Requerimiento solicitado por el usuario (=new y proceed): una vez generado el examen virtual por Evaluaciones, el docente debe tener la facultad de dar inicio a la evaluación de su grupo. Habilitado al docente el inicio y control de salas virtuales generadas. Soporte backend para iniciar directamente desde PREPARADA o ABIERTA; integración en calendario docente y panel dedicado en salas virtuales con monitoreo, PIN grupal y enlace directo.
+
+#### T-034 — Permitir al docente subir notas de exámenes sin cartilla a partir del estado IMPRESO
+
+- Prioridad: Alta
+- Área: Exámenes sin Cartilla / Calificaciones Docente
+- Responsable: Antigravity
+- Creada: 2026-09-23
+- Fecha límite: 2026-09-23
+- Dependencias: `ExamenSinCartillaService.java`, `RolExamenService.java`, `banco-preguntas.component.ts`, `evaluaciones-dia.component.ts`.
+- Criterio de cierre: 1) Permitir la carga de calificaciones en `ExamenSinCartillaService` a partir del estado `IMPRESO` (incluyendo `ENTREGADO`, `DEVUELTO` y `PENDIENTE_NOTAS`); 2) Habilitar en `RolExamenService.transicionarEstado` la transición a `CALIFICADO` desde cualquiera de estos estados para modalidad `PRESENCIAL_SIN_CARTILLA`; 3) En `banco-preguntas.component.ts`, mostrar el botón y panel "Cargar y Calificar Notas" a partir de `IMPRESO`; 4) En el calendario docente, identificar exámenes sin cartilla habilitados para subir notas a partir de `IMPRESO`; 5) En `evaluaciones-dia.component.ts`, habilitar el botón de edición y guardado de notas para personal autorizado desde `Impreso`; 6) Verificar compilación de backend y frontend y pruebas unitarias.
+- Notas: En progreso. Requerimiento solicitado por el usuario para eliminar el bloqueo que obligaba a esperar hasta después de devolver para registrar notas de exámenes sin cartilla. Carga y edicion de notas sin cartilla habilitada a partir del estado IMPRESO en frontend y backend Habilitada carga y edicion de notas sin cartilla en modal de banco-preguntas para estados IMPRESO, ENTREGADO, DEVUELTO y PENDIENTE_NOTAS
+
+#### T-003 — Revisar error al cargar el PDF de escaneados para calificar un examen en el servidor
+
+- Prioridad: Alta
+- Área: Calificación OMR / Servidor
+- Responsable: Por definir
+- Creada: 2026-09-12
+- Fecha límite: Por definir
+- Dependencias: Acceso a los registros del servidor y al archivo PDF que provoca el error.
+- Criterio de cierre: Identificar la causa del error, corregir la configuración o el código correspondiente y validar que el PDF de escaneados pueda procesarse correctamente.
+- Notas: Revisar especialmente el error HTTP 413 (`Request Entity Too Large`) y la respuesta HTML que aparece como `Unexpected token '<'`. Investigando y solucionando error TesseractError: (-8, '') con archivo real CARTILLAS MED-414 G1.pdf Resuelto TesseractError (-8) en OMR con captura de excepciones y --dpi 300; verificado al 100% con las 39 paginas de CARTILLAS MED-414 G1.pdf Optimizando tiempo de procesamiento OMR con cortocircuito temprano por nomina (de ~8 min a ~11 seg) Optimizado procesamiento OMR con cortocircuito inteligente de nomina; tiempo reducido de 8.9 min a 7.5 seg con 100% precision (39/39)
+
+#### T-035 — Compatibilidad con fórmulas LaTeX en generación Typst y resolución de fuente Liberation Serif
+
+- Prioridad: Alta
+- Área: Generación Typst / Fórmulas Matemáticas / Worker Typst
+- Responsable: Antigravity
+- Creada: 2026-09-23
+- Fecha límite: 2026-09-23
+- Dependencias: `evaluaciones-workers/src/generator.py`, `evaluaciones-workers/Dockerfile.typst`, `docker-compose.yml`.
+- Criterio de cierre: 1) Normalizar fórmulas LaTeX en _sanitize_math: eliminar barras invertidas de letras griegas (\gamma -> gamma, \tau -> tau) y operadores matemáticos (\approx, \neq, \le, \ge, \pm, \infty); 2) Reparar secuencias tabuladas corruptas (\t au -> tau); 3) Registrar todas las letras griegas y símbolos en la lista de funciones de Typst para evitar comillas espurias; 4) Configurar TYPST_FONT_PATHS=/usr/share/fonts en el entorno de compilación para eliminar warnings de Liberation Serif; 5) Corregir las celdas afectadas en el Excel BANCOPREGUNTAS_CONTROL2.xlsx.
+- Notas: En progreso. Implementando soporte robusto para fórmulas LaTeX en generator.py y corrigiendo celdas D41, E41, F41, H41 en BANCOPREGUNTAS_CONTROL2.xlsx. Normalizadas formulas LaTeX, letras griegas y tokens tabulados en generator.py. Corregido BANCOPREGUNTAS_CONTROL2.xlsx en celdas D41, E41, F41 y H41.
+
+#### T-011 — Generar endpoints de consulta para estudiantes según su matrícula
+
+- Prioridad: Alta
+- Área: Integración institucional / Portal del estudiante
+- Responsable: Por definir
+- Creada: 2026-09-12
+- Fecha límite: Por definir
+- Dependencias: Definir el mecanismo de autenticación del estudiante, validar la matrícula contra SEA/SISA y revisar las entidades de rol, examen, marcajes, variantes y notas.
+- Criterio de cierre: Diseñar y generar endpoints seguros para que cada estudiante consulte por su matrícula el rol de exámenes que le corresponde, el examen asignado, sus marcajes y el patrón de la variante; además, analizar y documentar qué información adicional puede compartirse, incluyendo si corresponde publicar notas.
+- Notas: No exponer bancos de preguntas, claves de respuestas ni información de otros estudiantes. La publicación de notas debe considerar estados de liberación, permisos y trazabilidad. Iniciando implementación de endpoints de consulta para estudiantes y sincronización de notas por matrícula y grupo Endpoints de consulta por matricula y sincronizacion de notas para DDIT/SEA implementados con soporte para Presencial con/sin cartilla y Virtual
 
 #### T-033 — Corrección de deriva vertical y optimización de detección de cuadrícula OMR (Preguntas 11 a 20)
 
@@ -407,9 +451,9 @@ _Sin tareas._
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 5 |
+| Pendientes | 4 |
 | En progreso | 0 |
-| En revisión | 24 |
+| En revisión | 29 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

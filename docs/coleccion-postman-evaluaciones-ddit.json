@@ -1,0 +1,207 @@
+{
+  "info": {
+    "_postman_id": "7f8b9a1c-3e4d-5f6a-8b9c-0d1e2f3a4b5c",
+    "name": "Sistema de Evaluaciones UNITEPC - API Integración SEA / SISA",
+    "description": "Colección oficial de endpoints para el Portal del Estudiante y la Sincronización de Actas de Calificaciones entre el Sistema de Evaluaciones y el SISA / SEA (DDIT).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://planificacion.unitepc.edu.bo",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "sea-dev-secret-api-key-2026",
+      "type": "string"
+    },
+    {
+      "key": "matriculaEjemplo",
+      "value": "1102016",
+      "type": "string"
+    },
+    {
+      "key": "seaGroupIdEjemplo",
+      "value": "9659fbe1-8cb1-44f8-827c-c3c812131b7c",
+      "type": "string"
+    },
+    {
+      "key": "rolExamenIdEjemplo",
+      "value": "ROL-9659fbe1-8cb1-44f8-827c-c3c812131b7c-1P-2026-09-23",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Portal Estudiante - Consultar Historial de Evaluaciones",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/consulta-estudiante/{{matriculaEjemplo}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "consulta-estudiante",
+            "{{matriculaEjemplo}}"
+          ],
+          "query": [
+            {
+              "key": "tipoParcial",
+              "value": "PRIMER_PARCIAL",
+              "disabled": true,
+              "description": "Opcional: Filtrar por PRIMER_PARCIAL, SEGUNDA_INSTANCIA, FINAL"
+            }
+          ]
+        },
+        "description": "Retorna el historial completo de evaluaciones del estudiante con notas sobre 60 y 100, y el desglose de preguntas si aplica."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Portal Estudiante - Detalle de Examen y Retroalimentación",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/consulta-estudiante/{{matriculaEjemplo}}/evaluacion/{{rolExamenIdEjemplo}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "consulta-estudiante",
+            "{{matriculaEjemplo}}",
+            "evaluacion",
+            "{{rolExamenIdEjemplo}}"
+          ]
+        },
+        "description": "Consulta el detalle individual y retroalimentación pregunta por pregunta de una evaluación específica."
+      },
+      "response": []
+    },
+    {
+      "name": "3. Integración SISA - Calificaciones de Grupo por seaGroupId (Actas)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Api-Key",
+            "value": "{{apiKey}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/integracion/grupos/{{seaGroupIdEjemplo}}/notas",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "integracion",
+            "grupos",
+            "{{seaGroupIdEjemplo}}",
+            "notas"
+          ],
+          "query": [
+            {
+              "key": "tipoParcial",
+              "value": "PRIMER_PARCIAL",
+              "disabled": true,
+              "description": "Opcional: Tipo de parcial a consultar"
+            },
+            {
+              "key": "apiKey",
+              "value": "{{apiKey}}",
+              "disabled": true,
+              "description": "Alternativa a la cabecera X-Api-Key"
+            }
+          ]
+        },
+        "description": "Obtiene la cabecera del grupo (docente, materia, carrera, total evaluados) y las notas de todos los estudiantes para el volcado de actas en SISA."
+      },
+      "response": []
+    },
+    {
+      "name": "4. Integración SISA - Calificaciones por rolExamenId",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Api-Key",
+            "value": "{{apiKey}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/integracion/roles/{{rolExamenIdEjemplo}}/notas",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "integracion",
+            "roles",
+            "{{rolExamenIdEjemplo}}",
+            "notas"
+          ]
+        },
+        "description": "Obtiene las notas consolidadas de un examen específico según su ID interno de rol."
+      },
+      "response": []
+    },
+    {
+      "name": "5. Integración SISA - Consulta de Notas por Estudiante (M2M)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Api-Key",
+            "value": "{{apiKey}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/integracion/estudiantes/{{matriculaEjemplo}}/notas",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "integracion",
+            "estudiantes",
+            "{{matriculaEjemplo}}",
+            "notas"
+          ]
+        },
+        "description": "Consulta de notas de estudiante para procesos internos del backend del SEA/SISA."
+      },
+      "response": []
+    }
+  ]
+}

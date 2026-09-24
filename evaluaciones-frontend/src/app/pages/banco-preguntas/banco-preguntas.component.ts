@@ -1,5 +1,6 @@
 import { Component, inject, signal, computed, ViewChild, ElementRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
@@ -12,7 +13,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { PrevisualizacionTypstRequest } from '../../core/models/generacion-typst.model';
 import { DocumentoSinCartilla, ExamenSinCartillaService, NotaDocente } from '../../core/services/examen-sin-cartilla.service';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { NotificacionesService } from '../../core/services/notificaciones.service';
 import { OmrProcesamientoService } from '../../core/services/omr-procesamiento.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
@@ -68,7 +69,9 @@ export interface ExamenDocenteCronograma {
   horario: string;
   aula: string;
   conCartilla: boolean;
+  modalidad?: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';
   estado: string;
+  estadoFlujo?: string;
 }
 
 export interface CampusEvaluacion {
@@ -107,7 +110,7 @@ export interface DiaCalendario {
 @Component({
   selector: 'sea-banco-preguntas',
   standalone: true,
-  imports: [CommonModule, FormsModule, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent, RouterModule],
   template: `
     <div class="space-y-6">
       
@@ -410,7 +413,7 @@ export interface DiaCalendario {
           @if (rolExamenActivo()) {
             @if (esSinCartillaActivo()) {
             <!-- Flujo específico: examen presencial sin cartilla -->
-            @if (rolExamenActivo()?.estadoFlujo === 'PENDIENTE_NOTAS') {
+            @if (esSinCartillaHabilitadoParaNotas()) {
               <div class="bg-card border-2 border-indigo-300 rounded-2xl p-6 shadow-md space-y-4 bg-gradient-to-r from-indigo-50/70 to-purple-50/70 animate-fade-in">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div class="flex items-start gap-3">
@@ -418,20 +421,30 @@ export interface DiaCalendario {
                       <i class="pi pi-file-edit"></i>
                     </div>
                     <div>
-                      <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-300 mb-1">
-                        Etapa: Pendiente de Calificación
-                      </span>
-                      <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 mb-1 ml-2">
-                        <i class="pi pi-exclamation-triangle text-[9px] mr-1"></i> No subió notas aún
-                      </span>
+                      <div class="flex flex-wrap items-center gap-2 mb-1">
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-300">
+                          Etapa: {{ rolExamenActivo()?.estadoFlujo === 'IMPRESO' ? 'Examen Impreso' : rolExamenActivo()?.estadoFlujo === 'ENTREGADO' ? 'Examen Entregado' : rolExamenActivo()?.estadoFlujo === 'DEVUELTO' ? 'Examen Devuelto' : 'Pendiente de notas' }}
+                        </span>
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                          <i class="pi pi-pencil text-[9px] mr-1"></i> Habilitado para subir notas
+                        </span>
+                      </div>
                       <h3 class="text-base font-black text-foreground">Registro de Calificaciones Oficiales</h3>
-                      <p class="text-xs text-muted-foreground mt-0.5">El examen presencial ya fue aplicado a los estudiantes. Como docente titular, registra las calificaciones sobre <strong>60 puntos</strong>. Al concluir, el examen pasará a <strong>Calificado</strong> y se generará la planilla oficial para firma y sello.</p>
+                      <p class="text-xs text-muted-foreground mt-0.5">El examen presencial sin cartilla ya fue gestionado por Evaluaciones. Como docente titular, ya puedes registrar las calificaciones sobre <strong>60 puntos</strong>. Al concluir, el examen pasará a <strong>Calificado</strong> y se generará la planilla oficial para firma y sello.</p>
                     </div>
                   </div>
-                  <button (click)="abrirNotasDocente()" class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer shrink-0 transition-transform hover:scale-105">
-                    <i class="pi pi-pencil"></i>
-                    <span>Cargar y Calificar Notas</span>
-                  </button>
+                  <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <button (click)="abrirNotasDocente()" class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer transition-transform hover:scale-105">
+                      <i class="pi pi-pencil"></i>
+                      <span>Cargar y Calificar Notas</span>
+                    </button>
+                    @if (documentoSinCartilla()) {
+                      <button (click)="abrirDocumentoSinCartilla()" class="px-4 py-3 rounded-xl border border-border bg-white text-foreground hover:bg-muted text-xs font-bold flex items-center gap-2 cursor-pointer shadow-2xs">
+                        <i class="pi pi-file-word text-emerald-700"></i>
+                        <span>Ver Examen (.doc)</span>
+                      </button>
+                    }
+                  </div>
                 </div>
               </div>
             } @else if (rolExamenActivo()?.estadoFlujo === 'CALIFICADO') {
@@ -1099,7 +1112,7 @@ export interface DiaCalendario {
                       @for (ex of dia.examenes; track ex.id) {
                         <div 
                           (click)="abrirModalDetalleExamen(ex)"
-                          [class]="ex.conCartilla ? 'border-l-4 border-l-blue-600 bg-blue-50/80 border border-blue-200' : 'border-l-4 border-l-amber-600 bg-amber-50/80 border border-amber-200'"
+                          [class]="ex.modalidad === 'VIRTUAL' ? 'border-l-4 border-l-purple-600 bg-purple-50/80 border border-purple-200' : (ex.conCartilla ? 'border-l-4 border-l-blue-600 bg-blue-50/80 border border-blue-200' : 'border-l-4 border-l-amber-600 bg-amber-50/80 border border-amber-200')"
                           class="p-2 rounded-lg text-[10px] space-y-1 shadow-2xs hover:shadow-xs transition-all cursor-pointer hover:scale-[1.02]">
                           
                           <!-- Tipo de Parcial y Estado -->
@@ -1118,6 +1131,12 @@ export interface DiaCalendario {
                             </div>
                           }
 
+                          @if (ex.modalidad === 'VIRTUAL' && (ex.estadoFlujo === 'GENERADO' || ex.estado === 'Generado')) {
+                            <div class="bg-purple-100 text-purple-900 border border-purple-300 font-extrabold px-1.5 py-0.5 rounded text-[8.5px] flex items-center gap-1">
+                              <i class="pi pi-desktop text-[8px] text-purple-700"></i> Sala virtual lista
+                            </div>
+                          }
+
                           <!-- Materia y Código -->
                           <div class="font-black text-foreground leading-tight">
                             [{{ ex.codigo }}] {{ ex.materia }}
@@ -1127,7 +1146,11 @@ export interface DiaCalendario {
                           <div class="flex items-center justify-between text-muted-foreground font-medium text-[9px]">
                             <span>{{ ex.grupo }}</span>
                             
-                            @if (ex.conCartilla) {
+                            @if (ex.modalidad === 'VIRTUAL') {
+                              <span class="text-purple-700 font-bold flex items-center gap-0.5">
+                                <i class="pi pi-desktop text-[9px]"></i> Virtual
+                              </span>
+                            } @else if (ex.conCartilla) {
                               <span class="text-blue-700 font-bold flex items-center gap-0.5">
                                 <i class="pi pi-check-square text-[9px]"></i> Con Cartilla
                               </span>
@@ -1520,7 +1543,13 @@ export interface DiaCalendario {
                 </div>
                 <div>
                   <span class="text-[10px] text-muted-foreground uppercase font-bold block">Modalidad</span>
-                  <span class="font-bold text-xs">{{ examenSeleccionadoModal()?.conCartilla ? 'Con Cartilla Óptica' : 'Sin Cartilla' }}</span>
+                  <span class="font-bold text-xs">
+                    @if (examenSeleccionadoModal()?.modalidad === 'VIRTUAL') {
+                      <span class="text-purple-700 font-bold flex items-center gap-1"><i class="pi pi-desktop text-xs"></i> Examen Virtual (En Línea)</span>
+                    } @else {
+                      {{ examenSeleccionadoModal()?.conCartilla ? 'Con Cartilla Óptica' : 'Sin Cartilla' }}
+                    }
+                  </span>
                 </div>
                 <div>
                   <span class="text-[10px] text-muted-foreground uppercase font-bold block">Fecha Programada</span>
@@ -1541,6 +1570,118 @@ export interface DiaCalendario {
                   </span>
                 </div>
               </div>
+
+              @if (examenSeleccionadoModal()?.modalidad === 'VIRTUAL') {
+                <div class="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50/90 via-white to-purple-50/50 p-4 space-y-3.5 shadow-xs">
+                  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-purple-100 pb-2.5">
+                    <div class="flex items-center gap-2">
+                      <div class="h-8 w-8 rounded-xl bg-purple-600 text-white flex items-center justify-center text-sm shadow-xs">
+                        <i class="pi pi-desktop"></i>
+                      </div>
+                      <div>
+                        <h4 class="font-black text-xs text-purple-950">Gestión de Sala Virtual</h4>
+                        <p class="text-[10px] text-purple-700/80">Control de acceso y lanzamiento de la evaluación en tiempo real</p>
+                      </div>
+                    </div>
+
+                    @if (salaVirtualExamenActivo(); as sala) {
+                      <span class="text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase border shadow-2xs"
+                            [ngClass]="{
+                              'bg-amber-100 text-amber-800 border-amber-300': sala.estado === 'PREPARADA',
+                              'bg-blue-100 text-blue-800 border-blue-300': sala.estado === 'ABIERTA',
+                              'bg-emerald-100 text-emerald-800 border-emerald-300': sala.estado === 'INICIADA' || sala.estado === 'EN_CURSO',
+                              'bg-slate-100 text-slate-700 border-slate-300': sala.estado === 'CERRADA' || sala.estado === 'CALIFICADA'
+                            }">
+                        ● Sala {{ sala.estado }}
+                      </span>
+                    }
+                  </div>
+
+                  @if (cargandoSalaVirtualExamen()) {
+                    <div class="py-6 text-center text-xs font-bold text-muted-foreground">
+                      <i class="pi pi-spin pi-spinner text-xl text-purple-600"></i>
+                      <p class="mt-2">Consultando sala virtual asignada...</p>
+                    </div>
+                  } @else if (salaVirtualExamenActivo(); as sala) {
+                    <!-- DATOS DE ACCESO SALA & PIN -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div class="rounded-xl border border-purple-200 bg-white p-3 shadow-2xs">
+                        <span class="text-[9px] font-black uppercase text-purple-600 block">Código de Sala</span>
+                        <span class="font-mono text-xl font-black text-purple-950 tracking-wider block mt-0.5 select-all">{{ sala.codigoSala }}</span>
+                        <span class="text-[9.5px] text-muted-foreground mt-0.5 block">Duración: <strong>{{ sala.duracionMinutos || 45 }} min</strong></span>
+                      </div>
+
+                      <div class="rounded-xl border border-purple-300 bg-purple-700 text-white p-3 shadow-2xs flex flex-col justify-between">
+                        <div>
+                          <span class="text-[9px] font-black uppercase text-purple-200 block">PIN Grupal de Acceso</span>
+                          @if (tokenGrupoVirtualExamen(); as pin) {
+                            <span class="font-mono text-xl font-black tracking-widest block mt-0.5 select-all">{{ pin }}</span>
+                          } @else {
+                            <span class="text-[11px] font-medium text-purple-200 block mt-1">Sin PIN activo en sesión</span>
+                          }
+                        </div>
+                        <div class="flex items-center gap-1.5 mt-2">
+                          @if (tokenGrupoVirtualExamen()) {
+                            <button (click)="copiarPinVirtual()" class="bg-white/20 hover:bg-white/30 text-white rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer transition">
+                              <i class="pi pi-copy text-[9px] mr-1"></i> Copiar PIN
+                            </button>
+                          }
+                          <button (click)="emitirTokenGrupoDocente()" [disabled]="operandoSalaVirtualExamen()" class="bg-white text-purple-950 hover:bg-purple-50 rounded-lg px-2 py-1 text-[10px] font-black cursor-pointer transition shadow-2xs disabled:opacity-50">
+                            <i class="pi pi-key text-[9px] mr-1"></i> {{ tokenGrupoVirtualExamen() ? 'Renovar PIN' : 'Generar PIN' }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- ESTUDIANTES CONECTADOS -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white/80 rounded-xl border border-purple-100 text-[11px]">
+                      <div class="flex items-center gap-3">
+                        <span><i class="pi pi-users text-purple-700 mr-1"></i> Registrados: <strong>{{ sala.participantes?.length || 0 }}</strong></span>
+                        <span class="text-amber-700"><i class="pi pi-clock mr-1"></i> En espera: <strong>{{ participantesEnEsperaVirtual() }}</strong></span>
+                        <span class="text-emerald-700"><i class="pi pi-play-circle mr-1"></i> En curso: <strong>{{ participantesEnCursoVirtual() }}</strong></span>
+                      </div>
+                      <button (click)="copiarDatosCompletosVirtual()" class="text-purple-700 hover:text-purple-900 font-bold flex items-center gap-1 text-[10.5px] cursor-pointer">
+                        <i class="pi pi-share-alt text-[10px]"></i> Copiar mensaje para estudiantes
+                      </button>
+                    </div>
+
+                    <!-- CONTROLES PRINCIPALES DEL DOCENTE -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-purple-100">
+                      <div class="flex flex-wrap items-center gap-2">
+                        @if (sala.estado === 'PREPARADA') {
+                          <button (click)="abrirSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                            <i class="pi pi-sign-in text-xs"></i> Abrir Sala (Permitir Ingreso)
+                          </button>
+                        }
+                        @if (sala.estado === 'PREPARADA' || sala.estado === 'ABIERTA') {
+                          <button (click)="iniciarSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50">
+                            <i class="pi pi-play text-xs"></i> Iniciar Examen Ahora
+                          </button>
+                        }
+                        @if (sala.estado === 'INICIADA' || sala.estado === 'EN_CURSO') {
+                          <button (click)="cerrarSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50">
+                            <i class="pi pi-lock text-xs"></i> Finalizar / Cerrar Examen
+                          </button>
+                        }
+                      </div>
+
+                      <button (click)="irASalaVirtualCompleta()" class="text-purple-700 hover:text-purple-900 font-bold text-xs flex items-center gap-1 cursor-pointer">
+                        <span>Panel de Monitoreo Completo</span>
+                        <i class="pi pi-arrow-right text-[10px]"></i>
+                      </button>
+                    </div>
+
+                  } @else {
+                    <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-xl text-purple-900 text-[11px] leading-relaxed flex items-start gap-2">
+                      <i class="pi pi-info-circle text-purple-700 text-sm mt-0.5 shrink-0"></i>
+                      <div>
+                        <span class="font-bold block">Sala virtual pendiente de generación</span>
+                        <span>El Departamento de Evaluaciones generará las variantes del examen virtual con la nómina oficial. En cuanto estén preparadas, aquí podrás abrir la sala y dar inicio a la evaluación.</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
 
               @if (esSinCartillaPendienteNotas(examenSeleccionadoModal())) {
                 <div class="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-950 text-xs flex items-start gap-2.5">
@@ -1567,6 +1708,23 @@ export interface DiaCalendario {
               </button>
 
               <div class="flex flex-wrap items-center gap-2">
+                @if (examenSeleccionadoModal()?.modalidad === 'VIRTUAL' && salaVirtualExamenActivo(); as sala) {
+                  @if (sala.estado === 'PREPARADA' || sala.estado === 'ABIERTA') {
+                    <button 
+                      (click)="iniciarSalaVirtualDocente()"
+                      [disabled]="operandoSalaVirtualExamen()"
+                      class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black hover:bg-emerald-700 flex items-center gap-2 shadow-xs cursor-pointer transition-transform hover:scale-105 disabled:opacity-50">
+                      <i class="pi pi-play text-xs"></i>
+                      <span>Iniciar Examen Virtual</span>
+                    </button>
+                  }
+                  <button 
+                    (click)="irASalaVirtualCompleta()"
+                    class="px-4 py-2 bg-purple-700 text-white rounded-xl text-xs font-black hover:bg-purple-800 flex items-center gap-2 shadow-xs cursor-pointer">
+                    <i class="pi pi-desktop text-xs"></i>
+                    <span>Monitor de Sala</span>
+                  </button>
+                }
                 @if (esSinCartillaPendienteNotas(examenSeleccionadoModal())) {
                   <button 
                     (click)="irACalificarExamenDesdeCalendario(examenSeleccionadoModal()!)"
@@ -1623,7 +1781,7 @@ export interface DiaCalendario {
             <div class="p-6 overflow-y-auto space-y-4 flex-1">
               <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs text-indigo-950">
                 <i class="pi pi-info-circle mr-1.5 text-indigo-700"></i>
-                @if (rolExamenActivo()?.estadoFlujo === 'PENDIENTE_NOTAS') {
+                @if (esSinCartillaHabilitadoParaNotas()) {
                   <span>Registre la calificación sobre <strong>60 puntos</strong> de cada estudiante oficial del grupo. El sistema calculará en tiempo real su equivalencia sobre <strong>100 puntos</strong>. Al guardar todas las notas, el examen pasará a <strong>Calificado</strong> y se generará la planilla oficial con firma y sello.</span>
                 } @else {
                   <span>Planilla de notas registrada oficialmente. Las calificaciones se encuentran consolidadas a partir de la nómina oficial institucional.</span>
@@ -1662,7 +1820,7 @@ export interface DiaCalendario {
                             step="0.01" 
                             [value]="nota.notaSobre60 ?? ''" 
                             (input)="editarNotaDocente(nota.codigoEstudiante, $any($event.target).value)" 
-                            [disabled]="rolExamenActivo()?.estadoFlujo !== 'PENDIENTE_NOTAS' || guardandoNotasDocente()" 
+                            [disabled]="!esSinCartillaHabilitadoParaNotas() || guardandoNotasDocente()" 
                             class="w-24 text-center rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 font-mono text-xs font-black text-indigo-950 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed" 
                             placeholder="0–60" />
                         </div>
@@ -1696,7 +1854,7 @@ export interface DiaCalendario {
                 <button (click)="cerrarNotasDocente()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">
                   Cerrar
                 </button>
-                @if (rolExamenActivo()?.estadoFlujo === 'PENDIENTE_NOTAS') {
+                @if (esSinCartillaHabilitadoParaNotas()) {
                   <button 
                     (click)="guardarNotasDocente()" 
                     [disabled]="!notasDocenteCompletas() || guardandoNotasDocente()" 
@@ -2786,6 +2944,8 @@ export class BancoPreguntasComponent implements OnInit {
   private readonly _omrService = inject(OmrProcesamientoService);
   private readonly _route = inject(ActivatedRoute);
   private readonly _notificacionesService = inject(NotificacionesService);
+  private readonly _http = inject(HttpClient);
+  private readonly _router = inject(Router);
 
   @ViewChild('fileInput') public fileInputRef!: ElementRef<HTMLInputElement>;
   @ViewChild('imageInput') public imageInputRef!: ElementRef<HTMLInputElement>;
@@ -2811,6 +2971,12 @@ export class BancoPreguntasComponent implements OnInit {
     const notas = this.notasDocente();
     return notas.length > 0 && notas.every(n => n.notaSobre60 !== null && n.notaSobre60 !== undefined && !isNaN(Number(n.notaSobre60)));
   });
+
+  // Estado de Sala Virtual en Modal de Examen Docente
+  public salaVirtualExamenActivo = signal<any | null>(null);
+  public cargandoSalaVirtualExamen = signal<boolean>(false);
+  public operandoSalaVirtualExamen = signal<boolean>(false);
+  public tokenGrupoVirtualExamen = signal<string | null>(null);
 
   // Pestaña activa: 'validador' (default) o 'calendario'
   public tabActiva = signal<'validador' | 'calendario'>('validador');
@@ -3398,6 +3564,170 @@ export class BancoPreguntasComponent implements OnInit {
 
   public abrirModalDetalleExamen(ex: ExamenDocenteCronograma): void {
     this.examenSeleccionadoModal.set(ex);
+    this.salaVirtualExamenActivo.set(null);
+    this.tokenGrupoVirtualExamen.set(null);
+    if (ex.modalidad === 'VIRTUAL') {
+      this.consultarSalaVirtualDeExamen(ex.id);
+    }
+  }
+
+  public consultarSalaVirtualDeExamen(rolExamenId: string): void {
+    this.cargandoSalaVirtualExamen.set(true);
+    this._http.get<any>(`/api/examenes-virtuales/roles/${rolExamenId}/sala`).subscribe({
+      next: sala => {
+        this.cargandoSalaVirtualExamen.set(false);
+        this.salaVirtualExamenActivo.set(sala);
+        const tokenGuardado = this._recuperarTokenSalaVirtual(sala.id);
+        this.tokenGrupoVirtualExamen.set(tokenGuardado);
+      },
+      error: () => {
+        this.cargandoSalaVirtualExamen.set(false);
+        this.salaVirtualExamenActivo.set(null);
+      }
+    });
+  }
+
+  public abrirSalaVirtualDocente(): void {
+    const sala = this.salaVirtualExamenActivo();
+    if (!sala || this.operandoSalaVirtualExamen()) return;
+    this.operandoSalaVirtualExamen.set(true);
+    this._http.post<any>(`/api/examenes-virtuales/salas/${sala.id}/abrir`, {}).subscribe({
+      next: actualizada => {
+        this.operandoSalaVirtualExamen.set(false);
+        this.salaVirtualExamenActivo.set(actualizada);
+        this._mostrarToast('Sala virtual abierta. Los estudiantes ya pueden ingresar con su PIN y matrícula.');
+        if (!this.tokenGrupoVirtualExamen()) {
+          this.emitirTokenGrupoDocente();
+        }
+      },
+      error: err => {
+        this.operandoSalaVirtualExamen.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo abrir la sala virtual.', 'error');
+      }
+    });
+  }
+
+  public iniciarSalaVirtualDocente(): void {
+    const sala = this.salaVirtualExamenActivo();
+    if (!sala || this.operandoSalaVirtualExamen()) return;
+    this.operandoSalaVirtualExamen.set(true);
+    this._http.post<any>(`/api/examenes-virtuales/salas/${sala.id}/iniciar`, {}).subscribe({
+      next: actualizada => {
+        this.operandoSalaVirtualExamen.set(false);
+        this.salaVirtualExamenActivo.set(actualizada);
+        this._mostrarToast('¡Examen virtual iniciado! La cuenta regresiva oficial comenzó.');
+      },
+      error: err => {
+        this.operandoSalaVirtualExamen.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo iniciar el examen virtual.', 'error');
+      }
+    });
+  }
+
+  public cerrarSalaVirtualDocente(): void {
+    const sala = this.salaVirtualExamenActivo();
+    if (!sala || this.operandoSalaVirtualExamen()) return;
+    this.operandoSalaVirtualExamen.set(true);
+    this._http.post<any>(`/api/examenes-virtuales/salas/${sala.id}/cerrar`, {}).subscribe({
+      next: actualizada => {
+        this.operandoSalaVirtualExamen.set(false);
+        this.salaVirtualExamenActivo.set(actualizada);
+        this._mostrarToast('Sala virtual cerrada y calificada automáticamente.');
+      },
+      error: err => {
+        this.operandoSalaVirtualExamen.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo cerrar la sala.', 'error');
+      }
+    });
+  }
+
+  public emitirTokenGrupoDocente(): void {
+    const sala = this.salaVirtualExamenActivo();
+    if (!sala || this.operandoSalaVirtualExamen()) return;
+    this.operandoSalaVirtualExamen.set(true);
+    this._http.post<{ codigoSala: string; tokenGrupo: string }>(`/api/examenes-virtuales/salas/${sala.id}/token-grupo`, {}).subscribe({
+      next: res => {
+        this.operandoSalaVirtualExamen.set(false);
+        this.tokenGrupoVirtualExamen.set(res.tokenGrupo);
+        this._guardarTokenSalaVirtual(sala.id, res.tokenGrupo);
+        this._mostrarToast(`PIN de acceso grupal generado: ${res.tokenGrupo}`);
+      },
+      error: err => {
+        this.operandoSalaVirtualExamen.set(false);
+        this._mostrarToast(err?.error?.message || 'No se pudo emitir el PIN grupal.', 'error');
+      }
+    });
+  }
+
+  public copiarPinVirtual(): void {
+    const pin = this.tokenGrupoVirtualExamen();
+    if (pin && typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(pin);
+      this._mostrarToast('PIN de acceso grupal copiado.');
+    }
+  }
+
+  public copiarDatosCompletosVirtual(): void {
+    const sala = this.salaVirtualExamenActivo();
+    const ex = this.examenSeleccionadoModal();
+    const pin = this.tokenGrupoVirtualExamen();
+    if (!sala) return;
+    const enlace = typeof window !== 'undefined' ? `${window.location.origin}/examen-virtual` : 'https://planificacion.unitepc.edu.bo/examen-virtual';
+    const lineas = [
+      `📋 *EVALUACIÓN VIRTUAL · UNITEPC*`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `• *Materia:* ${ex?.materia || '-'}`,
+      `• *Grupo:* ${ex?.grupo || '-'}`,
+      `• *Duración:* ${sala.duracionMinutos || 45} minutos`,
+      `• *Horario:* ${ex?.horario || '-'}`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `🌐 *Enlace de acceso:*`,
+      enlace,
+      ``,
+      `🔑 *DATOS PARA INGRESAR:*`,
+      `• *Código de Sala:* ${sala.codigoSala}`,
+      pin ? `• *PIN / Token Grupal:* ${pin}` : null,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `ℹ️ *Instrucciones para el estudiante:*`,
+      `1. Abre el enlace del examen.`,
+      `2. Ingresa tu Código de Estudiante (matrícula institucional).`,
+      `3. Introduce el Código de Sala y el PIN grupal.`
+    ].filter(Boolean).join('\n');
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(lineas);
+      this._mostrarToast('Instrucciones y accesos del examen copiados al portapapeles.');
+    }
+  }
+
+  private _guardarTokenSalaVirtual(salaId: string, token: string): void {
+    try { sessionStorage.setItem(`sea_token_sala_${salaId}`, token); } catch (_) {}
+  }
+
+  private _recuperarTokenSalaVirtual(salaId: string): string | null {
+    try { return sessionStorage.getItem(`sea_token_sala_${salaId}`); } catch (_) { return null; }
+  }
+
+  public participantesEnEsperaVirtual(): number {
+    const part = this.salaVirtualExamenActivo()?.participantes || [];
+    return part.filter((p: any) => p.estado === 'EN_ESPERA').length;
+  }
+
+  public participantesEnCursoVirtual(): number {
+    const part = this.salaVirtualExamenActivo()?.participantes || [];
+    return part.filter((p: any) => p.estado === 'EN_CURSO').length;
+  }
+
+  public irASalaVirtualCompleta(): void {
+    const ex = this.examenSeleccionadoModal();
+    const sala = this.salaVirtualExamenActivo();
+    this.examenSeleccionadoModal.set(null);
+    this._router.navigate(['/salas-virtuales'], {
+      queryParams: {
+        rolId: ex?.id,
+        salaId: sala?.codigoSala || sala?.id
+      }
+    });
   }
 
   public irAValidarExamenDesdeCalendario(ex: ExamenDocenteCronograma): void {
@@ -3414,10 +3744,17 @@ export class BancoPreguntasComponent implements OnInit {
     this._mostrarToast(`Redirigido al Validador para: ${ex.materia} (${ex.tipo}).`);
   }
 
+  public esSinCartillaHabilitadoParaNotas(): boolean {
+    const rol = this.rolExamenActivo();
+    if (!rol || !this.esSinCartillaActivo()) return false;
+    const st = rol.estadoFlujo;
+    return st === 'IMPRESO' || st === 'ENTREGADO' || st === 'DEVUELTO' || st === 'PENDIENTE_NOTAS';
+  }
+
   public esSinCartillaPendienteNotas(ex: ExamenDocenteCronograma | null): boolean {
-    if (!ex || ex.conCartilla) return false;
+    if (!ex || ex.conCartilla || ex.modalidad === 'VIRTUAL') return false;
     const st = (ex.estado || '').toLowerCase().trim();
-    return st === 'pendiente_notas' || st === 'pendiente de notas';
+    return st === 'impreso' || st === 'entregado' || st === 'devuelto' || st === 'pendiente_notas' || st === 'pendiente de notas';
   }
 
   public irACalificarExamenDesdeCalendario(ex: ExamenDocenteCronograma): void {
@@ -3445,7 +3782,9 @@ export class BancoPreguntasComponent implements OnInit {
       horario: rol.horario,
       aula: `${rol.aula} (${rol.campus})`,
       conCartilla: rol.modalidad === 'PRESENCIAL_CARTILLA',
-      estado
+      modalidad: rol.modalidad,
+      estado,
+      estadoFlujo: rol.estadoFlujo
     };
   }
 

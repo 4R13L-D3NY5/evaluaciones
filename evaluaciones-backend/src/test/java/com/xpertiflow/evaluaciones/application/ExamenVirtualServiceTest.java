@@ -204,4 +204,59 @@ class ExamenVirtualServiceTest {
         assertThat(resultado.getAciertos()).isEqualTo(30);
         verify(intentoRepository, never()).save(any());
     }
+
+    @Test
+    void iniciarSala_desdeEstadoPreparada_iniciaCorrectamente() {
+        SalaExamenVirtual sala = new SalaExamenVirtual();
+        sala.setId("SALA-PREP");
+        sala.setCodigoSala("SALA-12345");
+        sala.setEstado("PREPARADA");
+        sala.setDuracionMinutos(60);
+        when(salaRepository.findById("SALA-PREP")).thenReturn(Optional.of(sala));
+        when(configuracionEvaluacionesService.obtener()).thenReturn(new com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto());
+
+        IntentoExamenVirtual intento = new IntentoExamenVirtual();
+        intento.setId("INT-1");
+        intento.setEstado("PENDIENTE");
+        intento.setCodigoEstudiante("EST-01");
+        when(intentoRepository.findBySalaIdOrderByCodigoEstudianteAsc("SALA-PREP")).thenReturn(List.of(intento));
+
+        var dto = service.iniciarSala("SALA-PREP", "docente_titular");
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.getEstado()).isEqualTo("EN_CURSO");
+        assertThat(sala.getEstado()).isEqualTo("EN_CURSO");
+        assertThat(sala.getIniciadoPor()).isEqualTo("docente_titular");
+        assertThat(intento.getEstado()).isEqualTo("EN_ESPERA");
+        verify(salaRepository).save(sala);
+        verify(intentoRepository).save(intento);
+        verify(eventoRepository, times(2)).save(any()); // SALA_ABIERTA y SALA_INICIADA
+    }
+
+    @Test
+    void iniciarSala_desdeEstadoAbierta_iniciaCorrectamente() {
+        SalaExamenVirtual sala = new SalaExamenVirtual();
+        sala.setId("SALA-ABIERTA");
+        sala.setCodigoSala("SALA-67890");
+        sala.setEstado("ABIERTA");
+        sala.setDuracionMinutos(45);
+        when(salaRepository.findById("SALA-ABIERTA")).thenReturn(Optional.of(sala));
+        when(configuracionEvaluacionesService.obtener()).thenReturn(new com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto());
+
+        IntentoExamenVirtual intento = new IntentoExamenVirtual();
+        intento.setId("INT-2");
+        intento.setEstado("EN_ESPERA");
+        intento.setCodigoEstudiante("EST-02");
+        when(intentoRepository.findBySalaIdOrderByCodigoEstudianteAsc("SALA-ABIERTA")).thenReturn(List.of(intento));
+
+        var dto = service.iniciarSala("SALA-ABIERTA", "docente_titular");
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.getEstado()).isEqualTo("EN_CURSO");
+        assertThat(sala.getEstado()).isEqualTo("EN_CURSO");
+        assertThat(sala.getIniciadoPor()).isEqualTo("docente_titular");
+        verify(salaRepository).save(sala);
+        verify(intentoRepository).save(intento);
+        verify(eventoRepository, times(1)).save(any()); // SALA_INICIADA
+    }
 }

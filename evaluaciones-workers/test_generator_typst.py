@@ -17,7 +17,11 @@ class FormulasTypstTest(unittest.TestCase):
         '$ "Reparo" = 150.000 times 25% $',
         '$ x = (-b + sqrt(b^2 - 4a c)) / (2a) $',
         '$ H_2 S O_4 + 2 N a O H arrow N a_2 S O_4 + H_2 O $',
-        '$ C\\equiv C $',
+        r'$ C\equiv C $',
+        r'$ \gamma_0 / (K_0 \tau_0) $',
+        r'$ 3\tau_0 $',
+        r'$ 0,5\tau_0 $',
+        r'$ \Delta V \approx \alpha \cdot \beta $',
     ]
 
     def test_preserva_texto_entre_comillas(self):
@@ -29,6 +33,28 @@ class FormulasTypstTest(unittest.TestCase):
         resultado = generator._sanitize_math(r'C\equiv C')
         self.assertEqual(resultado, 'C equiv C')
         self.assertNotIn('\\"equiv"', resultado)
+
+    def test_normaliza_letras_griegas_latex(self):
+        # Caso reportado en BANCOPREGUNTAS_CONTROL2.xlsx: \gamma_0 / (K_0 \tau_0)
+        resultado = generator._sanitize_math(r'\gamma_0 / (K_0 \tau_0)')
+        self.assertEqual(resultado, 'gamma_0 / (K_0 tau_0)')
+        self.assertNotIn('\\gamma', resultado)
+        self.assertNotIn(' amma', resultado)
+        self.assertNotIn('"gamma"', resultado)
+
+    def test_repara_corrupcion_tabulacion_tau(self):
+        # \tau decodificado como ASCII Tab (\t) seguido de au_0
+        texto_con_tab = "\t au_0"
+        resultado = generator._sanitize_math(texto_con_tab)
+        self.assertEqual(resultado, 'tau_0')
+
+        texto_con_tab_sin_espacio = "\tau_0"  # En python literal \t es byte 9
+        resultado2 = generator._sanitize_math(texto_con_tab_sin_espacio)
+        self.assertEqual(resultado2, 'tau_0')
+
+    def test_normaliza_operadores_latex(self):
+        resultado = generator._sanitize_math(r'a \leq b \approx c \neq d \geq e \infty')
+        self.assertEqual(resultado, 'a <= b approx c != d >= e oo')
 
     def test_limpia_prefijos_de_inciso_y_no_duplica_cuadro_de_caso(self):
         opciones = json.dumps([
@@ -73,6 +99,9 @@ class FormulasTypstTest(unittest.TestCase):
             ruta_pdf = os.path.join(directorio, "formulas.pdf")
             with open(ruta_typ, "w", encoding="utf-8") as archivo:
                 archivo.write(documento)
+            env = os.environ.copy()
+            if "TYPST_FONT_PATHS" not in env and os.path.exists("/usr/share/fonts"):
+                env["TYPST_FONT_PATHS"] = "/usr/share/fonts"
             resultado = subprocess.run(
                 [config.TYPST_BIN, "compile", ruta_typ, ruta_pdf],
                 check=False,
@@ -80,6 +109,7 @@ class FormulasTypstTest(unittest.TestCase):
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                env=env,
             )
             self.assertEqual(resultado.returncode, 0, resultado.stderr or resultado.stdout)
             salida = f"{resultado.stdout}\n{resultado.stderr}".lower()

@@ -13,4 +13,6 @@ public interface CalificacionOmrRepository extends JpaRepository<CalificacionOmr
     List<CalificacionOmr> findByRolExamenIdOrderByCodigoEstudianteAsc(String rolExamenId);
 
     Optional<CalificacionOmr> findByRolExamenIdAndCodigoEstudiante(String rolExamenId, String codigoEstudiante);
+
+    List<CalificacionOmr> findByCodigoEstudiante(String codigoEstudiante);
 }

@@ -202,6 +202,7 @@ services:
       VAULT_TOKEN: ${VAULT_WORKER_TOKEN}
       VAULT_TRANSIT_KEY_NAME: ${VAULT_TRANSIT_KEY_NAME:-sea-banco-kek}
       MAINTENANCE_MARKER: /app/storage/.sea-maintenance
+      TYPST_FONT_PATHS: /usr/share/fonts
     volumes:
       - ./storage:/app/storage
       - ./bases:/app/bases:ro

@@ -540,7 +540,7 @@ def _resolver_codigo_estudiante(
             crop_hdr = imagen[y_top:gy, max(0, gx):min(imagen.shape[1], gx + gw)]
             if crop_hdr.size > 0:
                 hdr_gray = cv2.cvtColor(crop_hdr, cv2.COLOR_BGR2GRAY)
-                texto_hdr = pytesseract.image_to_string(hdr_gray, config="--psm 6").upper()
+                texto_hdr = pytesseract.image_to_string(hdr_gray, config="--psm 6 --dpi 300").upper()
                 for codigo, datos in mapeos.items():
                     nombre = datos.get("nombre", "").upper().strip()
                     partes = [p for p in nombre.split() if len(p) >= 4]
@@ -566,12 +566,33 @@ def _candidatos_codigo(
     imagen: np.ndarray,
     parametros: dict[str, float] | None = None,
     grilla: tuple[int, int, int, int] | None = None,
+    mapeos: dict[str, Any] | set[str] | list[str] | None = None,
 ) -> list[str]:
     alto, ancho = imagen.shape[:2]
     parametros = parametros or PARAMETROS_OMR_DEFECTO
     zonas_pixeles = _zonas_busqueda_codigo(grilla, ancho, alto, parametros)
 
+    codigos_nomina: set[str] = set()
+    if mapeos:
+        if isinstance(mapeos, dict):
+            codigos_nomina = set(str(k) for k in mapeos.keys())
+        else:
+            codigos_nomina = set(str(k) for k in mapeos)
+
     candidatos: list[str] = []
+
+    # 1. Modos prioritarios de alta velocidad y precisión numérica
+    psms_rapidos = (
+        "--psm 7 --dpi 300 -c tessedit_char_whitelist=0123456789",
+        "--psm 6 --dpi 300 -c tessedit_char_whitelist=0123456789",
+    )
+    # 2. Modos de contingencia si no se resuelve en la nómina
+    psms_contingencia = (
+        "--psm 7 --dpi 300",
+        "--psm 6 --dpi 300",
+        "--psm 8 --dpi 300",
+    )
+
     for x1, y1, x2, y2 in zonas_pixeles:
         x1, y1 = max(0, x1), max(0, y1)
         x2, y2 = min(ancho, x2), min(alto, y2)
@@ -586,26 +607,27 @@ def _candidatos_codigo(
         )
         variantes = (
             ampliada,
-            cv2.threshold(ampliada, 170, 255, cv2.THRESH_BINARY)[1],
             cv2.threshold(ampliada, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1],
+            cv2.threshold(ampliada, 170, 255, cv2.THRESH_BINARY)[1],
         )
-        for psm in (
-            "--psm 7 -c tessedit_char_whitelist=0123456789",
-            "--psm 6 -c tessedit_char_whitelist=0123456789",
-            "--psm 7",
-            "--psm 6",
-            "--psm 8",
-        ):
+
+        # Paso 1: Intentar modos rápidos con whitelist
+        for psm in psms_rapidos:
             for variante in variantes:
-                texto_raw = pytesseract.image_to_string(variante, config=psm)
+                try:
+                    texto_raw = pytesseract.image_to_string(variante, config=psm)
+                except Exception as ex_ocr:
+                    logger.debug("Fallo en variante OCR (psm: %s): %s", psm, ex_ocr)
+                    continue
                 secuencias_raw = re.findall(r"\d{5,12}", texto_raw)
                 texto_norm = _normalizar_digitos_ocr(texto_raw)
                 secuencias_norm = re.findall(r"\d{5,12}", texto_norm)
-                
+
                 todas = list(set(secuencias_raw + secuencias_norm))
-                candidatos.extend(todas)
-                
                 for sec in todas:
+                    candidatos.append(sec)
+                    if codigos_nomina and sec in codigos_nomina:
+                        return [sec]  # Cortocircuito inmediato al primer acierto en nómina
                     n = len(sec)
                     if n > 7:
                         candidatos.append(sec[-7:])
@@ -614,7 +636,48 @@ def _candidatos_codigo(
                     if n >= 7:
                         candidatos.append(sec[1:])
                         candidatos.append(sec[:-1])
-                        
+                    if codigos_nomina:
+                        for c in (sec[-7:], sec[:7], sec[1:8], sec[1:], sec[:-1]):
+                            if c in codigos_nomina:
+                                return [c]
+
+        # Si aún no tenemos acierto en nómina, intentar modos de contingencia
+        if not (codigos_nomina and any(c in codigos_nomina for c in candidatos)):
+            for psm in psms_contingencia:
+                for variante in variantes:
+                    try:
+                        texto_raw = pytesseract.image_to_string(variante, config=psm)
+                    except Exception as ex_ocr:
+                        logger.debug("Fallo en variante OCR contingencia (psm: %s): %s", psm, ex_ocr)
+                        continue
+                    secuencias_raw = re.findall(r"\d{5,12}", texto_raw)
+                    texto_norm = _normalizar_digitos_ocr(texto_raw)
+                    secuencias_norm = re.findall(r"\d{5,12}", texto_norm)
+
+                    todas = list(set(secuencias_raw + secuencias_norm))
+                    for sec in todas:
+                        candidatos.append(sec)
+                        if codigos_nomina and sec in codigos_nomina:
+                            return [sec]
+                        n = len(sec)
+                        if n > 7:
+                            candidatos.append(sec[-7:])
+                            candidatos.append(sec[:7])
+                            candidatos.append(sec[1:8])
+                        if n >= 7:
+                            candidatos.append(sec[1:])
+                            candidatos.append(sec[:-1])
+                        if codigos_nomina:
+                            for c in (sec[-7:], sec[:7], sec[1:8], sec[1:], sec[:-1]):
+                                if c in codigos_nomina:
+                                    return [c]
+
+        # Si en esta zona se logró una coincidencia con la nómina, salir
+        if codigos_nomina:
+            for c in candidatos:
+                if c in codigos_nomina:
+                    return [c]
+
     return [candidato for candidato, _ in Counter(candidatos).most_common()]
 
 
@@ -780,7 +843,7 @@ def procesar_archivo(archivo: str, rol_examen_id: str, campus: str = "", impreso
     for numero_pagina, imagen in enumerate(paginas, start=1):
         gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
         grilla = _detectar_grilla(gris, parametros)
-        candidatos = _candidatos_codigo(imagen, parametros, grilla)
+        candidatos = _candidatos_codigo(imagen, parametros, grilla, mapeos=mapeos)
         codigo, metodo_resolucion = _resolver_codigo_estudiante(candidatos, mapeos, imagen, grilla)
         if codigo and codigo not in candidatos:
             candidatos.insert(0, codigo)
