@@ -2678,10 +2678,10 @@ interface CampusDisponible extends Campus {
                         <span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span>
                         <span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span>
                         <span class="text-center font-mono font-bold" [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'" [class.text-slate-700]="nota.estadoCalificacion !== 'ANULADO'">
-                          {{ nota.estadoCalificacion === 'ANULADO' ? ('0/' + (nota.totalReactivos ?? 28)) : ((nota.aciertos ?? 0) + '/' + (nota.totalReactivos ?? 28)) }}
+                          {{ nota.estadoCalificacion === 'ANULADO' ? ('0/' + nota.totalReactivos) : (nota.aciertos + '/' + nota.totalReactivos) }}
                         </span>
-                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : (nota.notaSobre60 ?? 0) }}</strong>
-                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : (nota.notaSobre100 ?? 0) }}</strong>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre60 }}</strong>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre100 }}</strong>
                         <span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'" [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'" [class.bg-rose-50]="nota.estadoCalificacion === 'ANULADO'" [class.px-1.5]="nota.estadoCalificacion === 'ANULADO'" [class.py-0.5]="nota.estadoCalificacion === 'ANULADO'" [class.rounded]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion }}</span>
                         <div class="text-right">
                           @if (puedeAnularExamenEstudiante()) {
