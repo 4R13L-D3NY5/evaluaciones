@@ -59,6 +59,9 @@ public class ConfiguracionEvaluaciones {
     @Column(name = "horas_candado_72", nullable = false)
     private Integer horasCandado72;
 
+    @Column(name = "minutos_minimos_devolucion", nullable = false)
+    private Integer minutosMinimosDevolucion;
+
     @Column(name = "actualizado_en", nullable = false)
     private LocalDateTime actualizadoEn;
 

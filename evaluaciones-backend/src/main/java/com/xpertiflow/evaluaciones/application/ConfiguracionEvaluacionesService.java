@@ -32,6 +32,7 @@ public class ConfiguracionEvaluacionesService {
     private static final int HORAS_PATRON_POR_DEFECTO = 8;
     private static final int HORAS_LISTA_POR_DEFECTO = 24;
     private static final int HORAS_CANDADO_POR_DEFECTO = 72;
+    private static final int MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO = 45;
 
     private final ConfiguracionEvaluacionesRepository repository;
     private final ObjectMapper objectMapper;
@@ -62,6 +63,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setHorasPostPatron(valorORango(request.getHorasPostPatron(), HORAS_PATRON_POR_DEFECTO, 0, 720));
         configuracion.setHorasAntesLista(valorORango(request.getHorasAntesLista(), HORAS_LISTA_POR_DEFECTO, 0, 720));
         configuracion.setHorasCandado72(valorORango(request.getHorasCandado72(), HORAS_CANDADO_POR_DEFECTO, 0, 720));
+        configuracion.setMinutosMinimosDevolucion(valorORango(request.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         configuracion.setActualizadoEn(LocalDateTime.now());
         configuracion.setActualizadoPor(usuarioValido(request.getActualizadoPor()));
         return mapear(repository.save(configuracion));
@@ -83,6 +85,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setHorasPostPatron(HORAS_PATRON_POR_DEFECTO);
         configuracion.setHorasAntesLista(HORAS_LISTA_POR_DEFECTO);
         configuracion.setHorasCandado72(HORAS_CANDADO_POR_DEFECTO);
+        configuracion.setMinutosMinimosDevolucion(MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO);
         configuracion.setActualizadoPor("ADMIN_EVALUACIONES");
         configuracion.setActualizadoEn(LocalDateTime.now());
         return configuracion;
@@ -106,6 +109,7 @@ public class ConfiguracionEvaluacionesService {
         dto.setHorasPostPatron(valorORango(configuracion.getHorasPostPatron(), HORAS_PATRON_POR_DEFECTO, 0, 720));
         dto.setHorasAntesLista(valorORango(configuracion.getHorasAntesLista(), HORAS_LISTA_POR_DEFECTO, 0, 720));
         dto.setHorasCandado72(valorORango(configuracion.getHorasCandado72(), HORAS_CANDADO_POR_DEFECTO, 0, 720));
+        dto.setMinutosMinimosDevolucion(valorORango(configuracion.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         dto.setActualizadoEn(configuracion.getActualizadoEn());
         dto.setActualizadoPor(configuracion.getActualizadoPor());
         return dto;

@@ -280,6 +280,7 @@ class RolExamenServiceTest {
                 .build());
 
         assertThat(rol.getEstadoFlujo()).isEqualTo(EstadoFlujo.PENDIENTE_NOTAS);
+        verify(politicaTiempoEvaluacionesService).exigirDevolucionHabilitada(org.mockito.ArgumentMatchers.eq(rol), org.mockito.ArgumentMatchers.any());
         verify(rolExamenRepository, org.mockito.Mockito.times(2)).save(rol);
         ArgumentCaptor<AuditoriaEvaluacion> auditorias = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
         verify(auditoriaRepository, org.mockito.Mockito.times(2)).save(auditorias.capture());

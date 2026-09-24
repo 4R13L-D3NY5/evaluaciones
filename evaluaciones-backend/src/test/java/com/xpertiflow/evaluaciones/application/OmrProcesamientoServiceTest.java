@@ -22,6 +22,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -35,6 +36,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -154,6 +156,64 @@ class OmrProcesamientoServiceTest {
     }
 
     @Test
+    void anularExamenEstudiante_permitePersonalEvaluaciones() {
+        CalificacionOmr calificacion = new CalificacionOmr();
+        calificacion.setId(101L);
+        calificacion.setRolExamenId(rolId);
+        calificacion.setCodigoEstudiante("EST-67890");
+        calificacion.setEstudianteNombreCompleto("MARIA LOPEZ");
+        calificacion.setLetraVariante("B");
+        calificacion.setTotalReactivos(30);
+        calificacion.setAciertos(20);
+        calificacion.setFallos(10);
+        calificacion.setBlancos(0);
+        calificacion.setDoblesMarcas(0);
+        calificacion.setNotaSobre60(new BigDecimal("40.00"));
+        calificacion.setNotaSobre100(new BigDecimal("66.67"));
+        calificacion.setEstadoCalificacion("APROBADO");
+        calificacion.setRespuestasDetectadasJson("{\"1\":\"B\",\"2\":\"C\"}");
+
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+        when(calificacionRepository.findByRolExamenIdAndCodigoEstudiante(rolId, "EST-67890"))
+                .thenReturn(Optional.of(calificacion));
+        when(calificacionRepository.save(any(CalificacionOmr.class))).thenAnswer(i -> i.getArgument(0));
+
+        Authentication authPersonal = new UsernamePasswordAuthenticationToken(
+                "operador.campus",
+                "secret",
+                List.of(new SimpleGrantedAuthority("ROLE_PERSONAL_EVALUACIONES"))
+        );
+
+        CalificacionOmrResponseDto response = service.anularExamenEstudiante(
+                rolId, "EST-67890", true, "Cartilla dañada o anulada en mesa", authPersonal, "10.0.0.5");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getEstadoCalificacion()).isEqualTo("ANULADO");
+        assertThat(response.getNotaSobre60()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.getNotaSobre100()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        ArgumentCaptor<AuditoriaEvaluacion> auditoriaCaptor = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
+        verify(auditoriaRepository).save(auditoriaCaptor.capture());
+        assertThat(auditoriaCaptor.getValue().getAccion()).isEqualTo("EXAMEN_ESTUDIANTE_ANULADO");
+        assertThat(auditoriaCaptor.getValue().getUsuario()).isEqualTo("operador.campus");
+        assertThat(auditoriaCaptor.getValue().getIpOrigen()).isEqualTo("10.0.0.5");
+    }
+
+    @Test
+    void anularExamenEstudiante_deniegaRolNoAutorizado() {
+        Authentication authDocente = new UsernamePasswordAuthenticationToken(
+                "docente.titular",
+                "secret",
+                List.of(new SimpleGrantedAuthority("ROLE_DOCENTE"))
+        );
+
+        assertThatThrownBy(() -> service.anularExamenEstudiante(
+                rolId, "EST-12345", true, "Intento de anulación sin permiso", authDocente, "127.0.0.1"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Solo el personal o responsable de evaluaciones o el administrador pueden realizar esta acción");
+    }
+
+    @Test
     void recalificarEvaluacion_registraAuditoriaYUsuario() {
         when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
         when(varianteRepository.findByRolExamenId(rolId)).thenReturn(Collections.emptyList());
@@ -185,12 +245,22 @@ class OmrProcesamientoServiceTest {
     }
 
     @Test
-    void consultarPatronCalificado_enEstadoEntregado_validaEstadoFlujoCorrectamente() {
+    void consultarPatronCalificado_enEstadoEntregado_lanzaIllegalStateException() {
         rol.setEstadoFlujo(EstadoFlujo.ENTREGADO);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        IllegalStateException ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                service.consultarPatronCalificado(rolId, auth));
+        assertThat(ex.getMessage()).contains("El patrón solo puede consultarse una vez que el examen ha sido devuelto");
+    }
+
+    @Test
+    void consultarPatronCalificado_enEstadoDevuelto_validaEstadoFlujoCorrectamente() {
+        rol.setEstadoFlujo(EstadoFlujo.DEVUELTO);
         when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
         when(varianteRepository.findByRolExamenId(rolId)).thenReturn(Collections.emptyList());
 
-        // Al pasar la verificación de estado ENTREGADO, prosigue a verificar variantes persistidas
+        // Al pasar la verificación de estado DEVUELTO, prosigue a verificar variantes persistidas
         IllegalStateException ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
                 service.consultarPatronCalificado(rolId, auth));
         assertThat(ex.getMessage()).isEqualTo("No existe un patrón persistido para esta evaluación.");

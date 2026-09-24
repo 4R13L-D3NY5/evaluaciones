@@ -794,6 +794,9 @@ public class RolExamenService {
         if (destino == EstadoFlujo.ENTREGADO) {
             politicaTiempoEvaluacionesService.exigirEntregaHabilitada(rol, authentication);
         }
+        if (destino == EstadoFlujo.DEVUELTO) {
+            politicaTiempoEvaluacionesService.exigirDevolucionHabilitada(rol, authentication);
+        }
         if (!transicionVirtualFinal && !transicionSinCartillaAImpreso && !transicionSinCartillaACalificado && !permitidos.contains(destino)) {
             throw new RuntimeException(
                     String.format("Transición no permitida de %s a %s", origen, destino));

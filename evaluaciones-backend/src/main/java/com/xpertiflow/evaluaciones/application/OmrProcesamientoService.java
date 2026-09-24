@@ -672,7 +672,7 @@ public class OmrProcesamientoService {
                                                              String motivo,
                                                              Authentication authentication,
                                                              String ipOrigen) {
-        validarRolAjuste(authentication);
+        validarRolAnulacionExamen(authentication);
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
 
@@ -744,6 +744,16 @@ public class OmrProcesamientoService {
         }
     }
 
+    private void validarRolAnulacionExamen(Authentication authentication) {
+        boolean autorizado = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_RESPONSABLE_EVALUACIONES".equals(authority.getAuthority())
+                        || "ROLE_PERSONAL_EVALUACIONES".equals(authority.getAuthority())
+                        || "ROLE_ADMINISTRADOR_SISTEMA".equals(authority.getAuthority()));
+        if (!autorizado) {
+            throw new AccessDeniedException("Solo el personal o responsable de evaluaciones o el administrador pueden realizar esta acción.");
+        }
+    }
+
     private record ResultadoCalificacion(int total, int aciertos, int fallos, int blancos, int dobles,
                                          BigDecimal notaSobre60, BigDecimal notaSobre100) {}
 
@@ -764,9 +774,9 @@ public class OmrProcesamientoService {
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
         politicaTiempoEvaluacionesService.exigirPatronHabilitado(rol, authentication);
-        if (rol.getEstadoFlujo() == null || !Set.of("ENTREGADO", "DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO", "CONFIRMADO")
+        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO", "CONFIRMADO")
                 .contains(rol.getEstadoFlujo().name())) {
-            throw new IllegalStateException("El patrón solo puede consultarse una vez que el examen ha sido entregado o en etapas posteriores.");
+            throw new IllegalStateException("El patrón solo puede consultarse una vez que el examen ha sido devuelto o en etapas posteriores.");
         }
 
         List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);
