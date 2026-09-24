@@ -4657,14 +4657,14 @@ export class BancoPreguntasComponent implements OnInit {
   public puedeDescargarPatronDocente(): boolean {
     const rol = this.rolExamenActivo();
     if (!rol || this.esSinCartillaActivo()) return false;
-    const estados = ['ENTREGADO', 'DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO', 'CONFIRMADO'];
+    const estados = ['DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO', 'CONFIRMADO'];
     return !!rol.estadoFlujo && estados.includes(rol.estadoFlujo);
   }
 
   public puedeDescargarPatronCronograma(ex: ExamenDocenteCronograma | null): boolean {
     if (!ex || !ex.conCartilla) return false;
     const estado = (ex.estado || '').toLowerCase().trim();
-    const estados = ['entregado', 'devuelto', 'pendiente_notas', 'pendiente de notas', 'calificado', 'confirmado'];
+    const estados = ['devuelto', 'pendiente_notas', 'pendiente de notas', 'calificado', 'confirmado'];
     return estados.includes(estado);
   }
 

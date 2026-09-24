@@ -79,6 +79,28 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-038 - Control de tiempo mínimo para devolución de examen (45 min) y liberación de patrones OMR a partir de DEVUELTO
+
+- Prioridad: Alta
+- Área: Evaluaciones / Tiempos / OMR / Seguridad
+- Responsable: Antigravity
+- Creada: 2026-09-24
+- Fecha límite: 2026-09-24
+- Dependencias: `PoliticaTiempoEvaluacionesService.java`, `RolExamenService.java`, `ConfiguracionEvaluacionesService.java`, `OmrProcesamientoService.java`, `evaluaciones-dia.component.ts`, `banco-preguntas.component.ts`, `administracion.component.ts`.
+- Criterio de cierre: 1) Configurar parámetro `minutosMinimosDevolucion` (default 45 min) en backend y en la interfaz de Administración de Tiempos; 2) Validar en backend (`RolExamenService`) que la transición a `DEVUELTO` exija haber transcurrido al menos `minutosMinimosDevolucion` minutos desde el inicio oficial del examen o entrega, permitiendo bypass exclusivo a `ROLE_ADMINISTRADOR_SISTEMA`; 3) Restringir la consulta y descarga de patrones oficiales de variantes en `OmrProcesamientoService` y frontend para que solo se permita desde `DEVUELTO` en adelante (removiendo `ENTREGADO`); 4) Compilar backend y frontend y verificar tests.
+- Notas: En progreso. Implementando control de tiempo mínimo para paso a DEVUELTO y restringiendo visibilidad del patrón OMR a partir del estado DEVUELTO. Implementación técnica concluida: control de tiempo mínimo configurable para estado DEVUELTO (45 min default) con bypass para Administrador, migración V42, y restricción de descarga/consulta de patrones de variantes exclusivamente a partir de DEVUELTO en backend y frontend. Implementado parametro minutosMinimosDevolucion (45 min), validacion en paso a DEVUELTO con bypass de admin y restriccion de descarga de patron a partir de DEVUELTO.
+
+#### T-039 — Permitir al Personal de Evaluaciones anular la cartilla completa de un estudiante en calificación OMR
+
+- Prioridad: Alta
+- Área: OMR / Calificación / Permisos
+- Responsable: Antigravity
+- Creada: 2026-09-24
+- Fecha límite: 2026-09-24
+- Dependencias: `OmrProcesamientoController.java`, `OmrProcesamientoService.java`, `evaluaciones-dia.component.ts`.
+- Criterio de cierre: 1) Autorizar en `OmrProcesamientoController` y `OmrProcesamientoService` al rol `PERSONAL_EVALUACIONES` para ejecutar `anularExamenEstudiante` (anulación completa de cartilla de estudiante); 2) Mantener restringida la anulación o corrección de preguntas clave exclusivamente a responsable/administrador; 3) Habilitar en `evaluaciones-dia.component.ts` (`puedeAnularExamenEstudiante`) el botón de anular/restaurar cartilla para `esPersonalEvaluaciones`; 4) Actualizar y ejecutar tests unitarios de backend.
+- Notas: En progreso a solicitud del usuario para que el personal de evaluación pueda anular la cartilla completa (no preguntas) igual que el responsable. Habilitado rol PERSONAL_EVALUACIONES en controller y service para anular/restaurar cartilla completa individual con auditoria; habilitado boton en evaluaciones-dia y agregados tests unitarios.
+
 #### T-037 — Habilitar al docente el inicio y gestión de sala para exámenes virtuales generados
 
 - Prioridad: Alta
@@ -453,7 +475,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 4 |
 | En progreso | 0 |
-| En revisión | 29 |
+| En revisión | 31 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

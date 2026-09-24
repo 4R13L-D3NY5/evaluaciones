@@ -232,7 +232,7 @@ public class OmrProcesamientoController {
     }
 
     @PostMapping("/{rolExamenId}/estudiantes/{codigoEstudiante}/anular-examen")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     @Operation(summary = "Anular o restaurar el examen de un estudiante individual")
     public ResponseEntity<CalificacionOmrResponseDto> anularExamenEstudiante(
             @PathVariable String rolExamenId,

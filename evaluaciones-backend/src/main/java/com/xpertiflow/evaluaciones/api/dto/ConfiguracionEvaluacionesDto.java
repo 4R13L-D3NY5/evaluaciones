@@ -58,6 +58,10 @@ public class ConfiguracionEvaluacionesDto {
     @Max(720)
     private Integer horasCandado72;
 
+    @Min(0)
+    @Max(1440)
+    private Integer minutosMinimosDevolucion;
+
     private LocalDateTime actualizadoEn;
 
     private String actualizadoPor;

@@ -3799,23 +3799,42 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
    * PERSONAL_EVALUACIONES. La hora oficial continúa siendo la del servidor.
    */
   public politicaTemporalBloqueada(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): boolean {
-    if (!this.esPersonalEvaluaciones() || item.modalidad === 'VIRTUAL' || !['Generado', 'Entregado'].includes(pasoKey)) return false;
+    if (this.esAdministradorSistema()) return false;
+    if (item.modalidad === 'VIRTUAL' || !['Generado', 'Entregado', 'Devuelto'].includes(pasoKey)) return false;
     const inicio = this.inicioExamenLocal(item);
     if (!inicio) return true;
     const configuracion = this._configuracionEvaluaciones.configuracion();
     const ahora = new Date();
     if (pasoKey === 'Generado') {
+      if (!this.esPersonalEvaluaciones()) return false;
       const habilitadoDesde = new Date(inicio.getTime() - (configuracion.horasAntesGeneracion || 0) * 60 * 60 * 1000);
       return ahora < habilitadoDesde;
     }
-    const habilitadoDesde = new Date(inicio.getTime() - (configuracion.minutosAntesEntrega || 0) * 60 * 1000);
-    return ahora < habilitadoDesde;
+    if (pasoKey === 'Entregado') {
+      if (!this.esPersonalEvaluaciones()) return false;
+      const habilitadoDesde = new Date(inicio.getTime() - (configuracion.minutosAntesEntrega || 0) * 60 * 1000);
+      return ahora < habilitadoDesde;
+    }
+    if (pasoKey === 'Devuelto') {
+      const minutos = configuracion.minutosMinimosDevolucion ?? 45;
+      const habilitadoDesde = new Date(inicio.getTime() + minutos * 60 * 1000);
+      return ahora < habilitadoDesde;
+    }
+    return false;
   }
 
   public mensajePoliticaTemporal(item: EvaluacionItemUI, pasoKey: EtapaEvaluacion): string {
     const inicio = this.inicioExamenLocal(item);
     if (!inicio) return 'No se puede aplicar la ventana cronológica porque el examen no tiene fecha y hora válidas.';
     const configuracion = this._configuracionEvaluaciones.configuracion();
+    if (pasoKey === 'Devuelto') {
+      const minutos = configuracion.minutosMinimosDevolucion ?? 45;
+      const habilitadoDesde = new Date(inicio.getTime() + minutos * 60 * 1000);
+      const fecha = new Intl.DateTimeFormat('es-BO', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      }).format(habilitadoDesde);
+      return `La devolución se habilita desde ${fecha} (${minutos} min mínimos de desarrollo del examen).`;
+    }
     const habilitadoDesde = pasoKey === 'Generado'
       ? new Date(inicio.getTime() - (configuracion.horasAntesGeneracion || 0) * 60 * 60 * 1000)
       : new Date(inicio.getTime() - (configuracion.minutosAntesEntrega || 0) * 60 * 1000);
@@ -3873,7 +3892,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     return (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones())
       && !this.esConsultaAcademica()
       && item.modalidad !== 'PRESENCIAL_SIN_CARTILLA'
-      && ['Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado', 'Confirmado'].includes(item.etapa);
+      && ['Devuelto', 'Pendiente de notas', 'Calificado', 'Confirmado'].includes(item.etapa);
   }
 
   public puedeMostrarNotas(item: EvaluacionItemUI): boolean {
@@ -4508,7 +4527,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       error: async err => {
         ventana?.close();
         this.imprimiendoPatronCalificado.set(false);
-        let mensaje = 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido entregado o devuelto.';
+        let mensaje = 'No se pudo generar la planilla de patrones. Verifica que el examen haya sido devuelto.';
         if (err?.error instanceof Blob) {
           try {
             const raw = await err.error.text();
@@ -5365,7 +5384,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   // --- ANULACIÓN INDIVIDUAL DE EXAMEN DE ESTUDIANTE ---
   public puedeAnularExamenEstudiante(): boolean {
-    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones());
+    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones());
   }
 
   public abrirAnulacionExamenEstudiante(estudiante: { codigo: string; nombre?: string; anulado: boolean; pagina?: number; calificacionId?: number }): void {

@@ -669,6 +669,19 @@ export interface ParcialConfig {
                       </div>
                     </div>
 
+                    <!-- Parámetro 1.1: Minutos mínimos para devolución de examen -->
+                    <div class="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-1.5">
+                      <label class="block text-xs font-black text-amber-950 dark:text-amber-200 flex items-center gap-1.5">
+                        <i class="pi pi-clock text-amber-600"></i>
+                        <span>Minutos mínimos transcurridos para registrar devolución</span>
+                      </label>
+                      <p class="text-[11px] text-muted-foreground">Tiempo pedagógico mínimo transcurrido tras el inicio del examen para habilitar el paso a Devuelto (por defecto 45 min).</p>
+                      <div class="flex items-center gap-2 pt-1 max-w-xs">
+                        <input type="number" [(ngModel)]="tiempoMinutosMinimosDevolucion" min="0" max="1440" step="1" class="w-full bg-card border border-amber-300 dark:border-amber-700 rounded-lg p-2 text-xs font-mono font-black text-amber-700 dark:text-amber-300">
+                        <span class="text-xs font-bold text-amber-800 dark:text-amber-300 font-mono">minutos</span>
+                      </div>
+                    </div>
+
                     <div class="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 space-y-1.5">
                       <label class="block text-xs font-black text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
                         <i class="pi pi-desktop text-purple-600"></i>
@@ -1255,6 +1268,7 @@ export class AdministracionEvaluacionesComponent {
   public tiempoHorasPostPatron = 8;
   public tiempoHorasAntesLista = 24;
   public tiempoHorasCandado72 = 72;
+  public tiempoMinutosMinimosDevolucion = 45;
   public cuentaRegresivaInicioVirtualSegundos = 15;
   public duracionExamenVirtualMinutos = 45;
 
@@ -1271,6 +1285,7 @@ export class AdministracionEvaluacionesComponent {
     this.tiempoHorasPostPatron = configuracion.horasPostPatron ?? 8;
     this.tiempoHorasAntesLista = configuracion.horasAntesLista ?? 24;
     this.tiempoHorasCandado72 = configuracion.horasCandado72 ?? 72;
+    this.tiempoMinutosMinimosDevolucion = configuracion.minutosMinimosDevolucion ?? 45;
     const estructura = configuracion.estructuraPreguntas || {};
     const claves = ['1P', '2P', 'FINAL', '2DA_INSTANCIA'];
     this.parcialesConfig.update(actuales => actuales.map((actual, indice) => {
@@ -1799,7 +1814,8 @@ export class AdministracionEvaluacionesComponent {
       horasAntesGeneracion: this.tiempoHorasAntesGeneracion,
       horasPostPatron: this.tiempoHorasPostPatron,
       horasAntesLista: this.tiempoHorasAntesLista,
-      horasCandado72: this.tiempoHorasCandado72
+      horasCandado72: this.tiempoHorasCandado72,
+      minutosMinimosDevolucion: this.tiempoMinutosMinimosDevolucion
     }).subscribe({
       next: configuracion => {
         this.aplicarConfiguracion(configuracion);
@@ -1836,7 +1852,8 @@ export class AdministracionEvaluacionesComponent {
       horasAntesGeneracion: this.tiempoHorasAntesGeneracion,
       horasPostPatron: this.tiempoHorasPostPatron,
       horasAntesLista: this.tiempoHorasAntesLista,
-      horasCandado72: this.tiempoHorasCandado72
+      horasCandado72: this.tiempoHorasCandado72,
+      minutosMinimosDevolucion: this.tiempoMinutosMinimosDevolucion
     }).subscribe({
       next: configuracion => {
         this.aplicarConfiguracion(configuracion);

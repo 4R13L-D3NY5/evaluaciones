@@ -17,6 +17,7 @@ export interface ConfiguracionEvaluaciones {
   horasPostPatron: number;
   horasAntesLista: number;
   horasCandado72: number;
+  minutosMinimosDevolucion?: number;
   actualizadoEn?: string;
   actualizadoPor?: string;
 }
@@ -57,7 +58,8 @@ export class ConfiguracionEvaluacionesService {
     horasAntesGeneracion: 144,
     horasPostPatron: 8,
     horasAntesLista: 24,
-    horasCandado72: 72
+    horasCandado72: 72,
+    minutosMinimosDevolucion: 45
   });
 
   public cargar(): Observable<ConfiguracionEvaluaciones> {

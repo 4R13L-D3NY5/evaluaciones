@@ -1,7 +1,9 @@
 package com.xpertiflow.evaluaciones.application;
 
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +33,7 @@ public class PoliticaTiempoEvaluacionesService {
     private static final DateTimeFormatter HORA_CORTA = DateTimeFormatter.ofPattern("H:mm", Locale.ROOT);
 
     private final ConfiguracionEvaluacionesService configuracionService;
+    private final AuditoriaEvaluacionRepository auditoriaRepository;
 
     public boolean esPersonal(Authentication authentication) {
         return authentication != null
@@ -113,6 +117,42 @@ public class PoliticaTiempoEvaluacionesService {
                 .orElse(false);
     }
 
+    public void exigirDevolucionHabilitada(RolExamen rol, Authentication authentication) {
+        if (esAdministrador(authentication)) return;
+        LocalDateTime inicio = inicioExamenObligatorio(rol);
+        int minutosMinimos = configuracion().getMinutosMinimosDevolucion();
+
+        LocalDateTime momentoBase = calcularMomentoInicioEfectivo(rol, inicio);
+        LocalDateTime habilitadoDesde = momentoBase.plusMinutes(minutosMinimos);
+        if (LocalDateTime.now().isBefore(habilitadoDesde)) {
+            throw new VentanaTemporalException("La devolución todavía no está habilitada. "
+                    + "Se habilita desde " + formatear(habilitadoDesde) + " (" + minutosMinimos + " min mínimos de desarrollo del examen).");
+        }
+    }
+
+    public boolean estaHabilitadaDevolucion(RolExamen rol, Authentication authentication) {
+        if (esAdministrador(authentication)) return true;
+        return inicioExamenSeguro(rol).map(inicio -> {
+            int minutosMinimos = configuracion().getMinutosMinimosDevolucion();
+            LocalDateTime momentoBase = calcularMomentoInicioEfectivo(rol, inicio);
+            return !LocalDateTime.now().isBefore(momentoBase.plusMinutes(minutosMinimos));
+        }).orElse(false);
+    }
+
+    private LocalDateTime calcularMomentoInicioEfectivo(RolExamen rol, LocalDateTime inicio) {
+        if (auditoriaRepository != null && rol != null && rol.getId() != null) {
+            Optional<AuditoriaEvaluacion> auditEntrega = auditoriaRepository
+                    .findFirstByRolExamenIdAndEtapaDestinoOrderByFechaEventoDesc(rol.getId(), "ENTREGADO");
+            if (auditEntrega.isPresent() && auditEntrega.get().getFechaEvento() != null) {
+                LocalDateTime fechaEntrega = auditEntrega.get().getFechaEvento();
+                if (fechaEntrega.isAfter(inicio)) {
+                    return fechaEntrega;
+                }
+            }
+        }
+        return inicio;
+    }
+
     public boolean esAdministrador(Authentication authentication) {
         return authentication != null
                 && authentication.getAuthorities().stream()
@@ -167,6 +207,7 @@ public class PoliticaTiempoEvaluacionesService {
         if (configuracion.getMinutosAntesEntrega() == null) configuracion.setMinutosAntesEntrega(15);
         if (configuracion.getHorasPostPatron() == null) configuracion.setHorasPostPatron(8);
         if (configuracion.getHorasCandado72() == null) configuracion.setHorasCandado72(72);
+        if (configuracion.getMinutosMinimosDevolucion() == null) configuracion.setMinutosMinimosDevolucion(45);
         return configuracion;
     }
 

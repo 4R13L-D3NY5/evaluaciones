@@ -16,5 +16,8 @@ public interface AuditoriaEvaluacionRepository extends JpaRepository<AuditoriaEv
     Optional<AuditoriaEvaluacion> findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(
             String rolExamenId, String accion);
 
+    Optional<AuditoriaEvaluacion> findFirstByRolExamenIdAndEtapaDestinoOrderByFechaEventoDesc(
+            String rolExamenId, String etapaDestino);
+
     List<AuditoriaEvaluacion> findAllByOrderByFechaEventoDesc(Pageable pageable);
 }
