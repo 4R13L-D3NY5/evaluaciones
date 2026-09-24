@@ -1,7 +1,8 @@
-import { Component, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute } from '@angular/router';
 import { Observable, Subscription, interval } from 'rxjs';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
@@ -22,27 +23,105 @@ interface TokenGrupo { codigoSala: string; tokenGrupo: string; }
       </header>
 
       @if (!sala()) {
-        <section class="max-w-xl rounded-2xl border border-border bg-card p-6 shadow-xs">
-          <h2 class="font-black text-foreground">{{ esCodigoSala() ? 'Consultar sala existente' : 'Crear sala desde un examen generado' }}</h2>
-          <p class="mt-1 text-xs text-muted-foreground">{{ esCodigoSala() ? 'Ingresa el código de la sala ya generada para consultar su estado y participantes.' : 'El examen debe tener modalidad virtual, banco validado y variantes generadas.' }}</p>
-          <label class="mt-5 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">{{ esCodigoSala() ? 'Código de sala' : 'ID del rol de examen' }}</label>
-          <input [(ngModel)]="rolExamenId" placeholder="SALA-XXXXXX o ROL-GRUPO-1P-FECHA" class="mt-2 w-full rounded-xl border border-border bg-muted/50 px-3 py-3 text-sm font-mono uppercase outline-none focus:border-primary">
-          <div class="mt-4 grid grid-cols-2 gap-3">
-            <div><label class="block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Duración (minutos)</label><input [(ngModel)]="duracion" type="number" min="1" max="480" class="mt-2 w-full rounded-xl border border-border bg-muted/50 px-3 py-3 text-sm outline-none focus:border-primary"></div>
-            <div><label class="block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Gracia de ingreso</label><input [(ngModel)]="gracia" type="number" min="0" max="60" class="mt-2 w-full rounded-xl border border-border bg-muted/50 px-3 py-3 text-sm outline-none focus:border-primary"></div>
-          </div>
-          @if (error()) { <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{ error() }}</div> }
-          <button (click)="crear()" [disabled]="cargando()" class="mt-5 rounded-xl bg-primary px-5 py-3 text-xs font-black text-white shadow hover:opacity-90 disabled:opacity-50">{{ cargando() ? (esCodigoSala() ? 'Consultando…' : 'Creando…') : (esCodigoSala() ? 'Consultar sala' : 'Crear sala y generar accesos') }}</button>
-        </section>
+        <div class="space-y-6">
+          <!-- MIS EXÁMENES VIRTUALES ASIGNADOS -->
+          @if (cargandoMisExamenes()) {
+            <div class="rounded-2xl border border-border bg-card p-6 text-center text-xs font-bold text-muted-foreground">
+              <i class="pi pi-spin pi-spinner text-xl text-primary"></i>
+              <p class="mt-2">Consultando tus evaluaciones virtuales programadas...</p>
+            </div>
+          } @else if (misExamenesVirtuales().length > 0) {
+            <section class="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/30 p-6 shadow-xs">
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+                <div>
+                  <h2 class="text-base font-black text-indigo-950 flex items-center gap-2">
+                    <i class="pi pi-desktop text-indigo-700"></i>
+                    <span>Mis Exámenes Virtuales Asignados</span>
+                  </h2>
+                  <p class="text-xs text-indigo-800/80 mt-0.5">Selecciona tu evaluación para ingresar a su sala de monitoreo e iniciar el examen cuando estés listo.</p>
+                </div>
+                <span class="text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-full font-bold">
+                  {{ misExamenesVirtuales().length }} {{ misExamenesVirtuales().length === 1 ? 'examen virtual' : 'exámenes virtuales' }}
+                </span>
+              </div>
+
+              <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                @for (item of misExamenesVirtuales(); track item.id) {
+                  <div class="rounded-xl border border-indigo-100 bg-white p-4 shadow-2xs hover:shadow-xs transition space-y-2.5 flex flex-col justify-between">
+                    <div>
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[9px] font-black uppercase bg-indigo-700 text-white px-2 py-0.5 rounded">
+                          {{ item.tipoParcial }}
+                        </span>
+                        <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full border"
+                              [ngClass]="{
+                                'bg-emerald-50 text-emerald-700 border-emerald-200': item.estadoFlujo === 'GENERADO' || item.estadoFlujo === 'CALIFICADO',
+                                'bg-blue-50 text-blue-700 border-blue-200': item.estadoFlujo === 'VALIDADO',
+                                'bg-amber-50 text-amber-800 border-amber-200': item.estadoFlujo === 'PROGRAMADO'
+                              }">
+                          {{ item.estadoFlujo }}
+                        </span>
+                      </div>
+                      <h3 class="font-black text-xs text-foreground mt-2 leading-tight">
+                        [{{ item.materiaCodigo }}] {{ item.materiaNombre }}
+                      </h3>
+                      <p class="text-[10.5px] text-muted-foreground mt-0.5">
+                        Grupo {{ item.grupo }} · {{ item.carreraNombre }}
+                      </p>
+                      <div class="flex items-center gap-3 font-mono text-[9.5px] text-muted-foreground mt-1.5 pt-1.5 border-t border-border/50">
+                        <span><i class="pi pi-calendar text-[9px] text-primary"></i> {{ item.fechaDisplay }}</span>
+                        <span><i class="pi pi-clock text-[9px] text-primary"></i> {{ item.horario }}</span>
+                      </div>
+                    </div>
+
+                    <button 
+                      (click)="seleccionarExamenVirtual(item)" 
+                      [disabled]="cargando()"
+                      class="w-full mt-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs py-2 px-3 flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs disabled:opacity-50">
+                      <i class="pi pi-sign-in text-xs"></i>
+                      <span>Gestionar Sala de este Examen</span>
+                    </button>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+
+          <section class="max-w-xl rounded-2xl border border-border bg-card p-6 shadow-xs">
+            <h2 class="font-black text-foreground">{{ esCodigoSala() ? 'Consultar sala existente' : 'Consultar o crear sala por identificador' }}</h2>
+            <p class="mt-1 text-xs text-muted-foreground">{{ esCodigoSala() ? 'Ingresa el código de la sala ya generada para consultar su estado y participantes.' : 'Ingresa el ID del rol o código de sala. Si ya fue generada, se abrirá directamente.' }}</p>
+            <label class="mt-5 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">{{ esCodigoSala() ? 'Código de sala' : 'ID del rol de examen o código de sala' }}</label>
+            <input [(ngModel)]="rolExamenId" placeholder="SALA-XXXXXX o ROL-GRUPO-1P-FECHA" class="mt-2 w-full rounded-xl border border-border bg-muted/50 px-3 py-3 text-sm font-mono uppercase outline-none focus:border-primary">
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <div><label class="block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Duración (minutos)</label><input [(ngModel)]="duracion" type="number" min="1" max="480" class="mt-2 w-full rounded-xl border border-border bg-muted/50 px-3 py-3 text-sm outline-none focus:border-primary"></div>
+              <div><label class="block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Gracia de ingreso</label><input [(ngModel)]="gracia" type="number" min="0" max="60" class="mt-2 w-full rounded-xl border border-border bg-muted/50 px-3 py-3 text-sm outline-none focus:border-primary"></div>
+            </div>
+            @if (error()) { <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{ error() }}</div> }
+            <button (click)="crear()" [disabled]="cargando()" class="mt-5 rounded-xl bg-primary px-5 py-3 text-xs font-black text-white shadow hover:opacity-90 disabled:opacity-50">{{ cargando() ? (esCodigoSala() ? 'Consultando…' : 'Buscando sala…') : (esCodigoSala() ? 'Consultar sala' : 'Acceder o crear sala') }}</button>
+          </section>
+        </div>
       }
 
       @if (sala(); as actual) {
         <section class="rounded-2xl border border-border bg-card p-6 shadow-xs">
           <div class="flex flex-wrap items-center justify-between gap-4">
-            <div><p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sala {{ actual.codigoSala }}</p><h2 class="text-xl font-black text-foreground">{{ actual.rolExamenId }}</h2><span class="mt-2 inline-flex rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase text-indigo-700">{{ actual.estado }}</span></div>
+            <div>
+              <div class="flex items-center gap-2 mb-1.5">
+                <button (click)="salirDeSala()" class="rounded-lg border border-border bg-muted/50 hover:bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:text-foreground transition flex items-center gap-1 cursor-pointer">
+                  <i class="pi pi-arrow-left text-[10px]"></i>
+                  <span>Volver a mis exámenes</span>
+                </button>
+              </div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sala {{ actual.codigoSala }}</p>
+              <h2 class="text-xl font-black text-foreground">{{ actual.rolExamenId }}</h2>
+              <span class="mt-2 inline-flex rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase text-indigo-700 border border-indigo-200">{{ actual.estado }}</span>
+            </div>
             <div class="flex flex-wrap justify-end gap-2">
               @if (!tokenGrupo()) { <button (click)="emitirTokenGrupo()" [disabled]="cargando()" class="rounded-xl bg-primary px-4 py-2 text-xs font-black text-white disabled:opacity-50">Generar acceso grupal</button> }
-              @if (actual.estado === 'PREPARADA') { <button (click)="abrir()" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700">Abrir sala</button> }
+              @if (actual.estado === 'PREPARADA') { 
+                <button (click)="abrir()" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700">Abrir sala</button> 
+                <button (click)="iniciar()" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white">Iniciar examen</button>
+              }
               @if (actual.estado === 'ABIERTA') { <button (click)="iniciar()" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white">Iniciar examen</button> }
               @if (['ABIERTA', 'EN_CURSO', 'PAUSADA', 'CERRADA', 'CALIFICADA'].includes(actual.estado)) { <button (click)="abrirRestablecimiento()" [disabled]="cargando()" class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-black text-amber-800 disabled:opacity-50">Restablecer examen</button> }
               @if (actual.estado === 'EN_CURSO') { <button (click)="cerrar()" class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white">Cerrar sala</button> }
@@ -180,22 +259,131 @@ interface TokenGrupo { codigoSala: string; tokenGrupo: string; }
       }
     </div>`
 })
-export class SalaVirtualComponent implements OnDestroy {
+export class SalaVirtualComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly feedback = inject(UiFeedbackService);
-  sala = signal<Sala | null>(null); accesos = signal<Acceso[]>([]); tokenGrupo = signal(''); cargando = signal(false); error = signal(''); mostrarMotivoRestablecimiento = signal(false);
-  rolExamenId = ''; duracion = 90; gracia = 10; private monitoreo?: Subscription;
+  private readonly route = inject(ActivatedRoute);
+
+  sala = signal<Sala | null>(null);
+  accesos = signal<Acceso[]>([]);
+  tokenGrupo = signal('');
+  cargando = signal(false);
+  error = signal('');
+  mostrarMotivoRestablecimiento = signal(false);
+  rolExamenId = '';
+  duracion = 90;
+  gracia = 10;
+  private monitoreo?: Subscription;
   motivoRestablecimiento = '';
+
+  misExamenesVirtuales = signal<any[]>([]);
+  cargandoMisExamenes = signal(false);
+
+  ngOnInit(): void {
+    const qSala = this.route.snapshot.queryParams['salaId'];
+    const qRol = this.route.snapshot.queryParams['rolId'];
+
+    if (qSala) {
+      this.rolExamenId = qSala;
+      this.crear();
+    } else if (qRol) {
+      this.rolExamenId = qRol;
+      this.crear();
+    }
+
+    this.cargarMisExamenesVirtuales();
+  }
+
+  cargarMisExamenesVirtuales(): void {
+    this.cargandoMisExamenes.set(true);
+    this.http.get<any[]>('/api/roles-examen').subscribe({
+      next: data => {
+        this.cargandoMisExamenes.set(false);
+        const virtuales = (data || []).filter(item => item.modalidad === 'VIRTUAL');
+        this.misExamenesVirtuales.set(virtuales);
+      },
+      error: () => {
+        this.cargandoMisExamenes.set(false);
+        this.misExamenesVirtuales.set([]);
+      }
+    });
+  }
+
+  seleccionarExamenVirtual(item: any): void {
+    this.rolExamenId = item.id;
+    this.crear();
+  }
+
+  salirDeSala(): void {
+    this.detenerMonitoreo();
+    this.sala.set(null);
+    this.accesos.set([]);
+    this.tokenGrupo.set('');
+    this.rolExamenId = '';
+    this.cargarMisExamenesVirtuales();
+  }
 
   esCodigoSala(): boolean { return /^(SALA|SEA)-/i.test(this.rolExamenId.trim()); }
   urlAcceso(): string { return `${window.location.origin}/examen-virtual`; }
 
   crear(): void {
+    const input = this.rolExamenId.trim();
+    if (!input) return;
+
     if (this.esCodigoSala()) {
-      this.ejecutar(this.http.get<Sala>(`/api/examenes-virtuales/salas/${encodeURIComponent(this.rolExamenId.trim())}`), data => { this.sala.set(data); this.accesos.set([]); this.tokenGrupo.set(''); this.iniciarMonitoreo(); });
+      this.ejecutar(this.http.get<Sala>(`/api/examenes-virtuales/salas/${encodeURIComponent(input)}`), data => {
+        this.sala.set(data);
+        this.accesos.set([]);
+        const tokenGuardado = this._recuperarToken(data.id);
+        if (tokenGuardado) this.tokenGrupo.set(tokenGuardado);
+        this.iniciarMonitoreo();
+      });
       return;
     }
-    this.ejecutar(this.http.post<Creada>('/api/examenes-virtuales/salas', { rolExamenId: this.rolExamenId.trim(), duracionMinutos: this.duracion, graciaIngresoMinutos: this.gracia }), data => { this.sala.set(data.sala); this.accesos.set(data.accesos || []); this.tokenGrupo.set(data.tokenGrupo || ''); this.iniciarMonitoreo(); });
+
+    // Si es ID de rol de examen, consultar si ya tiene una sala preparada/existente
+    this.cargando.set(true);
+    this.error.set('');
+    this.http.get<Sala>(`/api/examenes-virtuales/roles/${encodeURIComponent(input)}/sala`).subscribe({
+      next: salaExistente => {
+        this.cargando.set(false);
+        this.sala.set(salaExistente);
+        this.accesos.set([]);
+        const tokenGuardado = this._recuperarToken(salaExistente.id);
+        if (tokenGuardado) {
+          this.tokenGrupo.set(tokenGuardado);
+        } else {
+          this.emitirTokenGrupoSilencioso(salaExistente.id);
+        }
+        this.iniciarMonitoreo();
+      },
+      error: () => {
+        // No existe sala previa, crearla
+        this.ejecutar(this.http.post<Creada>('/api/examenes-virtuales/salas', {
+          rolExamenId: input,
+          duracionMinutos: this.duracion,
+          graciaIngresoMinutos: this.gracia
+        }), data => {
+          this.sala.set(data.sala);
+          this.accesos.set(data.accesos || []);
+          if (data.tokenGrupo) {
+            this.tokenGrupo.set(data.tokenGrupo);
+            this._guardarToken(data.sala.id, data.tokenGrupo);
+          }
+          this.iniciarMonitoreo();
+        });
+      }
+    });
+  }
+
+  emitirTokenGrupoSilencioso(salaId: string): void {
+    this.http.post<TokenGrupo>(`/api/examenes-virtuales/salas/${encodeURIComponent(salaId)}/token-grupo`, {}).subscribe({
+      next: data => {
+        this.tokenGrupo.set(data.tokenGrupo);
+        this._guardarToken(salaId, data.tokenGrupo);
+      },
+      error: () => {}
+    });
   }
 
   async emitirTokenGrupo(): Promise<void> {
@@ -207,7 +395,18 @@ export class SalaVirtualComponent implements OnDestroy {
       'warning',
       'Renovar token'
     )) return;
-    this.ejecutar(this.http.post<TokenGrupo>(`/api/examenes-virtuales/salas/${encodeURIComponent(id)}/token-grupo`, {}), data => this.tokenGrupo.set(data.tokenGrupo));
+    this.ejecutar(this.http.post<TokenGrupo>(`/api/examenes-virtuales/salas/${encodeURIComponent(id)}/token-grupo`, {}), data => {
+      this.tokenGrupo.set(data.tokenGrupo);
+      this._guardarToken(id, data.tokenGrupo);
+    });
+  }
+
+  private _guardarToken(salaId: string, token: string): void {
+    try { sessionStorage.setItem(`sea_token_sala_${salaId}`, token); } catch (_) {}
+  }
+
+  private _recuperarToken(salaId: string): string | null {
+    try { return sessionStorage.getItem(`sea_token_sala_${salaId}`); } catch (_) { return null; }
   }
 
   copiarTokenGrupo(): void {

@@ -11,4 +11,5 @@ public interface IntentoExamenVirtualRepository extends JpaRepository<IntentoExa
     Optional<IntentoExamenVirtual> findBySalaIdAndCodigoEstudiante(String salaId, String codigoEstudiante);
     Optional<IntentoExamenVirtual> findByTokenHash(String tokenHash);
     Optional<IntentoExamenVirtual> findByTokenSesionHash(String tokenSesionHash);
+    List<IntentoExamenVirtual> findByCodigoEstudianteOrderByCreadoEnDesc(String codigoEstudiante);
 }

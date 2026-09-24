@@ -246,23 +246,60 @@ def _sanitize_math(math_text: str) -> str:
     entre comillas para mostrarse como texto. Se respetan funciones y
     constantes matemáticas comunes, así como variables de una sola letra.
     """
-    # Alias frecuentes de la plantilla oficial. Se convierten a símbolos
+    # 0. Reparar caracteres de tabulación escapados o corrupciones habituales:
+    # Ej: \t au_0 que en Excel o JSON se decodificó como tabulación + au_0
+    math_text = _replace_math_outside_quotes(math_text, r"(?:\\tau|[\t\\]+\s*au)(?=[_0-9^]|\b)", "tau")
+    math_text = _replace_math_outside_quotes(math_text, r"(?:\\theta|[\t\\]+\s*heta)(?=[_0-9^]|\b)", "theta")
+    math_text = _replace_math_outside_quotes(math_text, r"(?:\\times|[\t\\]+\s*imes)(?=[_0-9^]|\b)", "times")
+
+    # Alias frecuentes de la plantilla oficial y LaTeX. Se convierten a símbolos
     # Typst antes de envolver palabras de texto para que no aparezcan como
     # texto literal en el PDF final. Nunca se alteran cadenas entre comillas.
     math_text = _replace_math_outside_quotes(math_text, r"\\(?:times|cdot)\b", "times", re.IGNORECASE)
     math_text = _replace_math_outside_quotes(math_text, r"\s*\\equiv\s*", " equiv ", re.IGNORECASE)
     math_text = _replace_math_outside_quotes(math_text, r"\\(?:rightarrow|to)\b", "arrow", re.IGNORECASE)
+    math_text = _replace_math_outside_quotes(math_text, r"\\leftarrow\b", "arrow.l", re.IGNORECASE)
     math_text = _replace_math_outside_quotes(math_text, r"\\pm\b", "plus.minus")
+    math_text = _replace_math_outside_quotes(math_text, r"\\mp\b", "minus.plus")
     math_text = _replace_math_outside_quotes(math_text, r"\+\s*-", "plus.minus")
     math_text = _replace_math_outside_quotes(math_text, r"-\s*\+", "minus.plus")
     math_text = _replace_math_outside_quotes(math_text, r"=>|->", "arrow")
+    math_text = _replace_math_outside_quotes(math_text, r"\\approx\b", "approx", re.IGNORECASE)
+    math_text = _replace_math_outside_quotes(math_text, r"\\(?:neq|ne)\b", "!=")
+    math_text = _replace_math_outside_quotes(math_text, r"\\(?:leq|le)\b", "<=")
+    math_text = _replace_math_outside_quotes(math_text, r"\\(?:geq|ge)\b", ">=")
+    math_text = _replace_math_outside_quotes(math_text, r"\\infty\b", "oo", re.IGNORECASE)
+    math_text = _replace_math_outside_quotes(math_text, r"\\partial\b", "diff", re.IGNORECASE)
+    math_text = _replace_math_outside_quotes(math_text, r"\\nabla\b", "nabla", re.IGNORECASE)
+    math_text = _replace_math_outside_quotes(math_text, r"\\sqrt\b", "sqrt", re.IGNORECASE)
+
+    # Normalización de letras griegas LaTeX: en Typst se usan sin barra invertida (\)
+    griegas_regex = (
+        r"\\(alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|"
+        r"iota|kappa|lambda|mu|nu|xi|pi|varpi|rho|varrho|sigma|varsigma|tau|"
+        r"upsilon|phi|varphi|chi|psi|omega|"
+        r"Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega)(?=[_0-9^]|\b)"
+    )
+    math_text = _replace_math_outside_quotes(math_text, griegas_regex, r"\1")
+
+    # Limpiar cualquier barra invertida suelta restante que anteceda a identificadores matemáticos
+    math_text = _replace_math_outside_quotes(math_text, r"\\([a-zA-Z]+)", r"\1")
 
     funciones = {
+        # Funciones matemáticas estándar
         "log", "ln", "lg", "sin", "cos", "tan", "cot", "sec", "csc",
         "arcsin", "arccos", "arctan", "arcsinh", "arccosh", "arctanh",
         "sinh", "cosh", "tanh", "exp", "sqrt", "lim", "sum", "prod",
-        "int", "pi", "alpha", "beta", "gamma", "delta", "epsilon",
-        "theta", "lambda", "mu", "sigma", "omega", "phi", "psi",
+        "int", "diff", "nabla", "approx", "oo", "infinity",
+        # Letras griegas minúsculas
+        "alpha", "beta", "gamma", "delta", "epsilon", "varepsilon", "zeta",
+        "eta", "theta", "vartheta", "iota", "kappa", "lambda", "mu", "nu",
+        "xi", "pi", "varpi", "rho", "varrho", "sigma", "varsigma", "tau",
+        "upsilon", "phi", "varphi", "chi", "psi", "omega",
+        # Letras griegas mayúsculas
+        "Gamma", "Delta", "Theta", "Lambda", "Xi", "Pi", "Sigma",
+        "Upsilon", "Phi", "Psi", "Omega",
+        # Símbolos y operadores Typst
         "times", "arrow", "equiv", "plus", "minus",
     }
 
@@ -270,7 +307,7 @@ def _sanitize_math(math_text: str) -> str:
         word = match.group(0)
         if word.startswith('"') and word.endswith('"'):
             return word
-        if len(word) == 1 or word.lower() in funciones:
+        if len(word) == 1 or word.lower() in {f.lower() for f in funciones}:
             return word
         return f'"{word}"'
 
@@ -963,11 +1000,15 @@ def _compilar_typst(typ_path: str, pdf_path: str) -> None:
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
     if config.TYPST_BIN:
         import subprocess
+        env = os.environ.copy()
+        if "TYPST_FONT_PATHS" not in env and os.path.exists("/usr/share/fonts"):
+            env["TYPST_FONT_PATHS"] = "/usr/share/fonts"
         resultado = subprocess.run(
             [config.TYPST_BIN, "compile", typ_path, pdf_path],
             check=False,
             capture_output=True,
             text=True,
+            env=env,
         )
         if resultado.returncode != 0:
             detalle = (resultado.stderr or resultado.stdout or "Typst no devolvió detalles").strip()

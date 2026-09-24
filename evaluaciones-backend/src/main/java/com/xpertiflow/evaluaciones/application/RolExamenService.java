@@ -781,6 +781,9 @@ public class RolExamenService {
         boolean transicionSinCartillaAImpreso = rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA
                 && origen == EstadoFlujo.VALIDADO
                 && destino == EstadoFlujo.IMPRESO;
+        boolean transicionSinCartillaACalificado = rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA
+                && (origen == EstadoFlujo.IMPRESO || origen == EstadoFlujo.ENTREGADO || origen == EstadoFlujo.DEVUELTO || origen == EstadoFlujo.PENDIENTE_NOTAS)
+                && destino == EstadoFlujo.CALIFICADO;
         Set<EstadoFlujo> permitidos = TRANSICIONES_VALIDAS.getOrDefault(origen, Set.of());
         if (rol.getModalidad() == ModalidadExamen.PRESENCIAL_SIN_CARTILLA && destino == EstadoFlujo.GENERADO) {
             throw new RuntimeException("Los exámenes sin cartilla no requieren generación de variantes ni PDF.");
@@ -791,7 +794,7 @@ public class RolExamenService {
         if (destino == EstadoFlujo.ENTREGADO) {
             politicaTiempoEvaluacionesService.exigirEntregaHabilitada(rol, authentication);
         }
-        if (!transicionVirtualFinal && !transicionSinCartillaAImpreso && !permitidos.contains(destino)) {
+        if (!transicionVirtualFinal && !transicionSinCartillaAImpreso && !transicionSinCartillaACalificado && !permitidos.contains(destino)) {
             throw new RuntimeException(
                     String.format("Transición no permitida de %s a %s", origen, destino));
         }

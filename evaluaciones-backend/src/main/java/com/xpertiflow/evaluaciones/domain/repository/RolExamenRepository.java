@@ -34,4 +34,8 @@ public interface RolExamenRepository extends JpaRepository<RolExamen, String> {
     Optional<RolExamen> findTopByMateriaCodigoAndGrupoAndTipoParcialAndEstadoFlujoNotOrderByVersionDesc(
             String materiaCodigo, String grupo, com.xpertiflow.evaluaciones.domain.enums.TipoParcial tipoParcial,
             EstadoFlujo estadoExcluido);
+
+    List<RolExamen> findBySeaGroupIdOrderByVersionDesc(String seaGroupId);
+
+    Optional<RolExamen> findTopBySeaGroupIdOrderByVersionDesc(String seaGroupId);
 }

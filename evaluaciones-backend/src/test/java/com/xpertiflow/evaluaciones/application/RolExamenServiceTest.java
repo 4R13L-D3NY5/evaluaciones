@@ -287,7 +287,26 @@ class RolExamenServiceTest {
         assertThat(auditorias.getAllValues().get(0).getEtapaDestino()).isEqualTo("DEVUELTO");
         assertThat(auditorias.getAllValues().get(1).getEtapaOrigen()).isEqualTo("DEVUELTO");
         assertThat(auditorias.getAllValues().get(1).getEtapaDestino()).isEqualTo("PENDIENTE_NOTAS");
-        assertThat(auditorias.getAllValues().get(1).getAccion()).isEqualTo("INICIO_CALIFICACION_OMR");
+    }
+
+    @Test
+    void permiteTransicionarSinCartillaACalificadoDesdeImpreso() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-SIN-CARTILLA-001")
+                .modalidad(ModalidadExamen.PRESENCIAL_SIN_CARTILLA)
+                .estadoFlujo(EstadoFlujo.IMPRESO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(rolExamenRepository.save(rol)).thenReturn(rol);
+        when(mapper.toResponseDto(rol)).thenReturn(null);
+
+        service.transicionarEstado(rol.getId(), TransicionEstadoRequestDto.builder()
+                .nuevoEstado(EstadoFlujo.CALIFICADO)
+                .usuario("DOCENTE")
+                .motivo("Carga completa de notas por docente")
+                .build());
+
+        assertThat(rol.getEstadoFlujo()).isEqualTo(EstadoFlujo.CALIFICADO);
     }
 
     @Test

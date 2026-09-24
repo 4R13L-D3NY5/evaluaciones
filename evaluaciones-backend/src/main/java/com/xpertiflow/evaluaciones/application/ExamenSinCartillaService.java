@@ -155,8 +155,14 @@ public class ExamenSinCartillaService {
                                                      GuardarNotasDocenteRequestDto request,
                                                      Authentication authentication) {
         RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
-        if (rol.getEstadoFlujo() != EstadoFlujo.PENDIENTE_NOTAS) {
-            throw new IllegalStateException("La carga de notas se habilita únicamente cuando la evaluación está en PENDIENTE_NOTAS.");
+        Set<EstadoFlujo> estadosPermitidos = Set.of(
+                EstadoFlujo.IMPRESO,
+                EstadoFlujo.ENTREGADO,
+                EstadoFlujo.DEVUELTO,
+                EstadoFlujo.PENDIENTE_NOTAS
+        );
+        if (!estadosPermitidos.contains(rol.getEstadoFlujo())) {
+            throw new IllegalStateException("La carga de notas se habilita a partir del estado IMPRESO (actual: " + rol.getEstadoFlujo() + ").");
         }
 
         List<StudentItemDto> estudiantes = obtenerEstudiantesOficiales(rol);

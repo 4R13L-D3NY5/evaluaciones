@@ -685,7 +685,7 @@ interface CampusDisponible extends Campus {
                               <i class="pi pi-pencil text-xs"></i>
                             </button>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/notasDocente:flex flex-col items-center z-50 pointer-events-none">
-                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">{{ item.etapa === 'Pendiente de notas' ? 'Cargar notas del docente' : 'Ver notas registradas' }}</span>
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">{{ puedeEditarNotasDocente(item) ? 'Cargar notas del docente' : 'Ver notas registradas' }}</span>
                               <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                             </div>
                           </div>
@@ -1286,7 +1286,10 @@ interface CampusDisponible extends Campus {
               }
             </div>
             <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2 shrink-0">
-              @if (salaVirtualCreada()?.estado === 'PREPARADA') { <button (click)="abrirSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-door-open mr-1"></i> Abrir sala para estudiantes</button> }
+              @if (salaVirtualCreada()?.estado === 'PREPARADA') { 
+                <button (click)="abrirSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-door-open mr-1"></i> Abrir sala para estudiantes</button> 
+                <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button>
+              }
               @else if (salaVirtualCreada()?.estado === 'ABIERTA') { <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button> }
               @else if (salaVirtualCreada()?.estado === 'EN_CURSO' || salaVirtualCreada()?.estado === 'PAUSADA') { 
                 <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso.</span>
@@ -2925,7 +2928,7 @@ interface CampusDisponible extends Campus {
             <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
               <div>
                 <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Examen presencial sin cartilla</p>
-                <h3 class="text-lg font-black text-foreground">{{ evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas' ? 'Carga de notas por estudiante' : 'Reporte de notas registradas' }}</h3>
+                <h3 class="text-lg font-black text-foreground">{{ puedeEditarNotasDocente(evaluacionSeleccionadaNotasDocente()) ? 'Carga de notas por estudiante' : 'Reporte de notas registradas' }}</h3>
                 <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotasDocente()?.codigo }} · {{ evaluacionSeleccionadaNotasDocente()?.materia }} · {{ evaluacionSeleccionadaNotasDocente()?.grupo }}</p>
               </div>
               <button (click)="cerrarNotasDocente()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
@@ -2933,7 +2936,7 @@ interface CampusDisponible extends Campus {
             <div class="p-5 overflow-y-auto space-y-4">
               <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-950">
                 <i class="pi pi-info-circle mr-1.5"></i>
-                {{ evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas' ? 'Registre la nota sobre 60 de cada estudiante de la nómina oficial. Al guardar todas las notas, la evaluación pasará a Calificado.' : 'Las notas se calcularon y guardaron tomando como fuente la nómina oficial de los servicios institucionales.' }}
+                {{ puedeEditarNotasDocente(evaluacionSeleccionadaNotasDocente()) ? 'Registre la nota sobre 60 de cada estudiante de la nómina oficial. Al guardar todas las notas, la evaluación pasará a Calificado.' : 'Las notas se calcularon y guardaron tomando como fuente la nómina oficial de los servicios institucionales.' }}
               </div>
               @if (cargandoNotasDocente()) {
                 <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-xl text-amber-700"></i><p class="mt-2">Consultando nómina oficial y notas...</p></div>
@@ -2947,7 +2950,7 @@ interface CampusDisponible extends Campus {
                       <div class="grid grid-cols-[55px_1fr_150px_150px] gap-3 px-4 py-3 items-center text-xs">
                         <span class="font-mono text-muted-foreground">{{ idx + 1 }}</span>
                         <span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground uppercase">{{ nota.estudianteNombreCompleto }}</span></span>
-                        <input type="number" min="0" max="60" step="0.01" [value]="nota.notaSobre60 ?? ''" (input)="editarNotaDocente(nota.codigoEstudiante, $any($event.target).value)" [disabled]="evaluacionSeleccionadaNotasDocente()?.etapa !== 'Pendiente de notas' || guardandoNotasDocente()" class="rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs font-black text-foreground outline-none focus:border-amber-500 disabled:bg-muted disabled:cursor-not-allowed" placeholder="0–60" />
+                        <input type="number" min="0" max="60" step="0.01" [value]="nota.notaSobre60 ?? ''" (input)="editarNotaDocente(nota.codigoEstudiante, $any($event.target).value)" [disabled]="!puedeEditarNotasDocente(evaluacionSeleccionadaNotasDocente()) || guardandoNotasDocente()" class="rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs font-black text-foreground outline-none focus:border-amber-500 disabled:bg-muted disabled:cursor-not-allowed" placeholder="0–60" />
                         <span class="rounded-lg bg-emerald-50 px-3 py-2 font-mono text-xs font-black text-emerald-800">{{ nota.notaSobre100 ?? '—' }}</span>
                       </div>
                     }
@@ -2960,7 +2963,7 @@ interface CampusDisponible extends Campus {
               <div class="flex gap-2">
                 <button (click)="imprimirReporteNotasDocente()" [disabled]="!notasDocenteCompletas()" [title]="notasDocenteCompletas() ? 'Imprimir reporte de notas' : 'Complete todas las notas para imprimir'" class="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-black cursor-pointer disabled:opacity-40"><i class="pi pi-print mr-1"></i> Imprimir reporte</button>
                 <button (click)="cerrarNotasDocente()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button>
-                @if (evaluacionSeleccionadaNotasDocente()?.etapa === 'Pendiente de notas') {
+                @if (puedeEditarNotasDocente(evaluacionSeleccionadaNotasDocente())) {
                   <button (click)="guardarNotasDocente()" [disabled]="!notasDocenteCompletas() || guardandoNotasDocente()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="guardandoNotasDocente()" [class.pi-spinner]="guardandoNotasDocente()" [class.pi-check]="!guardandoNotasDocente()"></i> {{ guardandoNotasDocente() ? 'Guardando...' : 'Guardar y calificar' }}</button>
                 }
               </div>
@@ -3836,7 +3839,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public puedeMostrarNotasDocente(item: EvaluacionItemUI): boolean {
     return !this.esConsultaAcademica() && item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
-      && ['Pendiente de notas', 'Calificado'].includes(item.etapa);
+      && ['Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado', 'Confirmado'].includes(item.etapa);
+  }
+
+  public puedeEditarNotasDocente(item: EvaluacionItemUI | null | undefined): boolean {
+    if (!item) return false;
+    return item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
+      && ['Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas'].includes(item.etapa);
   }
 
   public puedeMostrarDocumento(item: EvaluacionItemUI): boolean {
@@ -4189,9 +4198,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }
 
     if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA'
-        && item.etapa === 'Pendiente de notas'
+        && ['Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas'].includes(item.etapa)
         && pasoKey === 'Calificado') {
-      return 'bg-muted/40 text-muted-foreground/50 border border-dashed border-amber-300 cursor-not-allowed';
+      return 'bg-amber-50 text-amber-700 border border-amber-300 font-bold hover:bg-amber-100';
     }
 
     // Manejo específico del paso Verificado
@@ -4286,6 +4295,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         return 'Bloqueado: El examen presenta observaciones y fue devuelto al docente titular.';
       }
       return 'Bloqueado: El examen debe ser verificado antes de generar el documento oficial.';
+    }
+
+    if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA' && st.key === 'Calificado'
+        && ['Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas'].includes(item.etapa)) {
+      return 'Clic para registrar notas del docente y calificar';
     }
 
     if (pasoIdx <= currentIdx && actividad) {
@@ -4414,9 +4428,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       }
     }
 
-    if (pasoKey === 'Calificado' && item.etapa === 'Pendiente de notas' && item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
-      this.abrirNotasDocente(item);
-      return;
+    if (pasoKey === 'Calificado' && item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+      if (item.etapa === 'Calificado' || item.etapa === 'Confirmado' || this.puedeEditarNotasDocente(item)) {
+        this.abrirNotasDocente(item);
+        return;
+      }
     }
 
     if (pasoIdx === currentIdx + 1) {
@@ -5701,7 +5717,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public guardarNotasDocente(): void {
     const item = this.evaluacionSeleccionadaNotasDocente();
-    if (!item || item.etapa !== 'Pendiente de notas' || !this.notasDocenteCompletas() || this.guardandoNotasDocente()) return;
+    if (!item || !this.puedeEditarNotasDocente(item) || !this.notasDocenteCompletas() || this.guardandoNotasDocente()) return;
     this.guardandoNotasDocente.set(true);
     const notas = this.notasDocente().map(nota => ({
       codigoEstudiante: nota.codigoEstudiante,
@@ -6213,7 +6229,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public iniciarSalaVirtual(): void {
     const sala = this.salaVirtualCreada();
-    if (!sala || sala.estado !== 'ABIERTA' || this.creandoSalaVirtual()) return;
+    if (!sala || (sala.estado !== 'ABIERTA' && sala.estado !== 'PREPARADA') || this.creandoSalaVirtual()) return;
     this.creandoSalaVirtual.set(true);
     this._http.post<SalaVirtualOperacion>(`/api/examenes-virtuales/salas/${sala.id}/iniciar`, {}).subscribe({
       next: actualizada => {

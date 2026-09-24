@@ -86,6 +86,17 @@ public class PoliticaTiempoEvaluacionesService {
         }
     }
 
+    public boolean esPatronLiberado(RolExamen rol) {
+        if (rol == null) return false;
+        return inicioExamenSeguro(rol)
+                .map(inicio -> !LocalDateTime.now().isBefore(inicio.plusHours(configuracion().getHorasPostPatron())))
+                .orElse(true);
+    }
+
+    public int getHorasPostPatron() {
+        return configuracion().getHorasPostPatron();
+    }
+
     public boolean estaHabilitadaGeneracion(RolExamen rol, Authentication authentication) {
         if (!esPersonal(authentication)) return true;
         return inicioExamenSeguro(rol)

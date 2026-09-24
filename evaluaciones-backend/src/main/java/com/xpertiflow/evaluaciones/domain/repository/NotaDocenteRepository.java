@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface NotaDocenteRepository extends JpaRepository<NotaDocente, Long> {
     List<NotaDocente> findByRolExamenId(String rolExamenId);
     Optional<NotaDocente> findByRolExamenIdAndCodigoEstudiante(String rolExamenId, String codigoEstudiante);
+    List<NotaDocente> findByCodigoEstudianteOrderByGuardadoEnDesc(String codigoEstudiante);
 }

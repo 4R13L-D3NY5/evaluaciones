@@ -78,6 +78,8 @@ public class SecurityConfig implements WebMvcConfigurer {
                     "/api/auth/logout",
                     "/api/acceso-virtual/**",
                     "/api/examen-virtual/**",
+                    "/api/consulta-estudiante/**",
+                    "/api/integracion/**",
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
                     "/actuator/health"
