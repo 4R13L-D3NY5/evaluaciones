@@ -1602,83 +1602,84 @@ export interface DiaCalendario {
                       <i class="pi pi-spin pi-spinner text-xl text-purple-600"></i>
                       <p class="mt-2">Consultando sala virtual asignada...</p>
                     </div>
-                  } @else if (salaVirtualExamenActivo(); as sala) {
-                    <!-- DATOS DE ACCESO SALA & PIN -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <div class="rounded-xl border border-purple-200 bg-white p-3 shadow-2xs">
-                        <span class="text-[9px] font-black uppercase text-purple-600 block">Código de Sala</span>
-                        <span class="font-mono text-xl font-black text-purple-950 tracking-wider block mt-0.5 select-all">{{ sala.codigoSala }}</span>
-                        <span class="text-[9.5px] text-muted-foreground mt-0.5 block">Duración: <strong>{{ sala.duracionMinutos || 45 }} min</strong></span>
+                  } @else {
+                    @if (salaVirtualExamenActivo(); as sala) {
+                      <!-- DATOS DE ACCESO SALA & PIN -->
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div class="rounded-xl border border-purple-200 bg-white p-3 shadow-2xs">
+                          <span class="text-[9px] font-black uppercase text-purple-600 block">Código de Sala</span>
+                          <span class="font-mono text-xl font-black text-purple-950 tracking-wider block mt-0.5 select-all">{{ sala.codigoSala }}</span>
+                          <span class="text-[9.5px] text-muted-foreground mt-0.5 block">Duración: <strong>{{ sala.duracionMinutos || 45 }} min</strong></span>
+                        </div>
+
+                        <div class="rounded-xl border border-purple-300 bg-purple-700 text-white p-3 shadow-2xs flex flex-col justify-between">
+                          <div>
+                            <span class="text-[9px] font-black uppercase text-purple-200 block">PIN Grupal de Acceso</span>
+                            @if (tokenGrupoVirtualExamen(); as pin) {
+                              <span class="font-mono text-xl font-black tracking-widest block mt-0.5 select-all">{{ pin }}</span>
+                            } @else {
+                              <span class="text-[11px] font-medium text-purple-200 block mt-1">Sin PIN activo en sesión</span>
+                            }
+                          </div>
+                          <div class="flex items-center gap-1.5 mt-2">
+                            @if (tokenGrupoVirtualExamen()) {
+                              <button (click)="copiarPinVirtual()" class="bg-white/20 hover:bg-white/30 text-white rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer transition">
+                                <i class="pi pi-copy text-[9px] mr-1"></i> Copiar PIN
+                              </button>
+                            }
+                            <button (click)="emitirTokenGrupoDocente()" [disabled]="operandoSalaVirtualExamen()" class="bg-white text-purple-950 hover:bg-purple-50 rounded-lg px-2 py-1 text-[10px] font-black cursor-pointer transition shadow-2xs disabled:opacity-50">
+                              <i class="pi pi-key text-[9px] mr-1"></i> {{ tokenGrupoVirtualExamen() ? 'Renovar PIN' : 'Generar PIN' }}
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
-                      <div class="rounded-xl border border-purple-300 bg-purple-700 text-white p-3 shadow-2xs flex flex-col justify-between">
-                        <div>
-                          <span class="text-[9px] font-black uppercase text-purple-200 block">PIN Grupal de Acceso</span>
-                          @if (tokenGrupoVirtualExamen(); as pin) {
-                            <span class="font-mono text-xl font-black tracking-widest block mt-0.5 select-all">{{ pin }}</span>
-                          } @else {
-                            <span class="text-[11px] font-medium text-purple-200 block mt-1">Sin PIN activo en sesión</span>
-                          }
+                      <!-- ESTUDIANTES CONECTADOS -->
+                      <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white/80 rounded-xl border border-purple-100 text-[11px]">
+                        <div class="flex items-center gap-3">
+                          <span><i class="pi pi-users text-purple-700 mr-1"></i> Registrados: <strong>{{ sala.participantes?.length || 0 }}</strong></span>
+                          <span class="text-amber-700"><i class="pi pi-clock mr-1"></i> En espera: <strong>{{ participantesEnEsperaVirtual() }}</strong></span>
+                          <span class="text-emerald-700"><i class="pi pi-play-circle mr-1"></i> En curso: <strong>{{ participantesEnCursoVirtual() }}</strong></span>
                         </div>
-                        <div class="flex items-center gap-1.5 mt-2">
-                          @if (tokenGrupoVirtualExamen()) {
-                            <button (click)="copiarPinVirtual()" class="bg-white/20 hover:bg-white/30 text-white rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer transition">
-                              <i class="pi pi-copy text-[9px] mr-1"></i> Copiar PIN
+                        <button (click)="copiarDatosCompletosVirtual()" class="text-purple-700 hover:text-purple-900 font-bold flex items-center gap-1 text-[10.5px] cursor-pointer">
+                          <i class="pi pi-share-alt text-[10px]"></i> Copiar mensaje para estudiantes
+                        </button>
+                      </div>
+
+                      <!-- CONTROLES PRINCIPALES DEL DOCENTE -->
+                      <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-purple-100">
+                        <div class="flex flex-wrap items-center gap-2">
+                          @if (sala.estado === 'PREPARADA') {
+                            <button (click)="abrirSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                              <i class="pi pi-sign-in text-xs"></i> Abrir Sala (Permitir Ingreso)
                             </button>
                           }
-                          <button (click)="emitirTokenGrupoDocente()" [disabled]="operandoSalaVirtualExamen()" class="bg-white text-purple-950 hover:bg-purple-50 rounded-lg px-2 py-1 text-[10px] font-black cursor-pointer transition shadow-2xs disabled:opacity-50">
-                            <i class="pi pi-key text-[9px] mr-1"></i> {{ tokenGrupoVirtualExamen() ? 'Renovar PIN' : 'Generar PIN' }}
-                          </button>
+                          @if (sala.estado === 'PREPARADA' || sala.estado === 'ABIERTA') {
+                            <button (click)="iniciarSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50">
+                              <i class="pi pi-play text-xs"></i> Iniciar Examen Ahora
+                            </button>
+                          }
+                          @if (sala.estado === 'INICIADA' || sala.estado === 'EN_CURSO') {
+                            <button (click)="cerrarSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50">
+                              <i class="pi pi-lock text-xs"></i> Finalizar / Cerrar Examen
+                            </button>
+                          }
+                        </div>
+
+                        <button (click)="irASalaVirtualCompleta()" class="text-purple-700 hover:text-purple-900 font-bold text-xs flex items-center gap-1 cursor-pointer">
+                          <span>Panel de Monitoreo Completo</span>
+                          <i class="pi pi-arrow-right text-[10px]"></i>
+                        </button>
+                      </div>
+                    } @else {
+                      <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-xl text-purple-900 text-[11px] leading-relaxed flex items-start gap-2">
+                        <i class="pi pi-info-circle text-purple-700 text-sm mt-0.5 shrink-0"></i>
+                        <div>
+                          <span class="font-bold block">Sala virtual pendiente de generación</span>
+                          <span>El Departamento de Evaluaciones generará las variantes del examen virtual con la nómina oficial. En cuanto estén preparadas, aquí podrás abrir la sala y dar inicio a la evaluación.</span>
                         </div>
                       </div>
-                    </div>
-
-                    <!-- ESTUDIANTES CONECTADOS -->
-                    <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white/80 rounded-xl border border-purple-100 text-[11px]">
-                      <div class="flex items-center gap-3">
-                        <span><i class="pi pi-users text-purple-700 mr-1"></i> Registrados: <strong>{{ sala.participantes?.length || 0 }}</strong></span>
-                        <span class="text-amber-700"><i class="pi pi-clock mr-1"></i> En espera: <strong>{{ participantesEnEsperaVirtual() }}</strong></span>
-                        <span class="text-emerald-700"><i class="pi pi-play-circle mr-1"></i> En curso: <strong>{{ participantesEnCursoVirtual() }}</strong></span>
-                      </div>
-                      <button (click)="copiarDatosCompletosVirtual()" class="text-purple-700 hover:text-purple-900 font-bold flex items-center gap-1 text-[10.5px] cursor-pointer">
-                        <i class="pi pi-share-alt text-[10px]"></i> Copiar mensaje para estudiantes
-                      </button>
-                    </div>
-
-                    <!-- CONTROLES PRINCIPALES DEL DOCENTE -->
-                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-purple-100">
-                      <div class="flex flex-wrap items-center gap-2">
-                        @if (sala.estado === 'PREPARADA') {
-                          <button (click)="abrirSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
-                            <i class="pi pi-sign-in text-xs"></i> Abrir Sala (Permitir Ingreso)
-                          </button>
-                        }
-                        @if (sala.estado === 'PREPARADA' || sala.estado === 'ABIERTA') {
-                          <button (click)="iniciarSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50">
-                            <i class="pi pi-play text-xs"></i> Iniciar Examen Ahora
-                          </button>
-                        }
-                        @if (sala.estado === 'INICIADA' || sala.estado === 'EN_CURSO') {
-                          <button (click)="cerrarSalaVirtualDocente()" [disabled]="operandoSalaVirtualExamen()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50">
-                            <i class="pi pi-lock text-xs"></i> Finalizar / Cerrar Examen
-                          </button>
-                        }
-                      </div>
-
-                      <button (click)="irASalaVirtualCompleta()" class="text-purple-700 hover:text-purple-900 font-bold text-xs flex items-center gap-1 cursor-pointer">
-                        <span>Panel de Monitoreo Completo</span>
-                        <i class="pi pi-arrow-right text-[10px]"></i>
-                      </button>
-                    </div>
-
-                  } @else {
-                    <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-xl text-purple-900 text-[11px] leading-relaxed flex items-start gap-2">
-                      <i class="pi pi-info-circle text-purple-700 text-sm mt-0.5 shrink-0"></i>
-                      <div>
-                        <span class="font-bold block">Sala virtual pendiente de generación</span>
-                        <span>El Departamento de Evaluaciones generará las variantes del examen virtual con la nómina oficial. En cuanto estén preparadas, aquí podrás abrir la sala y dar inicio a la evaluación.</span>
-                      </div>
-                    </div>
+                    }
                   }
                 </div>
               }
