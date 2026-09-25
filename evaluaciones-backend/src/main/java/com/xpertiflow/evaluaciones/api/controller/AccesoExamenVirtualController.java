@@ -40,4 +40,11 @@ public class AccesoExamenVirtualController {
         response.setEnviadoEn(intento.getEnviadoEn() == null ? null : intento.getEnviadoEn().toString());
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/api/examen-virtual/incidencia")
+    public ResponseEntity<IntentoVirtualResponseDto> registrarIncidencia(
+            @RequestHeader("X-Examen-Token") String token,
+            @RequestBody(required = false) IncidenciaVirtualRequestDto request) {
+        return ResponseEntity.ok(service.registrarIncidencia(token, request));
+    }
 }

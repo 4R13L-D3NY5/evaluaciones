@@ -10,6 +10,8 @@ services:
       POSTGRES_DB: ${DB_NAME:-sea_evaluaciones}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      TZ: ${TZ:-America/La_Paz}
+      PGTZ: ${TZ:-America/La_Paz}
     ports:
       - "${BIND_INTERNAL:-0.0.0.0}:${DB_PORT:-5432}:5432"
     volumes:
@@ -110,6 +112,7 @@ services:
       vault-bootstrap:
         condition: service_healthy
     environment:
+      TZ: ${TZ:-America/La_Paz}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SERVER_PORT: 8080
       DB_HOST: db
@@ -166,6 +169,8 @@ services:
         condition: service_healthy
     ports:
       - "${BIND_PUBLIC:-0.0.0.0}:${FRONTEND_PORT:-4200}:80"
+    environment:
+      TZ: ${TZ:-America/La_Paz}
     networks:
       - eval-network
 
@@ -188,6 +193,7 @@ services:
       vault-bootstrap:
         condition: service_healthy
     environment:
+      TZ: ${TZ:-America/La_Paz}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
@@ -230,6 +236,7 @@ services:
       vault-bootstrap:
         condition: service_healthy
     environment:
+      TZ: ${TZ:-America/La_Paz}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
@@ -273,6 +280,7 @@ services:
       vault-bootstrap:
         condition: service_healthy
     environment:
+      TZ: ${TZ:-America/La_Paz}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}

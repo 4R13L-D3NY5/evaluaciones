@@ -49,6 +49,9 @@ interface AccesoVirtual {
   aula?: string;
   estadoSala: string;
   estadoIntento: string;
+  salidasPantalla?: number;
+  advertenciasDocente?: number;
+  mensajeAdvertencia?: string;
   iniciadaEn?: string;
   terminaEn?: string;
   cuentaRegresivaSegundos?: number;
@@ -316,8 +319,8 @@ interface AccesoVirtual {
                             type="button"
                             class="h-7 w-7 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer border"
                             [ngClass]="{
-                              'bg-emerald-600 text-white border-emerald-600 shadow-xs': respuestas[pNum],
-                              'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100': !respuestas[pNum]
+                              'bg-emerald-600 text-white border-emerald-600 shadow-xs': respuestas()[pNum],
+                              'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100': !respuestas()[pNum]
                             }">
                       {{ pNum }}
                     </button>
@@ -373,8 +376,8 @@ interface AccesoVirtual {
                       <div class="flex items-start gap-3.5">
                         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-black transition"
                               [ngClass]="{
-                                'bg-emerald-600 text-white shadow-xs': respuestas[pregunta.numeroPregunta],
-                                'bg-indigo-50 text-indigo-700 border border-indigo-100': !respuestas[pregunta.numeroPregunta]
+                                'bg-emerald-600 text-white shadow-xs': respuestas()[pregunta.numeroPregunta],
+                                'bg-indigo-50 text-indigo-700 border border-indigo-100': !respuestas()[pregunta.numeroPregunta]
                               }">
                           {{ pregunta.numeroPregunta }}
                         </span>
@@ -411,30 +414,30 @@ interface AccesoVirtual {
                       <div class="mt-4 grid gap-2.5" [ngClass]="claseOpciones(pregunta)">
                         @for (opcion of opcionesParaResponder(pregunta); track opcion.letra) {
                           <label class="group relative flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 transition-all hover:border-indigo-200 hover:bg-slate-50"
-                                 [class.border-indigo-600]="respuestas[pregunta.numeroPregunta] === opcion.letra"
-                                 [class.bg-indigo-50]="respuestas[pregunta.numeroPregunta] === opcion.letra"
-                                 [class.shadow-xs]="respuestas[pregunta.numeroPregunta] === opcion.letra"
-                                 [class.border-slate-200]="respuestas[pregunta.numeroPregunta] !== opcion.letra"
+                                 [class.border-indigo-600]="respuestas()[pregunta.numeroPregunta] === opcion.letra"
+                                 [class.bg-indigo-50]="respuestas()[pregunta.numeroPregunta] === opcion.letra"
+                                 [class.shadow-xs]="respuestas()[pregunta.numeroPregunta] === opcion.letra"
+                                 [class.border-slate-200]="respuestas()[pregunta.numeroPregunta] !== opcion.letra"
                                  [class.justify-center]="esGrupoCompacto(pregunta)"
                                  [attr.title]="esGrupoCompacto(pregunta) ? opcion.texto : null">
                             
                             <input type="radio" 
                                    [name]="'pregunta-' + pregunta.numeroPregunta" 
                                    [value]="opcion.letra" 
-                                   [checked]="respuestas[pregunta.numeroPregunta] === opcion.letra" 
+                                   [checked]="respuestas()[pregunta.numeroPregunta] === opcion.letra" 
                                    (change)="responder(pregunta, opcion.letra)" 
                                    [class.sr-only]="esGrupoCompacto(pregunta)" 
                                    class="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 accent-indigo-600 cursor-pointer">
 
                             <span class="flex items-center gap-2 text-xs sm:text-sm"
                                   [ngClass]="{
-                                    'font-black text-indigo-950': respuestas[pregunta.numeroPregunta] === opcion.letra,
-                                    'text-slate-700': respuestas[pregunta.numeroPregunta] !== opcion.letra
+                                    'font-black text-indigo-950': respuestas()[pregunta.numeroPregunta] === opcion.letra,
+                                    'text-slate-700': respuestas()[pregunta.numeroPregunta] !== opcion.letra
                                   }">
                               <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
                                     [ngClass]="{
-                                      'bg-indigo-600 text-white': respuestas[pregunta.numeroPregunta] === opcion.letra,
-                                      'bg-slate-100 text-slate-600': respuestas[pregunta.numeroPregunta] !== opcion.letra
+                                      'bg-indigo-600 text-white': respuestas()[pregunta.numeroPregunta] === opcion.letra,
+                                      'bg-slate-100 text-slate-600': respuestas()[pregunta.numeroPregunta] !== opcion.letra
                                     }">
                                 {{ opcion.letra }}
                               </span>
@@ -454,15 +457,15 @@ interface AccesoVirtual {
           </div>
 
           <!-- BOTTOM ACTION BAR -->
-          <div class="sticky bottom-4 mt-8 flex items-center justify-between bg-white/95 backdrop-blur-xs border border-slate-200 p-4 rounded-2xl shadow-xl">
-            <div class="text-xs text-slate-500">
-              @if (respondidasCount() === totalPreguntas()) {
-                <span class="text-emerald-600 font-bold flex items-center gap-1.5">
-                  <i class="pi pi-check-circle"></i> Has respondido todas las preguntas
+          <div class="sticky bottom-4 mt-8 flex flex-wrap items-center justify-between gap-4 bg-white/95 backdrop-blur-xs border border-slate-200 p-4 rounded-2xl shadow-xl">
+            <div class="text-xs">
+              @if (totalPreguntas() > 0 && respondidasCount() >= totalPreguntas()) {
+                <span class="text-emerald-700 font-bold flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                  <i class="pi pi-check-circle text-sm text-emerald-600"></i> Has respondido todas las preguntas ({{ totalPreguntas() }} de {{ totalPreguntas() }})
                 </span>
               } @else {
-                <span class="text-amber-600 font-bold flex items-center gap-1.5">
-                  <i class="pi pi-info-circle"></i> Faltan {{ totalPreguntas() - respondidasCount() }} preguntas por responder
+                <span class="text-amber-800 font-bold flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+                  <i class="pi pi-info-circle text-sm text-amber-600"></i> Te restan {{ preguntasRestantes() }} preguntas por marcar (has respondido {{ respondidasCount() }} de {{ totalPreguntas() }})
                 </span>
               }
             </div>
@@ -504,7 +507,84 @@ interface AccesoVirtual {
           </section>
         }
 
+        <!-- ========================================== -->
+        <!-- VISTA: ANULADO                             -->
+        <!-- ========================================== -->
+        @if (vista() === 'anulado') {
+          <section class="mx-auto mt-6 max-w-lg rounded-3xl border border-rose-200 bg-white p-8 sm:p-10 text-center shadow-xl shadow-rose-100">
+            <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-rose-50 text-rose-600 border border-rose-200 shadow-sm">
+              <i class="pi pi-ban text-4xl"></i>
+            </div>
+            <h2 class="mt-6 text-2xl font-black text-rose-900">Evaluación Anulada</h2>
+            <p class="mt-2 text-sm text-slate-600 leading-relaxed">
+              Tu intento en esta evaluación ha sido anulado por el docente supervisor de la sala.
+            </p>
+            @if (mensajeDocenteActual() || acceso()?.mensajeAdvertencia) {
+              <div class="mt-4 rounded-xl bg-rose-50 border border-rose-200 p-3.5 text-xs text-rose-800 text-left font-medium">
+                <b>Motivo registrado:</b> {{ mensajeDocenteActual() || acceso()?.mensajeAdvertencia }}
+              </div>
+            }
+            <div class="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-4 text-xs text-slate-600 space-y-1 text-left">
+              <div><b>Estudiante:</b> {{ acceso()?.nombreEstudiante }} ({{ acceso()?.codigoEstudiante }})</div>
+              <div><b>Materia:</b> {{ acceso()?.materiaNombre }}</div>
+              <div><b>Código de Sala:</b> {{ acceso()?.codigoSala }}</div>
+            </div>
+            <p class="mt-6 text-xs text-slate-500">
+              Por favor, comunícate inmediatamente con el docente a cargo de la evaluación si consideras que se trata de un error.
+            </p>
+          </section>
+        }
+
       </div>
+
+      <!-- MODAL SUPERVISIÓN ANTIFRAUDE: SALIDA DE PESTAÑA -->
+      @if (mostrarAlertaSalida()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+          <div class="w-full max-w-md overflow-hidden rounded-3xl border-2 border-rose-500 bg-white shadow-2xl p-6 sm:p-7 text-center">
+            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 border border-rose-200">
+              <i class="pi pi-exclamation-triangle text-3xl animate-bounce"></i>
+            </div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-rose-600">Supervisión en vivo</p>
+            <h3 class="mt-1 text-lg font-black text-slate-900">¡Alerta de Abandono de Pestaña!</h3>
+            <p class="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Se detectó que cambiaste de ventana o minimizaste el examen. Este evento quedó registrado y ha sido reportado al docente en tiempo real.
+            </p>
+            <div class="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 text-left">
+              <p class="font-bold flex items-center gap-1.5 mb-1 text-amber-900">
+                <i class="pi pi-shield"></i> Reglas de control institucional:
+              </p>
+              <ul class="list-disc list-inside space-y-0.5 text-[11px] text-amber-950">
+                <li>No navegues a otros sitios ni abras aplicaciones secundarias.</li>
+                <li>Las salidas reiteradas facultan al docente para anular la evaluación.</li>
+              </ul>
+            </div>
+            <button (click)="cerrarAlertaSalida()"
+                    class="mt-5 w-full rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black py-3 px-4 text-xs sm:text-sm shadow-lg shadow-rose-200 transition cursor-pointer">
+              Comprendo y continúo con el examen
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL ADVERTENCIA DIRECTA DEL DOCENTE -->
+      @if (mostrarAdvertenciaDocente()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+          <div class="w-full max-w-md overflow-hidden rounded-3xl border-2 border-amber-500 bg-white shadow-2xl p-6 sm:p-7 text-center">
+            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
+              <i class="pi pi-bell text-3xl"></i>
+            </div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Aviso del Supervisor</p>
+            <h3 class="mt-1 text-lg font-black text-slate-900">Advertencia del Docente</h3>
+            <div class="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs sm:text-sm text-amber-950 text-left font-medium">
+              {{ mensajeDocenteActual() || 'El docente ha emitido una llamada de atención para tu intento. Mantente enfocado en la pantalla del examen.' }}
+            </div>
+            <button (click)="cerrarAdvertenciaDocente()"
+                    class="mt-5 w-full rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black py-3 px-4 text-xs sm:text-sm shadow-lg shadow-amber-200 transition cursor-pointer">
+              Entendido
+            </button>
+          </div>
+        </div>
+      }
     </main>
   `
 })
@@ -513,7 +593,7 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
   private readonly feedback = inject(UiFeedbackService);
   private readonly route = inject(ActivatedRoute);
 
-  vista = signal<'acceso' | 'espera' | 'preinicio' | 'examen' | 'finalizado'>('acceso');
+  vista = signal<'acceso' | 'espera' | 'preinicio' | 'examen' | 'finalizado' | 'anulado'>('acceso');
   acceso = signal<AccesoVirtual | null>(null);
   secciones = signal<SeccionVirtual[]>([]);
   cargando = signal(false);
@@ -521,10 +601,20 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
   guardandoEstado = signal<'guardado' | 'guardando' | 'error'>('guardado');
   enviando = signal(false);
 
+  // Antifraude y supervisión docente
+  mostrarAlertaSalida = signal(false);
+  mostrarAdvertenciaDocente = signal(false);
+  mensajeDocenteActual = signal('');
+  contadorSalidasLocal = signal(0);
+  private ultimaSalidaTimestamp = 0;
+  private salioDePantalla = false;
+  private ultimoMensajeDocenteVisto = '';
+  private monitorExamen?: ReturnType<typeof setInterval>;
+
   codigoSala = '';
   codigoEstudiante = '';
   token = '';
-  respuestas: Record<number, string> = {};
+  respuestas = signal<Record<number, string>>({});
 
   private polling?: ReturnType<typeof setInterval>;
   private reloj?: ReturnType<typeof setInterval>;
@@ -537,7 +627,12 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
   });
 
   respondidasCount = computed(() => {
-    return Object.keys(this.respuestas).filter(k => !!this.respuestas[Number(k)]).length;
+    const r = this.respuestas();
+    return Object.keys(r).filter(k => !!r[Number(k)]).length;
+  });
+
+  preguntasRestantes = computed(() => {
+    return Math.max(0, this.totalPreguntas() - this.respondidasCount());
   });
 
   porcentajeProgreso = computed(() => {
@@ -566,6 +661,12 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
       if (pinParam) this.token = pinParam.trim();
       if (estParam) this.codigoEstudiante = estParam.trim();
     });
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blur', this.onWindowBlur);
+      window.addEventListener('focus', this.onWindowFocus);
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+    }
   }
 
   ingresar(): void {
@@ -588,13 +689,13 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
   }
 
   responder(pregunta: PreguntaVirtual, respuesta: string): void {
-    this.respuestas[pregunta.numeroPregunta] = respuesta;
+    this.respuestas.update(r => ({ ...r, [pregunta.numeroPregunta]: respuesta }));
     this.guardandoEstado.set('guardando');
 
     // Guardar respaldo temporal en sessionStorage ante micro-cortes
     const intentoId = this.acceso()?.intentoId || 'temp';
     try {
-      sessionStorage.setItem('sea_respuestas_' + intentoId, JSON.stringify(this.respuestas));
+      sessionStorage.setItem('sea_respuestas_' + intentoId, JSON.stringify(this.respuestas()));
     } catch {}
 
     const headers = new HttpHeaders({ 'X-Examen-Token': this.acceso()?.tokenSesion || this.token });
@@ -623,9 +724,10 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
 
     if (confirmar) {
       const sinResponder: number[] = [];
+      const respActuales = this.respuestas();
       for (const s of this.secciones()) {
         for (const p of s.preguntas) {
-          if (!this.respuestas[p.numeroPregunta]) {
+          if (!respActuales[p.numeroPregunta]) {
             sinResponder.push(p.numeroPregunta);
           }
         }
@@ -681,17 +783,121 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
     return tamano === 'GRANDE' ? 58 : tamano === 'MUY_PEQUENA' ? 15 : tamano === 'PEQUENA' ? 24 : 36;
   }
 
+  cerrarAlertaSalida(): void {
+    this.mostrarAlertaSalida.set(false);
+  }
+
+  cerrarAdvertenciaDocente(): void {
+    this.mostrarAdvertenciaDocente.set(false);
+  }
+
+  private onVisibilityChange = () => {
+    if (this.vista() !== 'examen') return;
+    if (document.visibilityState === 'hidden') {
+      this.salioDePantalla = true;
+      this.notificarSalidaPantalla();
+    } else if (document.visibilityState === 'visible' && this.salioDePantalla) {
+      this.salioDePantalla = false;
+      this.mostrarAlertaSalida.set(true);
+    }
+  };
+
+  private onWindowBlur = () => {
+    if (this.vista() !== 'examen') return;
+    this.salioDePantalla = true;
+    this.notificarSalidaPantalla();
+  };
+
+  private onWindowFocus = () => {
+    if (this.vista() !== 'examen') return;
+    if (this.salioDePantalla) {
+      this.salioDePantalla = false;
+      this.mostrarAlertaSalida.set(true);
+    }
+  };
+
+  private notificarSalidaPantalla(): void {
+    if (this.vista() !== 'examen') return;
+    const ahora = Date.now();
+    if (ahora - this.ultimaSalidaTimestamp < 3000) return;
+    this.ultimaSalidaTimestamp = ahora;
+    this.contadorSalidasLocal.update(c => c + 1);
+
+    const token = this.acceso()?.tokenSesion || this.token;
+    if (!token) return;
+    const headers = new HttpHeaders({ 'X-Examen-Token': token });
+    this.http.post('/api/examen-virtual/incidencia', {
+      tipo: 'SALIDA_PESTANA',
+      detalle: 'Cambio de ventana, pestaña o aplicación detectado por el navegador'
+    }, { headers }).subscribe({
+      error: () => {}
+    });
+  }
+
+  private iniciarMonitorExamen(): void {
+    this.detenerMonitorExamen();
+    this.monitorExamen = setInterval(() => this.verificarEstadoExamen(), 5000);
+  }
+
+  private detenerMonitorExamen(): void {
+    if (this.monitorExamen) {
+      clearInterval(this.monitorExamen);
+      this.monitorExamen = undefined;
+    }
+  }
+
+  private verificarEstadoExamen(): void {
+    if (this.vista() !== 'examen') return;
+    const token = this.acceso()?.tokenSesion || this.token;
+    if (!token) return;
+    const headers = new HttpHeaders({ 'X-Examen-Token': token });
+    this.http.get<AccesoVirtual>('/api/examen-virtual/actual', { headers }).subscribe({
+      next: data => {
+        if (data.estadoIntento === 'ANULADO') {
+          this.detener();
+          this.acceso.set(data);
+          this.vista.set('anulado');
+          return;
+        }
+        if (['ENVIADO', 'CALIFICADO'].includes(data.estadoIntento)) {
+          this.detener();
+          this.acceso.set(data);
+          this.vista.set('finalizado');
+          return;
+        }
+        if (data.mensajeAdvertencia && data.mensajeAdvertencia !== this.ultimoMensajeDocenteVisto) {
+          this.ultimoMensajeDocenteVisto = data.mensajeAdvertencia;
+          this.mensajeDocenteActual.set(data.mensajeAdvertencia);
+          this.mostrarAdvertenciaDocente.set(true);
+        }
+      },
+      error: () => {}
+    });
+  }
+
   private actualizarVista(data: AccesoVirtual): void {
     this.acceso.set(data);
 
+    if (data.estadoIntento === 'ANULADO') {
+      this.detener();
+      this.vista.set('anulado');
+      return;
+    }
+
+    if (['ENVIADO', 'CALIFICADO'].includes(data.estadoIntento)) {
+      this.detener();
+      this.vista.set('finalizado');
+      return;
+    }
+
     // Hidratar respuestas guardadas previamente en base de datos o sesión local
     if (data.respuestasGuardadas && Object.keys(data.respuestasGuardadas).length > 0) {
-      this.respuestas = { ...data.respuestasGuardadas };
+      this.respuestas.set({ ...data.respuestasGuardadas });
     } else {
       try {
         const guardadasSession = sessionStorage.getItem('sea_respuestas_' + data.intentoId);
         if (guardadasSession) {
-          this.respuestas = { ...JSON.parse(guardadasSession) };
+          this.respuestas.set({ ...JSON.parse(guardadasSession) });
         }
       } catch {}
     }
@@ -710,10 +916,12 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
       this.secciones.set(this.organizarSecciones(data.preguntas || []));
       this.vista.set('examen');
       this.iniciarReloj(data.tiempoRestanteSegundos);
+      this.iniciarMonitorExamen();
       return;
     }
 
     this.detenerCuentaRegresiva();
+    this.detenerMonitorExamen();
     this.vista.set('espera');
     if (!this.polling) this.polling = setInterval(() => this.recargar(), 3000);
   }
@@ -909,9 +1117,15 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
     this.detenerPolling();
     this.detenerCuentaRegresiva();
     this.detenerReloj();
+    this.detenerMonitorExamen();
   }
 
   ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('blur', this.onWindowBlur);
+      window.removeEventListener('focus', this.onWindowFocus);
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    }
     this.detener();
   }
 }

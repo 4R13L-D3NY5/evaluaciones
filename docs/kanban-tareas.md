@@ -79,6 +79,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-040 — Optimizaciones y panel de monitoreo en vivo para exámenes y salas virtuales
+
+- Prioridad: Alta
+- Área: Exámenes Virtuales / Monitoreo en Vivo / Antifraude
+- Responsable: Antigravity
+- Creada: 2026-09-24
+- Fecha límite: 2026-09-24
+- Dependencias: `examen-virtual.component.ts`, `examen-virtual.component.html`, `sala-virtual.component.ts`, `sala-virtual.component.html`, `ExamenVirtualService.java`, `ExamenVirtualController.java`, `RolExamenService.java`, `evaluaciones-dia.component.ts`.
+- Criterio de cierre: 1) Permitir reconfigurar el ratio de preguntas al restablecer un examen virtual a `VALIDADO` y verificar flags en backend y frontend; 2) Corregir reactividad del contador de preguntas restantes en el examen virtual (`respuestas` como signal); 3) Implementar detección antifraude en el examen virtual cuando el estudiante abandona la pestaña o ventana del navegador (Page Visibility API / blur) mostrando advertencia y registrando contador de salidas; 4) Implementar en el módulo de Salas Virtuales el monitoreo en vivo del docente: lista de estudiantes, estado de conexión, % de avance, contador de salidas de pantalla, advertencias, expulsión/anulación e inicio del examen; 5) Compilar y verificar frontend y backend.
+- Notas: En progreso. Requerimiento solicitado por el usuario para corregir el ratio al restablecer, el contador de preguntas restantes, dar funcionalidad completa al seguimiento de sala virtual docente y detectar abandono de pestaña. Implementación concluida: ratio configurable al restablecer, contador restante reactivo, antifraude con eventos de visibilidad/desenfoque y panel docente de monitoreo en vivo con KPIs, progreso y acciones (advertir/anular/restaurar) Ajuste de sala virtual docente completado: eliminada sección de creación manual o búsqueda por identificador; el docente solo visualiza sus exámenes virtuales asignados; únicamente puede ingresar si la sala fue generada por Evaluaciones (GENERADO); sala en espera con desglose de conectados vs sin ingresar; botón Iniciar examen cuando esté listo; antifraude con detección de desenfoque y advertencias/anulación en vivo. Ajuste definitivo sala virtual docente: 1) Eliminado bloque 'Consultar o crear sala por identificador'; 2) Si el examen está en VALIDADO u otro estado previo a GENERADO, muestra aviso de que la sala está pendiente de preparación por Evaluaciones y no permite gestionar; 3) Eliminadas acciones docentes no autorizadas (Abrir sala, Restablecer examen, Generar otro PIN, Generar acceso grupal); 4) Cabecera de sala estilizada con materia, carrera y grupo; 5) Datos de sala y PIN generados por Evaluaciones visibles únicamente para proyectar/compartir; 6) Docente únicamente cuenta con 'Iniciar examen' (cuando estén conectados) y 'Finalizar / Cerrar sala' (en curso); 7) Contenedores frontend y backend reconstruidos y recreados en Docker. Ajuste completo para restablecer examen virtual permitiendo redefinir el ratio de variantes y regenerar, además de la restricción docente para que no gestione ni cree salas manualmente sino que solo proyecte/inicie el examen. Corrección de persistencia de anulación en examen virtual (sincronizarInicioIntento protegido contra sobreescritura de ANULADO), actualización de endpoints del controlador para devolver SalaVirtualResponseDto completa y aislamiento reactivo de botones de acción en panel docente con procesandoEstudiante. Eliminado bloque de Tokens individuales (alternativa) tanto del modal de Sala Virtual en Evaluaciones del Día como de la vista de sala virtual docente, dejando exclusivamente el flujo oficial con PIN grupal y código de estudiante. Persistencia unificada de PIN de sala virtual (V44__pin_acceso_sala_virtual.sql, token_grupo_plano en BD y DTO SalaVirtualResponseDto). Eliminada regeneración silenciosa docente para garantizar que Evaluaciones y Docente compartan exactamente el mismo PIN y código de sala en todo momento.
+
 #### T-038 - Control de tiempo mínimo para devolución de examen (45 min) y liberación de patrones OMR a partir de DEVUELTO
 
 - Prioridad: Alta
@@ -475,7 +486,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 4 |
 | En progreso | 0 |
-| En revisión | 31 |
+| En revisión | 32 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

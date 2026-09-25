@@ -21,6 +21,10 @@ import com.xpertiflow.evaluaciones.api.dto.gateway.CourseDto;
 import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoResponseDto;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
+import com.xpertiflow.evaluaciones.domain.entity.SalaExamenVirtual;
+import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
+import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
+import com.xpertiflow.evaluaciones.domain.repository.SalaExamenVirtualRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -54,6 +58,9 @@ public class RolExamenService {
     private final AccesoAcademicoService accesoAcademicoService;
     private final VerificacionPoliticaService verificacionPoliticaService;
     private final PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
+    private final SalaExamenVirtualRepository salaVirtualRepository;
+    private final ExamenVarianteRepository varianteRepository;
+    private final MapeoEstudianteVarianteRepository mapeoRepository;
 
     private static final long CACHE_GRUPOS_SEA_MILLIS = 600_000L; // 10 minutos para proteger el gateway ante concurrencia
     private volatile List<GroupItemDto> gruposSeaCache = List.of();
@@ -934,6 +941,21 @@ public class RolExamenService {
         }
 
         rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
+        if (rol.getModalidad() == ModalidadExamen.VIRTUAL) {
+            if (salaVirtualRepository != null) {
+                List<SalaExamenVirtual> salas = salaVirtualRepository.findByRolExamenIdOrderByCreadoEnDesc(rol.getId());
+                if (!salas.isEmpty()) {
+                    salaVirtualRepository.deleteAll(salas);
+                }
+            }
+            if (mapeoRepository != null) {
+                mapeoRepository.deleteByRolExamenId(rol.getId());
+            }
+            if (varianteRepository != null) {
+                varianteRepository.deleteByRolExamenId(rol.getId());
+            }
+            rol.setVariantesGeneradasCount(0);
+        }
         RolExamen guardado = rolExamenRepository.save(rol);
         registrarAuditoria(guardado, origen, EstadoFlujo.VALIDADO,
                 "RESTABLECIMIENTO_A_VALIDADO",

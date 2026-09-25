@@ -10,4 +10,11 @@ public class ParticipanteVirtualDto {
     private String enviadoEn;
     private Integer aciertos;
     private String notaSobre100;
+    private Integer preguntasRespondidas;
+    private Integer totalPreguntas;
+    private Integer porcentajeAvance;
+    private Integer salidasPantalla;
+    private Integer advertenciasDocente;
+    private String mensajeAdvertencia;
+    private String ultimaActividadEn;
 }

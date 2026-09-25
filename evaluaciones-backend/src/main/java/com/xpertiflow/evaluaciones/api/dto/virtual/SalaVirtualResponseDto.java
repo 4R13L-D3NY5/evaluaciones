@@ -6,6 +6,7 @@ public class SalaVirtualResponseDto {
     private String id;
     private String rolExamenId;
     private String codigoSala;
+    private String tokenGrupo;
     private String estado;
     private Integer duracionMinutos;
     private Integer graciaIngresoMinutos;

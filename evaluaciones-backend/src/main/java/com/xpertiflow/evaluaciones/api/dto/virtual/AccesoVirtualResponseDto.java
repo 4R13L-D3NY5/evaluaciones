@@ -28,4 +28,7 @@ public class AccesoVirtualResponseDto {
     private Long tiempoRestanteSegundos;
     private List<PreguntaVirtualDto> preguntas;
     private java.util.Map<Integer, String> respuestasGuardadas;
+    private Integer salidasPantalla;
+    private Integer advertenciasDocente;
+    private String mensajeAdvertencia;
 }
