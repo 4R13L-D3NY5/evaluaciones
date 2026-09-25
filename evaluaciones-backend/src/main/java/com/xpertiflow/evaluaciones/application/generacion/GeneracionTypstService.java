@@ -55,6 +55,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDateTime;
 
+import com.xpertiflow.evaluaciones.domain.entity.SalaExamenVirtual;
+import com.xpertiflow.evaluaciones.domain.repository.SalaExamenVirtualRepository;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -73,6 +76,7 @@ public class GeneracionTypstService {
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final com.xpertiflow.evaluaciones.application.VerificacionPoliticaService verificacionPoliticaService;
     private final com.xpertiflow.evaluaciones.application.PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
+    private final SalaExamenVirtualRepository salaRepository;
 
     private final Map<String, GeneracionTypstResultadoDto> estados = new ConcurrentHashMap<>();
     private static final Set<EstadoFlujo> ESTADOS_CON_DOCUMENTO = Set.of(
@@ -494,7 +498,15 @@ public class GeneracionTypstService {
         String rolExamenId = resultado.getRolExamenId();
         log.info("Persistiendo resultado de generacion Typst para rol {}", rolExamenId);
 
-        // 1. Borrar mapeos primero (FK a variantes) y luego variantes previas
+        // 1. Borrar salas virtuales previas para evitar violaciones de clave foránea
+        if (salaRepository != null) {
+            List<SalaExamenVirtual> salasPrevias = salaRepository.findByRolExamenIdOrderByCreadoEnDesc(rolExamenId);
+            if (!salasPrevias.isEmpty()) {
+                salaRepository.deleteAll(salasPrevias);
+            }
+        }
+
+        // 2. Borrar mapeos primero (FK a variantes) y luego variantes previas
         mapeoRepository.deleteByRolExamenId(rolExamenId);
         varianteRepository.deleteByRolExamenId(rolExamenId);
 

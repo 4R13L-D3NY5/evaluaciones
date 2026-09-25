@@ -259,4 +259,25 @@ class ExamenVirtualServiceTest {
         verify(intentoRepository).save(intento);
         verify(eventoRepository, times(1)).save(any()); // SALA_INICIADA
     }
+
+    @Test
+    void emitirTokenGrupo_guardaTokenPlanoYConsultarSalaLoDevuelve() {
+        SalaExamenVirtual sala = new SalaExamenVirtual();
+        sala.setId("SALA-TEST-PIN");
+        sala.setCodigoSala("SALA-ABC123");
+        sala.setEstado("PREPARADA");
+        sala.setDuracionMinutos(45);
+        when(salaRepository.findById("SALA-TEST-PIN")).thenReturn(Optional.of(sala));
+        when(intentoRepository.findBySalaIdOrderByCodigoEstudianteAsc("SALA-TEST-PIN")).thenReturn(List.of());
+
+        var respToken = service.emitirTokenGrupo("SALA-TEST-PIN", "personal_evaluaciones");
+
+        assertThat(respToken).isNotNull();
+        assertThat(respToken.getTokenGrupo()).isNotBlank().hasSize(6);
+        assertThat(sala.getTokenGrupoPlano()).isEqualTo(respToken.getTokenGrupo());
+        assertThat(sala.getTokenGrupoHash()).isEqualTo(hashToken(respToken.getTokenGrupo()));
+
+        var dtoSala = service.consultarSala("SALA-TEST-PIN");
+        assertThat(dtoSala.getTokenGrupo()).isEqualTo(respToken.getTokenGrupo());
+    }
 }

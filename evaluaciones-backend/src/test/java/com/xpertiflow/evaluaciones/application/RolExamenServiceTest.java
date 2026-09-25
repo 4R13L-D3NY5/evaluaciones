@@ -14,6 +14,9 @@ import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionReposito
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
+import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
+import com.xpertiflow.evaluaciones.domain.repository.SalaExamenVirtualRepository;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,12 +61,18 @@ class RolExamenServiceTest {
     private VerificacionPoliticaService verificacionPoliticaService;
     @Mock
     private PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
+    @Mock
+    private SalaExamenVirtualRepository salaVirtualRepository;
+    @Mock
+    private ExamenVarianteRepository varianteRepository;
+    @Mock
+    private MapeoEstudianteVarianteRepository mapeoRepository;
 
     private RolExamenService service;
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, verificacionExamenRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, verificacionExamenRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService, salaVirtualRepository, varianteRepository, mapeoRepository);
     }
 
     @Test

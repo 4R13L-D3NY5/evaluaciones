@@ -17,6 +17,7 @@ import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.GeneracionTypstJobRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.SalaExamenVirtualRepository;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,8 @@ class GeneracionTypstServiceTest {
     private VerificacionPoliticaService verificacionPoliticaService;
     @Mock
     private PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
+    @Mock
+    private SalaExamenVirtualRepository salaRepository;
 
     private GeneracionTypstService service;
 
@@ -78,7 +81,8 @@ class GeneracionTypstServiceTest {
                 properties,
                 unitepcGatewayClient,
                 verificacionPoliticaService,
-                politicaTiempoEvaluacionesService);
+                politicaTiempoEvaluacionesService,
+                salaRepository);
     }
 
     @Test

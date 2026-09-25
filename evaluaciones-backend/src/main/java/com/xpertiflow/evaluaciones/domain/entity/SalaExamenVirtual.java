@@ -24,6 +24,9 @@ public class SalaExamenVirtual {
     @Column(name = "token_grupo_hash", length = 128)
     private String tokenGrupoHash;
 
+    @Column(name = "token_grupo_plano", length = 10)
+    private String tokenGrupoPlano;
+
     @Column(name = "token_grupo_emitido_en")
     private LocalDateTime tokenGrupoEmitidoEn;
 

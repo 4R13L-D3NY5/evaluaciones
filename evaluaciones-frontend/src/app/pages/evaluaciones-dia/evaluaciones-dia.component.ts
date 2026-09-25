@@ -95,6 +95,7 @@ interface SalaVirtualOperacion {
   id: string;
   rolExamenId: string;
   codigoSala: string;
+  tokenGrupo?: string;
   estado: string;
   duracionMinutos: number;
   graciaIngresoMinutos?: number;
@@ -905,9 +906,21 @@ interface CampusDisponible extends Campus {
                       <span class="block text-[10px] uppercase tracking-wider text-purple-700 font-extrabold">Variantes a preparar</span>
                       <strong class="text-sm text-purple-950">{{ variantesCalculadas() }}</strong>
                     </div>
-                    <div class="bg-white/70 border border-purple-200 rounded-lg p-2">
-                      <span class="block text-[10px] uppercase tracking-wider text-purple-700 font-extrabold">Ratio institucional</span>
-                      <strong class="text-sm text-purple-950">{{ ratioEstudiantesPorVariante() }} estudiantes / variante</strong>
+                    <div class="bg-white/70 border border-purple-200 rounded-lg p-2 flex flex-col justify-between">
+                      <span class="block text-[10px] uppercase tracking-wider text-purple-700 font-extrabold">Ratio alumnos / var.</span>
+                      <div class="flex items-center gap-1.5 mt-1">
+                        <button type="button" (click)="cambiarRatioPorVariante(-1)" class="w-6 h-6 rounded bg-purple-100 hover:bg-purple-200 text-purple-900 font-black text-xs flex items-center justify-center cursor-pointer transition">−</button>
+                        <input
+                          type="number"
+                          min="1"
+                          max="30"
+                          class="w-12 rounded border border-purple-300 bg-white px-1 py-0.5 text-center font-mono text-xs font-black text-purple-900 outline-none focus:ring-2 focus:ring-purple-300"
+                          [value]="ratioEstudiantesPorVariante()"
+                          (input)="onRatioEstudiantesPorVarianteChange($event)"
+                          aria-label="Cantidad de estudiantes por variante"
+                        />
+                        <button type="button" (click)="cambiarRatioPorVariante(1)" class="w-6 h-6 rounded bg-purple-100 hover:bg-purple-200 text-purple-900 font-black text-xs flex items-center justify-center cursor-pointer transition">+</button>
+                      </div>
                     </div>
                     <div class="bg-white/70 border border-purple-200 rounded-lg p-2">
                       <span class="block text-[10px] uppercase tracking-wider text-purple-700 font-extrabold">Acceso</span>
@@ -1208,43 +1221,6 @@ interface CampusDisponible extends Campus {
                   }
                 </div>
 
-                <!-- TOKENS INDIVIDUALES (OPCIONALES) -->
-                @if (accesosVirtuales().length) {
-                  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <div class="flex items-center justify-between gap-3">
-                      <div>
-                        <p class="text-xs font-black text-amber-950">Tokens individuales (alternativa)</p>
-                        <p class="mt-0.5 text-[11px] text-amber-900">Tokens únicos por estudiante si se prefiere no usar el token grupal.</p>
-                      </div>
-                      <span class="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded">{{ accesosVirtuales().length }} estudiantes</span>
-                    </div>
-                    <div class="mt-3 overflow-x-auto max-h-48">
-                      <table class="w-full text-left text-xs">
-                        <thead>
-                          <tr class="border-b border-amber-200 text-[10px] font-black uppercase text-amber-800 sticky top-0 bg-amber-50">
-                            <th class="p-2">Estudiante</th>
-                            <th class="p-2">Token</th>
-                            <th class="p-2 text-right">Acción</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (acceso of accesosVirtuales(); track acceso.codigoEstudiante) {
-                            <tr class="border-b border-amber-100/70 hover:bg-amber-100/40">
-                              <td class="p-2 font-bold">{{ acceso.codigoEstudiante }} · {{ acceso.nombreEstudiante }}</td>
-                              <td class="p-2 font-mono break-all">{{ acceso.token }}</td>
-                              <td class="p-2 text-right">
-                                <button (click)="copiarAccesoEstudianteIndividual(acceso)" class="px-2 py-1 rounded bg-white hover:bg-amber-100 border border-amber-300 text-[10px] font-bold text-amber-900 cursor-pointer" title="Copiar mensaje de acceso para este estudiante">
-                                  <i class="pi pi-copy mr-1"></i>Copiar
-                                </button>
-                              </td>
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                }
-
                 @if (sala.participantes.length) {
                   <div class="rounded-xl border border-border bg-muted/20 p-4">
                     <div class="flex items-center justify-between gap-3">
@@ -1289,8 +1265,12 @@ interface CampusDisponible extends Campus {
               @if (salaVirtualCreada()?.estado === 'PREPARADA') { 
                 <button (click)="abrirSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-door-open mr-1"></i> Abrir sala para estudiantes</button> 
                 <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button>
+                <button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer / Reconfigurar</button>
               }
-              @else if (salaVirtualCreada()?.estado === 'ABIERTA') { <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button> }
+              @else if (salaVirtualCreada()?.estado === 'ABIERTA') { 
+                <button (click)="iniciarSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-play mr-1"></i> Iniciar examen</button> 
+                <button (click)="abrirDialogoRestablecerSalaVirtual()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi pi-refresh mr-1"></i> Restablecer / Reconfigurar</button>
+              }
               @else if (salaVirtualCreada()?.estado === 'EN_CURSO' || salaVirtualCreada()?.estado === 'PAUSADA') { 
                 <span class="self-center text-[11px] font-bold text-emerald-700">Examen en curso.</span>
                 <button (click)="cerrarSalaVirtualOperativa()" [disabled]="creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50 flex items-center gap-1.5"><i class="pi pi-stop-circle"></i> Cerrar sala y calificar</button>
@@ -1307,7 +1287,7 @@ interface CampusDisponible extends Campus {
       <!-- MODAL: MOTIVO DE RESTABLECIMIENTO DE SALA VIRTUAL -->
       @if (dialogRestablecerSalaVirtual()) {
         <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-fade-in">
-          <div class="bg-card border border-amber-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+          <div class="bg-card border border-amber-200 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
             <div class="p-5 border-b border-border flex items-start justify-between gap-4">
               <div class="flex items-start gap-3">
                 <div class="h-9 w-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center"><i class="pi pi-refresh"></i></div>
@@ -1319,18 +1299,53 @@ interface CampusDisponible extends Campus {
               <button (click)="cerrarDialogoRestablecerSalaVirtual()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
             </div>
             <div class="p-5 space-y-4 text-xs">
-              <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 leading-relaxed">
-                La sala volverá a estar disponible para los estudiantes. Se conservarán las respuestas guardadas y el restablecimiento quedará registrado en la bitácora.
+              <label class="block text-[10px] font-black uppercase tracking-wider text-muted-foreground">Acción a realizar</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button"
+                        (click)="tipoRestablecimientoVirtual = 'ratio'"
+                        [class]="tipoRestablecimientoVirtual === 'ratio' ? 'border-primary bg-primary/10 text-primary font-black shadow-2xs' : 'border-border bg-card text-muted-foreground font-semibold hover:border-muted-foreground/40'"
+                        class="p-3 rounded-xl border text-left text-xs transition cursor-pointer flex flex-col gap-1">
+                  <div class="flex items-center gap-1.5 font-black text-xs">
+                    <i class="pi pi-sliders-h"></i>
+                    <span>Redefinir Ratio</span>
+                  </div>
+                  <span class="text-[10px] opacity-80 leading-snug">Vuelve a Validado para cambiar el ratio y regenerar.</span>
+                </button>
+
+                <button type="button"
+                        (click)="tipoRestablecimientoVirtual = 'incidencia'"
+                        [class]="tipoRestablecimientoVirtual === 'incidencia' ? 'border-amber-400 bg-amber-500/10 text-amber-800 font-black shadow-2xs' : 'border-border bg-card text-muted-foreground font-semibold hover:border-muted-foreground/40'"
+                        class="p-3 rounded-xl border text-left text-xs transition cursor-pointer flex flex-col gap-1">
+                  <div class="flex items-center gap-1.5 font-black text-xs">
+                    <i class="pi pi-refresh"></i>
+                    <span>Reabrir por Incidencia</span>
+                  </div>
+                  <span class="text-[10px] opacity-80 leading-snug">Conserva respuestas y reabre la misma sala.</span>
+                </button>
               </div>
+
+              @if (tipoRestablecimientoVirtual === 'ratio') {
+                <div class="rounded-xl border border-primary/20 bg-primary/5 p-3 text-primary leading-relaxed">
+                  <i class="pi pi-info-circle mr-1 font-bold"></i>
+                  La sala y variantes actuales serán eliminadas y la evaluación volverá al estado <b>Validado</b>. Se abrirá de inmediato el panel para <b>redefinir el ratio de estudiantes por variante</b> y volver a generar la sala virtual.
+                </div>
+              } @else {
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 leading-relaxed">
+                  La sala volverá a estar disponible para los estudiantes. Se conservarán las respuestas guardadas y el restablecimiento quedará registrado en la bitácora.
+                </div>
+              }
+
               <label class="block space-y-1.5">
-                <span class="font-black text-foreground">Motivo del restablecimiento</span>
-                <textarea [(ngModel)]="motivoRestablecimientoSalaVirtual" rows="3" placeholder="Ej.: interrupción de internet durante el examen" class="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-xs font-medium text-foreground outline-none focus:border-amber-500"></textarea>
+                <span class="font-black text-foreground">Motivo del restablecimiento *</span>
+                <textarea [(ngModel)]="motivoRestablecimientoSalaVirtual" rows="2" placeholder="Ej.: redefinición de ratio por mayor cantidad de estudiantes" class="w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-primary"></textarea>
               </label>
             </div>
             <div class="p-4 border-t border-border flex justify-end gap-2">
               <button (click)="cerrarDialogoRestablecerSalaVirtual()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
-              <button (click)="restablecerSalaVirtual()" [disabled]="!motivoRestablecimientoSalaVirtual.trim() || creandoSalaVirtual()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black cursor-pointer disabled:opacity-50">
-                <i class="pi" [class.pi-spin]="creandoSalaVirtual()" [class.pi-spinner]="creandoSalaVirtual()" [class.pi-refresh]="!creandoSalaVirtual()"></i> {{ creandoSalaVirtual() ? 'Restableciendo...' : 'Confirmar restablecimiento' }}
+              <button (click)="ejecutarRestablecimientoVirtual()" [disabled]="!motivoRestablecimientoSalaVirtual.trim() || creandoSalaVirtual()" class="px-5 py-2 rounded-xl text-white text-xs font-black cursor-pointer disabled:opacity-50 transition"
+                      [ngClass]="tipoRestablecimientoVirtual === 'ratio' ? 'bg-primary hover:opacity-90' : 'bg-amber-600 hover:bg-amber-700'">
+                <i class="pi" [class.pi-spin]="creandoSalaVirtual()" [class.pi-spinner]="creandoSalaVirtual()" [class.pi-refresh]="!creandoSalaVirtual()"></i> 
+                {{ creandoSalaVirtual() ? 'Procesando...' : (tipoRestablecimientoVirtual === 'ratio' ? 'Restablecer y Redefinir Ratio' : 'Confirmar Reanudación') }}
               </button>
             </div>
           </div>
@@ -3309,6 +3324,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }
   }
 
+  public cambiarRatioPorVariante(delta: number): void {
+    const actual = this.ratioEstudiantesPorVariante() || 5;
+    this.ratioEstudiantesPorVariante.set(Math.min(30, Math.max(1, actual + delta)));
+  }
+
   private _normalizar(texto: string): string {
     if (!texto) return '';
     return texto
@@ -3789,7 +3809,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public puedeRestablecer(item: EvaluacionItemUI): boolean {
-    if (this.esConsultaAcademica() || item.modalidad === 'VIRTUAL') return false;
+    if (this.esConsultaAcademica()) return false;
+    if (item.modalidad === 'VIRTUAL') {
+      return ['Generado', 'Calificado'].includes(item.etapa);
+    }
     return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado']
       .includes(item.etapa);
   }
@@ -5796,8 +5819,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.salaVirtualCreada.set(sala);
         this.salaVirtualExistente.set(true);
         this.accesosVirtuales.set([]);
-        const tokenGuardado = this._recuperarTokenSala(sala.id);
+        const tokenGuardado = sala.tokenGrupo || this._recuperarTokenSala(sala.id);
         this.tokenGrupoVirtual.set(tokenGuardado);
+        if (tokenGuardado) {
+          this._guardarTokenSala(sala.id, tokenGuardado);
+        }
         this.dialogSalaVirtual.set(true);
       },
       error: err => {
@@ -5813,6 +5839,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         );
       }
     });
+  }
+
+  public cerrarSalaVirtual(): void {
+    this.dialogSalaVirtual.set(false);
   }
 
   public cerrarSalaVirtualOperativa(): void {
@@ -6040,36 +6070,6 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const variantes = this.generarEtiquetasVariantes(cantVariantes);
     const esVirtual = item.modalidad === 'VIRTUAL';
 
-    if (esVirtual && this.rolVirtualVerificadoParaGenerar !== item.id) {
-      if (this.consultandoSalaVirtual()) return;
-      this.consultandoSalaVirtual.set(true);
-      this.evaluacionSeleccionadaSala.set(item);
-      this._http.get<SalaVirtualOperacion>(`/api/examenes-virtuales/roles/${item.id}/sala`).subscribe({
-        next: sala => {
-          this.consultandoSalaVirtual.set(false);
-          this.rolVirtualVerificadoParaGenerar = null;
-          this.salaVirtualCreada.set(sala);
-          this.salaVirtualExistente.set(true);
-          this.accesosVirtuales.set([]);
-          const tokenGuardado = this._recuperarTokenSala(sala.id);
-          this.tokenGrupoVirtual.set(tokenGuardado);
-          this.dialogSalaVirtual.set(true);
-          this._mostrarToast(`${item.codigo}: ya tiene una sala virtual generada. Se muestran sus datos disponibles.`);
-        },
-        error: err => {
-          this.consultandoSalaVirtual.set(false);
-          if (err?.status === 404) {
-            this.rolVirtualVerificadoParaGenerar = item.id;
-            this.ejecutarGeneracionVariantes();
-            return;
-          }
-          const mensaje = err?.error?.message || err?.error?.error || 'No se pudo consultar la sala virtual existente.';
-          this._mostrarToast(mensaje, 'error');
-        }
-      });
-      return;
-    }
-    this.rolVirtualVerificadoParaGenerar = null;
 
     if (this.cargandoEstudiantesInscritos()) {
       this._mostrarToast('Espera a que termine la consulta de estudiantes inscritos antes de continuar.', 'info');
@@ -6276,8 +6276,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.dialogRestablecerSalaVirtual.set(false);
         this.motivoRestablecimientoSalaVirtual = '';
         this.accesosVirtuales.set([]);
-        this._limpiarTokenSala(sala.id);
-        this.tokenGrupoVirtual.set(null);
+        const tokenActual = actualizada.tokenGrupo || this._recuperarTokenSala(sala.id);
+        this.tokenGrupoVirtual.set(tokenActual);
+        if (tokenActual) {
+          this._guardarTokenSala(sala.id, tokenActual);
+        }
         this.dialogSalaVirtual.set(true);
         this._mostrarToast('Sala restablecida. Las respuestas guardadas se conservaron; inicia nuevamente cuando estén listos.', 'info');
       },
@@ -6288,17 +6291,55 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     });
   }
 
-  public cerrarSalaVirtual(): void {
-    this.dialogSalaVirtual.set(false);
+  public tipoRestablecimientoVirtual: 'ratio' | 'incidencia' = 'ratio';
+
+  public ejecutarRestablecimientoVirtual(): void {
+    if (this.tipoRestablecimientoVirtual === 'ratio') {
+      this.restablecerSalaARatioYValidado();
+    } else {
+      this.restablecerSalaVirtual();
+    }
+  }
+
+  public restablecerSalaARatioYValidado(): void {
+    const evaluacion = this.obtenerEvaluacionActualParaSala();
+    const motivo = this.motivoRestablecimientoSalaVirtual.trim();
+    if (!evaluacion || !motivo || this.creandoSalaVirtual()) return;
+
+    this.creandoSalaVirtual.set(true);
+    this._rolService.restablecerAValidado(evaluacion.id, { motivo }).subscribe({
+      next: rol => {
+        this.creandoSalaVirtual.set(false);
+        this.dialogRestablecerSalaVirtual.set(false);
+        this.dialogSalaVirtual.set(false);
+        this.motivoRestablecimientoSalaVirtual = '';
+        this.salaVirtualCreada.set(null);
+        this.accesosVirtuales.set([]);
+
+        const actualizado = this._mapearRolResponseA_UI(rol);
+        this.evaluaciones.update(items => items.map(actual =>
+          actual.id === evaluacion.id ? actualizado : actual
+        ));
+
+        this._mostrarToast(`${evaluacion.codigo}: Restablecido a Validado. Ahora puedes redefinir el ratio y regenerar.`);
+        this.abrirModalParametrizacion(actualizado);
+      },
+      error: err => {
+        this.creandoSalaVirtual.set(false);
+        const detalle = err?.error?.message || err?.error?.error || 'No se pudo restablecer la evaluación.';
+        this._mostrarToast(detalle, 'error');
+      }
+    });
   }
 
   public abrirDialogoRestablecerSalaVirtual(): void {
     const sala = this.salaVirtualCreada();
-    if (!sala || !['ABIERTA', 'EN_CURSO', 'PAUSADA', 'CERRADA', 'CALIFICADA'].includes(sala.estado)) {
+    if (!sala || !['PREPARADA', 'ABIERTA', 'EN_CURSO', 'PAUSADA', 'CERRADA', 'CALIFICADA'].includes(sala.estado)) {
       this._mostrarToast('La sala todavía no está disponible para restablecer.', 'error');
       return;
     }
     this.motivoRestablecimientoSalaVirtual = '';
+    this.tipoRestablecimientoVirtual = 'ratio';
     this.dialogRestablecerSalaVirtual.set(true);
   }
 
@@ -6357,6 +6398,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         window.sessionStorage.removeItem(`sea_token_sala_${salaId}`);
       }
     } catch (_) {}
+  }
+
+  public obtenerEvaluacionActualParaSala(): EvaluacionItemUI | null {
+    return this._obtenerEvaluacionSalaActual();
   }
 
   public _obtenerEvaluacionSalaActual(): EvaluacionItemUI | null {
@@ -6939,6 +6984,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.evaluacionSeleccionadaParaReestablecer.set(null);
         this.restableciendo.set(false);
         this._mostrarToast(`${item.codigo}: Restablecido a Validado y registrado en la base de datos.`);
+        if (actualizado.modalidad === 'VIRTUAL') {
+          this.abrirModalParametrizacion(actualizado);
+        }
       },
       error: err => {
         this.restableciendo.set(false);

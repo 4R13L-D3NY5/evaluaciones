@@ -70,6 +70,40 @@ public class ExamenVirtualController {
         return sala.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/salas/{salaId}/estudiantes/{codigoEstudiante}/advertir")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE')")
+    public ResponseEntity<SalaVirtualResponseDto> advertir(
+            @PathVariable String salaId,
+            @PathVariable String codigoEstudiante,
+            @RequestBody(required = false) AccionDocenteEstudianteRequestDto request,
+            Authentication auth) {
+        String mensaje = request != null ? request.getMensaje() : null;
+        service.advertirEstudiante(salaId, codigoEstudiante, auth == null ? "Docente" : auth.getName(), mensaje);
+        return ResponseEntity.ok(service.consultarSala(salaId));
+    }
+
+    @PostMapping("/salas/{salaId}/estudiantes/{codigoEstudiante}/anular")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE')")
+    public ResponseEntity<SalaVirtualResponseDto> anular(
+            @PathVariable String salaId,
+            @PathVariable String codigoEstudiante,
+            @RequestBody(required = false) AccionDocenteEstudianteRequestDto request,
+            Authentication auth) {
+        String motivo = request != null ? request.getMotivo() : null;
+        service.anularEstudiante(salaId, codigoEstudiante, auth == null ? "Docente" : auth.getName(), motivo);
+        return ResponseEntity.ok(service.consultarSala(salaId));
+    }
+
+    @PostMapping("/salas/{salaId}/estudiantes/{codigoEstudiante}/restaurar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE')")
+    public ResponseEntity<SalaVirtualResponseDto> restaurar(
+            @PathVariable String salaId,
+            @PathVariable String codigoEstudiante,
+            Authentication auth) {
+        service.restaurarEstudiante(salaId, codigoEstudiante, auth == null ? "Docente" : auth.getName());
+        return ResponseEntity.ok(service.consultarSala(salaId));
+    }
+
     @GetMapping("/roles/{rolExamenId}/resultados")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DOCENTE','VICERRECTOR')")
     public ResponseEntity<List<ResultadoVirtualDto>> resultados(@PathVariable String rolExamenId) {

@@ -50,6 +50,12 @@ public class IntentoExamenVirtual {
     private BigDecimal notaSobre30;
     @Column(name = "nota_sobre_100", precision = 5, scale = 2)
     private BigDecimal notaSobre100;
+    @Column(name = "salidas_pantalla")
+    private Integer salidasPantalla = 0;
+    @Column(name = "advertencias_docente")
+    private Integer advertenciasDocente = 0;
+    @Column(name = "mensaje_advertencia", length = 300)
+    private String mensajeAdvertencia;
     @CreationTimestamp
     @Column(name = "creado_en", nullable = false, updatable = false)
     private LocalDateTime creadoEn;
