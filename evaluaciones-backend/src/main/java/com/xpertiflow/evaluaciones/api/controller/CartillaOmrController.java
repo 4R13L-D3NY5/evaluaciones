@@ -3,6 +3,7 @@ package com.xpertiflow.evaluaciones.api.controller;
 import com.xpertiflow.evaluaciones.api.dto.GenerarCartillasOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.LoteCartillasOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.PreparacionCartillasOmrResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.SincronizacionNominaResponseDto;
 import com.xpertiflow.evaluaciones.application.CartillaOmrService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,6 +36,16 @@ public class CartillaOmrController {
     @Operation(summary = "Obtener la nómina oficial para imprimir marcas OMR")
     public ResponseEntity<PreparacionCartillasOmrResponseDto> obtenerPreparacion(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(cartillaOmrService.obtenerPreparacion(rolExamenId));
+    }
+
+    @PostMapping("/sincronizar-nomina")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @Operation(summary = "Sincronizar la nómina oficial del grupo desde UNITEPC Gateway (Toma de grupos tardía)")
+    public ResponseEntity<SincronizacionNominaResponseDto> sincronizarNomina(
+            @PathVariable String rolExamenId,
+            Authentication authentication) {
+        String usuario = authentication != null ? authentication.getName() : "SISTEMA";
+        return ResponseEntity.ok(cartillaOmrService.sincronizarNomina(rolExamenId, usuario));
     }
 
     @PostMapping(value = "/imprimir", produces = MediaType.APPLICATION_PDF_VALUE)
