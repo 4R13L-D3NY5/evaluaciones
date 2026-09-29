@@ -3,6 +3,7 @@ package com.xpertiflow.evaluaciones.api.dto;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,4 +28,11 @@ public class CalificacionOmrResponseDto {
     private String archivoEscaneadoPath;
     private String procesadoPor;
     private LocalDateTime fechaProcesamiento;
+    private Boolean esReprogramado;
+    private LocalDate fechaExamenReprogramado;
+    private String motivoReprogramacion;
+    private String comprobanteReprogramacion;
+    private String observacionReprogramacion;
+    private String reprogramadoPor;
+    private LocalDateTime fechaReprogramacion;
 }

@@ -79,6 +79,39 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-041 — Evaluación a subconjuntos de estudiantes y registro directo justificado de calificaciones
+
+- Prioridad: Alta
+- Área: Evaluaciones / Exámenes Virtuales / Calificaciones
+- Responsable: Por definir
+- Creada: 2026-09-26
+- Fecha límite: Por definir
+- Dependencias: Por definir
+- Criterio de cierre: 1) Permitir la toma y calificación de exámenes para uno o un subconjunto de estudiantes de la nómina oficial (rezagados, habilitación especial, 2da instancia o evaluación extemporánea) sin obligar a evaluar al grupo completo; 2) En modalidad virtual y sin cartilla, habilitar la sala o acta permitiendo seleccionar los estudiantes participantes; 3) Implementar la asignación directa/manual de calificación con motivo justificado obligatorio y auditoría para casos de 1 o 2 estudiantes (evaluación oral, virtual externa o caso extraordinario) sin requerir prueba en plataforma ni cartilla OMR; 4) Integrar las calificaciones registradas en el consolidado oficial y consulta de notas.
+- Notas: Registrada a solicitud del usuario (`=new`). Atiende casos donde solo 1 o pocos estudiantes rinden la evaluación y es indispensable asentar su nota oficial en el sistema. Iniciando implementación de recalificación por reprogramación oral con fecha del examen reprogramado y justificación en módulo de evaluaciones OMR Implementado flujo completo de recalificación por reprogramación oral: Flyway V46 en sea_calificaciones_omr (es_reprogramado, fecha_examen_reprogramado, comprobante, motivo, auditoría inmutable), endpoints backend para registrar/revertir reprogramación y consultar nómina oficial, protección contra sobreescritura en recalibración OMR, modal interactivo en frontend para registro/edición con sincronización /100 y /60 y badge identificador en tabla de calificaciones.
+
+#### T-043 — Visualización de patrones oficiales docentes, anulación de preguntas y cambio de incisos con recalibración en calificación OMR
+
+- Prioridad: Alta
+- Área: Calificación OMR / Evaluaciones del Día / Auditoría
+- Responsable: Antigravity
+- Creada: 2026-09-26
+- Fecha límite: 2026-09-27
+- Dependencias: `evaluaciones-dia.component.ts`, `omr-procesamiento.service.ts`, `OmrProcesamientoService.java`, `OmrProcesamientoController.java`.
+- Criterio de cierre: 1) Incorporar apartado y botón destacado en el modal de calificación OMR ('Ver Patrón del Docente y Anulaciones') exclusivo para Administrador del Sistema y Responsable de Evaluaciones; 2) Permitir visualizar en pestañas por variante (A, B, C, D...) el patrón oficial completo del docente; 3) Permitir anular preguntas justificadas con motivo obligatorio y opción de propagación a variantes vinculadas; 4) Permitir corregir incisos de respuesta de las claves oficiales con motivo y propagación; 5) Permitir la recalibración inmediata de las notas de las cartillas leídas del lote en memoria y su persistencia oficial al pasar a Calificado.
+- Notas: En progreso. Implementando apartado en cabecera de calificación OMR para Administrador y Responsable de Evaluaciones que permita visualizar patrones por variante, anular preguntas con motivo, modificar incisos erróneos y recalibrar notas de cartillas. Implementado apartado y boton 'Ver Patron del Docente y Anulaciones' en modal de calificacion OMR para Administrador y Responsable. Modal interactivo por variantes (A, B, C, D...) con claves oficiales, cambio de incisos, anulacion con motivo, reactivacion y recalibracion inmediata en memoria y persistencia. Implementada visualizacion destacada de la variante correspondiente a cada estudiante en cabecera de pagina, ficha de estudiante, barra de preguntas y resumen interactivo por variantes en calificacion OMR.
+
+#### T-042 — Eliminar dependencia de ubicación de aula/campus para el Personal de Evaluaciones
+
+- Prioridad: Alta
+- Área: Seguridad / Alcance Académico / Personal Evaluaciones
+- Responsable: Por definir
+- Creada: 2026-09-26
+- Fecha límite: Por definir
+- Dependencias: Por definir
+- Criterio de cierre: 1) Desacoplar la visualización y permisos de exámenes para el Personal de Evaluaciones del valor específico del campus/aula del examen, asegurando que el alcance se determine a nivel de Sede (y carreras si aplica); 2) Evitar que asignaturas con aulas especiales (ej. Gabinete de Fisioterapia, laboratorios, clínicas u hospitales) queden ocultas al personal de la sede; 3) Ajustar tanto el backend (AccesoAcademicoService) como el frontend (Evaluaciones del Día) para que la selección o filtrado por campus no excluya exámenes de la sede.
+- Notas: Registrada a solicitud del usuario (`=new`). Resuelve la invisibilidad de exámenes en El Alto para Personal de Evaluaciones debido a aulas no vinculadas al campus específico. Desacoplando campus/aula fisica para Personal de Evaluaciones Desacoplado filtro de aula/campus fisico en backend (AccesoAcademicoService) y frontend (Evaluaciones del Dia) a nivel de Sede
+
 #### T-040 — Optimizaciones y panel de monitoreo en vivo para exámenes y salas virtuales
 
 - Prioridad: Alta
@@ -486,7 +519,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 4 |
 | En progreso | 0 |
-| En revisión | 32 |
+| En revisión | 35 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

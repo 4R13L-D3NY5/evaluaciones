@@ -45,4 +45,9 @@ public class ConsultaEstudianteEvaluacionDto {
 
     // Retroalimentación detallada (solo para OMR / Virtual si patrón está liberado)
     private RetroalimentacionDto retroalimentacion;
+
+    // Metadatos de reprogramación
+    private Boolean esReprogramado;
+    private LocalDate fechaExamenReprogramado;
+    private String motivoReprogramacion;
 }

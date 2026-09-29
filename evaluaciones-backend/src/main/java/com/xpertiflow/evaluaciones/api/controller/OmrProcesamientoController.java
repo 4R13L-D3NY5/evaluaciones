@@ -10,6 +10,8 @@ import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.PatronCalificadoResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RecalificarOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramacionOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.EstudianteNominaOmrDto;
 import com.xpertiflow.evaluaciones.api.dto.VarianteVinculadaDto;
 import com.xpertiflow.evaluaciones.application.OmrProcesamientoService;
 import com.xpertiflow.evaluaciones.application.OmrEscaneadoService;
@@ -242,6 +244,40 @@ public class OmrProcesamientoController {
             Authentication authentication,
             HttpServletRequest httpRequest) {
         return ResponseEntity.ok(omrProcesamientoService.anularExamenEstudiante(rolExamenId, codigoEstudiante, anular, motivo, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
+    }
+
+    @GetMapping("/{rolExamenId}/estudiantes-nomina")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Listar nómina oficial de estudiantes y estado de calificación para reprogramación")
+    public ResponseEntity<List<EstudianteNominaOmrDto>> listarEstudiantesNomina(@PathVariable String rolExamenId) {
+        return ResponseEntity.ok(omrProcesamientoService.listarEstudiantesNomina(rolExamenId));
+    }
+
+    @PostMapping("/{rolExamenId}/estudiantes/{codigoEstudiante}/reprogramar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Registrar o actualizar la calificación de un estudiante por examen oral reprogramado")
+    public ResponseEntity<CalificacionOmrResponseDto> registrarReprogramacionEstudiante(
+            @PathVariable String rolExamenId,
+            @PathVariable String codigoEstudiante,
+            @Valid @RequestBody ReprogramacionOmrRequestDto request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(omrProcesamientoService.registrarReprogramacionEstudiante(
+                rolExamenId, codigoEstudiante, request, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
+    }
+
+    @PostMapping("/{rolExamenId}/estudiantes/{codigoEstudiante}/revertir-reprogramacion")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @Operation(summary = "Revertir calificación de reprogramación y restaurar calificación original OMR si existía")
+    public ResponseEntity<CalificacionOmrResponseDto> revertirReprogramacionEstudiante(
+            @PathVariable String rolExamenId,
+            @PathVariable String codigoEstudiante,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(omrProcesamientoService.revertirReprogramacionEstudiante(
+                rolExamenId, codigoEstudiante, authentication,
                 httpRequest == null ? null : httpRequest.getRemoteAddr()));
     }
 }

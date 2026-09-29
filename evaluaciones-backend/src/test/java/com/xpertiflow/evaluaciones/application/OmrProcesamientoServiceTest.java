@@ -5,11 +5,13 @@ import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RecalificarOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.AnulacionPreguntaOmr;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
+import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
@@ -357,5 +359,86 @@ class OmrProcesamientoServiceTest {
 
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () ->
                 service.anularPregunta(rolId, req, auth, "127.0.0.1"));
+    }
+
+    @Test
+    void registrarReprogramacionEstudiante_casoExitoso() {
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        MapeoEstudianteVariante mapeo = new MapeoEstudianteVariante();
+        mapeo.setRolExamenId(rolId);
+        mapeo.setCodigoEstudiante("EST-100");
+        mapeo.setNombres("Juan");
+        mapeo.setApellidoPaterno("Pérez");
+        mapeo.setApellidoMaterno("López");
+        mapeo.setLetraVariante("A");
+        when(mapeoRepository.findByRolExamenIdAndCodigoEstudiante(rolId, "EST-100"))
+                .thenReturn(Optional.of(mapeo));
+
+        when(calificacionRepository.findByRolExamenIdAndCodigoEstudiante(rolId, "EST-100"))
+                .thenReturn(Optional.empty());
+
+        when(calificacionRepository.save(any(CalificacionOmr.class))).thenAnswer(i -> i.getArgument(0));
+
+        ReprogramacionOmrRequestDto req = ReprogramacionOmrRequestDto.builder()
+                .notaSobre100(new BigDecimal("80.00"))
+                .fechaExamenReprogramado(LocalDate.of(2026, 9, 27))
+                .motivo("Examen oral tomado tras cancelación de arancel de reprogramación")
+                .comprobantePago("REC-12345")
+                .observaciones("Evaluado oralmente sobre temas de la unidad 1 a 3")
+                .build();
+
+        CalificacionOmrResponseDto resp = service.registrarReprogramacionEstudiante(
+                rolId, "EST-100", req, auth, "127.0.0.1");
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.getCodigoEstudiante()).isEqualTo("EST-100");
+        assertThat(resp.getNotaSobre100()).isEqualByComparingTo("80.00");
+        assertThat(resp.getNotaSobre60()).isEqualByComparingTo("48.00");
+        assertThat(resp.getEstadoCalificacion()).isEqualTo("APROBADO");
+        assertThat(resp.getEsReprogramado()).isTrue();
+        assertThat(resp.getFechaExamenReprogramado()).isEqualTo(LocalDate.of(2026, 9, 27));
+        assertThat(resp.getMotivoReprogramacion()).contains("Examen oral");
+
+        ArgumentCaptor<CalificacionOmr> califCaptor = ArgumentCaptor.forClass(CalificacionOmr.class);
+        verify(calificacionRepository).save(califCaptor.capture());
+        assertThat(califCaptor.getValue().getEsReprogramado()).isTrue();
+        assertThat(califCaptor.getValue().getNotaSobre60()).isEqualByComparingTo("48.00");
+
+        ArgumentCaptor<AuditoriaEvaluacion> audCaptor = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
+        verify(auditoriaRepository).save(audCaptor.capture());
+        assertThat(audCaptor.getValue().getAccion()).isEqualTo("REPROGRAMACION_EXAMEN_ORAL");
+    }
+
+    @Test
+    void revertirReprogramacionEstudiante_casoExitoso() {
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        CalificacionOmr calificacion = new CalificacionOmr();
+        calificacion.setId(10L);
+        calificacion.setRolExamenId(rolId);
+        calificacion.setCodigoEstudiante("EST-100");
+        calificacion.setEstudianteNombreCompleto("Juan Pérez López");
+        calificacion.setLetraVariante("A");
+        calificacion.setEsReprogramado(true);
+        calificacion.setFechaExamenReprogramado(LocalDate.of(2026, 9, 27));
+        calificacion.setMotivoReprogramacion("Examen oral");
+        calificacion.setRespuestasDetectadasJson("{\"tipo\":\"EXAMEN_ORAL_REPROGRAMADO\"}");
+
+        when(calificacionRepository.findByRolExamenIdAndCodigoEstudiante(rolId, "EST-100"))
+                .thenReturn(Optional.of(calificacion));
+        when(calificacionRepository.save(any(CalificacionOmr.class))).thenAnswer(i -> i.getArgument(0));
+
+        CalificacionOmrResponseDto resp = service.revertirReprogramacionEstudiante(
+                rolId, "EST-100", auth, "127.0.0.1");
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.getEsReprogramado()).isFalse();
+        assertThat(resp.getFechaExamenReprogramado()).isNull();
+        assertThat(resp.getMotivoReprogramacion()).isNull();
+
+        ArgumentCaptor<AuditoriaEvaluacion> audCaptor = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
+        verify(auditoriaRepository).save(audCaptor.capture());
+        assertThat(audCaptor.getValue().getAccion()).isEqualTo("REPROGRAMACION_EXAMEN_REVERTIDA");
     }
 }

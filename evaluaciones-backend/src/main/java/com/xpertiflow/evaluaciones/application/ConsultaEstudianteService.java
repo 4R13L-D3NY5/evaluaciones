@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -170,6 +171,9 @@ public class ConsultaEstudianteService {
         Integer blancos = null;
         Integer doblesMarcas = null;
         RetroalimentacionDto retro = null;
+        Boolean esReprogramado = null;
+        LocalDate fechaExamenReprogramado = null;
+        String motivoReprogramacion = null;
 
         boolean notasLiberadas = rol.getEstadoFlujo() == EstadoFlujo.CALIFICADO
                 || rol.getEstadoFlujo() == EstadoFlujo.CONFIRMADO;
@@ -204,6 +208,9 @@ public class ConsultaEstudianteService {
                     fallos = calif.getFallos();
                     blancos = calif.getBlancos();
                     doblesMarcas = calif.getDoblesMarcas();
+                    esReprogramado = calif.getEsReprogramado();
+                    fechaExamenReprogramado = calif.getFechaExamenReprogramado();
+                    motivoReprogramacion = calif.getMotivoReprogramacion();
 
                     if (incluirRetroalimentacion) {
                         retro = construirRetroalimentacionOmr(rol, calif);
@@ -281,6 +288,9 @@ public class ConsultaEstudianteService {
                 .blancos(blancos)
                 .doblesMarcas(doblesMarcas)
                 .retroalimentacion(retro)
+                .esReprogramado(esReprogramado)
+                .fechaExamenReprogramado(fechaExamenReprogramado)
+                .motivoReprogramacion(motivoReprogramacion)
                 .build();
     }
 
