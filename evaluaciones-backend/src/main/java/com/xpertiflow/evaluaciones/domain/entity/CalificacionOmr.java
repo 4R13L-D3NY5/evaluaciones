@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -71,4 +72,25 @@ public class CalificacionOmr {
     @CreationTimestamp
     @Column(name = "fecha_procesamiento", nullable = false, updatable = false)
     private LocalDateTime fechaProcesamiento;
+
+    @Column(name = "es_reprogramado", nullable = false)
+    private Boolean esReprogramado = false;
+
+    @Column(name = "fecha_examen_reprogramado")
+    private LocalDate fechaExamenReprogramado;
+
+    @Column(name = "motivo_reprogramacion", length = 500)
+    private String motivoReprogramacion;
+
+    @Column(name = "comprobante_reprogramacion", length = 100)
+    private String comprobanteReprogramacion;
+
+    @Column(name = "observacion_reprogramacion", columnDefinition = "TEXT")
+    private String observacionReprogramacion;
+
+    @Column(name = "reprogramado_por", length = 100)
+    private String reprogramadoPor;
+
+    @Column(name = "fecha_reprogramacion")
+    private LocalDateTime fechaReprogramacion;
 }

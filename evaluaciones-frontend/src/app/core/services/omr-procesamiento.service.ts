@@ -121,6 +121,34 @@ export interface CalificacionOmrResponse {
   archivoEscaneadoPath?: string;
   procesadoPor?: string;
   fechaProcesamiento?: string;
+  esReprogramado?: boolean;
+  fechaExamenReprogramado?: string;
+  motivoReprogramacion?: string;
+  comprobanteReprogramacion?: string;
+  observacionReprogramacion?: string;
+  reprogramadoPor?: string;
+  fechaReprogramacion?: string;
+}
+
+export interface ReprogramacionOmrRequest {
+  notaSobre60?: number;
+  notaSobre100?: number;
+  fechaExamenReprogramado: string;
+  motivo: string;
+  comprobantePago?: string;
+  observaciones?: string;
+}
+
+export interface EstudianteNominaOmr {
+  codigoEstudiante: string;
+  nombreCompleto: string;
+  letraVariante: string;
+  yaCalificado: boolean;
+  esReprogramado: boolean;
+  notaSobre60?: number;
+  notaSobre100?: number;
+  estadoCalificacion: string;
+  fechaExamenReprogramado?: string;
 }
 
 export interface AnulacionPreguntaOmr {
@@ -311,6 +339,33 @@ export class OmrProcesamientoService {
     const params = `anular=${anular}&motivo=${encodeURIComponent(motivo)}`;
     return this._http.post<CalificacionOmrResponse>(
       `/api/omr/${encodeURIComponent(rolExamenId)}/estudiantes/${encodeURIComponent(codigoEstudiante)}/anular-examen?${params}`,
+      {}
+    );
+  }
+
+  public listarEstudiantesNomina(rolExamenId: string): Observable<EstudianteNominaOmr[]> {
+    return this._http.get<EstudianteNominaOmr[]>(
+      `/api/omr/${encodeURIComponent(rolExamenId)}/estudiantes-nomina`
+    );
+  }
+
+  public registrarReprogramacion(
+    rolExamenId: string,
+    codigoEstudiante: string,
+    request: ReprogramacionOmrRequest
+  ): Observable<CalificacionOmrResponse> {
+    return this._http.post<CalificacionOmrResponse>(
+      `/api/omr/${encodeURIComponent(rolExamenId)}/estudiantes/${encodeURIComponent(codigoEstudiante)}/reprogramar`,
+      request
+    );
+  }
+
+  public revertirReprogramacion(
+    rolExamenId: string,
+    codigoEstudiante: string
+  ): Observable<CalificacionOmrResponse> {
+    return this._http.post<CalificacionOmrResponse>(
+      `/api/omr/${encodeURIComponent(rolExamenId)}/estudiantes/${encodeURIComponent(codigoEstudiante)}/revertir-reprogramacion`,
       {}
     );
   }

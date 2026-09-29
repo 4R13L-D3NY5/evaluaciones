@@ -31,6 +31,7 @@ import {
   CalificacionOmrResponse,
   AnulacionPreguntaOmr,
   PatronCalificadoResponse,
+  PatronCalificadoVariante,
   AjustarCalificacionOmrRequest,
   OmrJobResponse,
   OmrLecturaResponse,
@@ -39,7 +40,9 @@ import {
   ResumenVariantesVinculadas,
   CorregirClavePatronRequest,
   CorregirClavePatronResponse,
-  RecalificarOmrRequest
+  RecalificarOmrRequest,
+  ReprogramacionOmrRequest,
+  EstudianteNominaOmr
 } from '../../core/services/omr-procesamiento.service';
 import {
   GeneracionTypstRequest,
@@ -2254,9 +2257,22 @@ interface CampusDisponible extends Campus {
                     <div class="font-mono font-bold text-indigo-700 mt-2"><i class="pi pi-file mr-1"></i>{{ archivoOmrSeleccionado()?.name }}</div>
                   }
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                  <button (click)="archivoOmrInput.click()" [disabled]="procesandoCalificacionOmr()" class="px-3 py-2 rounded-xl border border-indigo-300 bg-white text-indigo-800 text-xs font-black cursor-pointer hover:bg-indigo-100 disabled:opacity-50"><i class="pi pi-folder-open mr-1.5"></i>{{ archivoOmrSeleccionado() ? 'Cambiar escaneado' : 'Seleccionar PDF' }}</button>
-                  <button (click)="ejecutarCalificacionOmr()" [disabled]="procesandoCalificacionOmr() || !archivoOmrSeleccionado()" class="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="procesandoCalificacionOmr()" [class.pi-spinner]="procesandoCalificacionOmr()" [class.pi-bolt]="!procesandoCalificacionOmr()"></i> {{ procesandoCalificacionOmr() ? ('Procesando (' + porcentajeProgresoOmr() + '%)') : 'Ejecutar OMR' }}</button>
+                <div class="flex flex-col items-end gap-2 shrink-0">
+                  <div class="flex items-center gap-2">
+                    <button (click)="archivoOmrInput.click()" [disabled]="procesandoCalificacionOmr()" class="px-3 py-2 rounded-xl border border-indigo-300 bg-white text-indigo-800 text-xs font-black cursor-pointer hover:bg-indigo-100 disabled:opacity-50"><i class="pi pi-folder-open mr-1.5"></i>{{ archivoOmrSeleccionado() ? 'Cambiar escaneado' : 'Seleccionar PDF' }}</button>
+                    <button (click)="ejecutarCalificacionOmr()" [disabled]="procesandoCalificacionOmr() || !archivoOmrSeleccionado()" class="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"><i class="pi" [class.pi-spin]="procesandoCalificacionOmr()" [class.pi-spinner]="procesandoCalificacionOmr()" [class.pi-bolt]="!procesandoCalificacionOmr()"></i> {{ procesandoCalificacionOmr() ? ('Procesando (' + porcentajeProgresoOmr() + '%)') : 'Ejecutar OMR' }}</button>
+                  </div>
+                  @if (puedeGestionarPatronYAnulaciones()) {
+                    <button type="button" (click)="abrirGestionPatronesYAnulacionesModal()" class="w-full px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-colors" title="Visualizar patrones docentes por variante, cambiar incisos de respuesta y anular preguntas">
+                      <i class="pi pi-sliders-h"></i>
+                      <span>Ver Patrón del Docente y Anulaciones</span>
+                      @if (anulacionesOmr().length > 0) {
+                        <span class="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black leading-none" title="Preguntas anuladas">
+                          {{ anulacionesOmr().length }}
+                        </span>
+                      }
+                    </button>
+                  }
                 </div>
               </div>
 
@@ -2377,23 +2393,83 @@ interface CampusDisponible extends Campus {
               } @else {
                 @if (resultadoCalificacionOmr(); as resultado) {
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div class="text-xs font-black text-foreground">Inspección del lote · {{ resultado.totalPaginas || resultado.resultados?.length || 0 }} páginas</div>
-                  <span class="text-[10px] font-black px-2.5 py-1 rounded-full" [class.bg-emerald-100]="todasPaginasCalificadas(resultado)" [class.text-emerald-800]="todasPaginasCalificadas(resultado)" [class.bg-amber-100]="!todasPaginasCalificadas(resultado)" [class.text-amber-900]="!todasPaginasCalificadas(resultado)">{{ todasPaginasCalificadas(resultado) ? 'LISTO PARA CALIFICAR' : 'REQUIERE REVISIÓN MANUAL' }}</span>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div class="text-xs font-black text-foreground">Inspección del lote · {{ resultado.totalPaginas || resultado.resultados?.length || 0 }} páginas</div>
+                    @if (resumenVariantesLote().length > 0) {
+                      <div class="flex items-center gap-1.5 flex-wrap ml-1">
+                        <span class="text-[10px] font-bold text-muted-foreground">Variantes:</span>
+                        <button type="button"
+                                (click)="filtroVarianteOmr.set('TODAS')"
+                                class="px-2 py-0.5 rounded-full text-[10px] font-black cursor-pointer transition-colors border"
+                                [class.bg-purple-700]="filtroVarianteOmr() === 'TODAS'"
+                                [class.text-white]="filtroVarianteOmr() === 'TODAS'"
+                                [class.border-purple-700]="filtroVarianteOmr() === 'TODAS'"
+                                [class.bg-card]="filtroVarianteOmr() !== 'TODAS'"
+                                [class.text-foreground]="filtroVarianteOmr() !== 'TODAS'"
+                                [class.border-border]="filtroVarianteOmr() !== 'TODAS'">
+                          Todas ({{ resultado.resultados?.length || 0 }})
+                        </button>
+                        @for (itemVar of resumenVariantesLote(); track itemVar.variante) {
+                          <button type="button"
+                                  (click)="filtroVarianteOmr.set(itemVar.variante)"
+                                  class="px-2 py-0.5 rounded-full text-[10px] font-black cursor-pointer transition-colors border flex items-center gap-1"
+                                  [class.bg-indigo-600]="filtroVarianteOmr() === itemVar.variante"
+                                  [class.text-white]="filtroVarianteOmr() === itemVar.variante"
+                                  [class.border-indigo-600]="filtroVarianteOmr() === itemVar.variante"
+                                  [class.bg-indigo-50]="filtroVarianteOmr() !== itemVar.variante"
+                                  [class.text-indigo-900]="filtroVarianteOmr() !== itemVar.variante"
+                                  [class.border-indigo-200]="filtroVarianteOmr() !== itemVar.variante">
+                            <span>Var {{ itemVar.variante }}</span>
+                            <span class="px-1 rounded-full text-[9px]" [class.bg-indigo-800]="filtroVarianteOmr() === itemVar.variante" [class.bg-indigo-200]="filtroVarianteOmr() !== itemVar.variante">{{ itemVar.conteo }}</span>
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                  <div class="flex items-center gap-2">
+                    @if (puedeGestionarPatronYAnulaciones()) {
+                      <button type="button" (click)="abrirGestionPatronesYAnulacionesModal()" class="px-3 py-1.5 rounded-lg border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-black cursor-pointer flex items-center gap-1.5 transition-colors" title="Gestionar variantes, claves y excepciones">
+                        <i class="pi pi-sliders-h text-indigo-600"></i>
+                        <span>Patrón y Anulaciones</span>
+                        @if (anulacionesOmr().length > 0) {
+                          <span class="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-black leading-none">
+                            {{ anulacionesOmr().length }}
+                          </span>
+                        }
+                      </button>
+                      <button type="button" (click)="recalibrarLoteCompletoConPatronActual(true)" [disabled]="recalibrandoLoteMemoria()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50" title="Recalcular notas del lote en memoria según el patrón y anulaciones vigentes">
+                        <i class="pi" [class.pi-spin]="recalibrandoLoteMemoria()" [class.pi-spinner]="recalibrandoLoteMemoria()" [class.pi-bolt]="!recalibrandoLoteMemoria()"></i>
+                        <span>Recalibrar notas</span>
+                      </button>
+                    }
+                    <span class="text-[10px] font-black px-2.5 py-1 rounded-full" [class.bg-emerald-100]="todasPaginasCalificadas(resultado)" [class.text-emerald-800]="todasPaginasCalificadas(resultado)" [class.bg-amber-100]="!todasPaginasCalificadas(resultado)" [class.text-amber-900]="!todasPaginasCalificadas(resultado)">{{ todasPaginasCalificadas(resultado) ? 'LISTO PARA CALIFICAR' : 'REQUIERE REVISIÓN MANUAL' }}</span>
+                  </div>
                 </div>
                 <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-2.5 text-[11px] text-indigo-950">
                   <i class="pi pi-eye mr-1.5"></i>
                   Verifique cada número de pregunta comparando la respuesta del estudiante con el patrón oficial de su variante. @if (puedeAjustarIncisosOmr()) { El responsable de evaluaciones puede ajustar manualmente el inciso cuando exista una no coincidencia. } @else { Las respuestas son informativas y no se pueden modificar con este perfil. }
                 </div>
                 <div class="border border-border rounded-xl overflow-hidden divide-y divide-border">
-                  @for (lectura of resultado.resultados ?? []; track lectura.pagina) {
+                  @for (lectura of lecturasOmrFiltradas(); track lectura.pagina) {
                     <div class="p-3 space-y-2">
                       <div class="flex flex-wrap items-center justify-between gap-2 bg-muted/40 px-3 py-2 rounded-lg">
-                        <div class="flex items-center gap-2 text-xs font-black">
+                        <div class="flex items-center gap-2 text-xs font-black flex-wrap">
                           <span class="bg-muted rounded-lg px-2.5 py-1 text-foreground font-mono">Página {{ lectura.pagina }}</span>
                           <span [class.text-emerald-700]="lectura.estado === 'CALIFICADO'" [class.text-amber-700]="lectura.estado !== 'CALIFICADO'" class="flex items-center gap-1 font-extrabold">
                             <i class="pi" [class.pi-check-circle]="lectura.estado === 'CALIFICADO'" [class.pi-exclamation-triangle]="lectura.estado !== 'CALIFICADO'"></i>
                             {{ lectura.estado === 'CALIFICADO' ? 'Código y patrón validados' : 'Código no reconocido' }}
                           </span>
+                          @if (obtenerVarianteEstudiante(lectura); as varEst) {
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-300 font-black text-[11px] shadow-2xs">
+                              <i class="pi pi-bookmark text-[9px] text-indigo-700"></i>
+                              <span>Variante <strong>{{ varEst }}</strong></span>
+                            </span>
+                          } @else if (lectura.codigoEstudiante) {
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">
+                              <i class="pi pi-question-circle text-[9px]"></i>
+                              <span>Variante por validar</span>
+                            </span>
+                          }
                         </div>
                         <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
                           <span>Marcajes: <strong class="text-foreground">{{ cantidadRespuestasLeidas(lectura) }}</strong>/{{ lectura.totalReactivos || 30 }}</span>
@@ -2407,10 +2483,17 @@ interface CampusDisponible extends Campus {
                         <!-- Lado izquierdo: Cartilla escaneada -->
                         <div class="lg:col-span-5 rounded-xl border border-sky-200 bg-slate-950/95 p-3">
                           <div class="mb-2 flex items-center justify-between gap-2 border-b border-white/10 pb-2">
-                            <span class="text-[10px] font-black uppercase text-white/90">
+                            <span class="text-[10px] font-black uppercase text-white/90 flex items-center gap-1.5">
                               <i class="pi pi-image mr-1.5 text-sky-300"></i>Cartilla escaneada · página {{ lectura.pagina }}
                             </span>
-                            <span class="text-[10px] font-mono text-white/60">Pág. {{ lectura.pagina }}</span>
+                            <div class="flex items-center gap-1.5">
+                              @if (obtenerVarianteEstudiante(lectura); as varEst) {
+                                <span class="text-[10px] font-black uppercase bg-indigo-500/30 text-indigo-200 border border-indigo-400/50 px-2 py-0.5 rounded font-mono">
+                                  Var. {{ varEst }}
+                                </span>
+                              }
+                              <span class="text-[10px] font-mono text-white/60">Pág. {{ lectura.pagina }}</span>
+                            </div>
                           </div>
                           @if (previewPaginaOmr(lectura.pagina)) {
                             <div class="flex justify-center overflow-auto max-h-[46rem] bg-slate-900/50 rounded-lg p-1">
@@ -2443,16 +2526,28 @@ interface CampusDisponible extends Campus {
                             </div>
                             <div class="rounded-lg bg-muted/50 p-2 flex flex-col justify-between">
                               <div>
-                                <span class="block text-muted-foreground uppercase font-bold">Estudiante / Estado</span>
+                                <div class="flex items-center justify-between gap-1">
+                                  <span class="block text-muted-foreground uppercase font-bold text-[9px]">Estudiante / Estado</span>
+                                  @if (obtenerVarianteEstudiante(lectura); as varEst) {
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-700 text-white font-mono font-black text-[10px] tracking-wide shadow-2xs" title="Variante oficial asignada al estudiante en la nómina">
+                                      <i class="pi pi-bookmark text-[8px]"></i> VAR. {{ varEst }}
+                                    </span>
+                                  }
+                                </div>
                                 <div class="mt-1 font-extrabold text-foreground text-xs truncate" [title]="lectura.estudianteNombre || 'No identificado'">
                                   {{ lectura.estudianteNombre || 'Estudiante no identificado' }}
                                 </div>
                               </div>
-                              <div class="mt-2">
+                              <div class="mt-2 flex items-center justify-between gap-2 flex-wrap">
                                 <span class="inline-flex items-center gap-1 font-bold text-[10px]" [class.text-emerald-700]="lectura.codigoValidado" [class.text-amber-700]="!lectura.codigoValidado">
                                   <i class="pi" [class.pi-check-circle]="lectura.codigoValidado" [class.pi-exclamation-triangle]="!lectura.codigoValidado"></i>
                                   {{ lectura.codigoValidado ? 'Detectado / validado' : 'Pendiente de validar' }}
                                 </span>
+                                @if (obtenerVarianteEstudiante(lectura); as varEst) {
+                                  <span class="text-[10px] font-bold text-indigo-800 bg-indigo-100/80 border border-indigo-200 px-1.5 py-0.5 rounded flex items-center gap-1" title="Patrón de respuestas contra el que se califica">
+                                    <i class="pi pi-check text-[8px] text-indigo-600"></i> Patrón: Tipo {{ varEst }}
+                                  </span>
+                                }
                               </div>
                             </div>
                             <div class="rounded-lg bg-muted/50 p-2 flex flex-col justify-between">
@@ -2474,7 +2569,7 @@ interface CampusDisponible extends Campus {
 
                           <div class="rounded-lg border border-border bg-card p-2.5">
                             <div class="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
-                              <div class="flex items-center gap-1.5">
+                              <div class="flex items-center gap-1.5 flex-wrap">
                                 <button type="button"
                                         (click)="cambiarTabRespuestas(lectura.pagina, '1-40')"
                                         class="px-3 py-1 rounded-lg text-xs font-black cursor-pointer transition-colors"
@@ -2496,6 +2591,12 @@ interface CampusDisponible extends Campus {
                                     <span class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-indigo-200 text-indigo-900 font-extrabold">{{ preguntasColumna3(lectura).length }}</span>
                                   }
                                 </button>
+                                @if (obtenerVarianteEstudiante(lectura); as varEst) {
+                                  <span class="ml-1 px-2.5 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 border border-indigo-200 text-indigo-950 flex items-center gap-1">
+                                    <i class="pi pi-check-circle text-indigo-600 text-[9px]"></i>
+                                    <span>Patrón evaluado: <strong>Variante {{ varEst }}</strong></span>
+                                  </span>
+                                }
                               </div>
                               <span class="text-[10px] text-muted-foreground hidden sm:inline">— blanco · AB doble marca · clic en Patrón para corregir error docente</span>
                             </div>
@@ -2586,9 +2687,259 @@ interface CampusDisponible extends Campus {
         </div>
       }
 
+      <!-- MODAL: GESTIÓN DE PATRONES DE DOCENTE Y ANULACIONES POR VARIANTE -->
+      @if (dialogGestionPatronesAnulaciones()) {
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 z-[60] animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-5xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4 shrink-0 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-indigo-300 bg-white/10 px-2 py-0.5 rounded">Auditoría y Excepciones</span>
+                  <span class="text-[10px] font-bold text-white/70">{{ evaluacionSeleccionadaOmr()?.etapa }}</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-black mt-1 flex items-center gap-2">
+                  <i class="pi pi-sliders-h text-indigo-400"></i>
+                  Patrones del Docente y Anulaciones por Variante
+                </h3>
+                <p class="text-xs text-indigo-200/80 mt-0.5 font-medium">
+                  {{ evaluacionSeleccionadaOmr()?.codigo }} · {{ evaluacionSeleccionadaOmr()?.materia }} · Docente: {{ evaluacionSeleccionadaOmr()?.docenteNombre || 'Docente asignado' }} · {{ evaluacionSeleccionadaOmr()?.tipo || 'Parcial' }}
+                </p>
+              </div>
+              <button type="button" (click)="cerrarGestionPatronesAnulaciones()" aria-label="Cerrar modal" class="h-8 w-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-5 overflow-y-auto space-y-4 flex-1">
+              @if (cargandoPatronGestion()) {
+                <div class="py-16 text-center text-xs font-bold text-muted-foreground">
+                  <i class="pi pi-spin pi-spinner text-2xl text-indigo-600 mb-2"></i>
+                  <p>Cargando patrones oficiales y variantes del examen...</p>
+                </div>
+              } @else if (errorPatronGestion()) {
+                <div class="rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs font-bold text-rose-900 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-exclamation-triangle text-rose-600 text-base"></i>
+                    <span>{{ errorPatronGestion() }}</span>
+                  </div>
+                  <button type="button" (click)="evaluacionSeleccionadaOmr() && cargarPatronGestion(evaluacionSeleccionadaOmr()!.id)" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer">
+                    Reintentar
+                  </button>
+                </div>
+              } @else {
+                @if (patronGestionOmr(); as patron) {
+                <!-- Info banner -->
+                <div class="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3.5 text-xs text-indigo-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div class="flex items-start gap-2.5">
+                    <i class="pi pi-info-circle text-indigo-600 text-base mt-0.5 shrink-0"></i>
+                    <div>
+                      <span class="font-bold">Control oficial de claves y anulación de preguntas.</span>
+                      <p class="text-[11px] text-indigo-900/80 mt-0.5">
+                        Seleccione una variante para ver el patrón del docente. Puede <strong>modificar la clave oficial</strong> ante errores de marcaje del docente o <strong>anular preguntas ambiguas</strong>. Todo cambio recalibrará automáticamente las calificaciones del lote.
+                      </p>
+                    </div>
+                  </div>
+                  @if (resultadoCalificacionOmr()?.resultados?.length) {
+                    <button type="button" (click)="recalibrarLoteCompletoConPatronActual(true)" [disabled]="recalibrandoLoteMemoria()" class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50">
+                      <i class="pi" [class.pi-spin]="recalibrandoLoteMemoria()" [class.pi-spinner]="recalibrandoLoteMemoria()" [class.pi-bolt]="!recalibrandoLoteMemoria()"></i>
+                      <span>Recalibrar notas del lote ({{ resultadoCalificacionOmr()?.resultados?.length }} cartillas)</span>
+                    </button>
+                  }
+                </div>
+
+                <!-- Tabs de Variantes -->
+                <div class="flex items-center gap-2 border-b border-border pb-2 overflow-x-auto">
+                  <span class="text-xs font-black uppercase tracking-wider text-muted-foreground mr-1 shrink-0">Variantes:</span>
+                  @for (v of patron.variantes; track v.letra) {
+                    <button type="button"
+                            (click)="varianteActivaGestion.set(v.letra)"
+                            class="px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all border shrink-0"
+                            [class.bg-indigo-600]="varianteActivaGestion() === v.letra"
+                            [class.text-white]="varianteActivaGestion() === v.letra"
+                            [class.border-indigo-600]="varianteActivaGestion() === v.letra"
+                            [class.shadow-sm]="varianteActivaGestion() === v.letra"
+                            [class.bg-card]="varianteActivaGestion() !== v.letra"
+                            [class.text-foreground]="varianteActivaGestion() !== v.letra"
+                            [class.border-border]="varianteActivaGestion() !== v.letra"
+                            [class.hover:bg-muted]="varianteActivaGestion() !== v.letra">
+                      <span>Variante {{ v.letra }}</span>
+                      <span class="text-[10px] font-mono opacity-80">({{ v.totalPreguntas || 30 }}p)</span>
+                      @if (conteoAnuladasEnVarianteGestion(v.letra) > 0) {
+                        <span class="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black leading-none">
+                          {{ conteoAnuladasEnVarianteGestion(v.letra) }} anulada(s)
+                        </span>
+                      }
+                    </button>
+                  }
+                </div>
+
+                <!-- Resumen de la variante activa -->
+                @if (varianteGestionActual(); as variante) {
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="p-3 rounded-xl bg-muted/40 border border-border">
+                      <span class="text-[10px] font-black uppercase text-muted-foreground">Reactivos Totales</span>
+                      <p class="text-lg font-black text-foreground font-mono mt-0.5">{{ variante.totalPreguntas || 30 }}</p>
+                    </div>
+                    <div class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200">
+                      <span class="text-[10px] font-black uppercase text-emerald-800">Reactivos Válidos</span>
+                      <p class="text-lg font-black text-emerald-900 font-mono mt-0.5">{{ conteoPreguntasValidasEnVarianteGestion(variante) }}</p>
+                    </div>
+                    <div class="p-3 rounded-xl border" [class.bg-rose-50]="conteoAnuladasEnVarianteGestion(variante.letra) > 0" [class.border-rose-200]="conteoAnuladasEnVarianteGestion(variante.letra) > 0" [class.bg-slate-50]="conteoAnuladasEnVarianteGestion(variante.letra) === 0" [class.border-border]="conteoAnuladasEnVarianteGestion(variante.letra) === 0">
+                      <span class="text-[10px] font-black uppercase" [class.text-rose-800]="conteoAnuladasEnVarianteGestion(variante.letra) > 0" [class.text-muted-foreground]="conteoAnuladasEnVarianteGestion(variante.letra) === 0">Reactivos Anulados</span>
+                      <p class="text-lg font-black font-mono mt-0.5" [class.text-rose-700]="conteoAnuladasEnVarianteGestion(variante.letra) > 0" [class.text-foreground]="conteoAnuladasEnVarianteGestion(variante.letra) === 0">{{ conteoAnuladasEnVarianteGestion(variante.letra) }}</p>
+                    </div>
+                    <div class="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200">
+                      <span class="text-[10px] font-black uppercase text-indigo-800">Estudiantes Asignados</span>
+                      <p class="text-lg font-black text-indigo-900 font-mono mt-0.5">{{ variante.estudiantes?.length || 0 }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Grid de preguntas y claves de la variante -->
+                  <div class="rounded-xl border border-border overflow-hidden">
+                    <div class="px-4 py-2.5 bg-muted/60 border-b border-border flex items-center justify-between text-xs font-black">
+                      <span>Preguntas y claves oficiales · Variante {{ variante.letra }}</span>
+                      <span class="text-muted-foreground text-[11px] font-normal">Haga clic en <strong>Modificar Clave</strong> o <strong>Anular</strong> para gestionar cada pregunta</span>
+                    </div>
+
+                    <div class="divide-y divide-border max-h-[46vh] overflow-y-auto">
+                      @for (p of preguntasDeVarianteGestion(); track p) {
+                        <div class="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                             [class.bg-rose-50]="esPreguntaAnuladaEnVarianteGestion(p)">
+                          <!-- Info de la pregunta -->
+                          <div class="flex items-center gap-3">
+                            <span class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 font-mono font-black text-xs flex items-center justify-center shrink-0">
+                              #{{ p }}
+                            </span>
+                            <div>
+                              <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-foreground">Pregunta {{ p }}</span>
+                                @if (esPreguntaAnuladaEnVarianteGestion(p)) {
+                                  <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-black flex items-center gap-1">
+                                    <i class="pi pi-ban text-[9px]"></i> ANULADA
+                                  </span>
+                                } @else {
+                                  <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-black flex items-center gap-1">
+                                    <i class="pi pi-check text-[9px]"></i> ACTIVA
+                                  </span>
+                                }
+                              </div>
+                              @if (esPreguntaAnuladaEnVarianteGestion(p)) {
+                                <p class="text-[11px] text-rose-700 font-medium mt-0.5">
+                                  <i class="pi pi-info-circle text-[10px] mr-1"></i>
+                                  Motivo: {{ motivoAnulacionEnVarianteGestion(p) || 'Excepción administrativa' }}
+                                </p>
+                              }
+                            </div>
+                          </div>
+
+                          <!-- Clave Oficial y Acciones -->
+                          <div class="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                            <!-- Clave oficial badge -->
+                            <div class="flex items-center gap-1.5">
+                              <span class="text-[10px] font-black uppercase text-muted-foreground">Clave oficial:</span>
+                              <span class="min-w-[2rem] h-7 px-2 rounded-lg font-mono font-black text-sm flex items-center justify-center shadow-2xs border"
+                                    [class.line-through]="esPreguntaAnuladaEnVarianteGestion(p)"
+                                    [class.bg-rose-100]="esPreguntaAnuladaEnVarianteGestion(p)"
+                                    [class.text-rose-700]="esPreguntaAnuladaEnVarianteGestion(p)"
+                                    [class.border-rose-300]="esPreguntaAnuladaEnVarianteGestion(p)"
+                                    [class.bg-indigo-600]="!esPreguntaAnuladaEnVarianteGestion(p)"
+                                    [class.text-white]="!esPreguntaAnuladaEnVarianteGestion(p)"
+                                    [class.border-indigo-600]="!esPreguntaAnuladaEnVarianteGestion(p)">
+                                {{ claveOficialEnVarianteGestion(p) }}
+                              </span>
+                            </div>
+
+                            <!-- Botones de Acción -->
+                            <div class="flex items-center gap-1.5">
+                              <button type="button"
+                                      (click)="abrirEdicionClaveDesdePatron(p)"
+                                      [disabled]="guardandoEdicionClaveOmr()"
+                                      class="px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-800 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs disabled:opacity-50"
+                                      title="Modificar clave oficial ante error del docente">
+                                <i class="pi pi-pencil text-[10px] text-indigo-600"></i>
+                                <span>Modificar clave</span>
+                              </button>
+
+                              @if (esPreguntaAnuladaEnVarianteGestion(p)) {
+                                <button type="button"
+                                        (click)="reactivarPreguntaDesdePatron(p)"
+                                        [disabled]="guardandoAnulacionOmr()"
+                                        class="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs disabled:opacity-50"
+                                        title="Reactivar esta pregunta para que vuelva a computar">
+                                  <i class="pi pi-replay text-[10px] text-emerald-600"></i>
+                                  <span>Reactivar</span>
+                                </button>
+                              } @else {
+                                <button type="button"
+                                        (click)="abrirAnulacionDesdePatron(p)"
+                                        [disabled]="guardandoAnulacionOmr()"
+                                        class="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs disabled:opacity-50"
+                                        title="Anular pregunta con motivo justificado">
+                                  <i class="pi pi-ban text-[10px] text-rose-600"></i>
+                                  <span>Anular</span>
+                                </button>
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Lista desplegable opcional de estudiantes de la variante -->
+                  @if (variante.estudiantes?.length) {
+                    <details class="rounded-xl border border-border bg-slate-50/70 overflow-hidden">
+                      <summary class="cursor-pointer px-4 py-2.5 text-xs font-bold text-indigo-900 flex items-center justify-between">
+                        <span>Ver estudiantes asignados a la Variante {{ variante.letra }} ({{ variante.estudiantes?.length }})</span>
+                        <i class="pi pi-chevron-down text-xs text-indigo-600"></i>
+                      </summary>
+                      <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 border-t border-border">
+                        @for (est of variante.estudiantes; track est.codigoEstudiante) {
+                          <div class="text-[11px] text-foreground flex items-center gap-2 p-1.5 rounded bg-white border border-border">
+                            <span class="font-mono font-black text-indigo-800">{{ est.codigoEstudiante }}</span>
+                            <span class="text-muted-foreground truncate">{{ est.nombreCompleto }}</span>
+                          </div>
+                        }
+                      </div>
+                    </details>
+                  }
+                }
+              }
+            }
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-border flex flex-wrap items-center justify-between gap-3 shrink-0 bg-muted/20">
+              <span class="text-[11px] text-muted-foreground font-medium">
+                <i class="pi pi-shield mr-1 text-indigo-600"></i>
+                Acción restringida a Administrador y Responsable de Evaluaciones. Todos los cambios se auditan.
+              </span>
+              <div class="flex items-center gap-2">
+                @if (resultadoCalificacionOmr()?.resultados?.length) {
+                  <button type="button"
+                          (click)="recalibrarLoteCompletoConPatronActual(true)"
+                          [disabled]="recalibrandoLoteMemoria()"
+                          class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black cursor-pointer shadow-xs disabled:opacity-50">
+                    <i class="pi" [class.pi-spin]="recalibrandoLoteMemoria()" [class.pi-spinner]="recalibrandoLoteMemoria()" [class.pi-bolt]="!recalibrandoLoteMemoria()"></i>
+                    <span>Recalibrar notas del lote en memoria</span>
+                  </button>
+                }
+                <button type="button"
+                        (click)="cerrarGestionPatronesAnulaciones()"
+                        class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer shadow-xs">
+                  Cerrar y volver a la inspección
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- MODAL: ANULACIÓN DE PREGUNTA OMR -->
       @if (dialogAnulacionOmr()) {
-        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-fade-in">
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-[70] animate-fade-in">
           <div class="bg-card border border-rose-200 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
             <div class="p-5 border-b border-border flex items-start justify-between gap-4">
               <div><p class="text-[10px] font-black uppercase tracking-widest text-rose-700">Excepción de calificación</p><h3 class="text-lg font-black text-foreground">Anular pregunta OMR</h3><p class="text-xs text-muted-foreground">La anulación se aplicará a todos los estudiantes de esta variante.</p></div>
@@ -2596,7 +2947,7 @@ interface CampusDisponible extends Campus {
             </div>
             <div class="p-5 space-y-4">
               @if (preguntaSeleccionadaAnulacionOmr(); as seleccion) {
-                <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-950"><strong>Variante {{ seleccion.lectura.letraVariante || '—' }} · Pregunta {{ seleccion.pregunta }}</strong><p class="mt-1 text-xs">La respuesta se conservará para auditoría, pero dejará de contar en la nota.</p></div>
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-950"><strong>Variante {{ seleccion.letraVariante || seleccion.lectura?.letraVariante || '—' }} · Pregunta {{ seleccion.pregunta }}</strong><p class="mt-1 text-xs">La respuesta se conservará para auditoría, pero dejará de contar en la nota.</p></div>
               }
 
               @if (cargandoVariantesVinculadasAnulacion()) {
@@ -2680,17 +3031,46 @@ interface CampusDisponible extends Campus {
                   }
                 </section>
               }
-              @if (!cargandoNotasOmr() && notasOmr().length === 0) { <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">Todavía no existen calificaciones OMR guardadas para esta evaluación.</div> }
+              @if (!cargandoNotasOmr()) {
+                <div class="mb-3 flex items-center justify-between gap-3 bg-card p-3 rounded-xl border border-border">
+                  <div class="text-xs text-muted-foreground flex items-center gap-2">
+                    <span>Calificaciones registradas: <strong class="text-foreground">{{ notasOmr().length }}</strong></span>
+                    @if (totalReprogramados() > 0) {
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                        <i class="pi pi-calendar-clock text-[9px]"></i> {{ totalReprogramados() }} reprogramado(s)
+                      </span>
+                    }
+                  </div>
+                  @if (puedeRegistrarReprogramacion()) {
+                    <button type="button" (click)="abrirModalReprogramarNueva()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
+                      <i class="pi pi-calendar-plus text-xs"></i> + Registrar examen reprogramado
+                    </button>
+                  }
+                </div>
+              }
+              @if (!cargandoNotasOmr() && notasOmr().length === 0) {
+                <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">
+                  Todavía no existen calificaciones OMR guardadas para esta evaluación. Puede registrar calificaciones por reprogramación oral usando el botón superior.
+                </div>
+              }
               @else if (!cargandoNotasOmr()) {
                 <div class="border border-border rounded-xl overflow-hidden">
-                  <div class="grid grid-cols-[45px_1fr_80px_85px_70px_70px_100px_80px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground items-center">
+                  <div class="grid grid-cols-[40px_1fr_75px_75px_65px_65px_95px_130px] gap-2 bg-muted/60 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground items-center">
                     <span>N°</span><span>Estudiante</span><span>Variante</span><span class="text-center">Aciertos</span><span>/60</span><span>/100</span><span>Estado</span><span class="text-right">Acción</span>
                   </div>
                   <div class="divide-y divide-border">
                     @for (nota of notasOmr(); track nota.id) {
-                      <div class="grid grid-cols-[45px_1fr_80px_85px_70px_70px_100px_80px] gap-2 px-3 py-2.5 items-center text-xs">
+                      <div class="grid grid-cols-[40px_1fr_75px_75px_65px_65px_95px_130px] gap-2 px-3 py-2.5 items-center text-xs">
                         <span class="font-mono text-muted-foreground">{{ $index + 1 }}</span>
-                        <span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground">{{ nota.estudianteNombreCompleto }}</span></span>
+                        <span>
+                          <strong class="block">{{ nota.codigoEstudiante }}</strong>
+                          <span class="text-[10px] text-muted-foreground block">{{ nota.estudianteNombreCompleto }}</span>
+                          @if (nota.esReprogramado) {
+                            <span class="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200" [title]="'Examen oral reprogramado: ' + (nota.fechaExamenReprogramado || '') + '\nMotivo: ' + (nota.motivoReprogramacion || '') + (nota.comprobanteReprogramacion ? '\nComprobante: ' + nota.comprobanteReprogramacion : '')">
+                              <i class="pi pi-comments text-[8px]"></i> Oral: {{ nota.fechaExamenReprogramado }}
+                            </span>
+                          }
+                        </span>
                         <span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span>
                         <span class="text-center font-mono font-bold" [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'" [class.text-slate-700]="nota.estadoCalificacion !== 'ANULADO'">
                           {{ nota.estadoCalificacion === 'ANULADO' ? ('0/' + nota.totalReactivos) : (nota.aciertos + '/' + nota.totalReactivos) }}
@@ -2698,12 +3078,17 @@ interface CampusDisponible extends Campus {
                         <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre60 }}</strong>
                         <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre100 }}</strong>
                         <span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'" [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'" [class.bg-rose-50]="nota.estadoCalificacion === 'ANULADO'" [class.px-1.5]="nota.estadoCalificacion === 'ANULADO'" [class.py-0.5]="nota.estadoCalificacion === 'ANULADO'" [class.rounded]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion }}</span>
-                        <div class="text-right">
+                        <div class="flex items-center justify-end gap-1">
+                          @if (puedeRegistrarReprogramacion()) {
+                            <button type="button" (click)="abrirModalReprogramar(nota)" class="px-1.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs" [title]="nota.esReprogramado ? 'Editar reprogramación oral' : 'Registrar nota por examen oral reprogramado'">
+                              <i class="pi pi-file-edit mr-0.5"></i>{{ nota.esReprogramado ? 'Editar' : 'Reprog.' }}
+                            </button>
+                          }
                           @if (puedeAnularExamenEstudiante()) {
                             @if (nota.estadoCalificacion === 'ANULADO') {
-                              <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: nota.codigoEstudiante, nombre: nota.estudianteNombreCompleto, anulado: true, calificacionId: nota.id })" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">Restaurar</button>
+                              <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: nota.codigoEstudiante, nombre: nota.estudianteNombreCompleto, anulado: true, calificacionId: nota.id })" class="px-1.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">Restaurar</button>
                             } @else {
-                              <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: nota.codigoEstudiante, nombre: nota.estudianteNombreCompleto, anulado: false, calificacionId: nota.id })" class="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">Anular</button>
+                              <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: nota.codigoEstudiante, nombre: nota.estudianteNombreCompleto, anulado: false, calificacionId: nota.id })" class="px-1.5 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">Anular</button>
                             }
                           }
                         </div>
@@ -2714,6 +3099,142 @@ interface CampusDisponible extends Campus {
               }
             </div>
             <div class="p-4 border-t border-border flex justify-end shrink-0"><button (click)="cerrarNotasOmr()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black cursor-pointer">Cerrar</button></div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: REPROGRAMACIÓN ORAL DE CALIFICACIÓN OMR -->
+      @if (dialogReprogramarEstudiante()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-amber-300 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-5 border-b border-border bg-amber-500/5 flex items-start justify-between gap-4 shrink-0">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-300">
+                  <i class="pi pi-calendar-plus text-lg"></i>
+                </div>
+                <div>
+                  <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Evaluación Extraordinaria</p>
+                  <h3 class="text-base font-black text-foreground">Calificación por Reprogramación Oral</h3>
+                  <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotas()?.codigo || evaluacionSeleccionadaOmr()?.codigo }} · {{ evaluacionSeleccionadaNotas()?.materia || evaluacionSeleccionadaOmr()?.materia }} · {{ evaluacionSeleccionadaNotas()?.grupo || evaluacionSeleccionadaOmr()?.grupo }}</p>
+                </div>
+              </div>
+              <button type="button" (click)="cerrarModalReprogramar()" [disabled]="guardandoReprogramacion()" class="text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50">
+                <i class="pi pi-times text-base"></i>
+              </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4 text-xs">
+              <!-- Selección o visualización del estudiante -->
+              @if (estudianteSeleccionadoReprogramar(); as est) {
+                <div class="p-3 bg-muted/40 rounded-xl border border-border">
+                  <div class="flex items-center justify-between gap-2">
+                    <div>
+                      <span class="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Estudiante a calificar</span>
+                      <p class="font-bold text-sm text-foreground">{{ est.nombre || 'Estudiante nómina' }}</p>
+                      <p class="font-mono text-xs text-muted-foreground">{{ est.codigo }} · Variante {{ est.variante || 'A' }}</p>
+                    </div>
+                    @if (est.esReprogramado) {
+                      <span class="px-2 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold">
+                        Ya reprogramado
+                      </span>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <div>
+                  <label class="block text-[11px] font-black uppercase text-foreground mb-1">Seleccionar estudiante de la nómina oficial *</label>
+                  @if (cargandoNominaReprogramacion()) {
+                    <div class="p-3 text-center text-muted-foreground italic">Cargando nómina oficial...</div>
+                  } @else {
+                    <select (change)="seleccionarEstudianteNomina($any($event.target).value)" class="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500">
+                      <option value="">-- Seleccionar estudiante --</option>
+                      @for (est of nominaEstudiantesReprogramacion(); track est.codigoEstudiante) {
+                        <option [value]="est.codigoEstudiante">
+                          {{ est.codigoEstudiante }} - {{ est.nombreCompleto }} (Var {{ est.letraVariante }}) {{ est.esReprogramado ? '[REPROGRAMADO]' : (est.yaCalificado ? '[CALIFICADO]' : '[SIN CARTILLA / AUSENTE]') }}
+                        </option>
+                      }
+                    </select>
+                  }
+                </div>
+              }
+
+              <!-- Fecha del examen reprogramado -->
+              <div>
+                <label class="block text-[11px] font-black uppercase text-foreground mb-1">Fecha en que se tomó el examen oral *</label>
+                <input type="date" [value]="reprogramacionFechaExamen()" (input)="reprogramacionFechaExamen.set($any($event.target).value)" class="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500" />
+                <p class="text-[10px] text-muted-foreground mt-0.5">Fecha del examen oral remitido por el docente a Evaluaciones.</p>
+              </div>
+
+              <!-- Calificaciones /100 y /60 -->
+              <div class="grid grid-cols-2 gap-3 p-3 bg-muted/20 rounded-xl border border-border">
+                <div>
+                  <label class="block text-[11px] font-black uppercase text-foreground mb-1">Nota sobre 100 *</label>
+                  <input type="number" min="0" max="100" step="0.5" [value]="reprogramacionNota100() ?? ''" (input)="alCambiarNota100($any($event.target).value)" placeholder="Ej. 75" class="w-full px-3 py-2 rounded-xl border border-input bg-background font-bold text-foreground text-sm focus:ring-2 focus:ring-amber-500" />
+                  <p class="text-[10px] text-muted-foreground mt-0.5">Escala estándar institucional (0 - 100).</p>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-black uppercase text-foreground mb-1">Nota sobre 60 (Ponderada)</label>
+                  <input type="number" min="0" max="60" step="0.5" [value]="reprogramacionNota60() ?? ''" (input)="alCambiarNota60($any($event.target).value)" placeholder="Ej. 45" class="w-full px-3 py-2 rounded-xl border border-input bg-background font-bold text-foreground text-sm focus:ring-2 focus:ring-amber-500" />
+                  <p class="text-[10px] text-muted-foreground mt-0.5">Calculada automáticamente: (Nota * 0.6).</p>
+                </div>
+                <div class="col-span-2 flex items-center justify-between pt-1 border-t border-border/50">
+                  <span class="text-xs text-muted-foreground font-semibold">Estado resultante:</span>
+                  @if (reprogramacionNota100() !== null) {
+                    @if (reprogramacionNota100()! >= 51) {
+                      <span class="px-2 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        APROBADO (≥ 51)
+                      </span>
+                    } @else {
+                      <span class="px-2 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300">
+                        REPROBADO (&lt; 51)
+                      </span>
+                    }
+                  } @else {
+                    <span class="text-muted-foreground italic text-[11px]">Ingrese la calificación</span>
+                  }
+                </div>
+              </div>
+
+              <!-- N° Comprobante / Recibo -->
+              <div>
+                <label class="block text-[11px] font-black uppercase text-foreground mb-1">N° Comprobante / Recibo de Pago (Opcional)</label>
+                <input type="text" [value]="reprogramacionComprobante()" (input)="reprogramacionComprobante.set($any($event.target).value)" placeholder="Ej. REC-09824 / Caja Central" class="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500" />
+              </div>
+
+              <!-- Motivo / Justificación -->
+              <div>
+                <label class="block text-[11px] font-black uppercase text-foreground mb-1">Motivo / Justificación académica *</label>
+                <textarea [value]="reprogramacionMotivo()" (input)="reprogramacionMotivo.set($any($event.target).value)" rows="2" placeholder="Describa el motivo de la reprogramación..." class="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500 resize-none"></textarea>
+              </div>
+
+              <!-- Observaciones -->
+              <div>
+                <label class="block text-[11px] font-black uppercase text-foreground mb-1">Observaciones del examen oral (Opcional)</label>
+                <textarea [value]="reprogramacionObservaciones()" (input)="reprogramacionObservaciones.set($any($event.target).value)" rows="2" placeholder="Detalles de los reactivos evaluados oralmente, modalidad de preguntas, etc." class="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500 resize-none"></textarea>
+              </div>
+            </div>
+
+            <div class="p-4 border-t border-border bg-muted/10 flex items-center justify-between gap-3 shrink-0">
+              <div>
+                @if (estudianteSeleccionadoReprogramar()?.esReprogramado) {
+                  <button type="button" (click)="revertirReprogramacion()" [disabled]="guardandoReprogramacion()" class="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-bold cursor-pointer disabled:opacity-50 transition-colors">
+                    Revertir reprogramación
+                  </button>
+                }
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" (click)="cerrarModalReprogramar()" [disabled]="guardandoReprogramacion()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer disabled:opacity-50">
+                  Cancelar
+                </button>
+                <button type="button" (click)="guardarReprogramacion()" [disabled]="guardandoReprogramacion() || !reprogramacionCodigoEstudiante() || reprogramacionNota100() === null" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5 transition-colors">
+                  @if (guardandoReprogramacion()) {
+                    <i class="pi pi-spin pi-spinner text-xs"></i> Guardando...
+                  } @else {
+                    <i class="pi pi-check text-xs"></i> Guardar Calificación Reprogramada
+                  }
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       }
@@ -3036,7 +3557,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     () => this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
   );
   public readonly esEvaluacionesPorCampus = computed(
-    () => this.esPersonalEvaluaciones()
+    () => false
   );
   public readonly puedeListarTodasLasCarreras = computed(
     () => this.esPersonalEvaluaciones()
@@ -3213,12 +3734,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public recalibrandoOmr = signal<Record<number, boolean>>({});
   public anulacionesOmr = signal<AnulacionPreguntaOmr[]>([]);
   public dialogAnulacionOmr = signal(false);
-  public preguntaSeleccionadaAnulacionOmr = signal<{ lectura: OmrLecturaResponse; pregunta: number } | null>(null);
+  public preguntaSeleccionadaAnulacionOmr = signal<{ lectura?: OmrLecturaResponse; letraVariante?: string; pregunta: number } | null>(null);
   public motivoAnulacionOmr = '';
   public guardandoAnulacionOmr = signal(false);
   public propagarAnulacionOmr = signal<boolean>(true);
   public variantesVinculadasAnulacion = signal<VarianteVinculada[]>([]);
   public cargandoVariantesVinculadasAnulacion = signal<boolean>(false);
+  public filtroVarianteOmr = signal<string>('TODAS');
 
   // Recalificación OMR
   public dialogRecalificarOmr = signal<boolean>(false);
@@ -3240,6 +3762,14 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public variantesVinculadasClave = signal<VarianteVinculada[]>([]);
   public cargandoVariantesVinculadasClave = signal<boolean>(false);
   public guardandoEdicionClaveOmr = signal<boolean>(false);
+
+  // Gestión de patrones del docente y anulaciones por variante
+  public dialogGestionPatronesAnulaciones = signal<boolean>(false);
+  public cargandoPatronGestion = signal<boolean>(false);
+  public errorPatronGestion = signal<string | null>(null);
+  public patronGestionOmr = signal<PatronCalificadoResponse | null>(null);
+  public varianteActivaGestion = signal<string>('A');
+  public recalibrandoLoteMemoria = signal<boolean>(false);
 
   // Anulación individual de examen de estudiante
   public dialogAnularExamenEstudiante = signal<boolean>(false);
@@ -3273,6 +3803,32 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public errorEscaneadoOmr = signal<string | null>(null);
   public previewEscaneadoGuardado = signal<{ url: string; segura: SafeResourceUrl; pdf: boolean } | null>(null);
   private _consultaEscaneadoOmr?: Subscription;
+
+  // Reprogramación de calificaciones OMR (examen oral extemporáneo)
+  public dialogReprogramarEstudiante = signal<boolean>(false);
+  public estudianteSeleccionadoReprogramar = signal<{
+    codigo: string;
+    nombre?: string;
+    variante?: string;
+    nota60?: number;
+    nota100?: number;
+    esReprogramado?: boolean;
+    fechaExamenReprogramado?: string;
+    motivo?: string;
+    comprobante?: string;
+    observaciones?: string;
+  } | null>(null);
+  public nominaEstudiantesReprogramacion = signal<EstudianteNominaOmr[]>([]);
+  public cargandoNominaReprogramacion = signal<boolean>(false);
+  public guardandoReprogramacion = signal<boolean>(false);
+  public reprogramacionCodigoEstudiante = signal<string>('');
+  public reprogramacionFechaExamen = signal<string>('');
+  public reprogramacionNota100 = signal<number | null>(null);
+  public reprogramacionNota60 = signal<number | null>(null);
+  public reprogramacionMotivo = signal<string>('');
+  public reprogramacionComprobante = signal<string>('');
+  public reprogramacionObservaciones = signal<string>('');
+  public totalReprogramados = computed(() => this.notasOmr().filter(n => n.esReprogramado).length);
 
   // Carga manual de notas para exámenes sin cartilla.
   public dialogNotasDocente = signal<boolean>(false);
@@ -4724,7 +5280,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.cargandoPreviewOmr.set(false);
     this.recalibrandoOmr.set({});
     this.anulacionesOmr.set([]);
+    this.patronGestionOmr.set(null);
+    this.errorPatronGestion.set(null);
     this.cerrarDialogoAnulacionOmr();
+    this.cerrarGestionPatronesAnulaciones();
     this.procesandoCalificacionOmr.set(false);
     this.guardandoCalificacionOmr.set(false);
     this._detenerProgresoCalificacionOmr();
@@ -4734,6 +5293,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.mensajeCalificacionOmr.set('Seleccione el PDF escaneado para iniciar la lectura página por página.');
     this.errorCalificacionOmr.set(false);
     this.dialogCalificacionOmr.set(true);
+
+    this.cargarPatronGestion(item.id);
     this._omrService.listarAnulaciones(item.id).subscribe({
       next: anulaciones => {
         const list = anulaciones || [];
@@ -4748,6 +5309,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (this.procesandoCalificacionOmr() || this.guardandoCalificacionOmr()) return;
     this._detenerProgresoCalificacionOmr();
     this.dialogCalificacionOmr.set(false);
+    this.cerrarGestionPatronesAnulaciones();
     this.evaluacionSeleccionadaOmr.set(null);
     this.archivoOmrSeleccionado.set(null);
     this.impresoraCalificacionOmr.set('');
@@ -4761,6 +5323,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.cargandoPreviewOmr.set(false);
     this.recalibrandoOmr.set({});
     this.anulacionesOmr.set([]);
+    this.patronGestionOmr.set(null);
+    this.errorPatronGestion.set(null);
     this.cerrarDialogoAnulacionOmr();
   }
 
@@ -4948,10 +5512,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
           this.pasoActualProgresoOmr.set('¡Procesamiento OMR completado con éxito!');
           window.setTimeout(() => {
             this.procesandoCalificacionOmr.set(false);
-            this.resultadoCalificacionOmr.set(resultado);
+            const resultadoEnriquecido: OmrJobResponse = {
+              ...resultado,
+              resultados: this.enriquecerLecturasConVariante(resultado.resultados || [])
+            };
+            this.resultadoCalificacionOmr.set(resultadoEnriquecido);
             if (this.anulacionesOmr().length > 0) {
               this.recalcularLecturasConAnulaciones(this.anulacionesOmr());
             }
+            this.filtroVarianteOmr.set('TODAS');
             this.edicionesOmr.set({});
             this.paginaPreviewOmr.set(null);
             this.paginasPreviewOcultas.set({});
@@ -5064,8 +5633,93 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     return [...new Set(incisos)].join('');
   }
 
+  public obtenerVarianteEstudiante(lectura: OmrLecturaResponse): string {
+    if (lectura.letraVariante && lectura.letraVariante.trim()) {
+      return lectura.letraVariante.trim().toUpperCase();
+    }
+    const codigo = (this.codigoOmr(lectura) || lectura.codigoEstudiante || '').trim();
+    if (!codigo) return '';
+
+    const patron = this.patronGestionOmr() || this.patronCalificado();
+    if (patron?.variantes) {
+      for (const v of patron.variantes) {
+        if (v.estudiantes?.some(e => e.codigoEstudiante === codigo)) {
+          return v.letra.toUpperCase();
+        }
+      }
+    }
+
+    const mapeo = this.evaluacionSeleccionadaOmr()?.mapeoEstudiantes?.find(m => m.codigoEstudiante === codigo);
+    if (mapeo?.letraVariante || mapeo?.variante) {
+      return (mapeo.letraVariante || mapeo.variante).trim().toUpperCase();
+    }
+
+    return '';
+  }
+
+  public resumenVariantesLote(): Array<{ variante: string; conteo: number }> {
+    const resultado = this.resultadoCalificacionOmr();
+    if (!resultado?.resultados?.length) return [];
+    const conteos = new Map<string, number>();
+    for (const lectura of resultado.resultados) {
+      const v = this.obtenerVarianteEstudiante(lectura) || 'S/V';
+      conteos.set(v, (conteos.get(v) || 0) + 1);
+    }
+    return Array.from(conteos.entries())
+      .map(([variante, conteo]) => ({ variante, conteo }))
+      .sort((a, b) => a.variante.localeCompare(b.variante));
+  }
+
+  public lecturasOmrFiltradas(): OmrLecturaResponse[] {
+    const todos = this.resultadoCalificacionOmr()?.resultados || [];
+    const filtro = this.filtroVarianteOmr();
+    if (filtro === 'TODAS') return todos;
+    return todos.filter(l => (this.obtenerVarianteEstudiante(l) || 'S/V') === filtro);
+  }
+
+  public enriquecerLecturasConVariante(resultados: OmrLecturaResponse[]): OmrLecturaResponse[] {
+    const patron = this.patronGestionOmr() || this.patronCalificado();
+    const mapaCodigoVariante = new Map<string, string>();
+    if (patron?.variantes) {
+      for (const v of patron.variantes) {
+        if (v.estudiantes) {
+          for (const est of v.estudiantes) {
+            if (est.codigoEstudiante) {
+              mapaCodigoVariante.set(est.codigoEstudiante.trim(), v.letra.toUpperCase());
+            }
+          }
+        }
+      }
+    }
+    const mapeos = this.evaluacionSeleccionadaOmr()?.mapeoEstudiantes || [];
+    for (const m of mapeos) {
+      if (m.codigoEstudiante && (m.letraVariante || m.variante)) {
+        mapaCodigoVariante.set(m.codigoEstudiante.trim(), (m.letraVariante || m.variante).trim().toUpperCase());
+      }
+    }
+
+    return resultados.map(lectura => {
+      const codigo = (this.codigoOmr(lectura) || lectura.codigoEstudiante || '').trim();
+      const varDetectada = lectura.letraVariante || (codigo ? mapaCodigoVariante.get(codigo) : null);
+      if (varDetectada && varDetectada !== lectura.letraVariante) {
+        return { ...lectura, letraVariante: varDetectada };
+      }
+      return lectura;
+    });
+  }
+
   public respuestaCorrectaOmr(lectura: OmrLecturaResponse, pregunta: number): string {
-    return this.normalizarRespuestaOmr(lectura.detalles?.find(detalle => detalle.pregunta === pregunta)?.respuestaCorrecta);
+    const detalleClave = this.normalizarRespuestaOmr(lectura.detalles?.find(detalle => detalle.pregunta === pregunta)?.respuestaCorrecta);
+    if (detalleClave) return detalleClave;
+    const varEst = this.obtenerVarianteEstudiante(lectura);
+    if (varEst) {
+      const patron = this.patronGestionOmr() || this.patronCalificado();
+      const varianteObj = patron?.variantes?.find(v => v.letra.toUpperCase() === varEst.toUpperCase());
+      if (varianteObj?.respuestas?.[String(pregunta)]) {
+        return this.normalizarRespuestaOmr(varianteObj.respuestas[String(pregunta)]);
+      }
+    }
+    return '';
   }
 
   public estadoPreguntaOmr(lectura: OmrLecturaResponse, pregunta: number): string {
@@ -5094,14 +5748,197 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }[estado] || estado;
   }
 
+  public puedeGestionarPatronYAnulaciones(): boolean {
+    const etapa = this.evaluacionSeleccionadaOmr()?.etapa;
+    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones())
+      && (etapa === 'Devuelto' || etapa === 'Pendiente de notas' || etapa === 'Calificado' || etapa === 'Confirmado');
+  }
+
   public puedeGestionarAnulacionOmr(): boolean {
     const etapa = this.evaluacionSeleccionadaOmr()?.etapa;
     return (this.esAdministradorSistema() || this.esResponsableEvaluaciones())
-      && (etapa === 'Devuelto' || etapa === 'Pendiente de notas');
+      && (etapa === 'Devuelto' || etapa === 'Pendiente de notas' || etapa === 'Calificado' || etapa === 'Confirmado');
+  }
+
+  public abrirGestionPatronesYAnulacionesModal(): void {
+    const item = this.evaluacionSeleccionadaOmr();
+    if (!item) return;
+    this.dialogGestionPatronesAnulaciones.set(true);
+    this.cargarPatronGestion(item.id);
+  }
+
+  public cerrarGestionPatronesAnulaciones(): void {
+    this.dialogGestionPatronesAnulaciones.set(false);
+    this.errorPatronGestion.set(null);
+  }
+
+  public cargarPatronGestion(rolId: string): void {
+    this.cargandoPatronGestion.set(true);
+    this.errorPatronGestion.set(null);
+    this._omrService.consultarPatronCalificado(rolId).subscribe({
+      next: patron => {
+        this.patronGestionOmr.set(patron);
+        this.cargandoPatronGestion.set(false);
+        if (patron?.variantes?.length && !patron.variantes.some(v => v.letra === this.varianteActivaGestion())) {
+          this.varianteActivaGestion.set(patron.variantes[0].letra);
+        }
+        const actual = this.resultadoCalificacionOmr();
+        if (actual?.resultados?.length) {
+          this.resultadoCalificacionOmr.set({
+            ...actual,
+            resultados: this.enriquecerLecturasConVariante(actual.resultados)
+          });
+        }
+      },
+      error: err => {
+        this.cargandoPatronGestion.set(false);
+        this.errorPatronGestion.set(err?.error?.message || 'No se pudo consultar el patrón oficial de la evaluación.');
+      }
+    });
+
+    this._omrService.listarAnulaciones(rolId).subscribe({
+      next: anulaciones => {
+        this.anulacionesOmr.set(anulaciones || []);
+      }
+    });
+  }
+
+  public varianteGestionActual(): PatronCalificadoVariante | undefined {
+    const patron = this.patronGestionOmr();
+    if (!patron?.variantes) return undefined;
+    return patron.variantes.find(v => v.letra === this.varianteActivaGestion()) || patron.variantes[0];
+  }
+
+  public preguntasDeVarianteGestion(): number[] {
+    const v = this.varianteGestionActual();
+    if (!v) return [];
+    const total = v.totalPreguntas || (v.respuestas ? Object.keys(v.respuestas).length : 30);
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  public claveOficialEnVarianteGestion(pregunta: number): string {
+    const v = this.varianteGestionActual();
+    return v?.respuestas ? (v.respuestas[String(pregunta)] || v.respuestas[pregunta as any] || '—') : '—';
+  }
+
+  public esPreguntaAnuladaEnVarianteGestion(pregunta: number): boolean {
+    const letra = this.varianteActivaGestion();
+    return this.anulacionesOmr().some(an =>
+      an.activo && an.letraVariante.toUpperCase() === letra.toUpperCase() && an.numeroPregunta === pregunta
+    );
+  }
+
+  public motivoAnulacionEnVarianteGestion(pregunta: number): string {
+    const letra = this.varianteActivaGestion();
+    const an = this.anulacionesOmr().find(item =>
+      item.activo && item.letraVariante.toUpperCase() === letra.toUpperCase() && item.numeroPregunta === pregunta
+    );
+    return an?.motivo || '';
+  }
+
+  public conteoAnuladasEnVarianteGestion(letraVariante: string): number {
+    return this.anulacionesOmr().filter(an =>
+      an.activo && an.letraVariante.toUpperCase() === letraVariante.toUpperCase()
+    ).length;
+  }
+
+  public conteoPreguntasValidasEnVarianteGestion(variante: PatronCalificadoVariante | undefined): number {
+    if (!variante) return 0;
+    const total = variante.totalPreguntas || (variante.respuestas ? Object.keys(variante.respuestas).length : 30);
+    const anuladas = this.conteoAnuladasEnVarianteGestion(variante.letra);
+    return Math.max(0, total - anuladas);
+  }
+
+  public abrirEdicionClaveDesdePatron(pregunta: number): void {
+    const variante = this.varianteActivaGestion();
+    const claveActual = this.claveOficialEnVarianteGestion(pregunta);
+    const item = this.evaluacionSeleccionadaOmr();
+    this.preguntaSeleccionadaClaveOmr.set({
+      variante,
+      numeroPregunta: pregunta,
+      claveActual: claveActual === '—' ? '' : claveActual
+    });
+    this.nuevaClaveOmr.set(claveActual === '—' ? '' : claveActual);
+    this.propagarClaveOmr.set(true);
+    this.motivoEdicionClaveOmr.set('');
+    this.variantesVinculadasClave.set([]);
+    this.cargandoVariantesVinculadasClave.set(true);
+    this.dialogEditarClaveOmr.set(true);
+
+    if (item) {
+      this._omrService.consultarVariantesVinculadas(item.id, variante, pregunta).subscribe({
+        next: resumen => {
+          this.variantesVinculadasClave.set(resumen.variantesVinculadas || []);
+          this.cargandoVariantesVinculadasClave.set(false);
+        },
+        error: () => {
+          this.variantesVinculadasClave.set([]);
+          this.cargandoVariantesVinculadasClave.set(false);
+        }
+      });
+    } else {
+      this.cargandoVariantesVinculadasClave.set(false);
+    }
+  }
+
+  public abrirAnulacionDesdePatron(pregunta: number): void {
+    const variante = this.varianteActivaGestion();
+    this.preguntaSeleccionadaAnulacionOmr.set({ letraVariante: variante, pregunta });
+    this.motivoAnulacionOmr = '';
+    this.propagarAnulacionOmr.set(true);
+    this.variantesVinculadasAnulacion.set([]);
+    this.cargandoVariantesVinculadasAnulacion.set(true);
+    this.dialogAnulacionOmr.set(true);
+
+    const item = this.evaluacionSeleccionadaOmr();
+    if (item && variante) {
+      this._omrService.consultarVariantesVinculadas(item.id, variante, pregunta).subscribe({
+        next: resumen => {
+          this.variantesVinculadasAnulacion.set(resumen.variantesVinculadas || []);
+          this.cargandoVariantesVinculadasAnulacion.set(false);
+        },
+        error: () => {
+          this.variantesVinculadasAnulacion.set([]);
+          this.cargandoVariantesVinculadasAnulacion.set(false);
+        }
+      });
+    } else {
+      this.cargandoVariantesVinculadasAnulacion.set(false);
+    }
+  }
+
+  public reactivarPreguntaDesdePatron(pregunta: number): void {
+    const variante = this.varianteActivaGestion();
+    const item = this.evaluacionSeleccionadaOmr();
+    if (!item || this.guardandoAnulacionOmr()) return;
+
+    this._feedback.confirmar(
+      `La pregunta ${pregunta} de la variante ${variante} está anulada. ¿Desea reactivarla para que vuelva a computar en la calificación?`,
+      'Reactivar pregunta OMR', 'warning', 'Reactivar'
+    ).then(confirmado => {
+      if (!confirmado) return;
+      this.guardandoAnulacionOmr.set(true);
+      this._omrService.reactivarPregunta(item.id, variante, pregunta).subscribe({
+        next: () => {
+          const restantes = this.anulacionesOmr().filter(actual =>
+            !(actual.letraVariante.toUpperCase() === variante.toUpperCase() && actual.numeroPregunta === pregunta)
+          );
+          this.anulacionesOmr.set(restantes);
+          this.cargarPatronGestion(item.id);
+          this.recalibrarLoteCompletoConPatronActual();
+          this.guardandoAnulacionOmr.set(false);
+          this._mostrarToast(`Pregunta ${pregunta} de la variante ${variante} reactivada.`);
+        },
+        error: err => {
+          this.guardandoAnulacionOmr.set(false);
+          this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo reactivar la pregunta.', 'error');
+        }
+      });
+    });
   }
 
   public buscarAnulacionOmr(lectura: OmrLecturaResponse, pregunta: number): AnulacionPreguntaOmr | undefined {
-    const variante = (lectura.letraVariante || '').toUpperCase();
+    const variante = (this.obtenerVarianteEstudiante(lectura) || lectura.letraVariante || '').toUpperCase();
     return this.anulacionesOmr().find(item => item.letraVariante.toUpperCase() === variante
       && item.numeroPregunta === pregunta && item.activo);
   }
@@ -5113,9 +5950,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public gestionarAnulacionOmr(lectura: OmrLecturaResponse, pregunta: number): void {
     if (!this.puedeGestionarAnulacionOmr()) return;
     const anulacion = this.buscarAnulacionOmr(lectura, pregunta);
+    const varEst = this.obtenerVarianteEstudiante(lectura) || lectura.letraVariante || 'A';
     if (anulacion) {
       this._feedback.confirmar(
-        `La pregunta ${pregunta} de la variante ${lectura.letraVariante} está anulada. ¿Desea reactivarla?`,
+        `La pregunta ${pregunta} de la variante ${anulacion.letraVariante || varEst} está anulada. ¿Desea reactivarla?`,
         'Reactivar pregunta OMR', 'warning', 'Reactivar'
       ).then(confirmado => {
         if (!confirmado) return;
@@ -5126,9 +5964,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
           next: () => {
             const restantes = this.anulacionesOmr().filter(actual => actual.id !== anulacion.id);
             this.anulacionesOmr.set(restantes);
-            this.recalcularLecturasConAnulaciones(restantes);
+            this.cargarPatronGestion(item.id);
+            this.recalibrarLoteCompletoConPatronActual();
             this.guardandoAnulacionOmr.set(false);
-            this._mostrarToast(`Pregunta ${pregunta} de la variante ${lectura.letraVariante} reactivada.`);
+            this._mostrarToast(`Pregunta ${pregunta} de la variante ${anulacion.letraVariante || varEst} reactivada.`);
           },
           error: err => {
             this.guardandoAnulacionOmr.set(false);
@@ -5138,7 +5977,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       });
       return;
     }
-    this.preguntaSeleccionadaAnulacionOmr.set({ lectura, pregunta });
+    this.preguntaSeleccionadaAnulacionOmr.set({ lectura, letraVariante: varEst, pregunta });
     this.motivoAnulacionOmr = '';
     this.propagarAnulacionOmr.set(true);
     this.variantesVinculadasAnulacion.set([]);
@@ -5146,8 +5985,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.dialogAnulacionOmr.set(true);
 
     const item = this.evaluacionSeleccionadaOmr();
-    if (item && lectura.letraVariante) {
-      this._omrService.consultarVariantesVinculadas(item.id, lectura.letraVariante, pregunta).subscribe({
+    if (item && varEst) {
+      this._omrService.consultarVariantesVinculadas(item.id, varEst, pregunta).subscribe({
         next: resumen => {
           this.variantesVinculadasAnulacion.set(resumen.variantesVinculadas || []);
           this.cargandoVariantesVinculadasAnulacion.set(false);
@@ -5176,9 +6015,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const seleccion = this.preguntaSeleccionadaAnulacionOmr();
     const motivo = this.motivoAnulacionOmr.trim();
     if (!item || !seleccion || motivo.length < 5 || this.guardandoAnulacionOmr()) return;
+    const letraVariante = seleccion.letraVariante || (seleccion.lectura ? this.obtenerVarianteEstudiante(seleccion.lectura) : '') || seleccion.lectura?.letraVariante || 'A';
     this.guardandoAnulacionOmr.set(true);
     this._omrService.anularPregunta(item.id, {
-      letraVariante: seleccion.lectura.letraVariante || '',
+      letraVariante,
       numeroPregunta: seleccion.pregunta,
       motivo,
       propagarVariantes: this.propagarAnulacionOmr()
@@ -5188,16 +6028,17 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
           next: items => {
             const list = items || [];
             this.anulacionesOmr.set(list);
-            this.recalcularLecturasConAnulaciones(list);
+            this.recalibrarLoteCompletoConPatronActual();
           }
         });
+        this.cargarPatronGestion(item.id);
         this.guardandoAnulacionOmr.set(false);
         this.cerrarDialogoAnulacionOmr();
         const countPropagadas = anulacion.anulacionesPropagadas?.length || 0;
         const infoPropagada = countPropagadas > 0
           ? ` y propagada a ${countPropagadas} variante(s) vinculada(s)`
           : '';
-        this._mostrarToast(`Pregunta ${seleccion.pregunta} de la variante ${seleccion.lectura.letraVariante} anulada${infoPropagada}.`);
+        this._mostrarToast(`Pregunta ${seleccion.pregunta} de la variante ${letraVariante} anulada${infoPropagada}.`);
       },
       error: err => {
         this.guardandoAnulacionOmr.set(false);
@@ -5223,7 +6064,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         ...res,
         resultados: res.resultados.map(lectura => {
           if (lectura.estadoCalificacion === 'ANULADO') return lectura;
-          const variante = (lectura.letraVariante || '').toUpperCase();
+          const variante = (this.obtenerVarianteEstudiante(lectura) || lectura.letraVariante || '').toUpperCase();
           const anuladasSet = mapaAnuladas.get(variante) || new Set<number>();
 
           const totalBase = (lectura.detalles && lectura.detalles.length > 0)
@@ -5256,6 +6097,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
           return {
             ...lectura,
+            letraVariante: lectura.letraVariante || (variante ? variante : null),
             totalReactivos: totalValidas,
             aciertos,
             fallos,
@@ -5280,7 +6122,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public abrirEdicionClave(lectura: OmrLecturaResponse, pregunta: number): void {
     if (!this.puedeEditarClaveOficial()) return;
     const item = this.evaluacionSeleccionadaOmr();
-    const variante = lectura.letraVariante || 'A';
+    const variante = this.obtenerVarianteEstudiante(lectura) || lectura.letraVariante || 'A';
     const claveActual = this.respuestaCorrectaOmr(lectura, pregunta) || '';
     this.preguntaSeleccionadaClaveOmr.set({
       lectura,
@@ -5359,12 +6201,119 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
             })
           };
         });
+        this.cargarPatronGestion(item.id);
+        this.recalibrarLoteCompletoConPatronActual();
       },
       error: err => {
         this.guardandoEdicionClaveOmr.set(false);
         this._mostrarToast(err?.error?.message || 'No se pudo actualizar la clave oficial.', 'error');
       }
     });
+  }
+
+  public recalibrarLoteCompletoConPatronActual(mostrarToastExito: boolean = false): void {
+    const res = this.resultadoCalificacionOmr();
+    if (!res || !res.resultados || res.resultados.length === 0) {
+      if (mostrarToastExito) {
+        this._mostrarToast('No hay cartillas procesadas en memoria para recalibrar.', 'info');
+      }
+      return;
+    }
+
+    this.recalibrandoLoteMemoria.set(true);
+    const patron = this.patronGestionOmr() || this.patronCalificado();
+
+    const mapaAnuladas = new Map<string, Set<number>>();
+    for (const an of this.anulacionesOmr()) {
+      if (!an.activo) continue;
+      const v = (an.letraVariante || '').toUpperCase();
+      if (!mapaAnuladas.has(v)) {
+        mapaAnuladas.set(v, new Set());
+      }
+      mapaAnuladas.get(v)!.add(an.numeroPregunta);
+    }
+
+    const mapaClavesPorVariante = new Map<string, Record<string, string>>();
+    if (patron?.variantes) {
+      for (const v of patron.variantes) {
+        if (v.letra && v.respuestas) {
+          mapaClavesPorVariante.set(v.letra.toUpperCase(), v.respuestas);
+        }
+      }
+    }
+
+    this.resultadoCalificacionOmr.update(actual => {
+      if (!actual || !actual.resultados) return actual;
+
+      const recalibrados = actual.resultados.map(lectura => {
+        if (lectura.estadoCalificacion === 'ANULADO') return lectura;
+
+        const variante = (this.obtenerVarianteEstudiante(lectura) || lectura.letraVariante || 'A').toUpperCase();
+        const clavesVariante = mapaClavesPorVariante.get(variante) || {};
+        const anuladasSet = mapaAnuladas.get(variante) || new Set<number>();
+
+        let detallesActualizados = lectura.detalles || [];
+        if (Object.keys(clavesVariante).length > 0) {
+          detallesActualizados = detallesActualizados.map(d => {
+            const claveActualizada = clavesVariante[String(d.pregunta)];
+            return claveActualizada ? { ...d, respuestaCorrecta: claveActualizada } : d;
+          });
+        }
+
+        const totalBase = (detallesActualizados.length > 0)
+          ? detallesActualizados.length
+          : (lectura.totalReactivos || 30);
+
+        const preguntasValidas = Array.from({ length: totalBase }, (_, i) => i + 1)
+          .filter(p => !anuladasSet.has(p));
+
+        const totalValidas = preguntasValidas.length;
+        let aciertos = 0;
+        let blancos = 0;
+        let dobles = 0;
+
+        for (const p of preguntasValidas) {
+          const resp = this.respuestaOmr(lectura, p).trim().toUpperCase();
+          const corr = (clavesVariante[String(p)] || this.respuestaCorrectaOmr({ ...lectura, detalles: detallesActualizados }, p) || '').trim().toUpperCase();
+
+          if (!resp) {
+            blancos++;
+          } else if (resp.length > 1) {
+            dobles++;
+          } else if (corr && resp === corr) {
+            aciertos++;
+          }
+        }
+
+        const fallos = Math.max(0, totalValidas - aciertos - blancos);
+        const nota60 = totalValidas > 0 ? Math.round((aciertos * 60 / totalValidas) * 100) / 100 : 0;
+        const nota100 = totalValidas > 0 ? Math.round((aciertos * 100 / totalValidas) * 100) / 100 : 0;
+
+        return {
+          ...lectura,
+          letraVariante: lectura.letraVariante || variante,
+          detalles: detallesActualizados,
+          totalReactivos: totalValidas,
+          aciertos,
+          fallos,
+          blancos,
+          doblesMarcas: dobles,
+          notaSobre60: nota60,
+          notaSobre100: nota100,
+          estadoCalificacion: nota100 >= 51 ? 'APROBADO' : 'REPROBADO'
+        };
+      });
+
+      return {
+        ...actual,
+        resultados: recalibrados
+      };
+    });
+
+    this.recalibrandoLoteMemoria.set(false);
+    if (mostrarToastExito) {
+      this._mostrarToast(`Notas recalibradas con éxito (${res.resultados.length} cartillas actualizadas en memoria).`);
+    }
   }
 
   // --- RECALIFICACIÓN OMR (VOLVER A CALIFICAR) ---
@@ -5463,6 +6412,202 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       error: err => {
         this.guardandoAnulacionExamenEstudiante.set(false);
         this._mostrarToast(err?.error?.message || 'Error al cambiar estado de anulación del examen.', 'error');
+      }
+    });
+  }
+
+  // --- REPROGRAMACIÓN ORAL DE CALIFICACIONES OMR ---
+  public puedeRegistrarReprogramacion(): boolean {
+    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones());
+  }
+
+  public alCambiarNota100(valor: any): void {
+    const num = valor !== null && valor !== undefined && valor !== '' ? Number(valor) : null;
+    this.reprogramacionNota100.set(num);
+    if (num !== null && !isNaN(num)) {
+      const n60 = Math.round(num * 0.6 * 100) / 100;
+      this.reprogramacionNota60.set(n60);
+    } else {
+      this.reprogramacionNota60.set(null);
+    }
+  }
+
+  public alCambiarNota60(valor: any): void {
+    const num = valor !== null && valor !== undefined && valor !== '' ? Number(valor) : null;
+    this.reprogramacionNota60.set(num);
+    if (num !== null && !isNaN(num)) {
+      const n100 = Math.round((num * 100 / 60) * 100) / 100;
+      this.reprogramacionNota100.set(n100);
+    } else {
+      this.reprogramacionNota100.set(null);
+    }
+  }
+
+  public abrirModalReprogramar(nota: CalificacionOmrResponse): void {
+    if (!this.puedeRegistrarReprogramacion()) return;
+    const fechaDefecto = nota.fechaExamenReprogramado || new Date().toISOString().substring(0, 10);
+    this.estudianteSeleccionadoReprogramar.set({
+      codigo: nota.codigoEstudiante,
+      nombre: nota.estudianteNombreCompleto,
+      variante: nota.letraVariante,
+      nota60: nota.notaSobre60,
+      nota100: nota.notaSobre100,
+      esReprogramado: nota.esReprogramado,
+      fechaExamenReprogramado: nota.fechaExamenReprogramado,
+      motivo: nota.motivoReprogramacion,
+      comprobante: nota.comprobanteReprogramacion,
+      observaciones: nota.observacionReprogramacion
+    });
+    this.reprogramacionCodigoEstudiante.set(nota.codigoEstudiante);
+    this.reprogramacionFechaExamen.set(fechaDefecto);
+    this.reprogramacionNota100.set(nota.esReprogramado ? nota.notaSobre100 : null);
+    this.reprogramacionNota60.set(nota.esReprogramado ? nota.notaSobre60 : null);
+    this.reprogramacionMotivo.set(nota.motivoReprogramacion || 'Examen oral tomado por docente tras cancelación de arancel de reprogramación');
+    this.reprogramacionComprobante.set(nota.comprobanteReprogramacion || '');
+    this.reprogramacionObservaciones.set(nota.observacionReprogramacion || '');
+    this.dialogReprogramarEstudiante.set(true);
+  }
+
+  public abrirModalReprogramarNueva(): void {
+    if (!this.puedeRegistrarReprogramacion()) return;
+    const item = this.evaluacionSeleccionadaNotas() || this.evaluacionSeleccionadaOmr();
+    if (!item) return;
+
+    this.estudianteSeleccionadoReprogramar.set(null);
+    this.reprogramacionCodigoEstudiante.set('');
+    this.reprogramacionFechaExamen.set(new Date().toISOString().substring(0, 10));
+    this.reprogramacionNota100.set(null);
+    this.reprogramacionNota60.set(null);
+    this.reprogramacionMotivo.set('Examen oral tomado por docente tras cancelación de arancel de reprogramación');
+    this.reprogramacionComprobante.set('');
+    this.reprogramacionObservaciones.set('');
+    this.cargandoNominaReprogramacion.set(true);
+    this.dialogReprogramarEstudiante.set(true);
+
+    this._omrService.listarEstudiantesNomina(item.id).subscribe({
+      next: nomina => {
+        this.nominaEstudiantesReprogramacion.set(nomina);
+        this.cargandoNominaReprogramacion.set(false);
+      },
+      error: () => {
+        this.cargandoNominaReprogramacion.set(false);
+      }
+    });
+  }
+
+  public seleccionarEstudianteNomina(codigo: string): void {
+    const est = this.nominaEstudiantesReprogramacion().find(e => e.codigoEstudiante === codigo);
+    if (!est) return;
+    this.reprogramacionCodigoEstudiante.set(est.codigoEstudiante);
+    this.estudianteSeleccionadoReprogramar.set({
+      codigo: est.codigoEstudiante,
+      nombre: est.nombreCompleto,
+      variante: est.letraVariante,
+      nota60: est.notaSobre60,
+      nota100: est.notaSobre100,
+      esReprogramado: est.esReprogramado,
+      fechaExamenReprogramado: est.fechaExamenReprogramado
+    });
+    if (est.esReprogramado && est.notaSobre100 !== undefined && est.notaSobre100 !== null) {
+      this.reprogramacionNota100.set(est.notaSobre100);
+      this.reprogramacionNota60.set(est.notaSobre60 ?? null);
+      if (est.fechaExamenReprogramado) {
+        this.reprogramacionFechaExamen.set(est.fechaExamenReprogramado);
+      }
+    }
+  }
+
+  public cerrarModalReprogramar(): void {
+    if (this.guardandoReprogramacion()) return;
+    this.dialogReprogramarEstudiante.set(false);
+    this.estudianteSeleccionadoReprogramar.set(null);
+    this.reprogramacionCodigoEstudiante.set('');
+    this.reprogramacionNota100.set(null);
+    this.reprogramacionNota60.set(null);
+    this.reprogramacionMotivo.set('');
+    this.reprogramacionComprobante.set('');
+    this.reprogramacionObservaciones.set('');
+  }
+
+  public guardarReprogramacion(): void {
+    const item = this.evaluacionSeleccionadaNotas() || this.evaluacionSeleccionadaOmr();
+    const codigo = this.reprogramacionCodigoEstudiante().trim();
+    const fecha = this.reprogramacionFechaExamen().trim();
+    const nota100 = this.reprogramacionNota100();
+    const nota60 = this.reprogramacionNota60();
+    const motivo = this.reprogramacionMotivo().trim();
+
+    if (!item) return;
+    if (!codigo) {
+      this._mostrarToast('Debe seleccionar o indicar el código del estudiante.', 'error');
+      return;
+    }
+    if (!fecha) {
+      this._mostrarToast('La fecha del examen reprogramado es obligatoria.', 'error');
+      return;
+    }
+    if (nota100 === null || isNaN(nota100) || nota100 < 0 || nota100 > 100) {
+      this._mostrarToast('La nota sobre 100 debe estar entre 0 y 100.', 'error');
+      return;
+    }
+    if (motivo.length < 5) {
+      this._mostrarToast('El motivo de la reprogramación debe tener al menos 5 caracteres.', 'error');
+      return;
+    }
+
+    const payload: ReprogramacionOmrRequest = {
+      notaSobre100: Number(nota100),
+      notaSobre60: nota60 !== null ? Number(nota60) : Math.round(Number(nota100) * 0.6 * 100) / 100,
+      fechaExamenReprogramado: fecha,
+      motivo,
+      comprobantePago: this.reprogramacionComprobante().trim() || undefined,
+      observaciones: this.reprogramacionObservaciones().trim() || undefined
+    };
+
+    this.guardandoReprogramacion.set(true);
+    this._omrService.registrarReprogramacion(item.id, codigo, payload).subscribe({
+      next: calificacion => {
+        this.guardandoReprogramacion.set(false);
+        this.cerrarModalReprogramar();
+        this._mostrarToast(`Calificación por reprogramación registrada correctamente para ${codigo} (${calificacion.notaSobre100}/100 - ${calificacion.estadoCalificacion}).`);
+
+        // Actualizar notasOmr si el modal de notas está abierto
+        this.notasOmr.update(notas => {
+          const index = notas.findIndex(n => n.codigoEstudiante === codigo);
+          if (index >= 0) {
+            return notas.map((n, i) => i === index ? calificacion : n);
+          } else {
+            // Estudiante ausente en escaneo original pero ahora calificado
+            return [...notas, calificacion].sort((a, b) => a.codigoEstudiante.localeCompare(b.codigoEstudiante));
+          }
+        });
+      },
+      error: err => {
+        this.guardandoReprogramacion.set(false);
+        this._mostrarToast(err?.error?.message || 'Error al registrar la calificación por reprogramación.', 'error');
+      }
+    });
+  }
+
+  public revertirReprogramacion(): void {
+    const item = this.evaluacionSeleccionadaNotas() || this.evaluacionSeleccionadaOmr();
+    const codigo = this.reprogramacionCodigoEstudiante().trim();
+    if (!item || !codigo || this.guardandoReprogramacion()) return;
+
+    this.guardandoReprogramacion.set(true);
+    this._omrService.revertirReprogramacion(item.id, codigo).subscribe({
+      next: calificacion => {
+        this.guardandoReprogramacion.set(false);
+        this.cerrarModalReprogramar();
+        this._mostrarToast(`Reprogramación revertida para el estudiante ${codigo}.`);
+
+        this.notasOmr.update(notas =>
+          notas.map(n => n.codigoEstudiante === codigo ? calificacion : n)
+        );
+      },
+      error: err => {
+        this.guardandoReprogramacion.set(false);
+        this._mostrarToast(err?.error?.message || 'Error al revertir la reprogramación.', 'error');
       }
     });
   }

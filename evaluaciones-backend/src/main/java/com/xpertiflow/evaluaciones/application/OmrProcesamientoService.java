@@ -57,8 +57,13 @@ import java.util.Comparator;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.EstudianteNominaOmrDto;
 import com.xpertiflow.evaluaciones.api.dto.RecalificarOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.VarianteVinculadaDto;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -298,6 +303,7 @@ public class OmrProcesamientoService {
         Set<Integer> anuladas = preguntasAnuladas(rolExamenId, letraVariante);
         calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId).stream()
                 .filter(calificacion -> letraVariante.equalsIgnoreCase(calificacion.getLetraVariante()))
+                .filter(calificacion -> !Boolean.TRUE.equals(calificacion.getEsReprogramado()))
                 .forEach(calificacion -> {
                     Map<String, String> respuestas = leerRespuestasGuardadas(calificacion.getRespuestasDetectadasJson());
                     aplicarMetricas(calificacion, patron, respuestas, anuladas);
@@ -309,6 +315,9 @@ public class OmrProcesamientoService {
                                  Map<String, String> patron,
                                  Map<String, String> respuestas,
                                  Set<Integer> anuladas) {
+        if (Boolean.TRUE.equals(calificacion.getEsReprogramado())) {
+            return;
+        }
         if ("ANULADO".equalsIgnoreCase(calificacion.getEstadoCalificacion())) {
             calificacion.setAciertos(0);
             calificacion.setFallos(0);
@@ -636,8 +645,10 @@ public class OmrProcesamientoService {
         // Marcar en las calificaciones quién hizo la recalificación
         List<CalificacionOmr> calificaciones = calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId);
         for (CalificacionOmr c : calificaciones) {
-            c.setProcesadoPor(usuario + "_RECALIFICACION");
-            calificacionRepository.save(c);
+            if (!Boolean.TRUE.equals(c.getEsReprogramado())) {
+                c.setProcesadoPor(usuario + "_RECALIFICACION");
+                calificacionRepository.save(c);
+            }
         }
 
         // Registrar auditoría formal inmutable
@@ -733,6 +744,231 @@ public class OmrProcesamientoService {
         }
 
         return mapearCalificacion(calificacion);
+    }
+
+    @Transactional
+    public CalificacionOmrResponseDto registrarReprogramacionEstudiante(String rolExamenId,
+                                                                        String codigoEstudiante,
+                                                                        ReprogramacionOmrRequestDto request,
+                                                                        Authentication authentication,
+                                                                        String ipOrigen) {
+        validarRolAnulacionExamen(authentication);
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+
+        if (rol.getEstadoFlujo() == null || !Set.of("DEVUELTO", "PENDIENTE_NOTAS", "CALIFICADO", "CONFIRMADO").contains(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("Solo se puede registrar reprogramación para exámenes en devolución, calificación o confirmación.");
+        }
+
+        if (codigoEstudiante == null || codigoEstudiante.isBlank()) {
+            throw new IllegalArgumentException("El código del estudiante es obligatorio.");
+        }
+        String codigo = codigoEstudiante.trim();
+
+        if (request.getFechaExamenReprogramado() == null) {
+            throw new IllegalArgumentException("La fecha del examen reprogramado es obligatoria.");
+        }
+        if (request.getMotivo() == null || request.getMotivo().trim().length() < 5) {
+            throw new IllegalArgumentException("El motivo o justificación de la reprogramación es obligatorio (mínimo 5 caracteres).");
+        }
+
+        BigDecimal nota100 = request.getNotaSobre100();
+        BigDecimal nota60 = request.getNotaSobre60();
+
+        if (nota100 == null && nota60 == null) {
+            throw new IllegalArgumentException("Debe proporcionar al menos una nota (sobre 100 o sobre 60).");
+        }
+
+        if (nota100 != null) {
+            if (nota100.compareTo(BigDecimal.ZERO) < 0 || nota100.compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new IllegalArgumentException("La nota sobre 100 debe estar entre 0 y 100.");
+            }
+            if (nota60 == null) {
+                nota60 = nota100.multiply(BigDecimal.valueOf(60)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            }
+        } else {
+            if (nota60.compareTo(BigDecimal.ZERO) < 0 || nota60.compareTo(BigDecimal.valueOf(60)) > 0) {
+                throw new IllegalArgumentException("La nota sobre 60 debe estar entre 0 y 60.");
+            }
+            nota100 = nota60.multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        }
+
+        MapeoEstudianteVariante mapeo = mapeoRepository.findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigo)
+                .orElseThrow(() -> new IllegalArgumentException("El estudiante con código " + codigo + " no pertenece a la nómina oficial de esta evaluación."));
+
+        CalificacionOmr calificacion = calificacionRepository
+                .findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigo)
+                .orElseGet(() -> {
+                    CalificacionOmr nueva = new CalificacionOmr();
+                    nueva.setRolExamenId(rolExamenId);
+                    nueva.setCodigoEstudiante(codigo);
+                    nueva.setEstudianteNombreCompleto(nombreCompleto(mapeo));
+                    nueva.setLetraVariante(mapeo.getLetraVariante());
+                    nueva.setTotalReactivos(30);
+                    nueva.setRespuestasDetectadasJson("{\"tipo\":\"EXAMEN_ORAL_REPROGRAMADO\"}");
+                    return nueva;
+                });
+
+        int totalReactivos = calificacion.getTotalReactivos() != null && calificacion.getTotalReactivos() > 0 ? calificacion.getTotalReactivos() : 30;
+        int aciertos = nota100.multiply(BigDecimal.valueOf(totalReactivos)).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP).intValue();
+        int fallos = Math.max(0, totalReactivos - aciertos);
+
+        calificacion.setTotalReactivos(totalReactivos);
+        calificacion.setAciertos(aciertos);
+        calificacion.setFallos(fallos);
+        calificacion.setBlancos(0);
+        calificacion.setDoblesMarcas(0);
+        calificacion.setNotaSobre60(nota60);
+        calificacion.setNotaSobre100(nota100);
+        calificacion.setEstadoCalificacion(nota100.doubleValue() >= 51 ? "APROBADO" : "REPROBADO");
+        calificacion.setEsReprogramado(true);
+        calificacion.setFechaExamenReprogramado(request.getFechaExamenReprogramado());
+        calificacion.setMotivoReprogramacion(request.getMotivo().trim());
+        calificacion.setComprobanteReprogramacion(request.getComprobantePago() == null || request.getComprobantePago().isBlank() ? null : request.getComprobantePago().trim());
+        calificacion.setObservacionReprogramacion(request.getObservaciones() == null || request.getObservaciones().isBlank() ? null : request.getObservaciones().trim());
+
+        String usuario = usuarioValido(authentication == null ? null : authentication.getName());
+        calificacion.setReprogramadoPor(usuario);
+        calificacion.setFechaReprogramacion(LocalDateTime.now());
+        calificacion.setProcesadoPor(usuario + "_REPROGRAMACION_ORAL");
+
+        CalificacionOmr guardada = calificacionRepository.save(calificacion);
+
+        // Auditoría formal
+        try {
+            Map<String, Object> auditoriaData = new LinkedHashMap<>();
+            auditoriaData.put("accion", "REPROGRAMACION_EXAMEN_ORAL");
+            auditoriaData.put("codigoEstudiante", codigo);
+            auditoriaData.put("estudianteNombre", calificacion.getEstudianteNombreCompleto());
+            auditoriaData.put("letraVariante", calificacion.getLetraVariante());
+            auditoriaData.put("notaSobre60", nota60);
+            auditoriaData.put("notaSobre100", nota100);
+            auditoriaData.put("estadoCalificacion", calificacion.getEstadoCalificacion());
+            auditoriaData.put("fechaExamenReprogramado", request.getFechaExamenReprogramado().toString());
+            auditoriaData.put("comprobantePago", calificacion.getComprobanteReprogramacion());
+            auditoriaData.put("motivo", calificacion.getMotivoReprogramacion());
+            auditoriaData.put("observaciones", calificacion.getObservacionReprogramacion());
+            auditoriaData.put("usuario", usuario);
+            auditoriaData.put("fechaRegistro", LocalDateTime.now().toString());
+
+            auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen(rol.getEstadoFlujo().getValor())
+                    .etapaDestino(rol.getEstadoFlujo().getValor())
+                    .accion("REPROGRAMACION_EXAMEN_ORAL")
+                    .usuario(usuario)
+                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                    .detallesJson(objectMapper.writeValueAsString(auditoriaData))
+                    .build());
+        } catch (IOException e) {
+            log.error("Error al registrar auditoría de reprogramación oral OMR", e);
+        }
+
+        return mapearCalificacion(guardada);
+    }
+
+    @Transactional
+    public CalificacionOmrResponseDto revertirReprogramacionEstudiante(String rolExamenId,
+                                                                       String codigoEstudiante,
+                                                                       Authentication authentication,
+                                                                       String ipOrigen) {
+        validarRolAnulacionExamen(authentication);
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+
+        if (codigoEstudiante == null || codigoEstudiante.isBlank()) {
+            throw new IllegalArgumentException("El código del estudiante es obligatorio.");
+        }
+        String codigo = codigoEstudiante.trim();
+
+        CalificacionOmr calificacion = calificacionRepository
+                .findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigo)
+                .orElseThrow(() -> new IllegalArgumentException("No se encontró la calificación para el estudiante " + codigo));
+
+        if (!Boolean.TRUE.equals(calificacion.getEsReprogramado())) {
+            throw new IllegalStateException("El estudiante no tiene una calificación por reprogramación.");
+        }
+
+        calificacion.setEsReprogramado(false);
+        calificacion.setFechaExamenReprogramado(null);
+        calificacion.setMotivoReprogramacion(null);
+        calificacion.setComprobanteReprogramacion(null);
+        calificacion.setObservacionReprogramacion(null);
+
+        String usuario = usuarioValido(authentication == null ? null : authentication.getName());
+        calificacion.setProcesadoPor(usuario + "_REVERSION_REPROGRAMACION");
+
+        // Si tenía respuestas OMR escaneadas previamente, recalcularlas con el patrón
+        Map<String, String> respuestas = leerRespuestasGuardadas(calificacion.getRespuestasDetectadasJson());
+        if (!respuestas.isEmpty() && !"EXAMEN_ORAL_REPROGRAMADO".equals(respuestas.get("tipo"))) {
+            ExamenVariante variante = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, calificacion.getLetraVariante())
+                    .orElse(null);
+            if (variante != null) {
+                Map<String, String> patron = leerPatron(variante);
+                Set<Integer> anuladas = preguntasAnuladas(rolExamenId, calificacion.getLetraVariante());
+                aplicarMetricas(calificacion, patron, respuestas, anuladas);
+            }
+        } else {
+            // Era un estudiante ausente en el escaneo original
+            calificacion.setNotaSobre60(BigDecimal.ZERO);
+            calificacion.setNotaSobre100(BigDecimal.ZERO);
+            calificacion.setAciertos(0);
+            calificacion.setFallos(0);
+            calificacion.setBlancos(calificacion.getTotalReactivos() != null ? calificacion.getTotalReactivos() : 30);
+            calificacion.setDoblesMarcas(0);
+            calificacion.setEstadoCalificacion("REPROBADO");
+        }
+
+        CalificacionOmr guardada = calificacionRepository.save(calificacion);
+
+        try {
+            Map<String, Object> auditoriaData = new LinkedHashMap<>();
+            auditoriaData.put("accion", "REPROGRAMACION_EXAMEN_REVERTIDA");
+            auditoriaData.put("codigoEstudiante", codigo);
+            auditoriaData.put("estudianteNombre", calificacion.getEstudianteNombreCompleto());
+            auditoriaData.put("usuario", usuario);
+            auditoriaData.put("fecha", LocalDateTime.now().toString());
+
+            auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen(rol.getEstadoFlujo().getValor())
+                    .etapaDestino(rol.getEstadoFlujo().getValor())
+                    .accion("REPROGRAMACION_EXAMEN_REVERTIDA")
+                    .usuario(usuario)
+                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                    .detallesJson(objectMapper.writeValueAsString(auditoriaData))
+                    .build());
+        } catch (IOException e) {
+            log.error("Error al registrar auditoría de reversión de reprogramación OMR", e);
+        }
+
+        return mapearCalificacion(guardada);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EstudianteNominaOmrDto> listarEstudiantesNomina(String rolExamenId) {
+        List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);
+        Map<String, CalificacionOmr> calificacionesMap = calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId)
+                .stream()
+                .collect(Collectors.toMap(CalificacionOmr::getCodigoEstudiante, c -> c, (c1, c2) -> c1));
+
+        return mapeos.stream()
+                .sorted(Comparator.comparing((MapeoEstudianteVariante m) -> nombreCompleto(m).toLowerCase(Locale.ROOT)))
+                .map(m -> {
+                    CalificacionOmr c = calificacionesMap.get(m.getCodigoEstudiante());
+                    return EstudianteNominaOmrDto.builder()
+                            .codigoEstudiante(m.getCodigoEstudiante())
+                            .nombreCompleto(nombreCompleto(m))
+                            .letraVariante(m.getLetraVariante())
+                            .yaCalificado(c != null)
+                            .esReprogramado(c != null && Boolean.TRUE.equals(c.getEsReprogramado()))
+                            .notaSobre60(c != null ? c.getNotaSobre60() : null)
+                            .notaSobre100(c != null ? c.getNotaSobre100() : null)
+                            .estadoCalificacion(c != null ? c.getEstadoCalificacion() : "SIN_CALIFICACION")
+                            .fechaExamenReprogramado(c != null ? c.getFechaExamenReprogramado() : null)
+                            .build();
+                })
+                .toList();
     }
 
     private void validarRolAjuste(Authentication authentication) {
@@ -1282,6 +1518,13 @@ public class OmrProcesamientoService {
         dto.setArchivoEscaneadoPath(calificacion.getArchivoEscaneadoPath());
         dto.setProcesadoPor(calificacion.getProcesadoPor());
         dto.setFechaProcesamiento(calificacion.getFechaProcesamiento());
+        dto.setEsReprogramado(calificacion.getEsReprogramado());
+        dto.setFechaExamenReprogramado(calificacion.getFechaExamenReprogramado());
+        dto.setMotivoReprogramacion(calificacion.getMotivoReprogramacion());
+        dto.setComprobanteReprogramacion(calificacion.getComprobanteReprogramacion());
+        dto.setObservacionReprogramacion(calificacion.getObservacionReprogramacion());
+        dto.setReprogramadoPor(calificacion.getReprogramadoPor());
+        dto.setFechaReprogramacion(calificacion.getFechaReprogramacion());
         return dto;
     }
 
