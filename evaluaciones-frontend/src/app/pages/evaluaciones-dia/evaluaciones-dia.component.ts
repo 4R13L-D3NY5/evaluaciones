@@ -24,7 +24,7 @@ import {
   RolExamenResponse,
   AuditoriaRolExamen
 } from '../../core/services/rol-examen.service';
-import { CartillasOmrService, PreparacionCartillasOmr } from '../../core/services/cartillas-omr.service';
+import { CartillasOmrService, PreparacionCartillasOmr, CartillaOmr } from '../../core/services/cartillas-omr.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import { DocumentoSinCartilla, ExamenSinCartillaService, NotaDocente as NotaDocenteSinCartilla } from '../../core/services/examen-sin-cartilla.service';
 import {
@@ -1960,28 +1960,60 @@ interface CampusDisponible extends Campus {
                      <div class="rounded-xl border border-border bg-muted/40 p-3"><span class="block text-[10px] uppercase font-bold text-muted-foreground">Formato</span><strong class="text-sm text-foreground">PDF de firmas</strong></div>
                    </div>
                   <div class="rounded-2xl border border-border overflow-hidden">
-                    <div class="px-4 py-3 bg-muted/40 border-b border-border flex items-center justify-between gap-3">
+                    <div class="px-4 py-3 bg-muted/40 border-b border-border flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h4 class="text-xs font-black text-foreground">Lista de estudiantes</h4>
-                        <p class="text-[11px] text-muted-foreground mt-0.5">Vista previa de la lista que acompañará el control de firmas.</p>
+                        <p class="text-[11px] text-muted-foreground mt-0.5">Vista previa oficial para firmas y marcas OMR.</p>
                       </div>
-                      <span class="px-2.5 py-1 rounded-full bg-background border border-border text-[10px] font-black text-muted-foreground">{{ preparacion.totalCartillas }} registros</span>
+                      <div class="flex items-center gap-2">
+                        <button
+                          (click)="sincronizarNominaOficial()"
+                          [disabled]="sincronizandoNomina() || generandoCartillas() || generandoListaCartillas()"
+                          class="px-3 py-1.5 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 text-[11px] font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+                          title="Sincronizar nómina con el SEA por toma de grupos tardía">
+                          <i class="pi" [class.pi-spin]="sincronizandoNomina()" [class.pi-spinner]="sincronizandoNomina()" [class.pi-sync]="!sincronizandoNomina()"></i>
+                          <span>{{ sincronizandoNomina() ? 'Sincronizando...' : 'Sincronizar nómina (Toma de grupos)' }}</span>
+                        </button>
+                        <span class="px-2.5 py-1 rounded-full bg-background border border-border text-[10px] font-black text-muted-foreground">{{ preparacion.totalCartillas }} registros</span>
+                      </div>
                     </div>
-                    <div class="max-h-48 overflow-y-auto divide-y divide-border text-xs">
-                      <div class="grid grid-cols-[36px_110px_1fr_130px] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
-                        <span>N°</span><span>Código</span><span>Estudiante</span><span>Observaciones</span>
+                    <div class="max-h-56 overflow-y-auto divide-y divide-border text-xs">
+                      <div class="grid grid-cols-[36px_100px_1fr_75px_100px_110px] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
+                        <span>N°</span><span>Código</span><span>Estudiante</span><span class="text-center">Variante</span><span class="text-center">Examen</span><span>Observaciones</span>
                       </div>
                     @for (estudiante of preparacion.estudiantes; track estudiante.codigoEstudiante) {
-                      <div class="grid grid-cols-[36px_110px_1fr_130px] gap-2 px-3 py-2.5 items-center">
+                      <div class="grid grid-cols-[36px_100px_1fr_75px_100px_110px] gap-2 px-3 py-2.5 items-center">
                         <span class="font-mono text-muted-foreground">{{ estudiante.numeroOrden }}</span>
                         <span class="font-mono font-bold">{{ estudiante.codigoEstudiante }}</span>
                         <span class="truncate font-medium">{{ estudiante.nombreCompleto }}</span>
+                        <div class="text-center">
+                          @if (estudiante.letraVariante) {
+                            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-purple-50 text-purple-700 border border-purple-200">
+                              Tipo {{ estudiante.letraVariante }}
+                            </span>
+                          } @else {
+                            <span class="text-[10px] text-muted-foreground">—</span>
+                          }
+                        </div>
+                        <div class="text-center">
+                          @if (estudiante.cuadernilloPdfPath) {
+                            <button
+                              (click)="descargarExamenEstudiante(estudiante)"
+                              class="px-2 py-1 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                              title="Descargar PDF de examen asignado a este estudiante">
+                              <i class="pi pi-file-pdf"></i>
+                              <span>Descargar</span>
+                            </button>
+                          } @else {
+                            <span class="text-[10px] text-muted-foreground italic">—</span>
+                          }
+                        </div>
                         @if (estudiante.estadoCalificacion === 'ANULADO' || (estudiante.observacion && estudiante.observacion.includes('ANULADO'))) {
                           <span class="inline-flex items-center gap-1 font-mono font-black text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
                             <i class="pi pi-ban text-[9px]"></i> ANULADO (0 / 0)
                           </span>
                         } @else {
-                          <span class="text-[10px] text-muted-foreground">{{ estudiante.observacion || '—' }}</span>
+                          <span class="text-[10px] text-muted-foreground truncate">{{ estudiante.observacion || '—' }}</span>
                         }
                       </div>
                     }
@@ -3698,6 +3730,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public cargandoCartillas = signal<boolean>(false);
   public generandoCartillas = signal<boolean>(false);
   public generandoListaCartillas = signal<boolean>(false);
+  public sincronizandoNomina = signal<boolean>(false);
 
   // Confirmación explícita antes de llevar un examen sin cartilla a Impreso.
   public dialogImpresionSinCartilla = signal<boolean>(false);
@@ -4685,6 +4718,52 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       },
       error: () => this._mostrarToast('No se pudo confirmar la impresión de la lista.', 'error')
     });
+  }
+
+  public sincronizarNominaOficial(): void {
+    const item = this.evaluacionSeleccionadaCartillas();
+    if (!item || this.sincronizandoNomina()) return;
+
+    this.sincronizandoNomina.set(true);
+    this._cartillasOmr.sincronizarNomina(item.id).subscribe({
+      next: resp => {
+        this.sincronizandoNomina.set(false);
+        this.loteCartillasActual.set(resp.preparacion);
+        if (resp.nuevosEstudiantes > 0) {
+          this._mostrarToast(
+            `Nómina sincronizada: ${resp.nuevosEstudiantes} nuevo(s) estudiante(s) incorporado(s) por toma de grupos tardía.`,
+            'info'
+          );
+        } else {
+          this._mostrarToast('La nómina ya se encuentra sincronizada con el Gateway institucional.', 'info');
+        }
+      },
+      error: err => {
+        this.sincronizandoNomina.set(false);
+        const mensaje = err?.error?.message || err?.message || 'No se pudo sincronizar la nómina.';
+        this._mostrarToast(mensaje, 'error');
+      }
+    });
+  }
+
+  public descargarExamenEstudiante(estudiante: CartillaOmr): void {
+    if (estudiante.cuadernilloPdfPath) {
+      window.open(this._urlArchivo(estudiante.cuadernilloPdfPath), '_blank');
+      return;
+    }
+    const item = this.evaluacionSeleccionadaCartillas();
+    if (item) {
+      this._generacionTypst.consultarDocumentoExamen(item.id).subscribe({
+        next: doc => {
+          if (doc?.archivoPdfPath) {
+            window.open(this._urlArchivo(doc.archivoPdfPath), '_blank');
+          } else {
+            this._mostrarToast('No se encontró el archivo PDF del examen.', 'error');
+          }
+        },
+        error: () => this._mostrarToast('No hay examen PDF disponible para este estudiante.', 'error')
+      });
+    }
   }
 
   public abrirConfiguracionGeneracion(item: EvaluacionItemUI): void {

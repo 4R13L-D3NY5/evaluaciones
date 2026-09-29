@@ -4,10 +4,12 @@ import com.xpertiflow.evaluaciones.api.dto.CartillaOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.DatosCartillaOmrDto;
 import com.xpertiflow.evaluaciones.api.dto.LoteCartillasOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.PreparacionCartillasOmrResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.SincronizacionNominaResponseDto;
 import com.xpertiflow.evaluaciones.config.AppProperties;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.CartillaOmr;
+import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
 import com.xpertiflow.evaluaciones.domain.entity.LoteCartillasOmr;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
@@ -15,6 +17,7 @@ import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.CalificacionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.CartillaOmrRepository;
+import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.LoteCartillasOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
@@ -35,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -57,6 +61,7 @@ public class CartillaOmrService {
 
     private final RolExamenRepository rolExamenRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
+    private final ExamenVarianteRepository varianteRepository;
     private final LoteCartillasOmrRepository loteRepository;
     private final CartillaOmrRepository cartillaRepository;
     private final CalificacionOmrRepository calificacionOmrRepository;
@@ -81,14 +86,31 @@ public class CartillaOmrService {
                 .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, ACCION_IMPRESION_MARCAS);
         Optional<AuditoriaEvaluacion> impresionLista = auditoriaRepository
                 .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, ACCION_IMPRESION_LISTA);
+
+        Map<String, MapeoEstudianteVariante> mapeosPorCodigo = mapeoRepository.findByRolExamenId(rolExamenId).stream()
+                .collect(Collectors.toMap(
+                        m -> m.getCodigoEstudiante().trim(),
+                        m -> m,
+                        (existente, reemplazo) -> existente
+                ));
+
+        Map<String, String> pdfPorVariante = varianteRepository.findByRolExamenId(rolExamenId).stream()
+                .filter(v -> v.getArchivoPdfPath() != null && !v.getArchivoPdfPath().isBlank())
+                .collect(Collectors.toMap(
+                        ExamenVariante::getLetraVariante,
+                        ExamenVariante::getArchivoPdfPath,
+                        (existente, reemplazo) -> existente
+                ));
+
         Map<String, CalificacionOmr> califsPorEstudiante = calificacionOmrRepository
                 .findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId)
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         c -> c.getCodigoEstudiante().trim(),
                         c -> c,
                         (existente, reemplazo) -> reemplazo
                 ));
+
         List<DatosCartillaOmrDto> datos = java.util.stream.IntStream.range(0, estudiantes.size())
                 .mapToObj(indice -> {
                     DatosEstudiante estudiante = estudiantes.get(indice);
@@ -100,9 +122,19 @@ public class CartillaOmrService {
                     if (calif != null && "ANULADO".equalsIgnoreCase(calif.getEstadoCalificacion())) {
                         obs = "ANULADO · 0/60";
                     }
+
+                    MapeoEstudianteVariante mapeo = mapeosPorCodigo.get(estudiante.codigo().trim());
+                    String letraVariante = mapeo != null ? mapeo.getLetraVariante() : null;
+                    String cuadernilloPdf = mapeo != null ? mapeo.getCuadernilloIndividualPdf() : null;
+                    if ((cuadernilloPdf == null || cuadernilloPdf.isBlank()) && letraVariante != null) {
+                        cuadernilloPdf = pdfPorVariante.get(letraVariante);
+                    }
+
                     return new DatosCartillaOmrDto(indice + 1, rol.getMateriaCodigo(), rol.getGrupo(),
-                            estudiante.codigo(), estudiante.nombreCompleto(), estadoCalif, obs, n60, n100);
+                            estudiante.codigo(), estudiante.nombreCompleto(), estadoCalif, obs, n60, n100,
+                            letraVariante, cuadernilloPdf);
                 }).toList();
+
         return new PreparacionCartillasOmrResponseDto(
                 rol.getId(), rol.getCarreraNombre(), rol.getMateriaCodigo(), rol.getGrupo(),
                 estudiantes.size(), impresion.isPresent() ? "IMPRESO" : "PENDIENTE",
@@ -111,6 +143,120 @@ public class CartillaOmrService {
                 impresionLista.isPresent() ? "IMPRESO" : "PENDIENTE",
                 impresionLista.map(AuditoriaEvaluacion::getFechaEvento).orElse(null),
                 impresionLista.map(AuditoriaEvaluacion::getUsuario).orElse(null));
+    }
+
+    @Transactional
+    public SincronizacionNominaResponseDto sincronizarNomina(String rolExamenId, String usuario) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+
+        String groupIdOficial = resolverGrupoOficialParaMarcas(rol);
+        if (groupIdOficial == null || groupIdOficial.isBlank()) {
+            throw new IllegalStateException("El rol de examen no tiene un grupo oficial para sincronizar la nómina.");
+        }
+
+        List<StudentItemDto> estudiantesGateway;
+        try {
+            estudiantesGateway = unitepcGatewayClient.getStudentsByGroup(groupIdOficial);
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("No se pudo consultar la nómina oficial del grupo desde UNITEPC Gateway.", exception);
+        }
+        if (estudiantesGateway == null) {
+            estudiantesGateway = List.of();
+        }
+
+        List<MapeoEstudianteVariante> mapeosActuales = mapeoRepository.findByRolExamenId(rolExamenId);
+        List<String> codigosNuevos = new java.util.ArrayList<>();
+
+        if (!mapeosActuales.isEmpty()) {
+            Set<String> codigosExistentes = mapeosActuales.stream()
+                    .map(m -> m.getCodigoEstudiante().trim())
+                    .collect(Collectors.toSet());
+
+            List<StudentItemDto> estudiantesNuevos = estudiantesGateway.stream()
+                    .filter(e -> e.getStudentCode() != null && !e.getStudentCode().isBlank())
+                    .filter(e -> !codigosExistentes.contains(e.getStudentCode().trim()))
+                    .sorted(Comparator.comparing(StudentItemDto::getStudentCode, OrdenEstudiantes.comparadorCodigo()))
+                    .toList();
+
+            if (!estudiantesNuevos.isEmpty()) {
+                List<ExamenVariante> variantes = varianteRepository.findByRolExamenId(rolExamenId).stream()
+                        .sorted(Comparator.comparing(ExamenVariante::getLetraVariante))
+                        .toList();
+
+                Map<String, Long> conteoPorLetra = mapeosActuales.stream()
+                        .filter(m -> m.getLetraVariante() != null)
+                        .collect(Collectors.groupingBy(MapeoEstudianteVariante::getLetraVariante, Collectors.counting()));
+
+                for (StudentItemDto estudianteNuevo : estudiantesNuevos) {
+                    String codigo = estudianteNuevo.getStudentCode().trim();
+                    String nombre = estudianteNuevo.getFullName() != null ? estudianteNuevo.getFullName().trim() : codigo;
+                    codigosNuevos.add(codigo);
+
+                    ExamenVariante varianteAsignada = null;
+                    if (!variantes.isEmpty()) {
+                        varianteAsignada = variantes.stream()
+                                .min(Comparator.comparingLong((ExamenVariante v) -> conteoPorLetra.getOrDefault(v.getLetraVariante(), 0L))
+                                        .thenComparing(ExamenVariante::getLetraVariante))
+                                .orElse(variantes.get(0));
+                    }
+
+                    String letra = varianteAsignada != null ? varianteAsignada.getLetraVariante() : "A";
+                    String varianteId = varianteAsignada != null ? varianteAsignada.getId() : String.format("VAR-%s-%s", rolExamenId, letra);
+                    String pdfPath = varianteAsignada != null ? varianteAsignada.getArchivoPdfPath() : null;
+
+                    MapeoEstudianteVariante nuevoMapeo = new MapeoEstudianteVariante();
+                    nuevoMapeo.setRolExamenId(rolExamenId);
+                    nuevoMapeo.setVarianteId(varianteId);
+                    nuevoMapeo.setCodigoEstudiante(codigo);
+                    nuevoMapeo.setNombres(nombre);
+                    nuevoMapeo.setApellidoPaterno("");
+                    nuevoMapeo.setApellidoMaterno("");
+                    nuevoMapeo.setLetraVariante(letra);
+                    nuevoMapeo.setHashControlSeguridad("CTL-" + codigo + "-" + letra);
+                    nuevoMapeo.setCuadernilloIndividualPdf(pdfPath);
+                    nuevoMapeo.setEstadoAsistencia("PRESENTE");
+                    mapeoRepository.save(nuevoMapeo);
+
+                    conteoPorLetra.put(letra, conteoPorLetra.getOrDefault(letra, 0L) + 1);
+                }
+
+                int totalFinal = mapeosActuales.size() + estudiantesNuevos.size();
+                rol.setEstudiantesInscritosCount(totalFinal);
+                rolExamenRepository.save(rol);
+
+                String listaCodigosJson = "[" + String.join(",", codigosNuevos.stream().map(c -> "\"" + c + "\"").toList()) + "]";
+                registrarAuditoriaDetalles(rol, "SINCRONIZACION_NOMINA_TOMA_GRUPOS", usuario,
+                        "{\"totalPrevio\":" + mapeosActuales.size() + ",\"totalNuevo\":" + totalFinal + ",\"nuevosEstudiantes\":" + listaCodigosJson + "}");
+            }
+        } else {
+            int totalPrevio = rol.getEstudiantesInscritosCount();
+            int totalNuevo = estudiantesGateway.size();
+            if (totalPrevio != totalNuevo) {
+                rol.setEstudiantesInscritosCount(totalNuevo);
+                rolExamenRepository.save(rol);
+                registrarAuditoriaDetalles(rol, "SINCRONIZACION_NOMINA_TOMA_GRUPOS", usuario,
+                        "{\"totalPrevio\":" + totalPrevio + ",\"totalNuevo\":" + totalNuevo + "}");
+            }
+        }
+
+        PreparacionCartillasOmrResponseDto preparacion = obtenerPreparacion(rolExamenId);
+        String mensaje;
+        if (codigosNuevos.isEmpty()) {
+            mensaje = "La nómina oficial ya se encuentra sincronizada con el Gateway institucional.";
+        } else {
+            mensaje = String.format("Se sincronizaron %d nuevo(s) estudiante(s) inscrito(s) por toma de grupos tardía: %s",
+                    codigosNuevos.size(), String.join(", ", codigosNuevos));
+        }
+
+        return new SincronizacionNominaResponseDto(
+                rolExamenId,
+                preparacion.totalCartillas(),
+                codigosNuevos.size(),
+                codigosNuevos,
+                mensaje,
+                preparacion
+        );
     }
 
     @Transactional
@@ -351,9 +497,22 @@ public class CartillaOmrService {
                 .build());
     }
 
+    private void registrarAuditoriaDetalles(RolExamen rol, String accion, String usuario, String detallesJson) {
+        auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                .rolExamen(rol)
+                .etapaOrigen(rol.getEstadoFlujo().getValor())
+                .etapaDestino(rol.getEstadoFlujo().getValor())
+                .accion(accion)
+                .usuario(usuarioValido(usuario))
+                .ipOrigen("127.0.0.1")
+                .detallesJson(detallesJson)
+                .build());
+    }
+
     private String nombreCompleto(MapeoEstudianteVariante mapeo) {
-        return String.join(" ", List.of(mapeo.getNombres(), mapeo.getApellidoPaterno(), mapeo.getApellidoMaterno()).stream()
-                .filter(valor -> valor != null && !valor.isBlank()).toList());
+        return java.util.stream.Stream.of(mapeo.getNombres(), mapeo.getApellidoPaterno(), mapeo.getApellidoMaterno())
+                .filter(valor -> valor != null && !valor.isBlank())
+                .collect(Collectors.joining(" "));
     }
 
     private String usuarioValido(String usuario) {

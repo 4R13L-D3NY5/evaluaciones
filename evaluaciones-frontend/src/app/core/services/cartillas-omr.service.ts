@@ -12,6 +12,17 @@ export interface CartillaOmr {
   observacion?: string;
   notaSobre60?: number;
   notaSobre100?: number;
+  letraVariante?: string;
+  cuadernilloPdfPath?: string;
+}
+
+export interface SincronizacionNominaResponse {
+  rolExamenId: string;
+  totalEstudiantes: number;
+  nuevosEstudiantes: number;
+  codigosNuevos: string[];
+  mensaje: string;
+  preparacion: PreparacionCartillasOmr;
 }
 
 export interface PreparacionCartillasOmr {
@@ -47,6 +58,13 @@ export class CartillasOmrService {
 
   public obtenerPreparacion(rolExamenId: string): Observable<PreparacionCartillasOmr> {
     return this._http.get<PreparacionCartillasOmr>(`/api/roles-examen/${rolExamenId}/cartillas/preparacion`);
+  }
+
+  public sincronizarNomina(rolExamenId: string): Observable<SincronizacionNominaResponse> {
+    return this._http.post<SincronizacionNominaResponse>(
+      `/api/roles-examen/${rolExamenId}/cartillas/sincronizar-nomina`,
+      {}
+    );
   }
 
   public imprimir(rolExamenId: string): Observable<Blob> {

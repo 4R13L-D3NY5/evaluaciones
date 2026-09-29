@@ -75,9 +75,31 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
-*(Sin tareas activas)*
+#### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
+
+- Prioridad: Media
+- Área: Auditoría y Bitácora
+- Responsable: Por definir
+- Creada: 2026-09-12
+- Fecha límite: Por definir
+- Dependencias: Revisar el estado actual del registro, consulta, filtros, detalle de eventos y permisos del módulo.
+- Criterio de cierre: Completar la implementación funcional y visual del módulo, validar que las acciones relevantes queden registradas y que la consulta respete los permisos establecidos.
+- Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz Implementacion integral de Auditoria y Bitacora: endpoint unificado backend, KPIs reales, filtros y exportacion Excel Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Auditoria integral, extension de eventos y control de acceso por roles
+
+
 
 ### En revisión
+
+#### T-044 — Sincronización de nómina oficial por toma de grupos tardía y generación de exámenes a rezagados
+
+- Prioridad: Alta
+- Área: Cartillas OMR / Evaluaciones del Día / Gateway SEA
+- Responsable: Antigravity
+- Creada: 2026-09-29
+- Fecha límite: 2026-09-30
+- Dependencias: `CartillaOmrService.java`, `CartillaOmrController.java`, `cartillas-omr.service.ts`, `evaluaciones-dia.component.ts`.
+- Criterio de cierre: 1) Permitir refrescar y sincronizar la nómina oficial en el modal de marcas OMR / lista de estudiantes consultando el Gateway de UNITEPC; 2) Asignar variantes rotativas (round-robin) e incorporar en MapeoEstudianteVariante a los estudiantes incorporados por toma de grupos tardía sin invalidar ni alterar los exámenes ya impresos de los estudiantes previos; 3) Habilitar la descarga y visualización del examen PDF correspondiente para cada estudiante (incluyendo rezagados); 4) Actualizar las cartillas OMR y listas de firmas con la nómina sincronizada.
+- Notas: Implementación completada con tests unitarios automatizados (CartillaOmrServiceTest) y botón de sincronización reactivo en frontend con visualización de variante y descarga de examen individual. Implementada sincronizacion de nomina oficial por toma de grupos tardia, asignacion balanceada de variantes round-robin para rezagados y descarga de examen individual en marcas OMR
 
 #### T-041 — Evaluación a subconjuntos de estudiantes y registro directo justificado de calificaciones
 
@@ -232,17 +254,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Dependencias: Ninguna.
 - Criterio de cierre: Bloquear completamente el botón de eliminar banco y la zona de arrastre/carga en el frontend cuando el rol de examen ha avanzado más allá de PROGRAMADO o VALIDADO, e inactivar alertas de observación previa desfasadas.
 - Notas: En progreso técnico para blindar la inmutabilidad operativa y criptográfica del banco. Implementado bloqueo estricto de eliminacion y recarga en banco-preguntas.component.ts para roles que superaron VALIDADO.
-
-#### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
-
-- Prioridad: Media
-- Área: Auditoría y Bitácora
-- Responsable: Por definir
-- Creada: 2026-09-12
-- Fecha límite: Por definir
-- Dependencias: Revisar el estado actual del registro, consulta, filtros, detalle de eventos y permisos del módulo.
-- Criterio de cierre: Completar la implementación funcional y visual del módulo, validar que las acciones relevantes queden registradas y que la consulta respete los permisos establecidos.
-- Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz Implementacion integral de Auditoria y Bitacora: endpoint unificado backend, KPIs reales, filtros y exportacion Excel Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX
 
 #### T-030 — Optimización de rendimiento en Notificaciones: Endpoint ligero en backend, exclusión de administrador y sondeo eficiente
 
@@ -518,7 +529,7 @@ _Sin tareas._
 | Indicador | Total |
 |---|---:|
 | Pendientes | 4 |
-| En progreso | 0 |
+| En progreso | 1 |
 | En revisión | 35 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
