@@ -3589,7 +3589,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     () => this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA'
   );
   public readonly esEvaluacionesPorCampus = computed(
-    () => false
+    () => this.esPersonalEvaluaciones()
   );
   public readonly puedeListarTodasLasCarreras = computed(
     () => this.esPersonalEvaluaciones()

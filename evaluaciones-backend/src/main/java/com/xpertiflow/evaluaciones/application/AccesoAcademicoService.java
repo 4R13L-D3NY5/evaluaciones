@@ -311,17 +311,19 @@ public class AccesoAcademicoService {
                             && coincideCampus(item, rol.getCampus()));
         }
         if ("PERSONAL_EVALUACIONES".equals(rolUsuario)) {
-            boolean sedeValida = false;
+            boolean sedeOCampusValido;
             if (!usuario.getCampuses().isEmpty()) {
-                sedeValida = usuario.getCampuses().stream().anyMatch(item ->
+                sedeOCampusValido = usuario.getCampuses().stream().anyMatch(item ->
                         item.isHabilitado()
-                                && coincide(item.getSedeCodigo(), rol.getSedeCodigo()));
-            }
-            if (!sedeValida && !usuario.getSedes().isEmpty()) {
-                sedeValida = usuario.getSedes().stream()
+                                && coincide(item.getSedeCodigo(), rol.getSedeCodigo())
+                                && coincideCampus(item, rol.getCampus()));
+            } else if (!usuario.getSedes().isEmpty()) {
+                sedeOCampusValido = usuario.getSedes().stream()
                         .anyMatch(item -> coincide(item.getCodigo(), rol.getSedeCodigo()));
+            } else {
+                return false;
             }
-            if (!sedeValida) return false;
+            if (!sedeOCampusValido) return false;
 
             if (!usuario.getCarreras().isEmpty()) {
                 return usuario.getCarreras().stream()
@@ -382,17 +384,18 @@ public class AccesoAcademicoService {
                     .collect(Collectors.toSet());
         }
         if ("PERSONAL_EVALUACIONES".equals(usuario.getRolCodigo())) {
-            Set<String> sedes = new LinkedHashSet<>();
-            usuario.getSedes().stream()
+            Set<String> sedes = usuario.getSedes().stream()
                     .map(item -> normalizar(item.getCodigo()))
                     .filter(codigo -> !codigo.isBlank())
-                    .forEach(sedes::add);
-            usuario.getCampuses().stream()
-                    .filter(AlcanceCampus::isHabilitado)
-                    .map(item -> normalizar(item.getSedeCodigo()))
-                    .filter(codigo -> !codigo.isBlank())
-                    .forEach(sedes::add);
-            return sedes.isEmpty() ? null : sedes;
+                    .collect(Collectors.toSet());
+            if (sedes.isEmpty() && !usuario.getCampuses().isEmpty()) {
+                sedes = usuario.getCampuses().stream()
+                        .filter(AlcanceCampus::isHabilitado)
+                        .map(item -> normalizar(item.getSedeCodigo()))
+                        .filter(codigo -> !codigo.isBlank())
+                        .collect(Collectors.toSet());
+            }
+            return sedes;
         }
         if (usuario.getSedes().isEmpty()) {
             return Set.of("DIRECTOR_CARRERA", "VICERRECTOR", "VERIFICADOR").contains(usuario.getRolCodigo())

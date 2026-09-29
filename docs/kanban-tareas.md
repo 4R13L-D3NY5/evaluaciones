@@ -1,4 +1,4 @@
-﻿# Kanban de tareas del proyecto
+# Kanban de tareas del proyecto
 
 Tablero documental para dar seguimiento a las tareas pendientes de `evaluaciones`. Este archivo es la fuente de verdad del seguimiento operativo y puede actualizarse desde cualquier conversación que esté trabajando sobre este proyecto y esta rama.
 
@@ -28,6 +28,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 ## Tablero
 
 ### Pendiente
+
+#### T-044 — Generación extemporánea para nuevos estudiantes agregados y refresco en vivo de nómina
+
+- Prioridad: Alta
+- Área: Evaluaciones / Generación de Exámenes / Nómina SEA
+- Responsable: Por definir
+- Creada: 2026-09-29
+- Fecha límite: Por definir
+- Dependencias: Por definir
+- Criterio de cierre: 1) Permitir generar examen extemporáneo complementario para nuevos estudiantes incorporados a un grupo después de que el examen ya fue generado o impreso, sin anular ni regenerar las variantes/cartillas de los estudiantes previamente generados; 2) Incluir botón/opción para refrescar en vivo la nómina de estudiantes desde SEA al momento de previsualizar/generar el examen o lote, detectando altas o bajas recientes; 3) Integrar y consolidar la calificación (OMR, virtual o sin cartilla) de todos los estudiantes (iniciales + extemporáneos) en una única acta/planilla oficial consolidada del grupo para entrega y cierre.
+- Notas: Registrada a solicitud del usuario (`=new`). Atiende casos donde se agregan estudiantes al grupo después de la generación del lote de exámenes, permitiendo emitir variantes solo para ellos y calificar en conjunto la nómina completa consolidada.
 
 #### T-036 — Flujo de rectificación y actualización administrativa de calificaciones sin cartilla
 
@@ -101,6 +112,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Criterio de cierre: 1) Permitir refrescar y sincronizar la nómina oficial en el modal de marcas OMR / lista de estudiantes consultando el Gateway de UNITEPC; 2) Asignar variantes rotativas (round-robin) e incorporar en MapeoEstudianteVariante a los estudiantes incorporados por toma de grupos tardía sin invalidar ni alterar los exámenes ya impresos de los estudiantes previos; 3) Habilitar la descarga y visualización del examen PDF correspondiente para cada estudiante (incluyendo rezagados); 4) Actualizar las cartillas OMR y listas de firmas con la nómina sincronizada.
 - Notas: Implementación completada con tests unitarios automatizados (CartillaOmrServiceTest) y botón de sincronización reactivo en frontend con visualización de variante y descarga de examen individual. Implementada sincronizacion de nomina oficial por toma de grupos tardia, asignacion balanceada de variantes round-robin para rezagados y descarga de examen individual en marcas OMR
 
+#### T-042 — Eliminar dependencia de ubicación de aula/campus para el Personal de Evaluaciones
+
+- Prioridad: Alta
+- Área: Seguridad / Alcance Académico / Personal Evaluaciones
+- Responsable: Por definir
+- Creada: 2026-09-26
+- Fecha límite: Por definir
+- Dependencias: Por definir
+- Criterio de cierre: 1) Desacoplar la visualización y permisos de exámenes para el Personal de Evaluaciones del valor específico del campus/aula del examen, asegurando que el alcance se determine a nivel de Sede (y carreras si aplica); 2) Evitar que asignaturas con aulas especiales (ej. Gabinete de Fisioterapia, laboratorios, clínicas u hospitales) queden ocultas al personal de la sede; 3) Ajustar tanto el backend (AccesoAcademicoService) como el frontend (Evaluaciones del Día) para que la selección o filtrado por campus no excluya exámenes de la sede.
+- Notas: Registrada a solicitud del usuario (`=new`). Resuelve la invisibilidad de exámenes en El Alto para Personal de Evaluaciones debido a aulas no vinculadas al campus específico. Desacoplando campus/aula fisica para Personal de Evaluaciones Desacoplado filtro de aula/campus fisico en backend (AccesoAcademicoService) y frontend (Evaluaciones del Dia) a nivel de Sede Restaurado filtrado y selector por Campus para Personal de Evaluaciones (Opcion B) para mantener la acotacion correcta de carreras y evaluaciones por campus.
+
 #### T-041 — Evaluación a subconjuntos de estudiantes y registro directo justificado de calificaciones
 
 - Prioridad: Alta
@@ -122,17 +144,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Dependencias: `evaluaciones-dia.component.ts`, `omr-procesamiento.service.ts`, `OmrProcesamientoService.java`, `OmrProcesamientoController.java`.
 - Criterio de cierre: 1) Incorporar apartado y botón destacado en el modal de calificación OMR ('Ver Patrón del Docente y Anulaciones') exclusivo para Administrador del Sistema y Responsable de Evaluaciones; 2) Permitir visualizar en pestañas por variante (A, B, C, D...) el patrón oficial completo del docente; 3) Permitir anular preguntas justificadas con motivo obligatorio y opción de propagación a variantes vinculadas; 4) Permitir corregir incisos de respuesta de las claves oficiales con motivo y propagación; 5) Permitir la recalibración inmediata de las notas de las cartillas leídas del lote en memoria y su persistencia oficial al pasar a Calificado.
 - Notas: En progreso. Implementando apartado en cabecera de calificación OMR para Administrador y Responsable de Evaluaciones que permita visualizar patrones por variante, anular preguntas con motivo, modificar incisos erróneos y recalibrar notas de cartillas. Implementado apartado y boton 'Ver Patron del Docente y Anulaciones' en modal de calificacion OMR para Administrador y Responsable. Modal interactivo por variantes (A, B, C, D...) con claves oficiales, cambio de incisos, anulacion con motivo, reactivacion y recalibracion inmediata en memoria y persistencia. Implementada visualizacion destacada de la variante correspondiente a cada estudiante en cabecera de pagina, ficha de estudiante, barra de preguntas y resumen interactivo por variantes en calificacion OMR.
-
-#### T-042 — Eliminar dependencia de ubicación de aula/campus para el Personal de Evaluaciones
-
-- Prioridad: Alta
-- Área: Seguridad / Alcance Académico / Personal Evaluaciones
-- Responsable: Por definir
-- Creada: 2026-09-26
-- Fecha límite: Por definir
-- Dependencias: Por definir
-- Criterio de cierre: 1) Desacoplar la visualización y permisos de exámenes para el Personal de Evaluaciones del valor específico del campus/aula del examen, asegurando que el alcance se determine a nivel de Sede (y carreras si aplica); 2) Evitar que asignaturas con aulas especiales (ej. Gabinete de Fisioterapia, laboratorios, clínicas u hospitales) queden ocultas al personal de la sede; 3) Ajustar tanto el backend (AccesoAcademicoService) como el frontend (Evaluaciones del Día) para que la selección o filtrado por campus no excluya exámenes de la sede.
-- Notas: Registrada a solicitud del usuario (`=new`). Resuelve la invisibilidad de exámenes en El Alto para Personal de Evaluaciones debido a aulas no vinculadas al campus específico. Desacoplando campus/aula fisica para Personal de Evaluaciones Desacoplado filtro de aula/campus fisico en backend (AccesoAcademicoService) y frontend (Evaluaciones del Dia) a nivel de Sede
 
 #### T-040 — Optimizaciones y panel de monitoreo en vivo para exámenes y salas virtuales
 
@@ -530,7 +541,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 4 |
 | En progreso | 1 |
-| En revisión | 35 |
+| En revisión | 36 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 
