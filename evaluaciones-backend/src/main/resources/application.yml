@@ -59,6 +59,7 @@ app:
     client-id: ${UNITEPC_CLIENT_ID}
     client-secret: ${UNITEPC_CLIENT_SECRET}
     system-client-id: ${UNITEPC_SYSTEM_CLIENT_ID:sea-evaluaciones}
+    mock-evaluations-enabled: ${UNITEPC_MOCK_EVALUATIONS_ENABLED:true}
   integracion:
     api-key: ${INTEGRACION_API_KEY:sea-dev-secret-api-key-2026}
   backups:

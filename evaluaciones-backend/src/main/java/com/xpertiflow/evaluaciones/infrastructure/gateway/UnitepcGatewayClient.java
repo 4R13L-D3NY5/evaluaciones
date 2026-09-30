@@ -28,6 +28,12 @@ public class UnitepcGatewayClient {
     @Value("${app.unitepc.system-client-id:sea-evaluaciones}")
     private String systemClientId;
 
+    @Value("${app.unitepc.mock-evaluations-enabled:true}")
+    private boolean mockEvaluationsEnabled;
+
+    @Value("${server.port:8080}")
+    private int serverPort;
+
     private String accessToken;
     private Instant tokenExpiration;
 
@@ -196,9 +202,23 @@ public class UnitepcGatewayClient {
     }
 
     public List<ResearchStudentEvaluationRegisterResponseDto> registerStudentEvaluations(ResearchStudentEvaluationRegisterInputDto input) {
-        log.info("Enviando calificaciones al Gateway SEA: groupId={}, syllabusCourseId={}, totalEstudiantes={}",
-                input.getGroupId(), input.getSyllabusCourseId(), input.getStudents() != null ? input.getStudents().size() : 0);
+        log.info("Enviando calificaciones al Gateway SEA (modo mock={}): groupId={}, syllabusCourseId={}, totalEstudiantes={}",
+                mockEvaluationsEnabled, input.getGroupId(), input.getSyllabusCourseId(), input.getStudents() != null ? input.getStudents().size() : 0);
         try {
+            if (mockEvaluationsEnabled) {
+                RestClient localClient = RestClient.builder().baseUrl("http://127.0.0.1:" + serverPort).build();
+                return localClient.post()
+                        .uri("/api/mock-gateway/api/v1/university/externals/research/student-evaluations")
+                        .headers(h -> {
+                            h.setBearerAuth(getToken());
+                            h.set("clientId", systemClientId);
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(input)
+                        .retrieve()
+                        .body(new ParameterizedTypeReference<List<ResearchStudentEvaluationRegisterResponseDto>>() {});
+            }
+
             return restClient.post()
                     .uri("/api/v1/university/externals/research/student-evaluations")
                     .headers(h -> {
