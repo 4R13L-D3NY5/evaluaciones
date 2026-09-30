@@ -35,8 +35,9 @@ public class AuditoriaEvaluacion {
     @Column(name = "usuario", length = 100, nullable = false)
     private String usuario;
 
-    @Column(name = "ip_origen", length = 45)
-    private String ipOrigen;
+    @Builder.Default
+    @Column(name = "ip_origen", length = 45, nullable = false)
+    private String ipOrigen = "127.0.0.1";
 
     @Column(name = "detalles_json")
     private String detallesJson;

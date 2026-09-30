@@ -89,8 +89,14 @@ public class SincronizacionNotasSeaService {
      */
     @Transactional
     public SincronizacionNotasSeaReporteDto sincronizarNotasConSea(String rolExamenId, Authentication auth) {
+        return sincronizarNotasConSea(rolExamenId, auth, "127.0.0.1");
+    }
+
+    @Transactional
+    public SincronizacionNotasSeaReporteDto sincronizarNotasConSea(String rolExamenId, Authentication auth, String ipOrigen) {
         RolExamen rol = obtenerRolValidado(rolExamenId);
         String usuario = validarPermisos(auth);
+        String ipValida = (ipOrigen != null && !ipOrigen.isBlank()) ? ipOrigen : "127.0.0.1";
 
         // 1. Validar estado del examen: debe tener notas cerradas o listas para volcado
         if (rol.getEstadoFlujo() != EstadoFlujo.CALIFICADO && rol.getEstadoFlujo() != EstadoFlujo.CONFIRMADO) {
@@ -235,6 +241,7 @@ public class SincronizacionNotasSeaService {
                     .etapaDestino(rol.getEstadoFlujo().getValor())
                     .accion("SINCRONIZACION_NOTAS_SEA")
                     .usuario(usuario)
+                    .ipOrigen(ipValida)
                     .detallesJson(objectMapper.writeValueAsString(auditoriaData))
                     .build());
         } catch (Exception e) {

@@ -36,8 +36,10 @@ public class SincronizacionSeaController {
     @Operation(summary = "Transmitir y registrar las calificaciones teóricas de los estudiantes en la base de datos del SEA")
     public ResponseEntity<SincronizacionNotasSeaReporteDto> sincronizarNotasConSea(
             @PathVariable @Parameter(description = "Identificador del rol de examen") String rolExamenId,
-            Authentication authentication) {
+            Authentication authentication,
+            jakarta.servlet.http.HttpServletRequest request) {
 
-        return ResponseEntity.ok(sincronizacionService.sincronizarNotasConSea(rolExamenId, authentication));
+        String ipOrigen = request != null ? request.getRemoteAddr() : "127.0.0.1";
+        return ResponseEntity.ok(sincronizacionService.sincronizarNotasConSea(rolExamenId, authentication, ipOrigen));
     }
 }
