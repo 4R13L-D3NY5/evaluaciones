@@ -34,6 +34,7 @@ public class SincronizacionNotasSeaService {
     private final IntentoExamenVirtualRepository intentoVirtualRepository;
     private final SalaExamenVirtualRepository salaVirtualRepository;
     private final AuditoriaEvaluacionRepository auditoriaRepository;
+    private final com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository mapeoRepository;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final ObjectMapper objectMapper;
 
@@ -324,6 +325,33 @@ public class SincronizacionNotasSeaService {
                         false,
                         "Pendiente de evaluación / Ausente"
                 ));
+            }
+        }
+
+        // Agregar también estudiantes del mapeo local de variantes (rezagados y nómina asignada)
+        if (mapeoRepository != null) {
+            List<com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante> mapeosLocales =
+                    mapeoRepository.findByRolExamenId(rol.getId());
+            if (mapeosLocales != null) {
+                for (com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante m : mapeosLocales) {
+                    String codigo = m.getCodigoEstudiante() != null ? m.getCodigoEstudiante().trim() : "";
+                    if (!codigo.isBlank() && !calculados.containsKey(codigo)) {
+                        Long oldCode = parseStudentOldCode(codigo);
+                        String nom = String.join(" ", List.of(
+                                m.getNombres() != null ? m.getNombres() : "",
+                                m.getApellidoPaterno() != null ? m.getApellidoPaterno() : "",
+                                m.getApellidoMaterno() != null ? m.getApellidoMaterno() : ""
+                        ).stream().filter(s -> !s.isBlank()).toList());
+                        calculados.put(codigo, new EstudianteCalculado(
+                                codigo,
+                                oldCode,
+                                !nom.isBlank() ? nom : "ESTUDIANTE",
+                                null,
+                                false,
+                                "Pendiente de evaluación / Ausente"
+                        ));
+                    }
+                }
             }
         }
 

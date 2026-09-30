@@ -55,6 +55,9 @@ class SincronizacionNotasSeaServiceTest {
     @Mock
     private UnitepcGatewayClient unitepcGatewayClient;
 
+    @Mock
+    private com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository mapeoRepository;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 

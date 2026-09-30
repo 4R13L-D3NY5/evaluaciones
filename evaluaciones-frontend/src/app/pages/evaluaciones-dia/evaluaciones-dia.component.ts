@@ -3209,7 +3209,7 @@ interface CampusDisponible extends Campus {
               @if (!cargandoNotasOmr()) {
                 <div class="mb-3 flex items-center justify-between gap-3 bg-card p-3 rounded-xl border border-border">
                   <div class="text-xs text-muted-foreground flex items-center gap-2">
-                    <span>Calificaciones registradas: <strong class="text-foreground">{{ notasOmr().length }}</strong></span>
+                    <span>Calificaciones registradas: <strong class="text-foreground">{{ totalCalificadosOmr() }} de {{ notasOmr().length }}</strong></span>
                     @if (totalReprogramados() > 0) {
                       <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
                         <i class="pi pi-calendar-clock text-[9px]"></i> {{ totalReprogramados() }} reprogramado(s)
@@ -3225,7 +3225,7 @@ interface CampusDisponible extends Campus {
               }
               @if (!cargandoNotasOmr() && notasOmr().length === 0) {
                 <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">
-                  Todavía no existen calificaciones OMR guardadas para esta evaluación. Puede registrar calificaciones por reprogramación oral usando el botón superior.
+                  Todavía no existen estudiantes en la nómina para esta evaluación.
                 </div>
               }
               @else if (!cargandoNotasOmr()) {
@@ -3234,8 +3234,8 @@ interface CampusDisponible extends Campus {
                     <span>N°</span><span>Estudiante</span><span>Variante</span><span class="text-center">Aciertos</span><span>/60</span><span>/100</span><span>Estado</span><span class="text-right">Acción</span>
                   </div>
                   <div class="divide-y divide-border">
-                    @for (nota of notasOmr(); track nota.id) {
-                      <div class="grid grid-cols-[40px_1fr_75px_75px_65px_65px_95px_130px] gap-2 px-3 py-2.5 items-center text-xs">
+                    @for (nota of notasOmr(); track (nota.id || nota.codigoEstudiante)) {
+                      <div class="grid grid-cols-[40px_1fr_75px_75px_65px_65px_95px_130px] gap-2 px-3 py-2.5 items-center text-xs" [class.bg-slate-50]="!nota.id">
                         <span class="font-mono text-muted-foreground">{{ $index + 1 }}</span>
                         <span>
                           <strong class="block">{{ nota.codigoEstudiante }}</strong>
@@ -3248,18 +3248,28 @@ interface CampusDisponible extends Campus {
                         </span>
                         <span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span>
                         <span class="text-center font-mono font-bold" [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'" [class.text-slate-700]="nota.estadoCalificacion !== 'ANULADO'">
-                          {{ nota.estadoCalificacion === 'ANULADO' ? ('0/' + nota.totalReactivos) : (nota.aciertos + '/' + nota.totalReactivos) }}
+                          {{ !nota.id ? '—' : (nota.estadoCalificacion === 'ANULADO' ? ('0/' + nota.totalReactivos) : (nota.aciertos + '/' + nota.totalReactivos)) }}
                         </span>
-                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre60 }}</strong>
-                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre100 }}</strong>
-                        <span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'" [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'" [class.bg-rose-50]="nota.estadoCalificacion === 'ANULADO'" [class.px-1.5]="nota.estadoCalificacion === 'ANULADO'" [class.py-0.5]="nota.estadoCalificacion === 'ANULADO'" [class.rounded]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion }}</span>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ !nota.id ? '—' : (nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre60) }}</strong>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ !nota.id ? '—' : (nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre100) }}</strong>
+                        <span class="text-[10px] font-black"
+                              [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'"
+                              [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'"
+                              [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'"
+                              [class.text-slate-500]="nota.estadoCalificacion === 'SIN_CALIFICACION'"
+                              [class.bg-slate-100]="nota.estadoCalificacion === 'SIN_CALIFICACION'"
+                              [class.px-1.5]="true"
+                              [class.py-0.5]="true"
+                              [class.rounded]="true">
+                          {{ nota.estadoCalificacion === 'SIN_CALIFICACION' ? 'SIN NOTA / AUSENTE' : nota.estadoCalificacion }}
+                        </span>
                         <div class="flex items-center justify-end gap-1">
                           @if (puedeRegistrarReprogramacion()) {
-                            <button type="button" (click)="abrirModalReprogramar(nota)" class="px-1.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs" [title]="nota.esReprogramado ? 'Editar reprogramación oral' : 'Registrar nota por examen oral reprogramado'">
+                            <button type="button" (click)="abrirModalReprogramar(nota)" class="px-1.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs" [title]="nota.esReprogramado ? 'Editar reprogramación oral' : (nota.id ? 'Registrar nota por examen oral reprogramado' : 'Registrar nota por reprogramación oral')">
                               <i class="pi pi-file-edit mr-0.5"></i>{{ nota.esReprogramado ? 'Editar' : 'Reprog.' }}
                             </button>
                           }
-                          @if (puedeAnularExamenEstudiante()) {
+                          @if (puedeAnularExamenEstudiante() && nota.id) {
                             @if (nota.estadoCalificacion === 'ANULADO') {
                               <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: nota.codigoEstudiante, nombre: nota.estudianteNombreCompleto, anulado: true, calificacionId: nota.id })" class="px-1.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">Restaurar</button>
                             } @else {
@@ -4140,6 +4150,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public reprogramacionComprobante = signal<string>('');
   public reprogramacionObservaciones = signal<string>('');
   public totalReprogramados = computed(() => this.notasOmr().filter(n => n.esReprogramado).length);
+  public totalCalificadosOmr = computed(() => this.notasOmr().filter(n => n.id !== null && n.estadoCalificacion !== 'SIN_CALIFICACION').length);
 
   // Carga manual de notas para exámenes sin cartilla.
   public dialogNotasDocente = signal<boolean>(false);

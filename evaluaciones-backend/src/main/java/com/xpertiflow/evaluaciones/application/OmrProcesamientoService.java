@@ -54,6 +54,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Function;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronResponseDto;
@@ -174,9 +177,57 @@ public class OmrProcesamientoService {
 
     @Transactional(readOnly = true)
     public List<CalificacionOmrResponseDto> listarCalificaciones(String rolExamenId) {
-        return calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId).stream()
-                .map(this::mapearCalificacion)
+        List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);
+        List<CalificacionOmr> calificaciones = calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId);
+
+        Map<String, CalificacionOmr> calificacionesMap = calificaciones.stream()
+                .filter(c -> c.getCodigoEstudiante() != null)
+                .collect(Collectors.toMap(c -> c.getCodigoEstudiante().trim(), Function.identity(), (c1, c2) -> c1));
+
+        if (mapeos == null || mapeos.isEmpty()) {
+            return calificaciones.stream().map(this::mapearCalificacion).toList();
+        }
+
+        List<CalificacionOmrResponseDto> resultado = new ArrayList<>();
+        Set<String> codigosProcesados = new HashSet<>();
+
+        List<MapeoEstudianteVariante> ordenados = mapeos.stream()
+                .sorted(Comparator.comparing((MapeoEstudianteVariante m) -> nombreCompleto(m).toLowerCase(Locale.ROOT)))
                 .toList();
+
+        for (MapeoEstudianteVariante m : ordenados) {
+            String codigo = m.getCodigoEstudiante() != null ? m.getCodigoEstudiante().trim() : "";
+            codigosProcesados.add(codigo);
+            CalificacionOmr cal = calificacionesMap.get(codigo);
+            if (cal != null) {
+                resultado.add(mapearCalificacion(cal));
+            } else {
+                CalificacionOmrResponseDto dto = new CalificacionOmrResponseDto();
+                dto.setId(null);
+                dto.setRolExamenId(rolExamenId);
+                dto.setCodigoEstudiante(codigo);
+                dto.setEstudianteNombreCompleto(nombreCompleto(m));
+                dto.setLetraVariante(m.getLetraVariante());
+                dto.setTotalReactivos(30);
+                dto.setAciertos(null);
+                dto.setFallos(null);
+                dto.setBlancos(null);
+                dto.setDoblesMarcas(null);
+                dto.setNotaSobre60(null);
+                dto.setNotaSobre100(null);
+                dto.setEstadoCalificacion("SIN_CALIFICACION");
+                dto.setEsReprogramado(false);
+                resultado.add(dto);
+            }
+        }
+
+        for (CalificacionOmr cal : calificaciones) {
+            if (!codigosProcesados.contains(cal.getCodigoEstudiante().trim())) {
+                resultado.add(mapearCalificacion(cal));
+            }
+        }
+
+        return resultado;
     }
 
     @Transactional(readOnly = true)
