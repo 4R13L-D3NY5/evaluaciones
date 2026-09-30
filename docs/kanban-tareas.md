@@ -75,16 +75,16 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
-#### T-046 — Módulo de Sincronización Masiva de Calificaciones al SEA por Sede y Carrera con Filtro Teórico/Práctico
+#### T-047 — Optimizaciones en Verificación de Exámenes: Botón persistente de previsualización en cabecera para todos los estados y 4to filtro de Devueltos con Observaciones
 
 - Prioridad: Alta
-- Área: Integración SEA / Calificaciones Masivas / Portal Director y Evaluaciones
+- Área: Verificación de Exámenes / Evaluaciones / UI
 - Responsable: Antigravity
 - Creada: 2026-09-30
 - Fecha límite: 2026-10-01
-- Dependencias: `SincronizacionNotasSeaService`, `SincronizacionSeaController`, `UnitepcGatewayClient`, `AccesoAcademicoService`, `app.routes.ts`, `sidebar.component.ts`.
-- Criterio de cierre: 1) Diseñar e implementar plan de integración para módulo dedicado de Sincronización SEA accesible por Director de Carrera, Responsable de Evaluaciones, Vicerrector y Administrador; 2) Permitir selección y filtrado reactivo por Sede y Carrera respetando el alcance académico del usuario; 3) Incluir filtro por tipo de grupo: Teóricos (default TA), Prácticos y Todos; 4) Presentar tabla interactiva con estado de sincronización (Sincronizado, Pendiente, No calificado) y checkboxes individuales con selector maestro 'Seleccionar todos'; 5) Endpoint backend y frontend para sincronización masiva con previsualización, reporte de progreso y auditoría inmutable.
-- Notas: En progreso. Elaborando el plan de implementación detallado a solicitud del usuario.
+- Dependencias: `verificar-examenes.component.ts`, `examenes-aprobados.component.ts`, `VerificacionExamenService`, `VerificacionExamenListaDto`.
+- Criterio de cierre: 1) Botón "Previsualizar examen completo" visible y anclado en la cabecera fija del modal en todos los estados (Validado, Devuelto y Aprobado); 2) Cuarto filtro/pestaña "Devueltos con observaciones" en la pantalla principal de verificación con contador reactivo; 3) Mapeo y conteo de cantidad de devoluciones por examen tanto en la lista como en el detalle.
+- Notas: En progreso. Implementando optimizaciones de cabecera persistente, nuevo filtro dedicado y conteo de devoluciones solicitadas por el usuario. Botón de previsualización anclado en cabecera para todos los estados de verificación y 4to filtro/pestaña de devueltos con observaciones con conteo de devoluciones completado y probado en contenedores. Ampliando con cards de indicadores de verificación (Validados, Observados, Aprobados, Sin banco) y estado/contador de observaciones en la vista de Evaluaciones del Día.
 
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
@@ -100,16 +100,16 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
-#### T-047 — Optimizaciones en Verificación de Exámenes: Botón persistente de previsualización en cabecera para todos los estados y 4to filtro de Devueltos con Observaciones
+#### T-046 — Módulo de Sincronización Masiva de Calificaciones al SEA por Sede y Carrera con Filtro Teórico/Práctico
 
 - Prioridad: Alta
-- Área: Verificación de Exámenes / Evaluaciones / UI
+- Área: Integración SEA / Calificaciones Masivas / Portal Director y Evaluaciones
 - Responsable: Antigravity
 - Creada: 2026-09-30
 - Fecha límite: 2026-10-01
-- Dependencias: `verificar-examenes.component.ts`, `examenes-aprobados.component.ts`, `VerificacionExamenService`, `VerificacionExamenListaDto`.
-- Criterio de cierre: 1) Botón "Previsualizar examen completo" visible y anclado en la cabecera fija del modal en todos los estados (Validado, Devuelto y Aprobado); 2) Cuarto filtro/pestaña "Devueltos con observaciones" en la pantalla principal de verificación con contador reactivo; 3) Mapeo y conteo de cantidad de devoluciones por examen tanto en la lista como en el detalle.
-- Notas: En progreso. Implementando optimizaciones de cabecera persistente, nuevo filtro dedicado y conteo de devoluciones solicitadas por el usuario. Botón de previsualización anclado en cabecera para todos los estados de verificación y 4to filtro/pestaña de devueltos con observaciones con conteo de devoluciones completado y probado en contenedores.
+- Dependencias: `SincronizacionNotasSeaService`, `SincronizacionSeaController`, `UnitepcGatewayClient`, `AccesoAcademicoService`, `app.routes.ts`, `sidebar.component.ts`.
+- Criterio de cierre: 1) Diseñar e implementar plan de integración para módulo dedicado de Sincronización SEA accesible por Director de Carrera, Responsable de Evaluaciones, Vicerrector y Administrador; 2) Permitir selección y filtrado reactivo por Sede y Carrera respetando el alcance académico del usuario; 3) Incluir filtro por tipo de grupo: Teóricos (default TA), Prácticos y Todos; 4) Presentar tabla interactiva con estado de sincronización (Sincronizado, Pendiente, No calificado) y checkboxes individuales con selector maestro 'Seleccionar todos'; 5) Endpoint backend y frontend para sincronización masiva con previsualización, reporte de progreso y auditoría inmutable.
+- Notas: En progreso. Elaborando el plan de implementación detallado a solicitud del usuario. Modulo implementado y verificado en Docker: endpoints GET /grupos y POST /masiva, DTOs, filtros sede/carrera/teoricos/practicos, seleccion multiple y sincronizacion al SEA exclusiva para Administrador y Responsable.
 
 #### T-044 — Generación extemporánea para nuevos estudiantes agregados y refresco en vivo de nómina
 

@@ -274,4 +274,77 @@ class SincronizacionNotasSeaServiceTest {
         assertNull(estAusente.getCompletado());
         assertTrue(estAusente.getObservacion().contains("Pendiente"));
     }
+
+    @Test
+    @DisplayName("Debe consultar grupos filtrando por sede, carrera y tipo teórico TA por defecto")
+    void testObtenerGruposParaSincronizacionTeoricos() {
+        rol.setTipoClase("TA");
+        rol.setSincronizadoSea(false);
+
+        RolExamen rolPractico = RolExamen.builder()
+                .id("ROL-PRACTICO")
+                .materiaCodigo("SIS-114")
+                .materiaNombre("PROGRAMACIÓN I")
+                .grupo("PA-01")
+                .tipoClase("PA")
+                .sedeCodigo("CBB")
+                .sedeNombre("COCHABAMBA")
+                .carreraCodigo("SIS")
+                .carreraNombre("INGENIERÍA DE SISTEMAS")
+                .modalidad(ModalidadExamen.PRESENCIAL_CARTILLA)
+                .estadoFlujo(EstadoFlujo.CALIFICADO)
+                .seaGroupId(UUID.randomUUID().toString())
+                .seaSyllabusCourseId(UUID.randomUUID().toString())
+                .sincronizadoSea(false)
+                .build();
+
+        when(rolExamenRepository.findBySedeCodigoAndCarreraCodigo("CBB", "SIS"))
+                .thenReturn(List.of(rol, rolPractico));
+
+        CalificacionOmr cal = new CalificacionOmr();
+        cal.setCodigoEstudiante("5178397");
+        cal.setNotaSobre100(new BigDecimal("85.00"));
+        when(calificacionOmrRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId))
+                .thenReturn(List.of(cal));
+
+        var lista = service.obtenerGruposParaSincronizacion("CBB", "SIS", "TEORICO", "TODOS", auth);
+
+        assertNotNull(lista);
+        assertEquals(1, lista.size());
+        assertEquals("TA-01", lista.get(0).getGrupo());
+        assertTrue(lista.get(0).getEsTeorico());
+        assertTrue(lista.get(0).getEsSincronizable());
+        assertEquals(1, lista.get(0).getTotalCalificados());
+    }
+
+    @Test
+    @DisplayName("Debe ejecutar sincronización masiva tolerante a fallos para múltiples grupos")
+    void testSincronizarNotasMasivo() {
+        when(rolExamenRepository.findById(rolExamenId)).thenReturn(Optional.of(rol));
+
+        CalificacionOmr cal1 = new CalificacionOmr();
+        cal1.setCodigoEstudiante("5178397");
+        cal1.setNotaSobre100(new BigDecimal("90.00"));
+        when(calificacionOmrRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId))
+                .thenReturn(List.of(cal1));
+
+        ResearchStudentEvaluationRegisterResponseDto resp1 = ResearchStudentEvaluationRegisterResponseDto.builder()
+                .syllabusCourseId(syllabusId)
+                .groupId(groupId)
+                .oldCode(5178397L)
+                .completed(true)
+                .build();
+
+        when(unitepcGatewayClient.registerStudentEvaluations(any(ResearchStudentEvaluationRegisterInputDto.class)))
+                .thenReturn(List.of(resp1));
+
+        var req = new com.xpertiflow.evaluaciones.api.dto.sincronizacion.SincronizacionMasivaRequestDto(List.of(rolExamenId));
+        var reporteMasivo = service.sincronizarNotasMasivo(req, auth, "192.168.1.100");
+
+        assertNotNull(reporteMasivo);
+        assertEquals(1, reporteMasivo.getTotalGruposSolicitados());
+        assertEquals(1, reporteMasivo.getTotalGruposExitosos());
+        assertEquals(0, reporteMasivo.getTotalGruposFallidos());
+        assertEquals(1, reporteMasivo.getTotalEstudiantesSincronizados());
+    }
 }

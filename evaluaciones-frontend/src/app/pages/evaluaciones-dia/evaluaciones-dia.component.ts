@@ -81,6 +81,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   bancoPreguntasCargado?: boolean;
   requiereVerificacion?: boolean;
   estadoVerificacion?: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | null;
+  cantidadDevoluciones?: number;
   verificadoPor?: string;
   fechaVerificacion?: string;
   fueRestablecido?: boolean;
@@ -440,13 +441,24 @@ interface CampusDisponible extends Campus {
                                 <i class="pi pi-check-circle text-[9px]"></i> Banco verificado
                               </span>
                             } @else if (item.estadoVerificacion === 'DEVUELTO') {
-                              <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-black uppercase text-rose-700" title="Banco de preguntas devuelto con observaciones por el verificador">
-                                <i class="pi pi-exclamation-triangle text-[9px]"></i> Banco observado
+                              <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[9px] font-black uppercase text-rose-800 shadow-2xs"
+                                    [title]="'Banco devuelto con observaciones por el verificador (' + (item.cantidadDevoluciones || 1) + ' vez/veces observado)'">
+                                <i class="pi pi-exclamation-triangle text-[9px] text-rose-600"></i>
+                                Devuelto con observaciones@if (item.cantidadDevoluciones && item.cantidadDevoluciones > 0) {
+                                  <span class="ml-1 rounded-full bg-rose-200 text-rose-900 px-1.5 py-0.2 text-[8px] font-black">
+                                    {{ item.cantidadDevoluciones }} {{ item.cantidadDevoluciones === 1 ? 'vez' : 'veces' }}
+                                  </span>
+                                }
                               </span>
                             } @else {
                               <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Banco validado, pendiente de revisión por el verificador">
                                 <i class="pi pi-clock text-[9px]"></i> Pendiente de verificación
                               </span>
+                              @if (item.cantidadDevoluciones && item.cantidadDevoluciones > 0) {
+                                <span class="mt-0.5 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.2 text-[8px] font-bold text-amber-900" title="Reingresado con correcciones tras devolución previa">
+                                  <i class="pi pi-history text-[8px]"></i> Reingresado ({{ item.cantidadDevoluciones }} {{ item.cantidadDevoluciones === 1 ? 'previa' : 'previas' }})
+                                </span>
+                              }
                             }
                           } @else {
                             <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
@@ -4671,6 +4683,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       bancoPreguntasCargado: rol.bancoPreguntasCargado,
       requiereVerificacion: rol.requiereVerificacion,
       estadoVerificacion: rol.estadoVerificacion,
+      cantidadDevoluciones: rol.cantidadDevoluciones,
       verificadoPor: rol.verificadoPor,
       fechaVerificacion: rol.fechaVerificacion
     };
@@ -5352,7 +5365,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         return `Examen verificado y aprobado${por}. Listo para generar`;
       }
       if (item.estadoVerificacion === 'DEVUELTO') {
-        return 'Banco observado: El verificador devolvió el banco con observaciones. El docente titular debe corregirlas.';
+        const veces = item.cantidadDevoluciones ? ` (${item.cantidadDevoluciones} ${item.cantidadDevoluciones === 1 ? 'vez observado' : 'veces observado'})` : '';
+        return `Devuelto con observaciones: El verificador devolvió el banco con observaciones al docente titular${veces}.`;
       }
       if (item.etapa === 'Validado') {
         return 'Pendiente de verificación: En espera de revisión por el verificador designado.';
@@ -5364,7 +5378,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         && item.requiereVerificacion
         && item.estadoVerificacion !== 'VERIFICADO') {
       if (item.estadoVerificacion === 'DEVUELTO') {
-        return 'Bloqueado: El examen presenta observaciones y fue devuelto al docente titular.';
+        const veces = item.cantidadDevoluciones ? ` (${item.cantidadDevoluciones} ${item.cantidadDevoluciones === 1 ? 'vez devuelto' : 'veces devuelto'})` : '';
+        return `Bloqueado: El examen presenta observaciones y fue devuelto al docente titular${veces}.`;
       }
       return 'Bloqueado: El examen debe ser verificado antes de generar el documento oficial.';
     }
@@ -5447,7 +5462,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       if (item.estadoVerificacion === 'VERIFICADO') {
         this._mostrarToast(`Examen verificado y aprobado${item.verificadoPor ? ' por ' + item.verificadoPor : ''}. Listo para generar.`, 'success');
       } else if (item.estadoVerificacion === 'DEVUELTO') {
-        this._mostrarToast('El banco de preguntas presenta observaciones del verificador y fue devuelto al docente titular.', 'error');
+        const veces = item.cantidadDevoluciones ? ` (${item.cantidadDevoluciones} ${item.cantidadDevoluciones === 1 ? 'vez observado' : 'veces observado'})` : '';
+        this._mostrarToast(`El banco de preguntas presenta observaciones del verificador y fue devuelto al docente titular${veces}.`, 'error');
       } else {
         this._mostrarToast('El examen se encuentra en espera de dictamen por el docente verificador.', 'info');
       }

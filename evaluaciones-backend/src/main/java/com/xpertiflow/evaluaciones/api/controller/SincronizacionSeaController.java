@@ -22,7 +22,7 @@ public class SincronizacionSeaController {
     private final SincronizacionNotasSeaService sincronizacionService;
 
     @GetMapping("/previa")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Obtener vista previa de calificaciones sobre 100 puntos consolidadas antes de enviar al SEA")
     public ResponseEntity<SincronizacionNotasSeaReporteDto> obtenerVistaPrevia(
             @PathVariable @Parameter(description = "Identificador del rol de examen") String rolExamenId,
@@ -32,7 +32,7 @@ public class SincronizacionSeaController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Transmitir y registrar las calificaciones teóricas de los estudiantes en la base de datos del SEA")
     public ResponseEntity<SincronizacionNotasSeaReporteDto> sincronizarNotasConSea(
             @PathVariable @Parameter(description = "Identificador del rol de examen") String rolExamenId,

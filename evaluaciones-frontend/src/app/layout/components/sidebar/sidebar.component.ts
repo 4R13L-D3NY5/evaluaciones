@@ -334,6 +334,13 @@ export class SidebarComponent implements OnInit {
       roles: ['RESPONSABLE_EVALUACIONES']
     },
     {
+      label: 'Sincronización SEA',
+      route: '/sincronizacion-sea',
+      icon: 'pi pi-cloud-upload',
+      description: 'Sincronización masiva de calificaciones con el sistema SEA por sede y carrera',
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES']
+    },
+    {
       label: 'Administración de Evaluaciones',
       route: '/administracion-evaluaciones',
       icon: 'pi pi-sliders-h',

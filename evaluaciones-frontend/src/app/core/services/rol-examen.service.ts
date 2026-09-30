@@ -34,6 +34,7 @@ export interface RolExamenResponse {
   bancoPreguntasCargado: boolean;
   requiereVerificacion?: boolean;
   estadoVerificacion?: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | null;
+  cantidadDevoluciones?: number;
   verificadoPor?: string;
   fechaVerificacion?: string;
   hashEncriptacion?: string;

@@ -25,10 +25,127 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         <button type="button" class="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:border-primary" (click)="actualizarVista()"><i class="pi pi-refresh mr-2"></i>Actualizar</button>
       </div>
 
+      <!-- Métricas / Cards de reporte en tiempo real -->
+      <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Métricas de verificación de exámenes">
+        <!-- Card 1: Por verificar (Validados) -->
+        <div role="button" tabindex="0" (click)="cambiarVista('revision')" (keydown.enter)="cambiarVista('revision')"
+             class="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+             [ngClass]="vistaActual === 'revision' ? 'border-purple-400 bg-purple-50/40 ring-2 ring-purple-500/30' : 'border-border bg-card hover:border-purple-300'">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Por verificar</p>
+              <div class="mt-1 flex items-baseline gap-2">
+                <span class="text-2xl font-black tracking-tight text-foreground">{{ examenesValidados().length }}</span>
+                <span class="text-[10px] font-bold text-purple-700 uppercase">Validados</span>
+              </div>
+            </div>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors"
+                  [ngClass]="vistaActual === 'revision' ? 'bg-purple-600 text-white shadow-xs' : 'bg-purple-100 text-purple-700 group-hover:bg-purple-200'">
+              <i class="pi pi-search text-base"></i>
+            </span>
+          </div>
+          <div class="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5 text-[11px]">
+            @if (totalCorregidosValidados() > 0) {
+              <span class="inline-flex items-center text-amber-800 font-bold" title="Exámenes devueltos previamente que el docente ya corrigió y reingresó">
+                <i class="pi pi-history mr-1 text-[10px] text-amber-600"></i>{{ totalCorregidosValidados() }} corregidos
+              </span>
+            } @else {
+              <span class="text-muted-foreground">Pendientes de revisión</span>
+            }
+            <span class="text-[10px] font-bold text-purple-700 group-hover:underline">Revisar <i class="pi pi-arrow-right text-[8px] ml-0.5"></i></span>
+          </div>
+        </div>
+
+        <!-- Card 2: Devueltos con observaciones -->
+        <div role="button" tabindex="0" (click)="cambiarVista('observados')" (keydown.enter)="cambiarVista('observados')"
+             class="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+             [ngClass]="vistaActual === 'observados' ? 'border-rose-400 bg-rose-50/40 ring-2 ring-rose-500/30' : 'border-border bg-card hover:border-rose-300'">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Devueltos / Observados</p>
+              <div class="mt-1 flex items-baseline gap-2">
+                <span class="text-2xl font-black tracking-tight text-foreground">{{ examenesDevueltos().length }}</span>
+                <span class="text-[10px] font-bold text-rose-700 uppercase">Observados</span>
+              </div>
+            </div>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors"
+                  [ngClass]="vistaActual === 'observados' ? 'bg-rose-600 text-white shadow-xs' : 'bg-rose-100 text-rose-700 group-hover:bg-rose-200'">
+              <i class="pi pi-exclamation-circle text-base"></i>
+            </span>
+          </div>
+          <div class="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5 text-[11px]">
+            @if (totalDevueltosMasDeUnaVez() > 0) {
+              <span class="inline-flex items-center text-rose-800 font-bold" title="Exámenes que han sido devueltos más de una vez">
+                <i class="pi pi-replay mr-1 text-[10px] text-rose-600"></i>{{ totalDevueltosMasDeUnaVez() }} reincidentes (>1)
+              </span>
+            } @else if (examenesDevueltos().length > 0) {
+              <span class="text-muted-foreground">En corrección por docente</span>
+            } @else {
+              <span class="inline-flex items-center text-emerald-700 font-semibold">
+                <i class="pi pi-check text-[10px] mr-1"></i>Sin observaciones
+              </span>
+            }
+            <span class="text-[10px] font-bold text-rose-700 group-hover:underline">Ver detalle <i class="pi pi-arrow-right text-[8px] ml-0.5"></i></span>
+          </div>
+        </div>
+
+        <!-- Card 3: Verificados (Aprobados) -->
+        <div role="button" tabindex="0" (click)="cambiarVista('aprobados')" (keydown.enter)="cambiarVista('aprobados')"
+             class="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+             [ngClass]="vistaActual === 'aprobados' ? 'border-emerald-400 bg-emerald-50/40 ring-2 ring-emerald-500/30' : 'border-border bg-card hover:border-emerald-300'">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Aprobados / Verificados</p>
+              <div class="mt-1 flex items-baseline gap-2">
+                <span class="text-2xl font-black tracking-tight text-foreground">{{ totalAprobados() }}</span>
+                <span class="text-[10px] font-bold text-emerald-700 uppercase">Aprobados</span>
+              </div>
+            </div>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors"
+                  [ngClass]="vistaActual === 'aprobados' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200'">
+              <i class="pi pi-check-circle text-base"></i>
+            </span>
+          </div>
+          <div class="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5 text-[11px]">
+            <span class="text-muted-foreground">Listos para impresión</span>
+            <span class="text-[10px] font-bold text-emerald-700 group-hover:underline">Historial <i class="pi pi-arrow-right text-[8px] ml-0.5"></i></span>
+          </div>
+        </div>
+
+        <!-- Card 4: Sin banco de preguntas -->
+        <div role="button" tabindex="0" (click)="cambiarVista('sin_banco')" (keydown.enter)="cambiarVista('sin_banco')"
+             class="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+             [ngClass]="vistaActual === 'sin_banco' ? 'border-amber-400 bg-amber-50/40 ring-2 ring-amber-500/30' : 'border-border bg-card hover:border-amber-300'">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Sin banco cargado</p>
+              <div class="mt-1 flex items-baseline gap-2">
+                <span class="text-2xl font-black tracking-tight text-foreground">{{ examenesSinBanco().length }}</span>
+                <span class="text-[10px] font-bold text-amber-800 uppercase">Pendientes</span>
+              </div>
+            </div>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors"
+                  [ngClass]="vistaActual === 'sin_banco' ? 'bg-amber-600 text-white shadow-xs' : 'bg-amber-100 text-amber-800 group-hover:bg-amber-200'">
+              <i class="pi pi-clock text-base"></i>
+            </span>
+          </div>
+          <div class="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5 text-[11px]">
+            @if (totalExamenesHoySinBanco() > 0) {
+              <span class="inline-flex items-center text-rose-700 font-extrabold animate-pulse" title="¡Atención! Hay exámenes programados para hoy sin banco cargado">
+                <i class="pi pi-bell mr-1 text-[10px]"></i>¡{{ totalExamenesHoySinBanco() }} para hoy!
+              </span>
+            } @else {
+              <span class="text-muted-foreground">Monitoreo de grupos</span>
+            }
+            <span class="text-[10px] font-bold text-amber-800 group-hover:underline">Monitorear <i class="pi pi-arrow-right text-[8px] ml-0.5"></i></span>
+          </div>
+        </div>
+      </section>
+
       <nav class="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Vistas de verificación">
         <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'revision'" (click)="cambiarVista('revision')" [class.bg-card]="vistaActual === 'revision'" [class.text-primary]="vistaActual === 'revision'" [class.shadow-xs]="vistaActual === 'revision'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-search mr-2"></i>Por verificar (Validados)@if (examenesValidados().length) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px]">({{ examenesValidados().length }})</span> }</button>
         <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'observados'" (click)="cambiarVista('observados')" [class.bg-card]="vistaActual === 'observados'" [class.text-rose-700]="vistaActual === 'observados'" [class.shadow-xs]="vistaActual === 'observados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-exclamation-circle mr-2 text-rose-600"></i>Devueltos con observaciones@if (examenesDevueltos().length) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px]">({{ examenesDevueltos().length }})</span> }</button>
-        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'aprobados'" (click)="cambiarVista('aprobados')" [class.bg-card]="vistaActual === 'aprobados'" [class.text-primary]="vistaActual === 'aprobados'" [class.shadow-xs]="vistaActual === 'aprobados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-check-circle mr-2 text-emerald-600"></i>Verificados (Aprobados)</button>
+        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'aprobados'" (click)="cambiarVista('aprobados')" [class.bg-card]="vistaActual === 'aprobados'" [class.text-primary]="vistaActual === 'aprobados'" [class.shadow-xs]="vistaActual === 'aprobados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-check-circle mr-2 text-emerald-600"></i>Verificados (Aprobados)@if (totalAprobados()) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">({{ totalAprobados() }})</span> }</button>
         <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'sin_banco'" (click)="cambiarVista('sin_banco')" [class.bg-card]="vistaActual === 'sin_banco'" [class.text-amber-800]="vistaActual === 'sin_banco'" [class.shadow-xs]="vistaActual === 'sin_banco'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-clock mr-2 text-amber-500"></i>Sin banco de preguntas@if (examenesSinBanco().length) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px]">({{ examenesSinBanco().length }})</span> }</button>
       </nav>
 
@@ -741,6 +858,13 @@ export class VerificarExamenesComponent implements OnDestroy {
   public readonly examenesDevueltos = computed(() =>
     this.examenes().filter(e => e.estadoVerificacion === 'DEVUELTO')
   );
+  public readonly totalAprobados = signal<number>(0);
+  public readonly totalCorregidosValidados = computed(() =>
+    this.examenesValidados().filter(e => e.tieneHistorialDevoluciones).length
+  );
+  public readonly totalDevueltosMasDeUnaVez = computed(() =>
+    this.examenesDevueltos().filter(e => (e.cantidadDevoluciones || 0) > 1).length
+  );
   public readonly examenesSinBanco = signal<VerificacionExamenLista[]>([]);
   public readonly cargandoSinBanco = signal(false);
   public readonly detalleSinBanco = signal<VerificacionExamenLista | null>(null);
@@ -787,8 +911,15 @@ export class VerificarExamenesComponent implements OnDestroy {
     // Mantener sincronizado el listado y conteo de exámenes sin banco
     this.cargarSinBanco(filtros);
 
+    // Mantener sincronizado el conteo de exámenes aprobados para el card de métricas
+    this.service.listar({ ...filtros, estado: 'VERIFICADO' }).subscribe({
+      next: aprobados => { this.totalAprobados.set(aprobados?.length || 0); },
+      error: () => {}
+    });
+
     if (this.vistaActual === 'aprobados') {
       this.error.set(null);
+      this.panelAprobados?.cargar(this.filtrosCompartidos);
       return;
     }
     if (this.vistaActual === 'sin_banco') {
@@ -824,6 +955,7 @@ export class VerificarExamenesComponent implements OnDestroy {
     this.error.set(null);
     if (vista === 'aprobados') {
       this.aprobadosInicializados = true;
+      setTimeout(() => this.panelAprobados?.cargar(this.filtrosCompartidos));
     } else if (vista === 'sin_banco') {
       this.cargarSinBanco();
     } else {
@@ -832,12 +964,9 @@ export class VerificarExamenesComponent implements OnDestroy {
   }
 
   public actualizarVista(): void {
+    this.cargar();
     if (this.vistaActual === 'aprobados') {
       this.panelAprobados?.cargar(this.filtrosCompartidos);
-    } else if (this.vistaActual === 'sin_banco') {
-      this.cargarSinBanco();
-    } else {
-      this.cargar();
     }
   }
 
