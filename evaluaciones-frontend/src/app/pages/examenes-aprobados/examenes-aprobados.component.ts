@@ -1,5 +1,7 @@
-import { Component, Input, OnChanges, SimpleChanges, inject, signal } from '@angular/core';
+import { Component, Input, OnChanges, OnDestroy, SimpleChanges, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { VerificacionExamenDetalle, VerificacionExamenFiltros, VerificacionExamenLista, VerificacionExamenService } from '../../core/services/verificacion-examen.service';
 import { MathContentDirective } from '../../shared/components/math-content.directive';
 
@@ -15,7 +17,7 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       @else {
         <div class="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
           <table class="w-full min-w-[1180px] text-left text-xs">
-            <thead class="bg-muted/50 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground"><tr><th class="p-3">Fecha examen</th><th class="p-3">Sede / carrera</th><th class="p-3">Asignatura</th><th class="p-3">Grupo · parcial</th><th class="p-3">Docente</th><th class="p-3">Aprobado por</th><th class="p-3">Fecha aprobación</th><th class="p-3">Modalidad</th><th class="p-3 text-right">Consulta</th></tr></thead>
+            <thead class="bg-muted/50 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground"><tr><th class="p-3">Fecha examen</th><th class="p-3">Sede / carrera</th><th class="p-3">Asignatura</th><th class="p-3">Grupo · parcial</th><th class="p-3">Docente</th><th class="p-3">Aprobado por</th><th class="p-3">Fecha aprobación</th><th class="p-3">Historial</th><th class="p-3">Modalidad</th><th class="p-3 text-right">Acción</th></tr></thead>
             <tbody class="divide-y divide-border">
               @for (examen of examenes(); track examen.rolExamenId) {
                 <tr class="hover:bg-muted/20">
@@ -26,8 +28,26 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                   <td class="p-3">{{ examen.docenteNombre }}</td>
                   <td class="p-3">{{ examen.verificadoPor || 'Verificador' }}</td>
                   <td class="p-3 text-muted-foreground">{{ examen.fechaVerificacion | date:'dd/MM/yyyy HH:mm' }}</td>
+                  <td class="p-3">
+                    @if (examen.cantidadDevoluciones && examen.cantidadDevoluciones > 0) {
+                      <span class="inline-flex items-center rounded-full bg-rose-50 text-rose-800 border border-rose-200 px-2 py-0.5 text-[10px] font-bold" title="Tuvo devoluciones antes de su aprobación">
+                        <i class="pi pi-history mr-1 text-rose-600"></i>{{ examen.cantidadDevoluciones }} {{ examen.cantidadDevoluciones === 1 ? 'dev.' : 'devs.' }}
+                      </span>
+                    } @else {
+                      <span class="text-[10px] text-muted-foreground">Directo (0)</span>
+                    }
+                  </td>
                   <td class="p-3">{{ etiquetaModalidad(examen.modalidad) }}</td>
-                  <td class="p-3 text-right"><button type="button" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-800 hover:bg-emerald-100" [disabled]="cargandoDetalle()" (click)="abrir(examen)"><i class="pi pi-eye mr-1"></i>Ver examen</button></td>
+                  <td class="p-3 text-right">
+                    <div class="inline-flex items-center gap-1.5">
+                      <button type="button" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs cursor-pointer" title="Previsualizar examen completo" [disabled]="procesando()" (click)="previsualizarDirecto(examen)">
+                        <i class="pi pi-file-pdf"></i>
+                      </button>
+                      <button type="button" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-800 hover:bg-emerald-100 transition shadow-2xs cursor-pointer" [disabled]="cargandoDetalle()" (click)="abrir(examen)">
+                        <i class="pi pi-eye mr-1"></i>Ver examen
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -38,9 +58,19 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       @if (detalle()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" (click)="cerrar()">
           <section class="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl" (click)="$event.stopPropagation()">
-            <header class="flex items-center justify-between border-b border-border px-5 py-4">
+            <header class="flex items-center justify-between border-b border-border px-5 py-4 bg-card z-10 sticky top-0 shrink-0">
               <div>
-                <p class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Consulta de examen aprobado</p>
+                <div class="flex items-center gap-2">
+                  <p class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Consulta de examen aprobado</p>
+                  <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800 border border-emerald-300">
+                    <i class="pi pi-check-circle mr-1"></i>APROBADO
+                  </span>
+                  @if (detalle()!.cantidadDevoluciones && detalle()!.cantidadDevoluciones! > 0) {
+                    <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800 border border-rose-300">
+                      <i class="pi pi-history mr-1"></i>{{ detalle()!.cantidadDevoluciones }} {{ detalle()!.cantidadDevoluciones === 1 ? 'devolución previa' : 'devoluciones previas' }}
+                    </span>
+                  }
+                </div>
                 <h2 class="text-lg font-black">{{ detalle()!.materiaCodigo }} · {{ detalle()!.materiaNombre }} · {{ detalle()!.grupo }}</h2>
                 <p class="text-xs text-muted-foreground">
                   {{ detalle()!.fechaExamen | date:'dd/MM/yyyy' }} · {{ detalle()!.tipoParcial }} · {{ detalle()!.horario }}
@@ -50,7 +80,13 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                   }
                 </p>
               </div>
-              <button type="button" aria-label="Cerrar" class="icon-button" (click)="cerrar()"><i class="pi pi-times"></i></button>
+              <div class="flex items-center gap-2">
+                <button type="button" class="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-black text-white shadow-sm transition disabled:opacity-50 cursor-pointer" [disabled]="procesando()" (click)="previsualizar()">
+                  <i class="pi" [class.pi-file-pdf]="!procesando()" [class.pi-spin]="procesando()" [class.pi-spinner]="procesando()"></i>
+                  <span>{{ procesando() ? 'Generando PDF...' : 'Previsualizar examen completo' }}</span>
+                </button>
+                <button type="button" aria-label="Cerrar" class="icon-button" (click)="cerrar()"><i class="pi pi-times"></i></button>
+              </div>
             </header>
             <div class="flex-1 space-y-4 overflow-y-auto p-5">
               <div class="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs sm:grid-cols-2"><p><strong>Estado:</strong> Aprobado (Verificado)</p><p><strong>Versión:</strong> {{ detalle()!.version }}</p><p><strong>Verificado por:</strong> {{ detalle()!.verificadoPor || 'Verificador' }}</p><p><strong>Fecha de aprobación:</strong> {{ detalle()!.fechaVerificacion | date:'dd/MM/yyyy HH:mm' }}</p></div>
@@ -262,18 +298,35 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
           </section>
         </div>
       }
+
+      @if (pdfUrl()) {
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-3" (click)="cerrarPdf()">
+          <div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card" (click)="$event.stopPropagation()">
+            <div class="flex items-center justify-between border-b border-border px-4 py-3">
+              <strong class="text-sm">Previsualización del examen aprobado</strong>
+              <button type="button" class="icon-button" (click)="cerrarPdf()"><i class="pi pi-times"></i></button>
+            </div>
+            <iframe [src]="pdfUrl()" class="h-[calc(100%-3.5rem)] w-full" title="Previsualización del examen"></iframe>
+          </div>
+        </div>
+      }
     </div>
   `
 })
-export class ExamenesAprobadosComponent implements OnChanges {
+export class ExamenesAprobadosComponent implements OnChanges, OnDestroy {
   private readonly service = inject(VerificacionExamenService);
+  private readonly generacion = inject(GeneracionTypstService);
+  private readonly sanitizer = inject(DomSanitizer);
   @Input() public filtros: VerificacionExamenFiltros = {};
   @Input() public activo = false;
   public readonly examenes = signal<VerificacionExamenLista[]>([]);
   public readonly detalle = signal<VerificacionExamenDetalle | null>(null);
   public readonly cargando = signal(false);
   public readonly cargandoDetalle = signal(false);
+  public readonly procesando = signal(false);
   public readonly error = signal<string | null>(null);
+  public readonly pdfUrl = signal<SafeResourceUrl | null>(null);
+  private pdfObjectUrl: string | null = null;
   public readonly alternativasVfComplejas = [
     { letra: 'A', texto: '1, 2 y 3 son verdaderas' },
     { letra: 'B', texto: '1 y 3 son verdaderas' },
@@ -409,4 +462,80 @@ export class ExamenesAprobadosComponent implements OnChanges {
   public cerrar(): void { this.detalle.set(null); }
   public etiquetaModalidad(valor: string): string { return valor === 'VIRTUAL' ? 'Virtual' : 'Con cartilla'; }
 
+  public previsualizar(): void {
+    const id = this.detalle()?.rolExamenId;
+    if (!id) return;
+    this.procesando.set(true);
+    this.service.previsualizar(id).subscribe({
+      next: resultado => {
+        if (resultado.estado === 'COMPLETADO') this.cargarPdf(resultado);
+        else this.esperarPdf(resultado.jobId);
+      },
+      error: e => {
+        this.procesando.set(false);
+        this.error.set(this.mensajeError(e, 'No se pudo solicitar la previsualización.'));
+      }
+    });
+  }
+
+  public previsualizarDirecto(examen: VerificacionExamenLista): void {
+    const id = examen.rolExamenId;
+    if (!id) return;
+    this.procesando.set(true);
+    this.service.previsualizar(id).subscribe({
+      next: resultado => {
+        if (resultado.estado === 'COMPLETADO') this.cargarPdf(resultado);
+        else this.esperarPdf(resultado.jobId);
+      },
+      error: e => {
+        this.procesando.set(false);
+        this.error.set(this.mensajeError(e, 'No se pudo solicitar la previsualización.'));
+      }
+    });
+  }
+
+  private esperarPdf(jobId: string): void {
+    this.generacion.esperarResultado(jobId, 1500, 80).subscribe({
+      next: resultado => {
+        this.procesando.set(false);
+        if (resultado.estado === 'COMPLETADO') this.cargarPdf(resultado);
+        else this.error.set(resultado.mensaje || 'Typst no pudo generar la previsualización.');
+      },
+      error: e => {
+        this.procesando.set(false);
+        this.error.set(this.mensajeError(e, 'No se pudo completar la previsualización.'));
+      }
+    });
+  }
+
+  private cargarPdf(resultado: any): void {
+    this.procesando.set(false);
+    const path = resultado?.variantes?.[0]?.archivoPdfPath;
+    if (!path) {
+      this.error.set('La previsualización terminó sin devolver un PDF.');
+      return;
+    }
+    this.generacion.descargarArchivo(path).subscribe({
+      next: blob => {
+        this.cerrarPdf();
+        this.pdfObjectUrl = URL.createObjectURL(blob);
+        this.pdfUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfObjectUrl));
+      },
+      error: e => this.error.set(this.mensajeError(e, 'No se pudo abrir el PDF.'))
+    });
+  }
+
+  public cerrarPdf(): void {
+    if (this.pdfObjectUrl) URL.revokeObjectURL(this.pdfObjectUrl);
+    this.pdfObjectUrl = null;
+    this.pdfUrl.set(null);
+  }
+
+  private mensajeError(error: any, fallback: string): string {
+    return error?.error?.mensaje || error?.error?.message || fallback;
+  }
+
+  public ngOnDestroy(): void {
+    this.cerrarPdf();
+  }
 }

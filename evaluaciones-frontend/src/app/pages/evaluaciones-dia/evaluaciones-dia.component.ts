@@ -2008,7 +2008,7 @@ interface CampusDisponible extends Campus {
                           <i class="pi" [class.pi-spin]="sincronizandoNomina()" [class.pi-spinner]="sincronizandoNomina()" [class.pi-sync]="!sincronizandoNomina()"></i>
                           <span>{{ sincronizandoNomina() ? 'Sincronizando...' : 'Sincronizar nómina (Toma de grupos)' }}</span>
                         </button>
-                        @if (esEntornoLocal) {
+                        @if (esEntornoLocal && (esResponsableEvaluaciones() || esAdministradorSistema())) {
                           <button
                             (click)="simularRezagadoParaPruebas()"
                             [disabled]="sincronizandoNomina() || generandoCartillas() || generandoListaCartillas() || simulandoRezagado()"
@@ -3216,11 +3216,17 @@ interface CampusDisponible extends Campus {
                       </span>
                     }
                   </div>
-                  @if (puedeRegistrarReprogramacion()) {
-                    <button type="button" (click)="abrirModalReprogramarNueva()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
-                      <i class="pi pi-calendar-plus text-xs"></i> + Registrar examen reprogramado
+                  <div class="flex items-center gap-2">
+                    <button type="button" (click)="sincronizarNominaDesdeNotas()" [disabled]="sincronizandoNomina() || cargandoNotasOmr()" class="px-2.5 py-1.5 rounded-lg border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors" title="Sincronizar nómina oficial con el SEA por toma de grupos tardía">
+                      <i class="pi" [class.pi-spin]="sincronizandoNomina()" [class.pi-spinner]="sincronizandoNomina()" [class.pi-sync]="!sincronizandoNomina()"></i>
+                      <span>{{ sincronizandoNomina() ? 'Sincronizando...' : 'Sincronizar nómina (Toma de grupos)' }}</span>
                     </button>
-                  }
+                    @if (puedeRegistrarReprogramacion()) {
+                      <button type="button" (click)="abrirModalReprogramarNueva()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
+                        <i class="pi pi-calendar-plus text-xs"></i> + Registrar examen reprogramado
+                      </button>
+                    }
+                  </div>
                 </div>
               }
               @if (!cargandoNotasOmr() && notasOmr().length === 0) {
@@ -3265,8 +3271,8 @@ interface CampusDisponible extends Campus {
                         </span>
                         <div class="flex items-center justify-end gap-1">
                           @if (puedeRegistrarReprogramacion()) {
-                            <button type="button" (click)="abrirModalReprogramar(nota)" class="px-1.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs" [title]="nota.esReprogramado ? 'Editar reprogramación oral' : (nota.id ? 'Registrar nota por examen oral reprogramado' : 'Registrar nota por reprogramación oral')">
-                              <i class="pi pi-file-edit mr-0.5"></i>{{ nota.esReprogramado ? 'Editar' : 'Reprog.' }}
+                            <button type="button" (click)="abrirModalReprogramar(nota)" class="px-1.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs" [title]="nota.esReprogramado ? 'Editar reprogramación oral' : (!nota.id ? 'Asignar calificación a rezagado / ausente' : 'Registrar nota por examen oral reprogramado')">
+                              <i class="pi pi-file-edit mr-0.5"></i>{{ nota.esReprogramado ? 'Editar' : (!nota.id ? 'Asignar nota' : 'Reprog.') }}
                             </button>
                           }
                           @if (puedeAnularExamenEstudiante() && nota.id) {
@@ -3298,8 +3304,8 @@ interface CampusDisponible extends Campus {
                   <i class="pi pi-calendar-plus text-lg"></i>
                 </div>
                 <div>
-                  <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Evaluación Extraordinaria</p>
-                  <h3 class="text-base font-black text-foreground">Calificación por Reprogramación Oral</h3>
+                  <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">{{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Calificación Extemporánea' : 'Evaluación Extraordinaria' }}</p>
+                  <h3 class="text-base font-black text-foreground">{{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Asignar Calificación a Rezagado / Ausente' : (estudianteSeleccionadoReprogramar()?.esReprogramado ? 'Editar Calificación por Reprogramación' : 'Calificación por Reprogramación Oral') }}</h3>
                   <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotas()?.codigo || evaluacionSeleccionadaOmr()?.codigo }} · {{ evaluacionSeleccionadaNotas()?.materia || evaluacionSeleccionadaOmr()?.materia }} · {{ evaluacionSeleccionadaNotas()?.grupo || evaluacionSeleccionadaOmr()?.grupo }}</p>
                 </div>
               </div>
@@ -3415,7 +3421,7 @@ interface CampusDisponible extends Campus {
                   @if (guardandoReprogramacion()) {
                     <i class="pi pi-spin pi-spinner text-xs"></i> Guardando...
                   } @else {
-                    <i class="pi pi-check text-xs"></i> Guardar Calificación Reprogramada
+                    <i class="pi pi-check text-xs"></i> {{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Guardar Calificación' : 'Guardar Calificación Reprogramada' }}
                   }
                 </button>
               </div>
@@ -5033,6 +5039,35 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         } else {
           this._mostrarToast('La nómina ya se encuentra sincronizada con el Gateway institucional.', 'info');
         }
+      },
+      error: err => {
+        this.sincronizandoNomina.set(false);
+        const mensaje = err?.error?.message || err?.message || 'No se pudo sincronizar la nómina.';
+        this._mostrarToast(mensaje, 'error');
+      }
+    });
+  }
+
+  public sincronizarNominaDesdeNotas(): void {
+    const item = this.evaluacionSeleccionadaNotas();
+    if (!item || this.sincronizandoNomina()) return;
+
+    this.sincronizandoNomina.set(true);
+    this._cartillasOmr.sincronizarNomina(item.id).subscribe({
+      next: resp => {
+        this.sincronizandoNomina.set(false);
+        if (resp.nuevosEstudiantes > 0) {
+          this._mostrarToast(
+            `Nómina sincronizada: ${resp.nuevosEstudiantes} nuevo(s) estudiante(s) incorporado(s) por toma de grupos tardía.`,
+            'info'
+          );
+        } else {
+          this._mostrarToast('La nómina ya se encuentra sincronizada con el Gateway institucional.', 'info');
+        }
+        // Refrescar notas de la evaluación inmediatamente
+        this._omrService.listarCalificaciones(item.id).subscribe({
+          next: notas => this.notasOmr.set(notas)
+        });
       },
       error: err => {
         this.sincronizandoNomina.set(false);
@@ -6900,8 +6935,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.reprogramacionCodigoEstudiante.set(nota.codigoEstudiante);
     this.reprogramacionFechaExamen.set(fechaDefecto);
     this.reprogramacionNota100.set(nota.esReprogramado ? nota.notaSobre100 : null);
-    this.reprogramacionNota60.set(nota.esReprogramado ? nota.notaSobre60 : null);
-    this.reprogramacionMotivo.set(nota.motivoReprogramacion || 'Examen oral tomado por docente tras cancelación de arancel de reprogramación');
+    const motivoDefecto = !nota.id && !nota.esReprogramado
+      ? 'Rezagado incorporado por toma de grupos tardía'
+      : (nota.motivoReprogramacion || 'Examen oral tomado por docente tras cancelación de arancel de reprogramación');
+    this.reprogramacionMotivo.set(motivoDefecto);
     this.reprogramacionComprobante.set(nota.comprobanteReprogramacion || '');
     this.reprogramacionObservaciones.set(nota.observacionReprogramacion || '');
     this.dialogReprogramarEstudiante.set(true);

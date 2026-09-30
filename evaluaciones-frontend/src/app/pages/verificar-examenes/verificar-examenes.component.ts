@@ -1,4 +1,4 @@
-import { Component, OnDestroy, ViewChild, inject, signal } from '@angular/core';
+import { Component, OnDestroy, ViewChild, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -19,16 +19,17 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         <div>
           <div class="flex items-center gap-3">
             <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-700"><i class="pi pi-verified text-xl"></i></span>
-            <div><h1 class="text-2xl font-black tracking-tight text-foreground">{{ vistaActual === 'sin_banco' ? 'Exámenes programados sin banco' : vistaActual === 'aprobados' ? 'Exámenes aprobados' : 'Verificar exámenes' }}</h1><p class="text-xs text-muted-foreground">{{ vistaActual === 'sin_banco' ? 'Grupos con examen programado que aún no han cargado su banco de preguntas.' : vistaActual === 'aprobados' ? 'Historial de exámenes aprobados por verificación dentro de tu alcance.' : 'Revisión completa de exámenes validados antes de generar el material oficial.' }}</p></div>
+            <div><h1 class="text-2xl font-black tracking-tight text-foreground">{{ vistaActual === 'sin_banco' ? 'Exámenes programados sin banco' : vistaActual === 'aprobados' ? 'Exámenes aprobados' : vistaActual === 'observados' ? 'Exámenes devueltos con observaciones' : 'Verificar exámenes' }}</h1><p class="text-xs text-muted-foreground">{{ vistaActual === 'sin_banco' ? 'Grupos con examen programado que aún no han cargado su banco de preguntas.' : vistaActual === 'aprobados' ? 'Historial de exámenes aprobados por verificación dentro de tu alcance.' : vistaActual === 'observados' ? 'Exámenes devueltos al docente titular con observaciones para su corrección y seguimiento.' : 'Revisión completa de exámenes validados antes de generar el material oficial.' }}</p></div>
           </div>
         </div>
         <button type="button" class="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:border-primary" (click)="actualizarVista()"><i class="pi pi-refresh mr-2"></i>Actualizar</button>
       </div>
 
-      <nav class="flex w-fit gap-1 rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Vistas de verificación">
-        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'revision'" (click)="cambiarVista('revision')" [class.bg-card]="vistaActual === 'revision'" [class.text-primary]="vistaActual === 'revision'" [class.shadow-xs]="vistaActual === 'revision'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-search mr-2"></i>Por verificar (Validados)@if (examenes().length) { <span class="ml-1 font-black">({{ examenes().length }})</span> }</button>
-        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'aprobados'" (click)="cambiarVista('aprobados')" [class.bg-card]="vistaActual === 'aprobados'" [class.text-primary]="vistaActual === 'aprobados'" [class.shadow-xs]="vistaActual === 'aprobados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-check-circle mr-2"></i>Verificados (Aprobados)</button>
-        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'sin_banco'" (click)="cambiarVista('sin_banco')" [class.bg-card]="vistaActual === 'sin_banco'" [class.text-amber-800]="vistaActual === 'sin_banco'" [class.shadow-xs]="vistaActual === 'sin_banco'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-exclamation-triangle mr-2 text-amber-500"></i>Sin banco de preguntas@if (examenesSinBanco().length) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px]">({{ examenesSinBanco().length }})</span> }</button>
+      <nav class="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Vistas de verificación">
+        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'revision'" (click)="cambiarVista('revision')" [class.bg-card]="vistaActual === 'revision'" [class.text-primary]="vistaActual === 'revision'" [class.shadow-xs]="vistaActual === 'revision'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-search mr-2"></i>Por verificar (Validados)@if (examenesValidados().length) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px]">({{ examenesValidados().length }})</span> }</button>
+        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'observados'" (click)="cambiarVista('observados')" [class.bg-card]="vistaActual === 'observados'" [class.text-rose-700]="vistaActual === 'observados'" [class.shadow-xs]="vistaActual === 'observados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-exclamation-circle mr-2 text-rose-600"></i>Devueltos con observaciones@if (examenesDevueltos().length) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px]">({{ examenesDevueltos().length }})</span> }</button>
+        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'aprobados'" (click)="cambiarVista('aprobados')" [class.bg-card]="vistaActual === 'aprobados'" [class.text-primary]="vistaActual === 'aprobados'" [class.shadow-xs]="vistaActual === 'aprobados'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-check-circle mr-2 text-emerald-600"></i>Verificados (Aprobados)</button>
+        <button type="button" role="tab" [attr.aria-selected]="vistaActual === 'sin_banco'" (click)="cambiarVista('sin_banco')" [class.bg-card]="vistaActual === 'sin_banco'" [class.text-amber-800]="vistaActual === 'sin_banco'" [class.shadow-xs]="vistaActual === 'sin_banco'" class="rounded-lg px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"><i class="pi pi-clock mr-2 text-amber-500"></i>Sin banco de preguntas@if (examenesSinBanco().length) { <span class="ml-1 font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px]">({{ examenesSinBanco().length }})</span> }</button>
       </nav>
 
       <div class="grid grid-cols-1 gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs md:grid-cols-3 lg:grid-cols-4">
@@ -41,11 +42,15 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Modalidad<select [(ngModel)]="modalidad" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">Todas</option><option value="PRESENCIAL_CARTILLA">Con cartilla</option><option value="PRESENCIAL_SIN_CARTILLA">Sin cartilla</option><option value="VIRTUAL">Virtual</option></select></label>
         @if (vistaActual === 'revision') {
           <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado
-            <select [(ngModel)]="estado" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs font-bold">
-              <option value="">Todos (por verificar y observados)</option>
-              <option value="PENDIENTE">Validados (por verificar)</option>
-              <option value="DEVUELTO">Observados / Devueltos</option>
-            </select>
+            <div class="mt-1 flex h-[34px] items-center rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-800">
+              <i class="pi pi-shield mr-1.5"></i>Validados (por verificar)
+            </div>
+          </label>
+        } @else if (vistaActual === 'observados') {
+          <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado
+            <div class="mt-1 flex h-[34px] items-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-800">
+              <i class="pi pi-exclamation-circle mr-1.5"></i>Devueltos con observaciones
+            </div>
           </label>
         } @else if (vistaActual === 'sin_banco') {
           <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado
@@ -61,7 +66,7 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
 
       @if (vistaActual === 'revision') {
       @if (cargando()) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground"><i class="pi pi-spin pi-spinner mr-2"></i>Cargando exámenes validados...</div> }
-      @else if (!examenes().length) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">No hay exámenes validados pendientes de verificación en tu alcance.</div> }
+      @else if (!examenesValidados().length) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">No hay exámenes validados pendientes de verificación en tu alcance.</div> }
       @else {
         <div class="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
           <table class="w-full min-w-[1200px] text-left text-xs">
@@ -80,7 +85,7 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
               </tr>
             </thead>
             <tbody class="divide-y divide-border">
-              @for (examen of examenes(); track examen.rolExamenId) {
+              @for (examen of examenesValidados(); track examen.rolExamenId) {
                 <tr class="hover:bg-muted/20">
                   <td class="p-3 font-bold">{{ examen.fechaExamen | date:'dd/MM/yyyy' }}<span class="block font-normal text-muted-foreground">{{ examen.horario }}</span></td>
                   <td class="p-3"><strong>{{ examen.sedeCodigo || '—' }}</strong><span class="block text-muted-foreground">{{ examen.sedeNombre || 'Sede no registrada' }}</span><span class="block text-muted-foreground">{{ examen.carreraCodigo }} · {{ examen.carreraNombre }}</span></td>
@@ -92,26 +97,25 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                   <td class="p-3">{{ etiquetaModalidad(examen.modalidad) }}</td>
                   <td class="p-3">
                     <div class="flex flex-col gap-1 items-start">
-                      @if (examen.estadoVerificacion === 'DEVUELTO') {
-                        <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-2.5 py-0.5 text-[10px] font-black tracking-wide border border-rose-200">
-                          <i class="pi pi-exclamation-circle mr-1"></i>DEVUELTO
-                        </span>
-                      } @else {
-                        <span class="inline-flex items-center rounded-full bg-purple-100 text-purple-800 px-2.5 py-0.5 text-[10px] font-black tracking-wide border border-purple-200">
-                          <i class="pi pi-shield mr-1"></i>{{ examen.estadoVerificacion === 'PENDIENTE' ? 'VALIDADO' : examen.estadoVerificacion }}
-                        </span>
-                      }
+                      <span class="inline-flex items-center rounded-full bg-purple-100 text-purple-800 px-2.5 py-0.5 text-[10px] font-black tracking-wide border border-purple-200">
+                        <i class="pi pi-shield mr-1"></i>VALIDADO
+                      </span>
                       @if (examen.tieneHistorialDevoluciones) {
                         <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[9px] font-bold border border-amber-300" title="Reingresado con correcciones tras devolución previa">
-                          <i class="pi pi-history mr-1"></i>Corregido
+                          <i class="pi pi-history mr-1"></i>Corregido ({{ examen.cantidadDevoluciones || 1 }} {{ (examen.cantidadDevoluciones || 1) === 1 ? 'previa' : 'previas' }})
                         </span>
                       }
                     </div>
                   </td>
                   <td class="p-3 text-right">
-                    <button type="button" class="rounded-lg px-3 py-2 text-[11px] font-black text-white" [class.bg-rose-700]="examen.estadoVerificacion === 'DEVUELTO'" [class.hover:bg-rose-800]="examen.estadoVerificacion === 'DEVUELTO'" [class.bg-purple-700]="examen.estadoVerificacion !== 'DEVUELTO'" [class.hover:bg-purple-800]="examen.estadoVerificacion !== 'DEVUELTO'" (click)="abrir(examen)">
-                      <i class="pi pi-search mr-1"></i>Revisar
-                    </button>
+                    <div class="inline-flex items-center gap-1.5">
+                      <button type="button" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs cursor-pointer" title="Previsualizar examen completo" [disabled]="procesando()" (click)="previsualizarDirecto(examen)">
+                        <i class="pi pi-file-pdf"></i>
+                      </button>
+                      <button type="button" class="rounded-lg bg-purple-700 hover:bg-purple-800 px-3 py-2 text-[11px] font-black text-white shadow-2xs cursor-pointer" (click)="abrir(examen)">
+                        <i class="pi pi-search mr-1"></i>Revisar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               }
@@ -119,11 +123,69 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
           </table>
         </div>
       }
+      }
+
+      @if (vistaActual === 'observados') {
+      @if (cargando()) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground"><i class="pi pi-spin pi-spinner mr-2"></i>Cargando exámenes devueltos con observaciones...</div> }
+      @else if (!examenesDevueltos().length) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground"><i class="pi pi-check-circle text-emerald-600 mr-2 text-base"></i>No hay exámenes devueltos con observaciones en tu alcance.</div> }
+      @else {
+        <div class="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
+          <table class="w-full min-w-[1200px] text-left text-xs">
+            <thead class="bg-muted/50 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th class="p-3">Fecha examen</th>
+                <th class="p-3">Sede / carrera</th>
+                <th class="p-3">Asignatura</th>
+                <th class="p-3">Grupo</th>
+                <th class="p-3">Docente</th>
+                <th class="p-3">Subido / Devuelto</th>
+                <th class="p-3">Versión</th>
+                <th class="p-3">Modalidad</th>
+                <th class="p-3">Veces devuelto</th>
+                <th class="p-3 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              @for (examen of examenesDevueltos(); track examen.rolExamenId) {
+                <tr class="hover:bg-muted/20">
+                  <td class="p-3 font-bold">{{ examen.fechaExamen | date:'dd/MM/yyyy' }}<span class="block font-normal text-muted-foreground">{{ examen.horario }}</span></td>
+                  <td class="p-3"><strong>{{ examen.sedeCodigo || '—' }}</strong><span class="block text-muted-foreground">{{ examen.sedeNombre || 'Sede no registrada' }}</span><span class="block text-muted-foreground">{{ examen.carreraCodigo }} · {{ examen.carreraNombre }}</span></td>
+                  <td class="p-3"><strong>{{ examen.materiaCodigo }}</strong><span class="block max-w-[220px] truncate text-muted-foreground">{{ examen.materiaNombre }}</span></td>
+                  <td class="p-3 font-black">{{ examen.grupo }}<span class="block font-normal text-muted-foreground">{{ examen.tipoParcial }}</span></td>
+                  <td class="p-3">{{ examen.docenteNombre }}</td>
+                  <td class="p-3 text-muted-foreground">{{ examen.fechaSubida | date:'dd/MM/yyyy HH:mm' }}</td>
+                  <td class="p-3 font-mono font-bold">{{ examen.version }}</td>
+                  <td class="p-3">{{ etiquetaModalidad(examen.modalidad) }}</td>
+                  <td class="p-3">
+                    <div class="flex flex-col gap-1 items-start">
+                      <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-800 px-2.5 py-1 text-[11px] font-black border border-rose-300 shadow-2xs">
+                        <i class="pi pi-history mr-1 text-rose-600"></i>
+                        {{ examen.cantidadDevoluciones || 1 }} {{ (examen.cantidadDevoluciones || 1) === 1 ? 'vez devuelto' : 'veces devuelto' }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="p-3 text-right">
+                    <div class="inline-flex items-center gap-1.5">
+                      <button type="button" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs cursor-pointer" title="Previsualizar examen completo" [disabled]="procesando()" (click)="previsualizarDirecto(examen)">
+                        <i class="pi pi-file-pdf"></i>
+                      </button>
+                      <button type="button" class="rounded-lg bg-rose-700 hover:bg-rose-800 px-3 py-2 text-[11px] font-black text-white shadow-2xs cursor-pointer" (click)="abrir(examen)">
+                        <i class="pi pi-search mr-1"></i>Revisar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      }
 
       @if (detalle()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" (click)="cerrar()">
           <div class="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl" (click)="$event.stopPropagation()">
-            <div class="flex items-center justify-between border-b border-border px-5 py-4">
+            <div class="flex items-center justify-between border-b border-border px-5 py-4 bg-card z-10 sticky top-0 shrink-0">
               <div>
                 <div class="flex items-center gap-2">
                   <p class="text-[10px] font-extrabold uppercase tracking-wider text-purple-700">Revisión de examen</p>
@@ -132,7 +194,12 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                   } @else {
                     <span class="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black text-purple-800 border border-purple-200">VALIDADO</span>
                   }
-                  @if (detalle()!.historialDevoluciones && detalle()!.historialDevoluciones.length > 0) {
+                  @if (detalle()!.cantidadDevoluciones && detalle()!.cantidadDevoluciones! > 0) {
+                    <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-black text-rose-800 border border-rose-300">
+                      <i class="pi pi-history mr-1"></i>{{ detalle()!.cantidadDevoluciones }} {{ detalle()!.cantidadDevoluciones === 1 ? 'devolución registrada' : 'devoluciones registradas' }}
+                    </span>
+                  }
+                  @if (detalle()!.historialDevoluciones && detalle()!.historialDevoluciones.length > 0 && detalle()!.estadoVerificacion !== 'DEVUELTO') {
                     <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-300">
                       <i class="pi pi-history mr-1"></i>Reingresado con correcciones
                     </span>
@@ -142,11 +209,16 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                 <p class="text-xs text-muted-foreground">{{ detalle()!.tipoParcial }} · {{ detalle()!.version }} · {{ detalle()!.estadoVerificacion }}</p>
                 <p class="text-xs text-muted-foreground">{{ detalle()!.sedeNombre || 'Sede no registrada' }} · {{ detalle()!.carreraNombre }}</p>
               </div>
-              <button type="button" class="icon-button" (click)="cerrar()"><i class="pi pi-times"></i></button>
+              <div class="flex items-center gap-3">
+                <button type="button" class="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-black text-white shadow-sm transition disabled:opacity-50 cursor-pointer" [disabled]="procesando()" (click)="previsualizar()">
+                  <i class="pi" [class.pi-file-pdf]="!procesando()" [class.pi-spin]="procesando()" [class.pi-spinner]="procesando()"></i>
+                  <span>{{ procesando() ? 'Generando...' : 'Previsualizar examen completo' }}</span>
+                </button>
+                <button type="button" class="icon-button" (click)="cerrar()"><i class="pi pi-times"></i></button>
+              </div>
             </div>
             <div class="flex-1 overflow-y-auto p-5">
               <div class="mb-4 flex flex-wrap items-center gap-2">
-                <button type="button" class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white disabled:opacity-50" [disabled]="procesando()" (click)="previsualizar()"><i class="pi pi-file-pdf mr-2"></i>{{ procesando() ? 'Generando...' : 'Previsualizar examen completo' }}</button>
                 <span class="rounded-xl bg-muted px-3 py-2 text-[11px] font-semibold text-muted-foreground">
                   {{ totalRespondibles() }} preguntas evaluables
                   @if (totalTroncos() > 0) {
@@ -427,7 +499,6 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         </div>
       }
       @if (pdfUrl()) { <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-3" (click)="cerrarPdf()"><div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card" (click)="$event.stopPropagation()"><div class="flex items-center justify-between border-b border-border px-4 py-3"><strong class="text-sm">Previsualización completa para verificación</strong><button type="button" class="icon-button" (click)="cerrarPdf()"><i class="pi pi-times"></i></button></div><iframe [src]="pdfUrl()" class="h-[calc(100%-3.5rem)] w-full" title="Previsualización del examen"></iframe></div></div> }
-      }
       @if (aprobadosInicializados) {
         <div [hidden]="vistaActual !== 'aprobados'"><sea-examenes-aprobados #panelAprobados [filtros]="filtrosCompartidos" [activo]="vistaActual === 'aprobados'" /></div>
       }
@@ -664,6 +735,12 @@ export class VerificarExamenesComponent implements OnDestroy {
   private pdfObjectUrl: string | null = null;
   private solicitudCarreras = 0;
   public readonly examenes = signal<VerificacionExamenLista[]>([]);
+  public readonly examenesValidados = computed(() =>
+    this.examenes().filter(e => e.estadoVerificacion !== 'DEVUELTO')
+  );
+  public readonly examenesDevueltos = computed(() =>
+    this.examenes().filter(e => e.estadoVerificacion === 'DEVUELTO')
+  );
   public readonly examenesSinBanco = signal<VerificacionExamenLista[]>([]);
   public readonly cargandoSinBanco = signal(false);
   public readonly detalleSinBanco = signal<VerificacionExamenLista | null>(null);
@@ -679,7 +756,7 @@ export class VerificarExamenesComponent implements OnDestroy {
   public filtrosCompartidos: VerificacionExamenFiltros = {};
   public mostrarTodasPreguntas = false;
   public observacionGeneral = ''; public observacionesPreguntas: Record<number, string> = {};
-  public vistaActual: 'revision' | 'aprobados' | 'sin_banco' = 'revision';
+  public vistaActual: 'revision' | 'observados' | 'aprobados' | 'sin_banco' = 'revision';
   public aprobadosInicializados = false;
 
   constructor() {
@@ -741,7 +818,7 @@ export class VerificarExamenesComponent implements OnDestroy {
     });
   }
 
-  public cambiarVista(vista: 'revision' | 'aprobados' | 'sin_banco'): void {
+  public cambiarVista(vista: 'revision' | 'observados' | 'aprobados' | 'sin_banco'): void {
     if (this.vistaActual === vista) return;
     this.vistaActual = vista;
     this.error.set(null);
@@ -988,6 +1065,7 @@ export class VerificarExamenesComponent implements OnDestroy {
   public abrir(examen: VerificacionExamenLista): void { this.error.set(null); this.service.obtener(examen.rolExamenId).subscribe({ next: detalle => { this.detalle.set(detalle); this.observacionGeneral = detalle.observacionesGenerales || ''; this.observacionesPreguntas = {}; this.mostrarTodasPreguntas = false; }, error: e => this.error.set(this.mensajeError(e, 'No se pudo obtener el examen para revisión.')) }); }
   public cerrar(): void { if (!this.guardando() && !this.procesando()) this.detalle.set(null); }
   public previsualizar(): void { const id = this.detalle()?.rolExamenId; if (!id) return; this.procesando.set(true); this.service.previsualizar(id).subscribe({ next: resultado => { if (resultado.estado === 'COMPLETADO') this.cargarPdf(resultado); else this.esperarPdf(resultado.jobId); }, error: e => { this.procesando.set(false); this.error.set(this.mensajeError(e, 'No se pudo solicitar la previsualización.')); } }); }
+  public previsualizarDirecto(examen: VerificacionExamenLista): void { const id = examen.rolExamenId; if (!id) return; this.procesando.set(true); this.service.previsualizar(id).subscribe({ next: resultado => { if (resultado.estado === 'COMPLETADO') this.cargarPdf(resultado); else this.esperarPdf(resultado.jobId); }, error: e => { this.procesando.set(false); this.error.set(this.mensajeError(e, 'No se pudo solicitar la previsualización.')); } }); }
   private esperarPdf(jobId: string): void { this.generacion.esperarResultado(jobId, 1500, 80).subscribe({ next: resultado => { this.procesando.set(false); if (resultado.estado === 'COMPLETADO') this.cargarPdf(resultado); else this.error.set(resultado.mensaje || 'Typst no pudo generar la previsualización.'); }, error: e => { this.procesando.set(false); this.error.set(this.mensajeError(e, 'No se pudo completar la previsualización.')); } }); }
   private cargarPdf(resultado: any): void { this.procesando.set(false); const path = resultado?.variantes?.[0]?.archivoPdfPath; if (!path) { this.error.set('La previsualización terminó sin devolver un PDF.'); return; } this.generacion.descargarArchivo(path).subscribe({ next: blob => { this.cerrarPdf(); this.pdfObjectUrl = URL.createObjectURL(blob); this.pdfUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfObjectUrl)); }, error: e => this.error.set(this.mensajeError(e, 'No se pudo abrir el PDF.')) }); }
   public cerrarPdf(): void { if (this.pdfObjectUrl) URL.revokeObjectURL(this.pdfObjectUrl); this.pdfObjectUrl = null; this.pdfUrl.set(null); }

@@ -143,20 +143,75 @@ public class OmrProcesamientoService {
             throw new IllegalArgumentException("El procesamiento OMR solo corresponde a exámenes con cartilla.");
         }
 
-        int cartillasEsperadas = loteCartillasRepository.findFirstByRolExamenIdOrderByGeneradoEnDesc(rolExamenId)
-                .map(LoteCartillasOmr::getTotalCartillas)
-                .filter(total -> total != null && total > 0)
-                .orElse(rol.getEstudiantesInscritosCount() == null ? 0 : rol.getEstudiantesInscritosCount());
-        if (cartillasEsperadas <= 0) {
+        Set<Integer> cantidadesValidas = resolverCantidadesValidasCartillas(rolExamenId, rol);
+        if (cantidadesValidas.isEmpty()) {
             throw new IllegalArgumentException("No se pudo determinar la cantidad de cartillas entregadas para este rol. Genere primero el lote de cartillas.");
         }
 
         int paginas = contarPaginas(archivo);
-        if (paginas != cartillasEsperadas) {
+        if (!cantidadesValidas.contains(paginas)) {
+            int esperada = cantidadesValidas.iterator().next();
             throw new IllegalArgumentException(String.format(
-                    "El escaneado contiene %d página%s, pero el rol tiene %d cartilla%s entregada%s. Verifique que corresponda al mismo grupo y vuelva a cargar el archivo.",
-                    paginas, paginas == 1 ? "" : "s", cartillasEsperadas, cartillasEsperadas == 1 ? "" : "s", cartillasEsperadas == 1 ? "" : "s"));
+                    "El escaneado contiene %d página%s, pero el rol tiene %d cartilla%s generada%s en el lote oficial de la base de datos. Verifique que corresponda al mismo grupo y vuelva a cargar el archivo.",
+                    paginas, paginas == 1 ? "" : "s", esperada, esperada == 1 ? "" : "s", esperada == 1 ? "" : "s"));
         }
+    }
+
+    private Set<Integer> resolverCantidadesValidasCartillas(String rolExamenId, RolExamen rol) {
+        Set<Integer> validas = new java.util.LinkedHashSet<>();
+
+        // 1. Total del lote formal de cartillas OMR si existe
+        loteCartillasRepository.findFirstByRolExamenIdOrderByGeneradoEnDesc(rolExamenId)
+                .map(LoteCartillasOmr::getTotalCartillas)
+                .filter(total -> total != null && total > 0)
+                .ifPresent(validas::add);
+
+        // 2. Total de cartillas registrado en auditoría de impresión de marcas OMR
+        auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, "IMPRESION_MARCAS_OMR")
+                .ifPresent(aud -> {
+                    Integer cant = extraerCantidadAuditoria(aud.getDetallesJson());
+                    if (cant != null && cant > 0) validas.add(cant);
+                });
+
+        // 3. Estudiantes del mapeo oficial con examen generado (lote inicial oficial o cualquier cuadernillo)
+        List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);
+        if (mapeos != null && !mapeos.isEmpty()) {
+            long conOficial = mapeos.stream()
+                    .filter(m -> m.getCuadernilloIndividualPdf() != null
+                            && m.getCuadernilloIndividualPdf().contains("_Examenes_Oficiales.pdf"))
+                    .count();
+            if (conOficial > 0) {
+                validas.add((int) conOficial);
+            }
+
+            long conCualquierExamen = mapeos.stream()
+                    .filter(m -> m.getCuadernilloIndividualPdf() != null && !m.getCuadernilloIndividualPdf().isBlank())
+                    .count();
+            if (conCualquierExamen > 0) {
+                validas.add((int) conCualquierExamen);
+            }
+        }
+
+        // 4. Si aún no hay cantidades registradas, usar el conteo de inscritos del rol
+        if (validas.isEmpty()) {
+            int inscritos = rol.getEstudiantesInscritosCount() == null ? 0 : rol.getEstudiantesInscritosCount();
+            if (inscritos > 0) {
+                validas.add(inscritos);
+            }
+        }
+
+        return validas;
+    }
+
+    private Integer extraerCantidadAuditoria(String detallesJson) {
+        if (detallesJson == null || detallesJson.isBlank()) return null;
+        try {
+            JsonNode node = objectMapper.readTree(detallesJson);
+            if (node.has("cantidad") && !node.get("cantidad").isNull()) {
+                return node.get("cantidad").asInt();
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     private int contarPaginas(MultipartFile archivo) {

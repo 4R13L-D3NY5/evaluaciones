@@ -28,6 +28,7 @@ export interface VerificacionExamenLista {
   verificadoPor?: string;
   fechaVerificacion?: string;
   tieneHistorialDevoluciones?: boolean;
+  cantidadDevoluciones?: number;
 }
 
 export interface VerificacionOpcion { letra: string; texto: string; correcta: boolean; }

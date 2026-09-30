@@ -29,17 +29,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### Pendiente
 
-#### T-044 — Generación extemporánea para nuevos estudiantes agregados y refresco en vivo de nómina
-
-- Prioridad: Alta
-- Área: Evaluaciones / Generación de Exámenes / Nómina SEA
-- Responsable: Por definir
-- Creada: 2026-09-29
-- Fecha límite: Por definir
-- Dependencias: Por definir
-- Criterio de cierre: 1) Permitir generar examen extemporáneo complementario para nuevos estudiantes incorporados a un grupo después de que el examen ya fue generado o impreso, sin anular ni regenerar las variantes/cartillas de los estudiantes previamente generados; 2) Incluir botón/opción para refrescar en vivo la nómina de estudiantes desde SEA al momento de previsualizar/generar el examen o lote, detectando altas o bajas recientes; 3) Integrar y consolidar la calificación (OMR, virtual o sin cartilla) de todos los estudiantes (iniciales + extemporáneos) en una única acta/planilla oficial consolidada del grupo para entrega y cierre.
-- Notas: Registrada a solicitud del usuario (`=new`). Atiende casos donde se agregan estudiantes al grupo después de la generación del lote de exámenes, permitiendo emitir variantes solo para ellos y calificar en conjunto la nómina completa consolidada.
-
 #### T-036 — Flujo de rectificación y actualización administrativa de calificaciones sin cartilla
 
 - Prioridad: Media
@@ -86,6 +75,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
+#### T-046 — Módulo de Sincronización Masiva de Calificaciones al SEA por Sede y Carrera con Filtro Teórico/Práctico
+
+- Prioridad: Alta
+- Área: Integración SEA / Calificaciones Masivas / Portal Director y Evaluaciones
+- Responsable: Antigravity
+- Creada: 2026-09-30
+- Fecha límite: 2026-10-01
+- Dependencias: `SincronizacionNotasSeaService`, `SincronizacionSeaController`, `UnitepcGatewayClient`, `AccesoAcademicoService`, `app.routes.ts`, `sidebar.component.ts`.
+- Criterio de cierre: 1) Diseñar e implementar plan de integración para módulo dedicado de Sincronización SEA accesible por Director de Carrera, Responsable de Evaluaciones, Vicerrector y Administrador; 2) Permitir selección y filtrado reactivo por Sede y Carrera respetando el alcance académico del usuario; 3) Incluir filtro por tipo de grupo: Teóricos (default TA), Prácticos y Todos; 4) Presentar tabla interactiva con estado de sincronización (Sincronizado, Pendiente, No calificado) y checkboxes individuales con selector maestro 'Seleccionar todos'; 5) Endpoint backend y frontend para sincronización masiva con previsualización, reporte de progreso y auditoría inmutable.
+- Notas: En progreso. Elaborando el plan de implementación detallado a solicitud del usuario.
+
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
 
@@ -100,6 +100,28 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-047 — Optimizaciones en Verificación de Exámenes: Botón persistente de previsualización en cabecera para todos los estados y 4to filtro de Devueltos con Observaciones
+
+- Prioridad: Alta
+- Área: Verificación de Exámenes / Evaluaciones / UI
+- Responsable: Antigravity
+- Creada: 2026-09-30
+- Fecha límite: 2026-10-01
+- Dependencias: `verificar-examenes.component.ts`, `examenes-aprobados.component.ts`, `VerificacionExamenService`, `VerificacionExamenListaDto`.
+- Criterio de cierre: 1) Botón "Previsualizar examen completo" visible y anclado en la cabecera fija del modal en todos los estados (Validado, Devuelto y Aprobado); 2) Cuarto filtro/pestaña "Devueltos con observaciones" en la pantalla principal de verificación con contador reactivo; 3) Mapeo y conteo de cantidad de devoluciones por examen tanto en la lista como en el detalle.
+- Notas: En progreso. Implementando optimizaciones de cabecera persistente, nuevo filtro dedicado y conteo de devoluciones solicitadas por el usuario. Botón de previsualización anclado en cabecera para todos los estados de verificación y 4to filtro/pestaña de devueltos con observaciones con conteo de devoluciones completado y probado en contenedores.
+
+#### T-044 — Generación extemporánea para nuevos estudiantes agregados y refresco en vivo de nómina
+
+- Prioridad: Alta
+- Área: Evaluaciones / Generación de Exámenes / Nómina SEA
+- Responsable: Por definir
+- Creada: 2026-09-29
+- Fecha límite: Por definir
+- Dependencias: Por definir
+- Criterio de cierre: 1) Permitir generar examen extemporáneo complementario para nuevos estudiantes incorporados a un grupo después de que el examen ya fue generado o impreso, sin anular ni regenerar las variantes/cartillas de los estudiantes previamente generados; 2) Incluir botón/opción para refrescar en vivo la nómina de estudiantes desde SEA al momento de previsualizar/generar el examen o lote, detectando altas o bajas recientes; 3) Integrar y consolidar la calificación (OMR, virtual o sin cartilla) de todos los estudiantes (iniciales + extemporáneos) en una única acta/planilla oficial consolidada del grupo para entrega y cierre.
+- Notas: Registrada a solicitud del usuario (`=new`). Atiende casos donde se agregan estudiantes al grupo después de la generación del lote de exámenes, permitiendo emitir variantes solo para ellos y calificar en conjunto la nómina completa consolidada. Restriccion de simulador de rezagado a Admin y Responsable, sincronizacion de notas y propuesta de escaneo parcial OMR Validacion estricta OMR contra examenes generados en BD (Escenario A y B1), restriccion de simulador a Responsable y Admin, y asignacion directa de notas a rezagados
+
 #### T-045 — Sincronización Push de calificaciones de exámenes teóricos al Gateway SEA (POST /student-evaluations sobre 100 puntos)
 
 - Prioridad: Crítica
@@ -110,17 +132,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Dependencias: `UnitepcGatewayClient.java`, `sea_roles_evaluaciones`, `sea_calificaciones_omr`, `sea_notas_docente`, `sea_intentos_examen_virtual`.
 - Criterio de cierre: 1) Implementar cliente POST para `/api/v1/university/externals/research/student-evaluations` en `UnitepcGatewayClient` con cabeceras `Authorization: Bearer <token>` y `clientId: sea-evaluaciones`; 2) Homogeneizar la recolección de calificaciones teóricas sobre 100 puntos para cualquier modalidad (con cartilla OMR, sin cartilla y virtual) incluyendo notas orales reprogramadas; 3) Asignar 0 a estudiantes ausentes o sin evaluación registrada en la nómina oficial del grupo; 4) Crear migración Flyway V47 para persistir estado, fecha, usuario y resultado de la sincronización en `sea_roles_evaluaciones`; 5) Registrar auditoría inmutable en `sea_auditoria_evaluaciones`; 6) Proveer botón y diálogo de confirmación/previsualización y reporte de resultados en frontend (`evaluaciones-dia.component.ts`).
 - Notas: En progreso. Iniciando implementación de DTOs, extensión de GatewayClient y servicio de sincronización. Implementación completada: DTOs, endpoint POST al SEA, cálculo sobre 100 pts para OMR/Docente/Virtual, V47 migration, pruebas unitarias y modal Angular integrados y verificados en Docker Iniciando sandbox mock persistente y sincronizacion incremental delta Sandbox mock persistente en BD (Flyway V48) y sincronizacion incremental delta validadas en vivo en Docker Mock gateway persistente, sincronizacion delta sin ceros prematuros para ausentes, unificacion de nomina completa en Notas OMR y correccion de auditoria de IP
-
-#### T-044 — Sincronización de nómina oficial por toma de grupos tardía y generación de exámenes a rezagados
-
-- Prioridad: Alta
-- Área: Cartillas OMR / Evaluaciones del Día / Gateway SEA
-- Responsable: Antigravity
-- Creada: 2026-09-29
-- Fecha límite: 2026-09-30
-- Dependencias: `CartillaOmrService.java`, `CartillaOmrController.java`, `cartillas-omr.service.ts`, `evaluaciones-dia.component.ts`.
-- Criterio de cierre: 1) Permitir refrescar y sincronizar la nómina oficial en el modal de marcas OMR / lista de estudiantes consultando el Gateway de UNITEPC; 2) Asignar variantes rotativas (round-robin) e incorporar en MapeoEstudianteVariante a los estudiantes incorporados por toma de grupos tardía sin invalidar ni alterar los exámenes ya impresos de los estudiantes previos; 3) Habilitar la descarga y visualización del examen PDF correspondiente para cada estudiante (incluyendo rezagados); 4) Actualizar las cartillas OMR y listas de firmas con la nómina sincronizada.
-- Notas: Implementación completada con tests unitarios automatizados (CartillaOmrServiceTest) y botón de sincronización reactivo en frontend con visualización de variante y descarga de examen individual. Implementada sincronizacion de nomina oficial por toma de grupos tardia, asignacion balanceada de variantes round-robin para rezagados y descarga de examen individual en marcas OMR
 
 #### T-042 — Eliminar dependencia de ubicación de aula/campus para el Personal de Evaluaciones
 
@@ -549,9 +560,9 @@ _Sin tareas._
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 5 |
-| En progreso | 1 |
-| En revisión | 36 |
+| Pendientes | 4 |
+| En progreso | 2 |
+| En revisión | 37 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 
