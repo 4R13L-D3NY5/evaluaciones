@@ -23,23 +23,30 @@ import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepo
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
+import com.xpertiflow.evaluaciones.application.generacion.ExamenIndividualTypstService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CartillaOmrService {
@@ -70,6 +77,7 @@ public class CartillaOmrService {
     private final AppProperties appProperties;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final RolExamenService rolExamenService;
+    private final ExamenIndividualTypstService examenIndividualTypstService;
 
     @Transactional(readOnly = true)
     public Optional<LoteCartillasOmrResponseDto> obtenerUltimo(String rolExamenId) {
@@ -111,6 +119,8 @@ public class CartillaOmrService {
                         (existente, reemplazo) -> reemplazo
                 ));
 
+        String typOficialContenido = cargarContenidoTypstOficial(rolExamenId);
+
         List<DatosCartillaOmrDto> datos = java.util.stream.IntStream.range(0, estudiantes.size())
                 .mapToObj(indice -> {
                     DatosEstudiante estudiante = estudiantes.get(indice);
@@ -126,8 +136,12 @@ public class CartillaOmrService {
                     MapeoEstudianteVariante mapeo = mapeosPorCodigo.get(estudiante.codigo().trim());
                     String letraVariante = mapeo != null ? mapeo.getLetraVariante() : null;
                     String cuadernilloPdf = mapeo != null ? mapeo.getCuadernilloIndividualPdf() : null;
-                    if ((cuadernilloPdf == null || cuadernilloPdf.isBlank()) && letraVariante != null) {
-                        cuadernilloPdf = pdfPorVariante.get(letraVariante);
+
+                    // Si apunta al documento unificado del lote completo, validar si este estudiante está en él
+                    if (cuadernilloPdf != null && cuadernilloPdf.contains("_Examenes_Oficiales.pdf")) {
+                        if (typOficialContenido == null || !typOficialContenido.contains(estudiante.codigo().trim())) {
+                            cuadernilloPdf = null;
+                        }
                     }
 
                     return new DatosCartillaOmrDto(indice + 1, rol.getMateriaCodigo(), rol.getGrupo(),
@@ -214,7 +228,7 @@ public class CartillaOmrService {
                     nuevoMapeo.setApellidoMaterno("");
                     nuevoMapeo.setLetraVariante(letra);
                     nuevoMapeo.setHashControlSeguridad("CTL-" + codigo + "-" + letra);
-                    nuevoMapeo.setCuadernilloIndividualPdf(pdfPath);
+                    nuevoMapeo.setCuadernilloIndividualPdf(null);
                     nuevoMapeo.setEstadoAsistencia("PRESENTE");
                     mapeoRepository.save(nuevoMapeo);
 
@@ -537,6 +551,104 @@ public class CartillaOmrService {
             throw new IllegalStateException("La lista de firmas solo puede generarse antes de entregar el examen. "
                     + "Estado actual: " + rol.getEstadoFlujo().getValor());
         }
+    }
+
+    @Transactional
+    public PreparacionCartillasOmrResponseDto generarExamenEstudiante(String rolExamenId, String codigoEstudiante, String variante, String usuario) {
+        examenIndividualTypstService.generarCuadernilloEstudiante(rolExamenId, codigoEstudiante, variante, usuario);
+        return obtenerPreparacion(rolExamenId);
+    }
+
+    @Transactional
+    public PreparacionCartillasOmrResponseDto simularEstudianteRezagado(String rolExamenId, String usuario) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+
+        List<MapeoEstudianteVariante> mapeosActuales = mapeoRepository.findByRolExamenId(rolExamenId);
+
+        long countSimulados = mapeosActuales.stream()
+                .filter(m -> m.getCodigoEstudiante() != null && m.getCodigoEstudiante().startsWith("999"))
+                .count();
+        String nuevoCodigo = String.format("999%04d", countSimulados + 1);
+        String nuevoNombre = "QUINTANILLA PRUEBA CARLOS " + (countSimulados + 1);
+
+        List<ExamenVariante> variantes = varianteRepository.findByRolExamenId(rolExamenId).stream()
+                .sorted(Comparator.comparing(ExamenVariante::getLetraVariante))
+                .toList();
+
+        Map<String, Long> conteoPorLetra = mapeosActuales.stream()
+                .filter(m -> m.getLetraVariante() != null)
+                .collect(Collectors.groupingBy(MapeoEstudianteVariante::getLetraVariante, Collectors.counting()));
+
+        ExamenVariante varianteAsignada = null;
+        if (!variantes.isEmpty()) {
+            varianteAsignada = variantes.stream()
+                    .min(Comparator.comparingLong((ExamenVariante v) -> conteoPorLetra.getOrDefault(v.getLetraVariante(), 0L))
+                            .thenComparing(ExamenVariante::getLetraVariante))
+                    .orElse(variantes.get(0));
+        }
+        String letra = varianteAsignada != null ? varianteAsignada.getLetraVariante() : "A";
+        String varianteId = varianteAsignada != null ? varianteAsignada.getId() : String.format("VAR-%s-%s", rolExamenId, letra);
+
+        MapeoEstudianteVariante nuevoMapeo = new MapeoEstudianteVariante();
+        nuevoMapeo.setRolExamenId(rolExamenId);
+        nuevoMapeo.setVarianteId(varianteId);
+        nuevoMapeo.setCodigoEstudiante(nuevoCodigo);
+        nuevoMapeo.setNombres(nuevoNombre);
+        nuevoMapeo.setApellidoPaterno("");
+        nuevoMapeo.setApellidoMaterno("");
+        nuevoMapeo.setLetraVariante(letra);
+        nuevoMapeo.setHashControlSeguridad("CTL-" + nuevoCodigo + "-" + letra);
+        nuevoMapeo.setCuadernilloIndividualPdf(null);
+        nuevoMapeo.setEstadoAsistencia("PRESENTE");
+
+        int totalFinal = mapeosActuales.size() + 1;
+        mapeoRepository.save(nuevoMapeo);
+
+        rol.setEstudiantesInscritosCount(totalFinal);
+        rolExamenRepository.save(rol);
+
+        registrarAuditoriaDetalles(rol, "SIMULACION_ESTUDIANTE_REZAGADO", usuario,
+                "{\"codigoSimulado\":\"" + nuevoCodigo + "\",\"nombre\":\"" + nuevoNombre + "\",\"varianteAsignada\":\"" + letra + "\"}");
+
+        return obtenerPreparacion(rolExamenId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> obtenerVariantesDisponibles(String rolExamenId) {
+        List<ExamenVariante> variantes = varianteRepository.findByRolExamenId(rolExamenId);
+        if (variantes.isEmpty()) {
+            return List.of("A");
+        }
+        return variantes.stream()
+                .map(ExamenVariante::getLetraVariante)
+                .filter(Objects::nonNull)
+                .sorted()
+                .distinct()
+                .toList();
+    }
+
+    private String cargarContenidoTypstOficial(String rolExamenId) {
+        try {
+            if (appProperties == null || appProperties.getStorage() == null || appProperties.getStorage().getBasePath() == null) {
+                return null;
+            }
+            Path documentosDir = Path.of(appProperties.getStorage().getBasePath(), "generados", rolExamenId, "documentos");
+            if (!Files.exists(documentosDir)) {
+                return null;
+            }
+            try (Stream<Path> stream = Files.list(documentosDir)) {
+                Path typ = stream.filter(p -> p.getFileName().toString().endsWith(".typ"))
+                        .findFirst()
+                        .orElse(null);
+                if (typ != null && Files.exists(typ)) {
+                    return Files.readString(typ, StandardCharsets.UTF_8);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("No se pudo leer contenido Typst para verificación en rol {}: {}", rolExamenId, e.getMessage());
+        }
+        return null;
     }
 
     private String seguro(String valor) {

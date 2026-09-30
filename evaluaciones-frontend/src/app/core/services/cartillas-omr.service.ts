@@ -107,4 +107,29 @@ export class CartillasOmrService {
       {}
     );
   }
+
+  public generarExamenEstudiante(rolExamenId: string, codigoEstudiante: string, variante?: string): Observable<PreparacionCartillasOmr> {
+    const params: Record<string, string> = {};
+    if (variante) {
+      params['variante'] = variante;
+    }
+    return this._http.post<PreparacionCartillasOmr>(
+      `/api/roles-examen/${rolExamenId}/cartillas/estudiantes/${encodeURIComponent(codigoEstudiante)}/generar-examen`,
+      {},
+      { params }
+    );
+  }
+
+  public simularEstudianteRezagado(rolExamenId: string): Observable<PreparacionCartillasOmr> {
+    return this._http.post<PreparacionCartillasOmr>(
+      `/api/roles-examen/${rolExamenId}/cartillas/simular-rezagado`,
+      {}
+    );
+  }
+
+  public obtenerVariantesDisponibles(rolExamenId: string): Observable<string[]> {
+    return this._http.get<string[]>(
+      `/api/roles-examen/${rolExamenId}/cartillas/variantes-disponibles`
+    );
+  }
 }

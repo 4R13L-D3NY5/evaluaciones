@@ -16,6 +16,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/roles-examen/{rolExamenId}/cartillas")
 @RequiredArgsConstructor
@@ -108,5 +110,34 @@ public class CartillaOmrController {
             @RequestBody(required = false) GenerarCartillasOmrRequestDto request,
             Authentication authentication) {
         return ResponseEntity.ok(cartillaOmrService.marcarImpreso(rolExamenId, loteId, authentication.getName()));
+    }
+
+    @PostMapping("/estudiantes/{codigoEstudiante}/generar-examen")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @Operation(summary = "Generar examen individual personalizado para un estudiante rezagado")
+    public ResponseEntity<PreparacionCartillasOmrResponseDto> generarExamenEstudiante(
+            @PathVariable String rolExamenId,
+            @PathVariable String codigoEstudiante,
+            @RequestParam(required = false) String variante,
+            Authentication authentication) {
+        String usuario = authentication != null ? authentication.getName() : "SISTEMA";
+        return ResponseEntity.ok(cartillaOmrService.generarExamenEstudiante(rolExamenId, codigoEstudiante, variante, usuario));
+    }
+
+    @PostMapping("/simular-rezagado")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @Operation(summary = "Simular incorporación de un estudiante rezagado para pruebas locales")
+    public ResponseEntity<PreparacionCartillasOmrResponseDto> simularRezagado(
+            @PathVariable String rolExamenId,
+            Authentication authentication) {
+        String usuario = authentication != null ? authentication.getName() : "SISTEMA";
+        return ResponseEntity.ok(cartillaOmrService.simularEstudianteRezagado(rolExamenId, usuario));
+    }
+
+    @GetMapping("/variantes-disponibles")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @Operation(summary = "Obtener las letras de variantes disponibles en el examen oficial")
+    public ResponseEntity<List<String>> obtenerVariantesDisponibles(@PathVariable String rolExamenId) {
+        return ResponseEntity.ok(cartillaOmrService.obtenerVariantesDisponibles(rolExamenId));
     }
 }

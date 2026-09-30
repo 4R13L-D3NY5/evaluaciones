@@ -54,4 +54,8 @@ public class RolExamenResponseDto {
     private LocalDateTime fechaGeneracion;
     private LocalDateTime creadoEn;
     private LocalDateTime actualizadoEn;
+    private Boolean sincronizadoSea;
+    private LocalDateTime fechaSincronizacionSea;
+    private String sincronizadoSeaPor;
+    private String sincronizacionSeaResultado;
 }

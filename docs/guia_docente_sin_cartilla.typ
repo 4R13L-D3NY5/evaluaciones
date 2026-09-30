@@ -48,7 +48,7 @@
 )
 
 #set text(
-  font: ("Segoe UI", "Arial", "Liberation Sans"),
+  font: ("Segoe UI", "Arial"),
   size: 9.3pt,
   lang: "es",
   fill: rgb("#1e293b")
@@ -93,7 +93,7 @@
 
 #text(size: 10pt, weight: "bold", fill: rgb("#0f172a"))[1. Resumen del Flujo Operativo]
 
-En las evaluaciones presenciales de modalidad *Sin Cartilla*, el docente titular califica los exámenes en aula y registra las notas en el *Sistema de Evaluaciones*. Al completar la nómina, el sistema emite la *Planilla Oficial de Calificaciones*, la cual debe imprimirse, firmarse y entregarse en el *Departamento de Evaluaciones* junto con las pruebas físicas.
+En las evaluaciones presenciales de modalidad *Sin Cartilla*, el docente titular califica los exámenes y registra las notas en el *Sistema de Evaluaciones*. Al completar la nómina, el sistema emite la *Planilla Oficial de Calificaciones*, la cual debe imprimirse, firmarse y entregarse en el *Departamento de Evaluaciones* junto con las pruebas físicas.
 
 #v(3pt)
 
@@ -139,13 +139,12 @@ El docente puede acceder a registrar calificaciones tan pronto el examen se encu
 
 #text(size: 10pt, weight: "bold", fill: rgb("#0f172a"))[3. Paso 2: Registro de Calificaciones en la Nómina Oficial]
 
-Al abrir la ventana emergente *Planilla Oficial de Calificaciones*, el sistema presenta la nómina oficial del grupo:
+Al abrir la ventana *Planilla Oficial de Calificaciones*, el sistema muestra la nómina de estudiantes del grupo:
 
-- *Casilla "Nota / 60":* Digite la calificación del estudiante en escala de *0 a 60 puntos*.
-- *Columna "Nota / 100":* El sistema calcula en tiempo real la equivalencia oficial:
-  $ "Nota"_(100) = ("Nota"_(60) times 100) / 60 $
-- *Regla de nómina completa:* Se deben calificar todos los estudiantes del grupo. Si un estudiante no rindió la prueba, debe asignársele `0`.
-- *Verificación de progreso:* El contador indicará cuando todas las notas estén cargadas mostrando la insignia verde *COMPLETAS 4/4*.
+- *Casilla "Nota / 60":* Ingrese la calificación obtenida por el estudiante sobre *60 puntos*.
+- *Columna "Nota / 100":* El sistema calcula de forma automática la equivalencia sobre *100 puntos*.
+- *Nómina completa:* Es obligatorio calificar a todos los estudiantes de la lista. Si un estudiante no se presentó a rendir el examen, debe registrarle *0*.
+- *Verificación rápida:* El contador superior indicará el avance y se marcará en verde (*COMPLETAS*) cuando la nómina esté llena, habilitando el botón de guardado.
 
 #v(2pt)
 
@@ -178,7 +177,7 @@ Al completar la nómina, pulse el botón verde *Guardar y Calificar Examen*.
   inset: 7pt,
   [
     #text(weight: "bold", fill: rgb("#1e3a8a"))[Regla de Inmutabilidad Docente:]
-    El guardado realizado por el docente es definitivo. Una vez guardadas las notas, el examen pasa a estado *CALIFICADO* y las notas no pueden modificarse desde el perfil docente. Cualquier rectificación posterior debe gestionarse a través de Dirección de Carrera.
+    El guardado realizado por el docente es definitivo. Una vez guardadas las notas, el examen pasa a estado *CALIFICADO* y las calificaciones no podrán ser modificadas desde el perfil docente.
   ]
 )
 

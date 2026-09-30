@@ -1,4 +1,4 @@
-# Kanban de tareas del proyecto
+﻿# Kanban de tareas del proyecto
 
 Tablero documental para dar seguimiento a las tareas pendientes de `evaluaciones`. Este archivo es la fuente de verdad del seguimiento operativo y puede actualizarse desde cualquier conversación que esté trabajando sobre este proyecto y esta rama.
 
@@ -88,6 +88,7 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
+
 - Prioridad: Media
 - Área: Auditoría y Bitácora
 - Responsable: Por definir
@@ -100,6 +101,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 
 ### En revisión
+
+#### T-045 — Sincronización Push de calificaciones de exámenes teóricos al Gateway SEA (POST /student-evaluations sobre 100 puntos)
+
+- Prioridad: Crítica
+- Área: Integración Institucional / Gateway SEA / Calificaciones
+- Responsable: Antigravity
+- Creada: 2026-09-29
+- Fecha límite: 2026-09-30
+- Dependencias: `UnitepcGatewayClient.java`, `sea_roles_evaluaciones`, `sea_calificaciones_omr`, `sea_notas_docente`, `sea_intentos_examen_virtual`.
+- Criterio de cierre: 1) Implementar cliente POST para `/api/v1/university/externals/research/student-evaluations` en `UnitepcGatewayClient` con cabeceras `Authorization: Bearer <token>` y `clientId: sea-evaluaciones`; 2) Homogeneizar la recolección de calificaciones teóricas sobre 100 puntos para cualquier modalidad (con cartilla OMR, sin cartilla y virtual) incluyendo notas orales reprogramadas; 3) Asignar 0 a estudiantes ausentes o sin evaluación registrada en la nómina oficial del grupo; 4) Crear migración Flyway V47 para persistir estado, fecha, usuario y resultado de la sincronización en `sea_roles_evaluaciones`; 5) Registrar auditoría inmutable en `sea_auditoria_evaluaciones`; 6) Proveer botón y diálogo de confirmación/previsualización y reporte de resultados en frontend (`evaluaciones-dia.component.ts`).
+- Notas: En progreso. Iniciando implementación de DTOs, extensión de GatewayClient y servicio de sincronización. Implementación completada: DTOs, endpoint POST al SEA, cálculo sobre 100 pts para OMR/Docente/Virtual, V47 migration, pruebas unitarias y modal Angular integrados y verificados en Docker
 
 #### T-044 — Sincronización de nómina oficial por toma de grupos tardía y generación de exámenes a rezagados
 
@@ -539,7 +551,7 @@ _Sin tareas._
 
 | Indicador | Total |
 |---|---:|
-| Pendientes | 4 |
+| Pendientes | 5 |
 | En progreso | 1 |
 | En revisión | 36 |
 | Bloqueadas | 0 |

@@ -195,6 +195,26 @@ public class UnitepcGatewayClient {
                 .body(TimeFrameDto.class);
     }
 
+    public List<ResearchStudentEvaluationRegisterResponseDto> registerStudentEvaluations(ResearchStudentEvaluationRegisterInputDto input) {
+        log.info("Enviando calificaciones al Gateway SEA: groupId={}, syllabusCourseId={}, totalEstudiantes={}",
+                input.getGroupId(), input.getSyllabusCourseId(), input.getStudents() != null ? input.getStudents().size() : 0);
+        try {
+            return restClient.post()
+                    .uri("/api/v1/university/externals/research/student-evaluations")
+                    .headers(h -> {
+                        h.setBearerAuth(getToken());
+                        h.set("clientId", systemClientId);
+                    })
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(input)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<List<ResearchStudentEvaluationRegisterResponseDto>>() {});
+        } catch (Exception ex) {
+            log.error("Error al registrar calificaciones en el Gateway SEA: {}", ex.getMessage(), ex);
+            throw new RuntimeException("Error en la comunicación con el Gateway SEA: " + ex.getMessage(), ex);
+        }
+    }
+
     public void clearToken() {
         this.accessToken = null;
         this.tokenExpiration = null;
