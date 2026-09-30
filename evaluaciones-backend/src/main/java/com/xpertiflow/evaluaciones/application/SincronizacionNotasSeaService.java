@@ -108,26 +108,32 @@ public class SincronizacionNotasSeaService {
             throw new IllegalStateException("El rol de examen no cuenta con identificadores válidos de SEA (syllabusCourseId o groupId faltante o inválido).");
         }
 
-        // 3. Consolidar la nómina de estudiantes y sus notas sobre 100 (incluyendo 0 para ausentes)
+        // 3. Consolidar la nómina de estudiantes y sus notas sobre 100 (omitiendo ausentes sin nota)
         List<EstudianteCalculado> estudiantesCalculados = consolidarNotasTeoricas(rol);
         if (estudiantesCalculados.isEmpty()) {
             throw new IllegalStateException("No se encontraron estudiantes para sincronizar en este grupo.");
         }
 
-        // 4. Construir payload para el Gateway SEA
+        // 4. Construir payload para el Gateway SEA (SOLO estudiantes con nota calculada)
         List<StudentOldCodeScoreInputDto> studentsInput = new ArrayList<>();
         Map<Long, EstudianteCalculado> porOldCode = new HashMap<>();
 
         for (EstudianteCalculado calc : estudiantesCalculados) {
-            if (calc.studentOldCode() != null) {
+            if (calc.studentOldCode() != null && calc.score() != null) {
                 studentsInput.add(StudentOldCodeScoreInputDto.builder()
                         .studentOldCode(calc.studentOldCode())
                         .score(calc.score())
                         .build());
                 porOldCode.put(calc.studentOldCode(), calc);
-            } else {
+            } else if (calc.studentOldCode() == null) {
                 log.warn("Estudiante {} con código no numérico omitido del envío al SEA", calc.codigoEstudiante());
+            } else {
+                log.info("Estudiante {} omitido del envío al SEA por estar pendiente de evaluación (sin nota)", calc.codigoEstudiante());
             }
+        }
+
+        if (studentsInput.isEmpty()) {
+            throw new IllegalStateException("No hay estudiantes con calificaciones registradas para sincronizar en este grupo.");
         }
 
         ResearchStudentEvaluationRegisterInputDto inputDto = ResearchStudentEvaluationRegisterInputDto.builder()
@@ -164,19 +170,21 @@ public class SincronizacionNotasSeaService {
 
         for (EstudianteCalculado calc : estudiantesCalculados) {
             Boolean completado = null;
-            if (calc.studentOldCode() != null) {
+            if (calc.studentOldCode() != null && calc.score() != null) {
                 completado = resultadoPorOldCode.get(calc.studentOldCode());
             }
 
             if (Boolean.TRUE.equals(completado)) {
                 exitosos++;
-            } else {
+            } else if (Boolean.FALSE.equals(completado)) {
                 fallidos++;
             }
 
             String observacionFinal = calc.observacion();
             if (Boolean.FALSE.equals(completado)) {
                 observacionFinal = (observacionFinal != null ? observacionFinal + " - " : "") + "Rechazado por el SEA (completed: false)";
+            } else if (calc.score() == null) {
+                observacionFinal = "Pendiente de evaluación (Omitido de la sincronización)";
             }
 
             detalleReporte.add(EstudianteSincronizadoDetalleDto.builder()
@@ -296,7 +304,7 @@ public class SincronizacionNotasSeaService {
             consolidarNotasOmr(rol, nominaGatewayMap, calculados);
         }
 
-        // Agregar a cualquier estudiante de la nómina oficial del gateway que no haya sido calificado con nota 0
+        // Agregar a cualquier estudiante de la nómina oficial del gateway que no haya sido calificado aún
         for (StudentItemDto estudiante : estudiantesGateway) {
             String codigo = estudiante.getStudentCode() != null ? estudiante.getStudentCode().trim() : "";
             if (!codigo.isBlank() && !calculados.containsKey(codigo)) {
@@ -305,9 +313,9 @@ public class SincronizacionNotasSeaService {
                         codigo,
                         oldCode,
                         estudiante.getFullName() != null ? estudiante.getFullName() : "ESTUDIANTE",
-                        0,
+                        null,
                         false,
-                        "Ausente / Sin evaluación registrada"
+                        "Pendiente de evaluación / Ausente"
                 ));
             }
         }
@@ -400,7 +408,7 @@ public class SincronizacionNotasSeaService {
 
     private Integer parseScore(BigDecimal notaSobre100) {
         if (notaSobre100 == null) {
-            return 0;
+            return null;
         }
         int rounded = notaSobre100.setScale(0, RoundingMode.HALF_UP).intValue();
         return Math.max(0, Math.min(100, rounded));

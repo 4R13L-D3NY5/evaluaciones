@@ -129,10 +129,11 @@ class SincronizacionNotasSeaServiceTest {
         assertEquals(86, est1.getScore());
         assertEquals(1113004L, est1.getStudentOldCode());
 
-        // Verificar que s2 (ausente) tiene nota 0
+        // Verificar que s2 (ausente) tiene score null (no se inventa 0)
         var est2 = previa.getEstudiantes().stream().filter(e -> "1108137".equals(e.getCodigoEstudiante())).findFirst().orElseThrow();
-        assertEquals(0, est2.getScore());
+        assertNull(est2.getScore());
         assertEquals(1108137L, est2.getStudentOldCode());
+        assertTrue(est2.getObservacion().contains("Pendiente"));
     }
 
     @Test
@@ -204,5 +205,70 @@ class SincronizacionNotasSeaServiceTest {
 
         verify(rolExamenRepository).save(rol);
         verify(auditoriaRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("Debe sincronizar de forma incremental: transmitir evaluados y omitir ausentes sin marcarlos como fallidos")
+    void testSincronizarNotasConSea_OmiteAusentes() {
+        when(rolExamenRepository.findById(rolExamenId)).thenReturn(Optional.of(rol));
+
+        // 1 evaluado con cartilla
+        CalificacionOmr cal1 = new CalificacionOmr();
+        cal1.setRolExamenId(rolExamenId);
+        cal1.setCodigoEstudiante("5178397");
+        cal1.setEstudianteNombreCompleto("QUISPE MAMANI LUIS");
+        cal1.setNotaSobre100(new BigDecimal("80.00"));
+        cal1.setEstadoCalificacion("CALIFICADO");
+        cal1.setEsReprogramado(false);
+
+        when(calificacionOmrRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId))
+                .thenReturn(List.of(cal1));
+
+        // Nómina del gateway con el evaluado y 1 ausente
+        StudentItemDto s1 = new StudentItemDto();
+        s1.setStudentCode("5178397");
+        s1.setFullName("QUISPE MAMANI LUIS");
+
+        StudentItemDto s2Ausente = new StudentItemDto();
+        s2Ausente.setStudentCode("9999999");
+        s2Ausente.setFullName("PEREZ CARLOS");
+
+        when(unitepcGatewayClient.getStudentsByGroup(groupId.toString()))
+                .thenReturn(List.of(s1, s2Ausente));
+
+        // Gateway responde éxito para el único enviado
+        ResearchStudentEvaluationRegisterResponseDto resp1 = ResearchStudentEvaluationRegisterResponseDto.builder()
+                .syllabusCourseId(syllabusId)
+                .groupId(groupId)
+                .oldCode(5178397L)
+                .completed(true)
+                .build();
+
+        when(unitepcGatewayClient.registerStudentEvaluations(any(ResearchStudentEvaluationRegisterInputDto.class)))
+                .thenReturn(List.of(resp1));
+
+        SincronizacionNotasSeaReporteDto resultado = service.sincronizarNotasConSea(rolExamenId, auth);
+
+        assertNotNull(resultado);
+        assertEquals(2, resultado.getTotalEstudiantes());
+        assertEquals(1, resultado.getTotalExitosos());
+        assertEquals(0, resultado.getTotalFallidos()); // Ausente NO cuenta como fallido
+
+        // Verificar que el payload enviado al Gateway solo tiene 1 estudiante (el evaluado)
+        ArgumentCaptor<ResearchStudentEvaluationRegisterInputDto> captor = ArgumentCaptor.forClass(ResearchStudentEvaluationRegisterInputDto.class);
+        verify(unitepcGatewayClient).registerStudentEvaluations(captor.capture());
+
+        ResearchStudentEvaluationRegisterInputDto enviado = captor.getValue();
+        assertEquals(1, enviado.getStudents().size());
+        assertEquals(5178397L, enviado.getStudents().get(0).getStudentOldCode());
+        assertEquals(80, enviado.getStudents().get(0).getScore());
+
+        // Verificar el detalle del ausente
+        var estAusente = resultado.getEstudiantes().stream()
+                .filter(e -> "9999999".equals(e.getCodigoEstudiante()))
+                .findFirst().orElseThrow();
+        assertNull(estAusente.getScore());
+        assertNull(estAusente.getCompletado());
+        assertTrue(estAusente.getObservacion().contains("Pendiente"));
     }
 }
