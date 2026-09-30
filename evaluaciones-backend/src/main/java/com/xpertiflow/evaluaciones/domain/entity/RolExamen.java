@@ -114,6 +114,19 @@ public class RolExamen {
     @Column(name = "fecha_generacion")
     private LocalDateTime fechaGeneracion;
 
+    @Builder.Default
+    @Column(name = "sincronizado_sea", nullable = false)
+    private Boolean sincronizadoSea = false;
+
+    @Column(name = "fecha_sincronizacion_sea")
+    private LocalDateTime fechaSincronizacionSea;
+
+    @Column(name = "sincronizado_sea_por", length = 100)
+    private String sincronizadoSeaPor;
+
+    @Column(name = "sincronizacion_sea_resultado", columnDefinition = "TEXT")
+    private String sincronizacionSeaResultado;
+
     @CreationTimestamp
     @Column(name = "creado_en", updatable = false)
     private LocalDateTime creadoEn;

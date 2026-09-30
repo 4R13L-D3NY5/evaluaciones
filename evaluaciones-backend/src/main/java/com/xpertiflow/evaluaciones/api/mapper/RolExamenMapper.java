@@ -113,6 +113,10 @@ public class RolExamenMapper {
                 .fechaGeneracion(entity.getFechaGeneracion())
                 .creadoEn(entity.getCreadoEn())
                 .actualizadoEn(entity.getActualizadoEn())
+                .sincronizadoSea(entity.getSincronizadoSea())
+                .fechaSincronizacionSea(entity.getFechaSincronizacionSea())
+                .sincronizadoSeaPor(entity.getSincronizadoSeaPor())
+                .sincronizacionSeaResultado(entity.getSincronizacionSeaResultado())
                 .build();
     }
 

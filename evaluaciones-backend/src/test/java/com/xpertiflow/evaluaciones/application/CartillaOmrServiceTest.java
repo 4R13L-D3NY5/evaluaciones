@@ -48,6 +48,7 @@ class CartillaOmrServiceTest {
     private AppProperties appProperties;
     private UnitepcGatewayClient unitepcGatewayClient;
     private RolExamenService rolExamenService;
+    private com.xpertiflow.evaluaciones.application.generacion.ExamenIndividualTypstService examenIndividualTypstService;
 
     private CartillaOmrService service;
 
@@ -62,8 +63,12 @@ class CartillaOmrServiceTest {
         auditoriaRepository = mock(AuditoriaEvaluacionRepository.class);
         pdfService = mock(CartillaOmrPdfService.class);
         appProperties = mock(AppProperties.class);
+        AppProperties.Storage storage = new AppProperties.Storage();
+        storage.setBasePath("/app/storage");
+        when(appProperties.getStorage()).thenReturn(storage);
         unitepcGatewayClient = mock(UnitepcGatewayClient.class);
         rolExamenService = mock(RolExamenService.class);
+        examenIndividualTypstService = mock(com.xpertiflow.evaluaciones.application.generacion.ExamenIndividualTypstService.class);
 
         service = new CartillaOmrService(
                 rolExamenRepository,
@@ -76,7 +81,8 @@ class CartillaOmrServiceTest {
                 pdfService,
                 appProperties,
                 unitepcGatewayClient,
-                rolExamenService
+                rolExamenService,
+                examenIndividualTypstService
         );
     }
 
@@ -193,13 +199,14 @@ class CartillaOmrServiceTest {
         // Como había 2 en A y 1 en B, el nuevo estudiante debe asignarse a B para balancear
         assertEquals("B", guardado1.getLetraVariante());
         assertEquals("CTL-1004-B", guardado1.getHashControlSeguridad());
-        assertEquals("/storage/exam_B.pdf", guardado1.getCuadernilloIndividualPdf());
+        assertNull(guardado1.getCuadernilloIndividualPdf());
 
         MapeoEstudianteVariante guardado2 = guardados.get(1);
         assertEquals("1005", guardado2.getCodigoEstudiante());
         // Ahora ambos tienen 2, entonces se asigna a A
         assertEquals("A", guardado2.getLetraVariante());
         assertEquals("CTL-1005-A", guardado2.getHashControlSeguridad());
+        assertNull(guardado2.getCuadernilloIndividualPdf());
 
         // Verificar auditoría
         verify(auditoriaRepository, atLeastOnce()).save(any(AuditoriaEvaluacion.class));
@@ -236,5 +243,68 @@ class CartillaOmrServiceTest {
         assertEquals(0, resultado.nuevosEstudiantes());
         assertTrue(resultado.codigosNuevos().isEmpty());
         verify(mapeoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Simular estudiante rezagado crea mapeo con examen individual en null y audita")
+    void simularEstudianteRezagadoCreaMapeo() {
+        String rolId = "ROL-003";
+        RolExamen rol = crearRolExamen(rolId, EstadoFlujo.GENERADO, 1);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        MapeoEstudianteVariante m1 = new MapeoEstudianteVariante();
+        m1.setId(1L);
+        m1.setRolExamenId(rolId);
+        m1.setCodigoEstudiante("1001");
+        m1.setNombres("JUAN PEREZ");
+        m1.setLetraVariante("A");
+        List<MapeoEstudianteVariante> mapeos = new ArrayList<>(List.of(m1));
+
+        when(mapeoRepository.findByRolExamenId(rolId)).thenReturn(mapeos);
+        when(varianteRepository.findByRolExamenId(rolId)).thenReturn(List.of());
+        when(mapeoRepository.save(any(MapeoEstudianteVariante.class))).thenAnswer(inv -> {
+            MapeoEstudianteVariante guardado = inv.getArgument(0);
+            mapeos.add(guardado);
+            return guardado;
+        });
+
+        // Simular rezagado
+        PreparacionCartillasOmrResponseDto resp = service.simularEstudianteRezagado(rolId, "test_admin");
+
+        assertNotNull(resp);
+        ArgumentCaptor<MapeoEstudianteVariante> captor = ArgumentCaptor.forClass(MapeoEstudianteVariante.class);
+        verify(mapeoRepository).save(captor.capture());
+
+        MapeoEstudianteVariante simulado = captor.getValue();
+        assertEquals("9990001", simulado.getCodigoEstudiante());
+        assertTrue(simulado.getNombres().contains("QUINTANILLA PRUEBA CARLOS"));
+        assertNull(simulado.getCuadernilloIndividualPdf());
+        assertEquals(2, rol.getEstudiantesInscritosCount());
+        verify(auditoriaRepository, atLeastOnce()).save(any(AuditoriaEvaluacion.class));
+    }
+
+    @Test
+    @DisplayName("Generar examen estudiante invoca servicio Typst")
+    void generarExamenEstudianteInvocaTypst() {
+        String rolId = "ROL-004";
+        RolExamen rol = crearRolExamen(rolId, EstadoFlujo.GENERADO, 1);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        MapeoEstudianteVariante m1 = new MapeoEstudianteVariante();
+        m1.setId(1L);
+        m1.setRolExamenId(rolId);
+        m1.setCodigoEstudiante("9990001");
+        m1.setNombres("CARLOS QUINTANILLA");
+        m1.setLetraVariante("B");
+
+        when(mapeoRepository.findByRolExamenId(rolId)).thenReturn(List.of(m1));
+        when(varianteRepository.findByRolExamenId(rolId)).thenReturn(List.of());
+        when(examenIndividualTypstService.generarCuadernilloEstudiante(rolId, "9990001", "B", "admin"))
+                .thenReturn("/storage/generados/ROL-004/cuadernillos/examen.pdf");
+
+        PreparacionCartillasOmrResponseDto resp = service.generarExamenEstudiante(rolId, "9990001", "B", "admin");
+
+        assertNotNull(resp);
+        verify(examenIndividualTypstService).generarCuadernilloEstudiante(rolId, "9990001", "B", "admin");
     }
 }

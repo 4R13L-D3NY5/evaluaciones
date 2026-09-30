@@ -53,6 +53,11 @@ import {
 } from '../../core/models/generacion-typst.model';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import { CampusCarrerasService, CarreraCampusAsignada } from '../../core/services/campus-carreras.service';
+import {
+  SincronizacionSeaService,
+  SincronizacionNotasSeaReporte,
+  EstudianteSincronizadoDetalle
+} from '../../core/services/sincronizacion-sea.service';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker-4.10.38.min.mjs';
@@ -90,6 +95,10 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
     usuario: string;
     detalle: string;
   }[];
+  sincronizadoSea?: boolean;
+  fechaSincronizacionSea?: string;
+  sincronizadoSeaPor?: string;
+  sincronizacionSeaResultado?: string;
 }
 
 type ColumnaOrdenEvaluaciones = 'materia' | 'docente' | 'parcial' | 'fechaHora' | 'modalidad' | 'etapa';
@@ -523,6 +532,11 @@ interface CampusDisponible extends Campus {
                           <i class="pi pi-clock mr-1"></i>{{ formatearFechaHoraAuditoria(actividad.fechaEvento) }} · {{ actividad.usuario || 'Sistema' }}
                         </div>
                       }
+                      @if (item.sincronizadoSea) {
+                        <div class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-50 border border-sky-200 text-sky-800 text-[9px] font-bold">
+                          <i class="pi pi-cloud text-[9px] text-sky-600"></i> SEA Sincronizado
+                        </div>
+                      }
                     </td>
 
                     <td class="p-3.5 text-center">
@@ -711,7 +725,27 @@ interface CampusDisponible extends Campus {
                           </div>
                         }
 
-                        <!-- 4. Botón Restablecer a Validado -->
+                        <!-- 4. Sincronizar Notas con SEA (Push POST) -->
+                        @if (puedeSincronizarNotasSea(item)) {
+                          <div class="relative group/sincronizarSea">
+                            <button
+                              (click)="abrirModalSincronizarSea(item)"
+                              title="Sincronizar notas teóricas con el SEA"
+                              aria-label="Sincronizar notas teóricas con el SEA"
+                              [class]="item.sincronizadoSea ? 'bg-sky-100 hover:bg-sky-200 text-sky-800 border-sky-300' : 'bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200'"
+                              class="h-7 w-7 rounded-lg border flex items-center justify-center cursor-pointer transition-colors shadow-2xs">
+                              <i class="pi pi-cloud-upload text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/sincronizarSea:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                                {{ item.sincronizadoSea ? 'Re-sincronizar notas con SEA (Actas)' : 'Sincronizar notas con SEA (Actas)' }}
+                              </span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
+                        <!-- 5. Botón Restablecer a Validado -->
                         @if (puedeRestablecer(item)) {
                           <div class="relative group/reestablecer">
                             <button 
@@ -1974,6 +2008,16 @@ interface CampusDisponible extends Campus {
                           <i class="pi" [class.pi-spin]="sincronizandoNomina()" [class.pi-spinner]="sincronizandoNomina()" [class.pi-sync]="!sincronizandoNomina()"></i>
                           <span>{{ sincronizandoNomina() ? 'Sincronizando...' : 'Sincronizar nómina (Toma de grupos)' }}</span>
                         </button>
+                        @if (esEntornoLocal) {
+                          <button
+                            (click)="simularRezagadoParaPruebas()"
+                            [disabled]="sincronizandoNomina() || generandoCartillas() || generandoListaCartillas() || simulandoRezagado()"
+                            class="px-2.5 py-1.5 rounded-xl border border-dashed border-amber-400 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+                            title="Herramienta de prueba local: simula la incorporación de un estudiante rezagado para generar su examen">
+                            <i class="pi" [class.pi-spin]="simulandoRezagado()" [class.pi-spinner]="simulandoRezagado()" [class.pi-user-plus]="!simulandoRezagado()"></i>
+                            <span>{{ simulandoRezagado() ? 'Simulando...' : '+ Simular rezagado (Pruebas)' }}</span>
+                          </button>
+                        }
                         <span class="px-2.5 py-1 rounded-full bg-background border border-border text-[10px] font-black text-muted-foreground">{{ preparacion.totalCartillas }} registros</span>
                       </div>
                     </div>
@@ -2005,7 +2049,14 @@ interface CampusDisponible extends Campus {
                               <span>Descargar</span>
                             </button>
                           } @else {
-                            <span class="text-[10px] text-muted-foreground italic">—</span>
+                            <button
+                              (click)="abrirModalGenerarExamen(estudiante)"
+                              [disabled]="generandoExamenIndividual()"
+                              class="px-2 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                              title="Generar examen personalizado para este estudiante rezagado">
+                              <i class="pi pi-file-plus"></i>
+                              <span>Generar</span>
+                            </button>
                           }
                         </div>
                         @if (estudiante.estadoCalificacion === 'ANULADO' || (estudiante.observacion && estudiante.observacion.includes('ANULADO'))) {
@@ -2062,6 +2113,98 @@ interface CampusDisponible extends Campus {
             </div>
             <div class="p-4 border-t border-border flex justify-end shrink-0 bg-muted/20">
               <button (click)="cerrarGestionCartillas()" class="px-5 py-2.5 rounded-xl border border-border bg-background hover:bg-muted text-xs font-black text-foreground cursor-pointer">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: GENERACIÓN DE EXAMEN INDIVIDUAL PARA REZAGADO -->
+      @if (dialogGenerarExamenIndividual()) {
+        <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-border flex items-start justify-between gap-4 bg-muted/30">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center">
+                  <i class="pi pi-file-plus text-lg"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Generar Examen Individual</h3>
+                  <p class="text-xs text-muted-foreground">Estudiante rezagado por toma de grupos tardía</p>
+                </div>
+              </div>
+              <button (click)="cerrarModalGenerarExamen()" [disabled]="generandoExamenIndividual()" class="text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <div class="p-5 space-y-4">
+              @if (estudianteSeleccionadoParaExamen(); as est) {
+                <div class="rounded-xl border border-border bg-muted/40 p-3.5 space-y-1.5">
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="text-muted-foreground font-semibold">Estudiante:</span>
+                    <strong class="text-foreground font-bold">{{ est.nombreCompleto }}</strong>
+                  </div>
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="text-muted-foreground font-semibold">Código:</span>
+                    <span class="font-mono font-bold text-foreground">{{ est.codigoEstudiante }}</span>
+                  </div>
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="text-muted-foreground font-semibold">Materia / Grupo:</span>
+                    <span class="text-foreground">{{ est.codigoMateria }} · Grupo {{ est.grupo }}</span>
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <label class="block text-xs font-bold text-foreground">
+                    Seleccione la variante a generar:
+                  </label>
+                  <p class="text-[11px] text-muted-foreground">
+                    El examen compilará exactamente las mismas preguntas, opciones y formato que la variante seleccionada, asignándole un código de control exclusivo.
+                  </p>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                    @for (v of variantesDisponibles(); track v) {
+                      <button
+                        type="button"
+                        (click)="varianteSeleccionada.set(v)"
+                        [class.border-purple-600]="varianteSeleccionada() === v"
+                        [class.bg-purple-50]="varianteSeleccionada() === v"
+                        [class.text-purple-900]="varianteSeleccionada() === v"
+                        [class.font-black]="varianteSeleccionada() === v"
+                        class="p-2.5 rounded-xl border border-border text-center text-xs font-bold hover:bg-muted/50 cursor-pointer transition-all flex flex-col items-center gap-1">
+                        <span class="text-base font-black">Tipo {{ v }}</span>
+                        @if (varianteSeleccionada() === v) {
+                          <span class="text-[10px] text-purple-700 font-semibold"><i class="pi pi-check text-[9px] mr-0.5"></i>Seleccionado</span>
+                        } @else {
+                          <span class="text-[10px] text-muted-foreground">Disponible</span>
+                        }
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (generandoExamenIndividual()) {
+                <div class="p-3.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs flex items-center gap-2.5 animate-pulse">
+                  <i class="pi pi-spin pi-spinner text-base text-amber-600"></i>
+                  <span>Compilando cuadernillo Typst oficial para el estudiante...</span>
+                </div>
+              }
+            </div>
+
+            <div class="p-4 border-t border-border flex justify-end gap-2 bg-muted/20">
+              <button
+                (click)="cerrarModalGenerarExamen()"
+                [disabled]="generandoExamenIndividual()"
+                class="px-4 py-2 rounded-xl border border-border bg-background hover:bg-muted text-xs font-bold text-foreground cursor-pointer disabled:opacity-50">
+                Cancelar
+              </button>
+              <button
+                (click)="confirmarGeneracionExamenIndividual()"
+                [disabled]="generandoExamenIndividual() || !varianteSeleccionada()"
+                class="px-5 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50 flex items-center gap-2 shadow-xs transition-colors">
+                <i class="pi" [class.pi-spin]="generandoExamenIndividual()" [class.pi-spinner]="generandoExamenIndividual()" [class.pi-file-pdf]="!generandoExamenIndividual()"></i>
+                <span>{{ generandoExamenIndividual() ? 'Generando examen...' : 'Generar Cuadernillo' }}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -3271,6 +3414,133 @@ interface CampusDisponible extends Campus {
         </div>
       }
 
+      <!-- MODAL: SINCRONIZACIÓN DE NOTAS CON SEA -->
+      @if (dialogSincronizarSea()) {
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-sky-300 rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div class="p-5 border-b border-border bg-sky-500/5 flex items-start justify-between gap-4 shrink-0">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center shrink-0 border border-sky-300">
+                  <i class="pi pi-cloud-upload text-lg"></i>
+                </div>
+                <div>
+                  <p class="text-[10px] font-black uppercase tracking-widest text-sky-700">Integración Institucional · Actas SISA/SEA</p>
+                  <h3 class="text-base font-black text-foreground">Sincronización de Calificaciones Teóricas</h3>
+                  @if (reporteSincronizacion(); as rep) {
+                    <p class="text-xs text-muted-foreground">{{ rep.materiaCodigo }} · {{ rep.materiaNombre }} ({{ rep.grupo }}) · {{ rep.modalidad }}</p>
+                  }
+                </div>
+              </div>
+              <button type="button" (click)="cerrarModalSincronizarSea()" [disabled]="enviandoSincronizacion()" class="text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50">
+                <i class="pi pi-times text-sm"></i>
+              </button>
+            </div>
+
+            <!-- Contenido / Tabla de notas -->
+            <div class="p-5 overflow-y-auto space-y-4">
+              @if (cargandoSincronizacion()) {
+                <div class="py-12 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                  <i class="pi pi-spin pi-spinner text-3xl text-sky-600"></i>
+                  <span class="text-xs font-semibold">Consolidando calificaciones sobre 100 puntos y nómina oficial...</span>
+                </div>
+              } @else {
+                @if (reporteSincronizacion(); as rep) {
+                <!-- Tarjeta resumen -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <p class="text-[10px] uppercase font-bold text-muted-foreground">Total Estudiantes</p>
+                    <p class="text-xl font-black text-slate-800">{{ rep.totalEstudiantes }}</p>
+                  </div>
+                  <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <p class="text-[10px] uppercase font-bold text-emerald-700">Registrados con éxito (SEA)</p>
+                    <p class="text-xl font-black text-emerald-800">{{ rep.totalExitosos }}</p>
+                  </div>
+                  <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
+                    <p class="text-[10px] uppercase font-bold text-rose-700">Pendientes / Observados</p>
+                    <p class="text-xl font-black text-rose-800">{{ rep.totalFallidos }}</p>
+                  </div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 text-xs">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-info-circle text-sky-700"></i>
+                    <span class="font-bold">Regla Oficial de Calificación Teórica:</span>
+                  </div>
+                  <p class="mt-1 text-[11px] text-sky-800">
+                    Todas las evaluaciones teóricas se transmiten en escala de <strong>0 a 100 puntos</strong>. Los estudiantes ausentes o sin evaluación registrada se transmiten con nota <strong>0</strong>. Si un estudiante rindió examen oral reprogramado, se envía su nota oral oficial.
+                  </p>
+                </div>
+
+                <!-- Tabla de estudiantes -->
+                <div class="border border-border rounded-xl overflow-hidden">
+                  <table class="w-full text-xs text-left">
+                    <thead class="bg-muted/50 border-b border-border text-[11px] uppercase font-extrabold text-muted-foreground">
+                      <tr>
+                        <th class="p-2.5">Cód. Matrícula</th>
+                        <th class="p-2.5">Estudiante</th>
+                        <th class="p-2.5 text-center">Nota / 100</th>
+                        <th class="p-2.5">Detalle / Modalidad</th>
+                        <th class="p-2.5 text-center">Estado SEA</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                      @for (est of rep.estudiantes; track est.codigoEstudiante) {
+                        <tr class="hover:bg-muted/20">
+                          <td class="p-2.5 font-mono font-bold">{{ est.codigoEstudiante }}</td>
+                          <td class="p-2.5 font-medium">{{ est.nombreCompleto }}</td>
+                          <td class="p-2.5 text-center">
+                            <span class="px-2 py-0.5 rounded-full font-black text-xs"
+                                  [class.bg-emerald-100]="est.score >= 51"
+                                  [class.text-emerald-800]="est.score >= 51"
+                                  [class.bg-rose-100]="est.score < 51"
+                                  [class.text-rose-800]="est.score < 51">
+                              {{ est.score }} pts
+                            </span>
+                          </td>
+                          <td class="p-2.5 text-[11px] text-muted-foreground">
+                            @if (est.esReprogramado) {
+                              <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px] mr-1">Oral Reprog.</span>
+                            }
+                            {{ est.observacion || '—' }}
+                          </td>
+                          <td class="p-2.5 text-center">
+                            @if (est.completado === true) {
+                              <span class="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]">
+                                <i class="pi pi-check-circle"></i> Sincronizado
+                              </span>
+                            } @else if (est.completado === false) {
+                              <span class="inline-flex items-center gap-1 text-rose-700 font-bold text-[11px]">
+                                <i class="pi pi-times-circle"></i> Rechazado
+                              </span>
+                            } @else {
+                              <span class="text-muted-foreground/60 text-[10px]">Listo para envío</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                }
+              }
+            </div>
+
+            <div class="p-4 border-t border-border bg-muted/10 flex items-center justify-between gap-3 shrink-0">
+              <button type="button" (click)="cerrarModalSincronizarSea()" [disabled]="enviandoSincronizacion()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer disabled:opacity-50">
+                Cerrar
+              </button>
+              <button type="button" (click)="ejecutarSincronizacionSea()" [disabled]="cargandoSincronizacion() || enviandoSincronizacion() || !reporteSincronizacion()" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-black cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5 transition-colors">
+                @if (enviandoSincronizacion()) {
+                  <i class="pi pi-spin pi-spinner text-xs"></i> Transmitiendo al SEA...
+                } @else {
+                  <i class="pi pi-cloud-upload text-xs"></i> Confirmar y Enviar al SEA
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- MODAL: RECALIFICACIÓN OMR -->
       @if (dialogRecalificarOmr()) {
         <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -3566,6 +3836,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   private readonly _sinCartillaService = inject(ExamenSinCartillaService);
   private readonly _feedback = inject(UiFeedbackService);
   private readonly _campusCarreras = inject(CampusCarrerasService);
+  private readonly _sincronizacionSeaService = inject(SincronizacionSeaService);
 
   // Sedes y Carreras desde SEA Gateway
   public sedes = signal<BranchOffice[]>([]);
@@ -3731,6 +4002,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public generandoCartillas = signal<boolean>(false);
   public generandoListaCartillas = signal<boolean>(false);
   public sincronizandoNomina = signal<boolean>(false);
+  public dialogGenerarExamenIndividual = signal<boolean>(false);
+  public estudianteSeleccionadoParaExamen = signal<CartillaOmr | null>(null);
+  public variantesDisponibles = signal<string[]>(['A']);
+  public varianteSeleccionada = signal<string>('A');
+  public generandoExamenIndividual = signal<boolean>(false);
+  public simulandoRezagado = signal<boolean>(false);
+  public readonly esEntornoLocal: boolean = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   // Confirmación explícita antes de llevar un examen sin cartilla a Impreso.
   public dialogImpresionSinCartilla = signal<boolean>(false);
@@ -3889,6 +4167,13 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public motivoRestablecimientoSalaVirtual = '';
   private rolVirtualVerificadoParaGenerar: string | null = null;
   private grupoSEAActualParaGenerar: string | null = null;
+
+  // Sincronización de Calificaciones Teóricas con SEA (SISA)
+  public dialogSincronizarSea = signal<boolean>(false);
+  public reporteSincronizacion = signal<SincronizacionNotasSeaReporte | null>(null);
+  public cargandoSincronizacion = signal<boolean>(false);
+  public enviandoSincronizacion = signal<boolean>(false);
+  public evaluacionParaSincronizar = signal<EvaluacionItemUI | null>(null);
 
   // Indicador del banco cargado por evaluación.
   public estadoBancos = signal<Record<string, boolean>>({});
@@ -4751,19 +5036,83 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       window.open(this._urlArchivo(estudiante.cuadernilloPdfPath), '_blank');
       return;
     }
+    // Si no tiene examen generado aún, abrir modal de generación individual
+    this.abrirModalGenerarExamen(estudiante);
+  }
+
+  public abrirModalGenerarExamen(estudiante: CartillaOmr): void {
     const item = this.evaluacionSeleccionadaCartillas();
-    if (item) {
-      this._generacionTypst.consultarDocumentoExamen(item.id).subscribe({
-        next: doc => {
-          if (doc?.archivoPdfPath) {
-            window.open(this._urlArchivo(doc.archivoPdfPath), '_blank');
-          } else {
-            this._mostrarToast('No se encontró el archivo PDF del examen.', 'error');
+    if (!item) return;
+
+    this.estudianteSeleccionadoParaExamen.set(estudiante);
+    this.varianteSeleccionada.set(estudiante.letraVariante || 'A');
+    this.dialogGenerarExamenIndividual.set(true);
+
+    this._cartillasOmr.obtenerVariantesDisponibles(item.id).subscribe({
+      next: vars => {
+        if (vars && vars.length > 0) {
+          this.variantesDisponibles.set(vars);
+          if (!this.varianteSeleccionada() || !vars.includes(this.varianteSeleccionada())) {
+            this.varianteSeleccionada.set(vars[0]);
           }
-        },
-        error: () => this._mostrarToast('No hay examen PDF disponible para este estudiante.', 'error')
-      });
-    }
+        }
+      },
+      error: () => this.variantesDisponibles.set(['A', 'B'])
+    });
+  }
+
+  public cerrarModalGenerarExamen(): void {
+    if (this.generandoExamenIndividual()) return;
+    this.dialogGenerarExamenIndividual.set(false);
+    this.estudianteSeleccionadoParaExamen.set(null);
+  }
+
+  public confirmarGeneracionExamenIndividual(): void {
+    const item = this.evaluacionSeleccionadaCartillas();
+    const estudiante = this.estudianteSeleccionadoParaExamen();
+    if (!item || !estudiante || this.generandoExamenIndividual()) return;
+
+    this.generandoExamenIndividual.set(true);
+    const variante = this.varianteSeleccionada();
+
+    this._cartillasOmr.generarExamenEstudiante(item.id, estudiante.codigoEstudiante, variante).subscribe({
+      next: prep => {
+        this.generandoExamenIndividual.set(false);
+        this.loteCartillasActual.set(prep);
+        this.cerrarModalGenerarExamen();
+        this._mostrarToast(
+          `Examen generado con éxito para ${estudiante.nombreCompleto} (Variante ${variante}).`,
+          'success'
+        );
+      },
+      error: err => {
+        this.generandoExamenIndividual.set(false);
+        const msg = err?.error?.message || err?.message || 'Error al compilar el examen individual con Typst.';
+        this._mostrarToast(msg, 'error');
+      }
+    });
+  }
+
+  public simularRezagadoParaPruebas(): void {
+    const item = this.evaluacionSeleccionadaCartillas();
+    if (!item || this.simulandoRezagado()) return;
+
+    this.simulandoRezagado.set(true);
+    this._cartillasOmr.simularEstudianteRezagado(item.id).subscribe({
+      next: prep => {
+        this.simulandoRezagado.set(false);
+        this.loteCartillasActual.set(prep);
+        this._mostrarToast(
+          'Estudiante rezagado simulado con éxito. Ahora puede generar su examen individual.',
+          'info'
+        );
+      },
+      error: err => {
+        this.simulandoRezagado.set(false);
+        const msg = err?.error?.message || err?.message || 'Error al simular estudiante rezagado.';
+        this._mostrarToast(msg, 'error');
+      }
+    });
   }
 
   public abrirConfiguracionGeneracion(item: EvaluacionItemUI): void {
@@ -7025,6 +7374,89 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       },
       error: err => {
         this._mostrarToast(err?.error?.message || err?.error?.error || 'No se pudo generar la planilla PDF oficial.', 'error');
+      }
+    });
+  }
+
+  // =========================================================================
+  // INTEGRACIÓN Y SINCRONIZACIÓN DE NOTAS CON SEA (SISA)
+  // =========================================================================
+
+  public puedeSincronizarNotasSea(item: EvaluacionItemUI): boolean {
+    if (!item?.id) return false;
+    const esEstadoFinal = item.etapa === 'Calificado' || item.etapa === 'Confirmado' ||
+                          item.estado === 'CALIFICADO' || item.estado === 'CONFIRMADO';
+    const tienePermiso = this.esPersonalEvaluaciones() || this.esResponsableEvaluaciones() || this.esAdministradorSistema();
+    return Boolean(esEstadoFinal && tienePermiso);
+  }
+
+  public abrirModalSincronizarSea(item: EvaluacionItemUI): void {
+    if (!this.puedeSincronizarNotasSea(item)) return;
+    this.evaluacionParaSincronizar.set(item);
+    this.reporteSincronizacion.set(null);
+    this.cargandoSincronizacion.set(true);
+    this.dialogSincronizarSea.set(true);
+
+    this._sincronizacionSeaService.obtenerVistaPrevia(item.id).subscribe({
+      next: (reporte) => {
+        this.reporteSincronizacion.set(reporte);
+        this.cargandoSincronizacion.set(false);
+      },
+      error: (err) => {
+        this.cargandoSincronizacion.set(false);
+        this._mostrarToast(
+          err?.error?.message || err?.error?.error || 'Error al obtener la vista previa de calificaciones para el SEA.',
+          'error'
+        );
+      }
+    });
+  }
+
+  public cerrarModalSincronizarSea(): void {
+    if (this.enviandoSincronizacion()) return;
+    this.dialogSincronizarSea.set(false);
+    this.evaluacionParaSincronizar.set(null);
+    this.reporteSincronizacion.set(null);
+  }
+
+  public ejecutarSincronizacionSea(): void {
+    const item = this.evaluacionParaSincronizar();
+    if (!item || this.enviandoSincronizacion() || !this.reporteSincronizacion()) return;
+
+    this.enviandoSincronizacion.set(true);
+    this._sincronizacionSeaService.sincronizarNotas(item.id).subscribe({
+      next: (resultado) => {
+        this.enviandoSincronizacion.set(false);
+        this.reporteSincronizacion.set(resultado);
+
+        const exito = (resultado.totalFallidos ?? 0) === 0 && (resultado.totalExitosos ?? 0) > 0;
+
+        // Actualizar item reactivo en la lista principal
+        this.evaluaciones.update(lista => lista.map(e => e.id === item.id ? {
+          ...e,
+          sincronizadoSea: exito,
+          fechaSincronizacionSea: resultado.fechaSincronizacion,
+          sincronizadoSeaPor: resultado.sincronizadoPor,
+          sincronizacionSeaResultado: exito ? 'OK' : 'PARCIAL'
+        } : e));
+
+        if (exito) {
+          this._mostrarToast(
+            `¡Calificaciones registradas exitosamente en el SEA! (${resultado.totalExitosos}/${resultado.totalEstudiantes} estudiantes).`
+          );
+        } else {
+          this._mostrarToast(
+            `Sincronización finalizada con observaciones: ${resultado.totalExitosos} registrados, ${resultado.totalFallidos} pendientes.`,
+            'info'
+          );
+        }
+      },
+      error: (err) => {
+        this.enviandoSincronizacion.set(false);
+        this._mostrarToast(
+          err?.error?.message || err?.error?.error || 'No se pudo completar el registro de notas en el SEA.',
+          'error'
+        );
       }
     });
   }

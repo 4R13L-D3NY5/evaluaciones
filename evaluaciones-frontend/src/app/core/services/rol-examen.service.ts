@@ -41,6 +41,10 @@ export interface RolExamenResponse {
   fechaGeneracion?: string;
   creadoEn?: string;
   actualizadoEn?: string;
+  sincronizadoSea?: boolean;
+  fechaSincronizacionSea?: string;
+  sincronizadoSeaPor?: string;
+  sincronizacionSeaResultado?: string;
 }
 
 export interface RolExamenCreateRequest {
