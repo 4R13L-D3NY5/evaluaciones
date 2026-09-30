@@ -1,4 +1,3 @@
-target/*
-!target/evaluaciones-backend-*.jar
+target
 .git
 .idea
