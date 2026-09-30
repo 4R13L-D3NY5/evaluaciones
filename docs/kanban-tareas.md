@@ -86,17 +86,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
-#### T-045 — Sincronización Push de calificaciones de exámenes teóricos al Gateway SEA (POST /student-evaluations sobre 100 puntos)
-
-- Prioridad: Crítica
-- Área: Integración Institucional / Gateway SEA / Calificaciones
-- Responsable: Antigravity
-- Creada: 2026-09-29
-- Fecha límite: 2026-09-30
-- Dependencias: `UnitepcGatewayClient.java`, `sea_roles_evaluaciones`, `sea_calificaciones_omr`, `sea_notas_docente`, `sea_intentos_examen_virtual`.
-- Criterio de cierre: 1) Implementar cliente POST para `/api/v1/university/externals/research/student-evaluations` en `UnitepcGatewayClient` con cabeceras `Authorization: Bearer <token>` y `clientId: sea-evaluaciones`; 2) Homogeneizar la recolección de calificaciones teóricas sobre 100 puntos para cualquier modalidad (con cartilla OMR, sin cartilla y virtual) incluyendo notas orales reprogramadas; 3) Asignar 0 a estudiantes ausentes o sin evaluación registrada en la nómina oficial del grupo; 4) Crear migración Flyway V47 para persistir estado, fecha, usuario y resultado de la sincronización en `sea_roles_evaluaciones`; 5) Registrar auditoría inmutable en `sea_auditoria_evaluaciones`; 6) Proveer botón y diálogo de confirmación/previsualización y reporte de resultados en frontend (`evaluaciones-dia.component.ts`).
-- Notas: En progreso. Iniciando implementación de DTOs, extensión de GatewayClient y servicio de sincronización. Implementación completada: DTOs, endpoint POST al SEA, cálculo sobre 100 pts para OMR/Docente/Virtual, V47 migration, pruebas unitarias y modal Angular integrados y verificados en Docker Iniciando sandbox mock persistente y sincronizacion incremental delta
-
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
 
@@ -110,6 +99,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz Implementacion integral de Auditoria y Bitacora: endpoint unificado backend, KPIs reales, filtros y exportacion Excel Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Auditoria integral, extension de eventos y control de acceso por roles
 
 ### En revisión
+
+#### T-045 — Sincronización Push de calificaciones de exámenes teóricos al Gateway SEA (POST /student-evaluations sobre 100 puntos)
+
+- Prioridad: Crítica
+- Área: Integración Institucional / Gateway SEA / Calificaciones
+- Responsable: Antigravity
+- Creada: 2026-09-29
+- Fecha límite: 2026-09-30
+- Dependencias: `UnitepcGatewayClient.java`, `sea_roles_evaluaciones`, `sea_calificaciones_omr`, `sea_notas_docente`, `sea_intentos_examen_virtual`.
+- Criterio de cierre: 1) Implementar cliente POST para `/api/v1/university/externals/research/student-evaluations` en `UnitepcGatewayClient` con cabeceras `Authorization: Bearer <token>` y `clientId: sea-evaluaciones`; 2) Homogeneizar la recolección de calificaciones teóricas sobre 100 puntos para cualquier modalidad (con cartilla OMR, sin cartilla y virtual) incluyendo notas orales reprogramadas; 3) Asignar 0 a estudiantes ausentes o sin evaluación registrada en la nómina oficial del grupo; 4) Crear migración Flyway V47 para persistir estado, fecha, usuario y resultado de la sincronización en `sea_roles_evaluaciones`; 5) Registrar auditoría inmutable en `sea_auditoria_evaluaciones`; 6) Proveer botón y diálogo de confirmación/previsualización y reporte de resultados en frontend (`evaluaciones-dia.component.ts`).
+- Notas: En progreso. Iniciando implementación de DTOs, extensión de GatewayClient y servicio de sincronización. Implementación completada: DTOs, endpoint POST al SEA, cálculo sobre 100 pts para OMR/Docente/Virtual, V47 migration, pruebas unitarias y modal Angular integrados y verificados en Docker Iniciando sandbox mock persistente y sincronizacion incremental delta Sandbox mock persistente en BD (Flyway V48) y sincronizacion incremental delta validadas en vivo en Docker
 
 #### T-044 — Sincronización de nómina oficial por toma de grupos tardía y generación de exámenes a rezagados
 
@@ -550,8 +550,8 @@ _Sin tareas._
 | Indicador | Total |
 |---|---:|
 | Pendientes | 5 |
-| En progreso | 2 |
-| En revisión | 35 |
+| En progreso | 1 |
+| En revisión | 36 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 
