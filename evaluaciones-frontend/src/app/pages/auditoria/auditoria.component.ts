@@ -828,10 +828,10 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
           <!-- Barra de Filtros y Búsqueda -->
           <div class="bg-card border border-border rounded-2xl p-5 shadow-xs space-y-4">
             
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
               
               <!-- Búsqueda General -->
-              <div class="lg:col-span-2">
+              <div class="lg:col-span-4">
                 <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                   <i class="pi pi-search text-primary text-[10px]"></i> Buscar por Usuario, IP, Acción o Detalle
                 </label>
@@ -847,7 +847,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
               </div>
 
               <!-- Filtro por Módulo -->
-              <div>
+              <div class="lg:col-span-3">
                 <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                   <i class="pi pi-th-large text-primary text-[10px]"></i> Módulo
                 </label>
@@ -856,21 +856,24 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                   (ngModelChange)="filtroModulo.set($event)"
                   class="w-full bg-muted/60 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
                   <option value="TODOS">Todos los Módulos</option>
+                  <option value="Autenticación y Sesiones">Autenticación y Sesiones</option>
+                  <option value="Usuarios y Accesos">Usuarios y Accesos</option>
+                  <option value="Administración de Evaluaciones">Administración de Evaluaciones</option>
                   <option value="Evaluaciones">Evaluaciones</option>
                   <option value="Banco de Preguntas">Banco de Preguntas</option>
                   <option value="Generación Typst">Generación de exámenes</option>
                   <option value="Calificación OMR">Calificación OMR</option>
                   <option value="Examen Virtual">Examen Virtual</option>
-                  <option value="Usuarios y Accesos">Usuarios y Accesos</option>
+                  <option value="Sincronización Institucional (SEA)">Sincronización Institucional (SEA)</option>
                   <option value="Respaldos">Respaldos</option>
                   <option value="Verificación de Exámenes">Verificación de Exámenes</option>
                 </select>
               </div>
 
               <!-- Filtro por Nivel de Criticidad -->
-              <div>
+              <div class="lg:col-span-2">
                 <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
-                  <i class="pi pi-flag text-primary text-[10px]"></i> Nivel de Severidad
+                  <i class="pi pi-flag text-primary text-[10px]"></i> Severidad
                 </label>
                 <select 
                   [ngModel]="filtroNivel()"
@@ -881,6 +884,38 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                   <option value="ADVERTENCIA">ADVERTENCIA (Alerta)</option>
                   <option value="OPERACION_CRITICA">OPERACIÓN CRÍTICA</option>
                 </select>
+              </div>
+
+              <!-- Filtro por Rango de Fechas -->
+              <div class="lg:col-span-3 flex gap-2 items-end">
+                <div class="flex-1 min-w-0">
+                  <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                    <i class="pi pi-calendar text-primary text-[10px]"></i> Desde
+                  </label>
+                  <input 
+                    type="date" 
+                    [ngModel]="fechaInicio()"
+                    (ngModelChange)="fechaInicio.set($event); cargarAuditoria()"
+                    class="w-full bg-muted/60 border border-border rounded-xl px-2 py-1.5 text-xs font-bold text-foreground outline-none focus:border-primary">
+                </div>
+                <div class="flex-1 min-w-0">
+                  <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                    <i class="pi pi-calendar text-primary text-[10px]"></i> Hasta
+                  </label>
+                  <input 
+                    type="date" 
+                    [ngModel]="fechaFin()"
+                    (ngModelChange)="fechaFin.set($event); cargarAuditoria()"
+                    class="w-full bg-muted/60 border border-border rounded-xl px-2 py-1.5 text-xs font-bold text-foreground outline-none focus:border-primary">
+                </div>
+                @if (fechaInicio() || fechaFin()) {
+                  <button 
+                    (click)="limpiarFechas()"
+                    class="bg-muted hover:bg-muted/80 text-foreground border border-border p-2 rounded-xl text-xs transition-colors shrink-0"
+                    title="Limpiar fechas">
+                    <i class="pi pi-times"></i>
+                  </button>
+                }
               </div>
 
             </div>
@@ -1131,6 +1166,8 @@ export class AuditoriaComponent implements OnInit {
   public busquedaTexto = signal<string>('');
   public filtroModulo = signal<string>('TODOS');
   public filtroNivel = signal<string>('TODOS');
+  public fechaInicio = signal<string>('');
+  public fechaFin = signal<string>('');
   public registroSeleccionado = signal<AuditoriaGlobalItem | null>(null);
 
   // Trazabilidad Forense de Toma de Grupos
@@ -1431,7 +1468,11 @@ export class AuditoriaComponent implements OnInit {
 
   public cargarAuditoria(): void {
     this.cargando.set(true);
-    this.auditoriaService.obtenerAuditoria({ limite: 500 }).subscribe({
+    this.auditoriaService.obtenerAuditoria({
+      limite: 500,
+      fechaInicio: this.fechaInicio() || undefined,
+      fechaFin: this.fechaFin() || undefined
+    }).subscribe({
       next: (data) => {
         this.resumen.set(data);
         this.items.set(data.items || []);
@@ -1449,11 +1490,19 @@ export class AuditoriaComponent implements OnInit {
     });
   }
 
+  public limpiarFechas(): void {
+    this.fechaInicio.set('');
+    this.fechaFin.set('');
+    this.cargarAuditoria();
+  }
+
   public registrosFiltrados = computed(() => {
     let list = this.items();
     const modulo = this.filtroModulo();
     const nivel = this.filtroNivel();
     const q = this.busquedaTexto().trim().toLowerCase();
+    const inicio = this.fechaInicio();
+    const fin = this.fechaFin();
 
     if (modulo !== 'TODOS') {
       list = list.filter(i => i.modulo === modulo);
@@ -1461,6 +1510,22 @@ export class AuditoriaComponent implements OnInit {
 
     if (nivel !== 'TODOS') {
       list = list.filter(i => i.nivel === nivel);
+    }
+
+    if (inicio) {
+      list = list.filter(i => {
+        if (!i.fechaEvento) return false;
+        const fechaStr = i.fechaEvento.slice(0, 10);
+        return fechaStr >= inicio;
+      });
+    }
+
+    if (fin) {
+      list = list.filter(i => {
+        if (!i.fechaEvento) return false;
+        const fechaStr = i.fechaEvento.slice(0, 10);
+        return fechaStr <= fin;
+      });
     }
 
     if (q) {

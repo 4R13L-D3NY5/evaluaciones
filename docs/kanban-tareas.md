@@ -75,6 +75,10 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
+*(Sin tareas activas)*
+
+### En revisión
+
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
 
@@ -85,9 +89,7 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Fecha límite: Por definir
 - Dependencias: Revisar el estado actual del registro, consulta, filtros, detalle de eventos y permisos del módulo.
 - Criterio de cierre: Completar la implementación funcional y visual del módulo, validar que las acciones relevantes queden registradas y que la consulta respete los permisos establecidos.
-- Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz Implementacion integral de Auditoria y Bitacora: endpoint unificado backend, KPIs reales, filtros y exportacion Excel Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Auditoria integral, extension de eventos y control de acceso por roles
-
-### En revisión
+- Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz Implementacion integral de Auditoria y Bitacora: endpoint unificado backend, KPIs reales, filtros y exportacion Excel Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Auditoria integral, extension de eventos y control de acceso por roles Implementación integral de bitácora y auditoría con captación de IP real, Examen Virtual, filtros por fecha y sincronización SEA
 
 #### T-049 — Módulo de Trazabilidad y Auditoría Forense de Toma de Grupos e Inscripciones de Estudiantes
 
@@ -583,8 +585,8 @@ _Sin tareas._
 | Indicador | Total |
 |---|---:|
 | Pendientes | 4 |
-| En progreso | 1 |
-| En revisión | 40 |
+| En progreso | 0 |
+| En revisión | 41 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 
