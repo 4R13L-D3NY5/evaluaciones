@@ -81,6 +81,7 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   bancoPreguntasCargado?: boolean;
   requiereVerificacion?: boolean;
   estadoVerificacion?: 'PENDIENTE' | 'VERIFICADO' | 'DEVUELTO' | null;
+  cantidadDevoluciones?: number;
   verificadoPor?: string;
   fechaVerificacion?: string;
   fueRestablecido?: boolean;
@@ -440,13 +441,24 @@ interface CampusDisponible extends Campus {
                                 <i class="pi pi-check-circle text-[9px]"></i> Banco verificado
                               </span>
                             } @else if (item.estadoVerificacion === 'DEVUELTO') {
-                              <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-black uppercase text-rose-700" title="Banco de preguntas devuelto con observaciones por el verificador">
-                                <i class="pi pi-exclamation-triangle text-[9px]"></i> Banco observado
+                              <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[9px] font-black uppercase text-rose-800 shadow-2xs"
+                                    [title]="'Banco devuelto con observaciones por el verificador (' + (item.cantidadDevoluciones || 1) + ' vez/veces observado)'">
+                                <i class="pi pi-exclamation-triangle text-[9px] text-rose-600"></i>
+                                Devuelto con observaciones@if (item.cantidadDevoluciones && item.cantidadDevoluciones > 0) {
+                                  <span class="ml-1 rounded-full bg-rose-200 text-rose-900 px-1.5 py-0.2 text-[8px] font-black">
+                                    {{ item.cantidadDevoluciones }} {{ item.cantidadDevoluciones === 1 ? 'vez' : 'veces' }}
+                                  </span>
+                                }
                               </span>
                             } @else {
                               <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700" title="Banco validado, pendiente de revisión por el verificador">
                                 <i class="pi pi-clock text-[9px]"></i> Pendiente de verificación
                               </span>
+                              @if (item.cantidadDevoluciones && item.cantidadDevoluciones > 0) {
+                                <span class="mt-0.5 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.2 text-[8px] font-bold text-amber-900" title="Reingresado con correcciones tras devolución previa">
+                                  <i class="pi pi-history text-[8px]"></i> Reingresado ({{ item.cantidadDevoluciones }} {{ item.cantidadDevoluciones === 1 ? 'previa' : 'previas' }})
+                                </span>
+                              }
                             }
                           } @else {
                             <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700" title="Este examen ya tiene un banco de preguntas cargado">
@@ -2008,7 +2020,7 @@ interface CampusDisponible extends Campus {
                           <i class="pi" [class.pi-spin]="sincronizandoNomina()" [class.pi-spinner]="sincronizandoNomina()" [class.pi-sync]="!sincronizandoNomina()"></i>
                           <span>{{ sincronizandoNomina() ? 'Sincronizando...' : 'Sincronizar nómina (Toma de grupos)' }}</span>
                         </button>
-                        @if (esEntornoLocal) {
+                        @if (esEntornoLocal && (esResponsableEvaluaciones() || esAdministradorSistema())) {
                           <button
                             (click)="simularRezagadoParaPruebas()"
                             [disabled]="sincronizandoNomina() || generandoCartillas() || generandoListaCartillas() || simulandoRezagado()"
@@ -3209,23 +3221,29 @@ interface CampusDisponible extends Campus {
               @if (!cargandoNotasOmr()) {
                 <div class="mb-3 flex items-center justify-between gap-3 bg-card p-3 rounded-xl border border-border">
                   <div class="text-xs text-muted-foreground flex items-center gap-2">
-                    <span>Calificaciones registradas: <strong class="text-foreground">{{ notasOmr().length }}</strong></span>
+                    <span>Calificaciones registradas: <strong class="text-foreground">{{ totalCalificadosOmr() }} de {{ notasOmr().length }}</strong></span>
                     @if (totalReprogramados() > 0) {
                       <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
                         <i class="pi pi-calendar-clock text-[9px]"></i> {{ totalReprogramados() }} reprogramado(s)
                       </span>
                     }
                   </div>
-                  @if (puedeRegistrarReprogramacion()) {
-                    <button type="button" (click)="abrirModalReprogramarNueva()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
-                      <i class="pi pi-calendar-plus text-xs"></i> + Registrar examen reprogramado
+                  <div class="flex items-center gap-2">
+                    <button type="button" (click)="sincronizarNominaDesdeNotas()" [disabled]="sincronizandoNomina() || cargandoNotasOmr()" class="px-2.5 py-1.5 rounded-lg border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors" title="Sincronizar nómina oficial con el SEA por toma de grupos tardía">
+                      <i class="pi" [class.pi-spin]="sincronizandoNomina()" [class.pi-spinner]="sincronizandoNomina()" [class.pi-sync]="!sincronizandoNomina()"></i>
+                      <span>{{ sincronizandoNomina() ? 'Sincronizando...' : 'Sincronizar nómina (Toma de grupos)' }}</span>
                     </button>
-                  }
+                    @if (puedeRegistrarReprogramacion()) {
+                      <button type="button" (click)="abrirModalReprogramarNueva()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
+                        <i class="pi pi-calendar-plus text-xs"></i> + Registrar examen reprogramado
+                      </button>
+                    }
+                  </div>
                 </div>
               }
               @if (!cargandoNotasOmr() && notasOmr().length === 0) {
                 <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">
-                  Todavía no existen calificaciones OMR guardadas para esta evaluación. Puede registrar calificaciones por reprogramación oral usando el botón superior.
+                  Todavía no existen estudiantes en la nómina para esta evaluación.
                 </div>
               }
               @else if (!cargandoNotasOmr()) {
@@ -3234,8 +3252,8 @@ interface CampusDisponible extends Campus {
                     <span>N°</span><span>Estudiante</span><span>Variante</span><span class="text-center">Aciertos</span><span>/60</span><span>/100</span><span>Estado</span><span class="text-right">Acción</span>
                   </div>
                   <div class="divide-y divide-border">
-                    @for (nota of notasOmr(); track nota.id) {
-                      <div class="grid grid-cols-[40px_1fr_75px_75px_65px_65px_95px_130px] gap-2 px-3 py-2.5 items-center text-xs">
+                    @for (nota of notasOmr(); track (nota.id || nota.codigoEstudiante)) {
+                      <div class="grid grid-cols-[40px_1fr_75px_75px_65px_65px_95px_130px] gap-2 px-3 py-2.5 items-center text-xs" [class.bg-slate-50]="!nota.id">
                         <span class="font-mono text-muted-foreground">{{ $index + 1 }}</span>
                         <span>
                           <strong class="block">{{ nota.codigoEstudiante }}</strong>
@@ -3248,18 +3266,36 @@ interface CampusDisponible extends Campus {
                         </span>
                         <span class="font-black text-indigo-700">TIPO {{ nota.letraVariante }}</span>
                         <span class="text-center font-mono font-bold" [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'" [class.text-slate-700]="nota.estadoCalificacion !== 'ANULADO'">
-                          {{ nota.estadoCalificacion === 'ANULADO' ? ('0/' + nota.totalReactivos) : (nota.aciertos + '/' + nota.totalReactivos) }}
+                          {{ !nota.id ? '—' : (nota.estadoCalificacion === 'ANULADO' ? ('0/' + nota.totalReactivos) : (nota.aciertos + '/' + nota.totalReactivos)) }}
                         </span>
-                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre60 }}</strong>
-                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre100 }}</strong>
-                        <span class="text-[10px] font-black" [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'" [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'" [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'" [class.bg-rose-50]="nota.estadoCalificacion === 'ANULADO'" [class.px-1.5]="nota.estadoCalificacion === 'ANULADO'" [class.py-0.5]="nota.estadoCalificacion === 'ANULADO'" [class.rounded]="nota.estadoCalificacion === 'ANULADO'">{{ nota.estadoCalificacion }}</span>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ !nota.id ? '—' : (nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre60) }}</strong>
+                        <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ !nota.id ? '—' : (nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre100) }}</strong>
+                        <div class="flex flex-col gap-1 items-start">
+                          <span class="text-[10px] font-black px-1.5 py-0.5 rounded"
+                                [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'"
+                                [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'"
+                                [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'"
+                                [class.text-slate-500]="nota.estadoCalificacion === 'SIN_CALIFICACION'"
+                                [class.bg-slate-100]="nota.estadoCalificacion === 'SIN_CALIFICACION'">
+                            {{ nota.estadoCalificacion === 'SIN_CALIFICACION' ? 'SIN NOTA / AUSENTE' : nota.estadoCalificacion }}
+                          </span>
+                          @if (nota.sincronizadoSea) {
+                            <span class="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[8px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200" [title]="'Sincronizado con SEA: ' + (nota.fechaSincronizacionSea || '') + (nota.sincronizadoSeaPor ? ' por ' + nota.sincronizadoSeaPor : '')">
+                              <i class="pi pi-check text-[7px]"></i> SEA
+                            </span>
+                          } @else if (nota.id && nota.estadoCalificacion !== 'SIN_CALIFICACION') {
+                            <span class="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[8px] font-bold bg-amber-50 text-amber-800 border border-amber-200" title="Calificación pendiente de sincronizar con el SEA">
+                              <i class="pi pi-clock text-[7px]"></i> Pend. SEA
+                            </span>
+                          }
+                        </div>
                         <div class="flex items-center justify-end gap-1">
                           @if (puedeRegistrarReprogramacion()) {
-                            <button type="button" (click)="abrirModalReprogramar(nota)" class="px-1.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs" [title]="nota.esReprogramado ? 'Editar reprogramación oral' : 'Registrar nota por examen oral reprogramado'">
-                              <i class="pi pi-file-edit mr-0.5"></i>{{ nota.esReprogramado ? 'Editar' : 'Reprog.' }}
+                            <button type="button" (click)="abrirModalReprogramar(nota)" class="px-1.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs" [title]="nota.esReprogramado ? 'Editar reprogramación oral' : (!nota.id ? 'Asignar calificación a rezagado / ausente' : 'Registrar nota por examen oral reprogramado')">
+                              <i class="pi pi-file-edit mr-0.5"></i>{{ nota.esReprogramado ? 'Editar' : (!nota.id ? 'Asignar nota' : 'Reprog.') }}
                             </button>
                           }
-                          @if (puedeAnularExamenEstudiante()) {
+                          @if (puedeAnularExamenEstudiante() && nota.id) {
                             @if (nota.estadoCalificacion === 'ANULADO') {
                               <button type="button" (click)="abrirAnulacionExamenEstudiante({ codigo: nota.codigoEstudiante, nombre: nota.estudianteNombreCompleto, anulado: true, calificacionId: nota.id })" class="px-1.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">Restaurar</button>
                             } @else {
@@ -3288,8 +3324,8 @@ interface CampusDisponible extends Campus {
                   <i class="pi pi-calendar-plus text-lg"></i>
                 </div>
                 <div>
-                  <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Evaluación Extraordinaria</p>
-                  <h3 class="text-base font-black text-foreground">Calificación por Reprogramación Oral</h3>
+                  <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">{{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Calificación Extemporánea' : 'Evaluación Extraordinaria' }}</p>
+                  <h3 class="text-base font-black text-foreground">{{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Asignar Calificación a Rezagado / Ausente' : (estudianteSeleccionadoReprogramar()?.esReprogramado ? 'Editar Calificación por Reprogramación' : 'Calificación por Reprogramación Oral') }}</h3>
                   <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotas()?.codigo || evaluacionSeleccionadaOmr()?.codigo }} · {{ evaluacionSeleccionadaNotas()?.materia || evaluacionSeleccionadaOmr()?.materia }} · {{ evaluacionSeleccionadaNotas()?.grupo || evaluacionSeleccionadaOmr()?.grupo }}</p>
                 </div>
               </div>
@@ -3405,7 +3441,7 @@ interface CampusDisponible extends Campus {
                   @if (guardandoReprogramacion()) {
                     <i class="pi pi-spin pi-spinner text-xs"></i> Guardando...
                   } @else {
-                    <i class="pi pi-check text-xs"></i> Guardar Calificación Reprogramada
+                    <i class="pi pi-check text-xs"></i> {{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Guardar Calificación' : 'Guardar Calificación Reprogramada' }}
                   }
                 </button>
               </div>
@@ -4140,6 +4176,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public reprogramacionComprobante = signal<string>('');
   public reprogramacionObservaciones = signal<string>('');
   public totalReprogramados = computed(() => this.notasOmr().filter(n => n.esReprogramado).length);
+  public totalCalificadosOmr = computed(() => this.notasOmr().filter(n => n.id !== null && n.estadoCalificacion !== 'SIN_CALIFICACION').length);
 
   // Carga manual de notas para exámenes sin cartilla.
   public dialogNotasDocente = signal<boolean>(false);
@@ -4654,6 +4691,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       bancoPreguntasCargado: rol.bancoPreguntasCargado,
       requiereVerificacion: rol.requiereVerificacion,
       estadoVerificacion: rol.estadoVerificacion,
+      cantidadDevoluciones: rol.cantidadDevoluciones,
       verificadoPor: rol.verificadoPor,
       fechaVerificacion: rol.fechaVerificacion
     };
@@ -5031,6 +5069,35 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     });
   }
 
+  public sincronizarNominaDesdeNotas(): void {
+    const item = this.evaluacionSeleccionadaNotas();
+    if (!item || this.sincronizandoNomina()) return;
+
+    this.sincronizandoNomina.set(true);
+    this._cartillasOmr.sincronizarNomina(item.id).subscribe({
+      next: resp => {
+        this.sincronizandoNomina.set(false);
+        if (resp.nuevosEstudiantes > 0) {
+          this._mostrarToast(
+            `Nómina sincronizada: ${resp.nuevosEstudiantes} nuevo(s) estudiante(s) incorporado(s) por toma de grupos tardía.`,
+            'info'
+          );
+        } else {
+          this._mostrarToast('La nómina ya se encuentra sincronizada con el Gateway institucional.', 'info');
+        }
+        // Refrescar notas de la evaluación inmediatamente
+        this._omrService.listarCalificaciones(item.id).subscribe({
+          next: notas => this.notasOmr.set(notas)
+        });
+      },
+      error: err => {
+        this.sincronizandoNomina.set(false);
+        const mensaje = err?.error?.message || err?.message || 'No se pudo sincronizar la nómina.';
+        this._mostrarToast(mensaje, 'error');
+      }
+    });
+  }
+
   public descargarExamenEstudiante(estudiante: CartillaOmr): void {
     if (estudiante.cuadernilloPdfPath) {
       window.open(this._urlArchivo(estudiante.cuadernilloPdfPath), '_blank');
@@ -5306,7 +5373,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         return `Examen verificado y aprobado${por}. Listo para generar`;
       }
       if (item.estadoVerificacion === 'DEVUELTO') {
-        return 'Banco observado: El verificador devolvió el banco con observaciones. El docente titular debe corregirlas.';
+        const veces = item.cantidadDevoluciones ? ` (${item.cantidadDevoluciones} ${item.cantidadDevoluciones === 1 ? 'vez observado' : 'veces observado'})` : '';
+        return `Devuelto con observaciones: El verificador devolvió el banco con observaciones al docente titular${veces}.`;
       }
       if (item.etapa === 'Validado') {
         return 'Pendiente de verificación: En espera de revisión por el verificador designado.';
@@ -5318,7 +5386,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         && item.requiereVerificacion
         && item.estadoVerificacion !== 'VERIFICADO') {
       if (item.estadoVerificacion === 'DEVUELTO') {
-        return 'Bloqueado: El examen presenta observaciones y fue devuelto al docente titular.';
+        const veces = item.cantidadDevoluciones ? ` (${item.cantidadDevoluciones} ${item.cantidadDevoluciones === 1 ? 'vez devuelto' : 'veces devuelto'})` : '';
+        return `Bloqueado: El examen presenta observaciones y fue devuelto al docente titular${veces}.`;
       }
       return 'Bloqueado: El examen debe ser verificado antes de generar el documento oficial.';
     }
@@ -5401,7 +5470,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       if (item.estadoVerificacion === 'VERIFICADO') {
         this._mostrarToast(`Examen verificado y aprobado${item.verificadoPor ? ' por ' + item.verificadoPor : ''}. Listo para generar.`, 'success');
       } else if (item.estadoVerificacion === 'DEVUELTO') {
-        this._mostrarToast('El banco de preguntas presenta observaciones del verificador y fue devuelto al docente titular.', 'error');
+        const veces = item.cantidadDevoluciones ? ` (${item.cantidadDevoluciones} ${item.cantidadDevoluciones === 1 ? 'vez observado' : 'veces observado'})` : '';
+        this._mostrarToast(`El banco de preguntas presenta observaciones del verificador y fue devuelto al docente titular${veces}.`, 'error');
       } else {
         this._mostrarToast('El examen se encuentra en espera de dictamen por el docente verificador.', 'info');
       }
@@ -6889,8 +6959,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.reprogramacionCodigoEstudiante.set(nota.codigoEstudiante);
     this.reprogramacionFechaExamen.set(fechaDefecto);
     this.reprogramacionNota100.set(nota.esReprogramado ? nota.notaSobre100 : null);
-    this.reprogramacionNota60.set(nota.esReprogramado ? nota.notaSobre60 : null);
-    this.reprogramacionMotivo.set(nota.motivoReprogramacion || 'Examen oral tomado por docente tras cancelación de arancel de reprogramación');
+    const motivoDefecto = !nota.id && !nota.esReprogramado
+      ? 'Rezagado incorporado por toma de grupos tardía'
+      : (nota.motivoReprogramacion || 'Examen oral tomado por docente tras cancelación de arancel de reprogramación');
+    this.reprogramacionMotivo.set(motivoDefecto);
     this.reprogramacionComprobante.set(nota.comprobanteReprogramacion || '');
     this.reprogramacionObservaciones.set(nota.observacionReprogramacion || '');
     this.dialogReprogramarEstudiante.set(true);

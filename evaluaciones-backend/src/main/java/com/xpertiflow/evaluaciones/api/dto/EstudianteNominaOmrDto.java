@@ -22,4 +22,6 @@ public class EstudianteNominaOmrDto {
     private BigDecimal notaSobre100;
     private String estadoCalificacion;
     private LocalDate fechaExamenReprogramado;
+    private Boolean sincronizadoSea;
+    private java.time.LocalDateTime fechaSincronizacionSea;
 }

@@ -128,6 +128,9 @@ export interface CalificacionOmrResponse {
   observacionReprogramacion?: string;
   reprogramadoPor?: string;
   fechaReprogramacion?: string;
+  sincronizadoSea?: boolean;
+  fechaSincronizacionSea?: string;
+  sincronizadoSeaPor?: string;
 }
 
 export interface ReprogramacionOmrRequest {
@@ -149,6 +152,8 @@ export interface EstudianteNominaOmr {
   notaSobre100?: number;
   estadoCalificacion: string;
   fechaExamenReprogramado?: string;
+  sincronizadoSea?: boolean;
+  fechaSincronizacionSea?: string;
 }
 
 export interface AnulacionPreguntaOmr {

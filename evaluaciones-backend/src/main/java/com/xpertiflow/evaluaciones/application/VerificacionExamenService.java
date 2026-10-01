@@ -501,7 +501,10 @@ public class VerificacionExamenService {
         dto.setObservacionesGenerales(verificacion.getObservacionesGenerales());
         dto.setVerificadoPor(verificacion.getVerificadoPor());
         dto.setFechaVerificacion(verificacion.getFechaVerificacion());
-        dto.setTieneHistorialDevoluciones(historialVerificacionRepository.existsByRolExamenId(rol.getId()));
+        long devolucionesHistorial = historialVerificacionRepository.countByRolExamenId(rol.getId());
+        long totalDevoluciones = devolucionesHistorial + ("DEVUELTO".equalsIgnoreCase(verificacion.getEstado()) ? 1 : 0);
+        dto.setCantidadDevoluciones((int) totalDevoluciones);
+        dto.setTieneHistorialDevoluciones(totalDevoluciones > 0);
         return dto;
     }
 
@@ -533,6 +536,8 @@ public class VerificacionExamenService {
                 : "Examen programado sin banco de preguntas cargado.");
         dto.setVerificadoPor(null);
         dto.setFechaVerificacion(null);
+        dto.setTieneHistorialDevoluciones(false);
+        dto.setCantidadDevoluciones(0);
         return dto;
     }
 
@@ -550,6 +555,9 @@ public class VerificacionExamenService {
         dto.setObservacionesGenerales(verificacion.getObservacionesGenerales());
         dto.setVerificadoPor(verificacion.getVerificadoPor());
         dto.setFechaVerificacion(verificacion.getFechaVerificacion());
+        long devolucionesHistorialDetalle = historialVerificacionRepository.countByRolExamenId(rol.getId());
+        long totalDevolucionesDetalle = devolucionesHistorialDetalle + ("DEVUELTO".equalsIgnoreCase(verificacion.getEstado()) ? 1 : 0);
+        dto.setCantidadDevoluciones((int) totalDevolucionesDetalle);
         return dto;
     }
 

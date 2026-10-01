@@ -35,4 +35,7 @@ public class CalificacionOmrResponseDto {
     private String observacionReprogramacion;
     private String reprogramadoPor;
     private LocalDateTime fechaReprogramacion;
+    private Boolean sincronizadoSea;
+    private LocalDateTime fechaSincronizacionSea;
+    private String sincronizadoSeaPor;
 }

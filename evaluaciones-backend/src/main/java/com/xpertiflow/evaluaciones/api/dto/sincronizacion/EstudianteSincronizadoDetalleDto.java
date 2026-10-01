@@ -18,4 +18,7 @@ public class EstudianteSincronizadoDetalleDto {
     private Boolean completado;
     private String observacion;
     private Boolean esReprogramado;
+    private Boolean sincronizadoSea;
+    private java.time.LocalDateTime fechaSincronizacionSea;
+    private String sincronizadoSeaPor;
 }

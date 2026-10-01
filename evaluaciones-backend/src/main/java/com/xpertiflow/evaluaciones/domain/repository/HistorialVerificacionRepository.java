@@ -12,4 +12,6 @@ public interface HistorialVerificacionRepository extends JpaRepository<Historial
     boolean existsByRolExamenIdAndBancoPreguntasId(String rolExamenId, String bancoPreguntasId);
 
     boolean existsByRolExamenId(String rolExamenId);
+
+    long countByRolExamenId(String rolExamenId);
 }

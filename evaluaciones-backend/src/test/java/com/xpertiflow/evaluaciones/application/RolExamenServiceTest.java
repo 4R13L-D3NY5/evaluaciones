@@ -14,6 +14,7 @@ import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionReposito
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.HistorialVerificacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.SalaExamenVirtualRepository;
@@ -52,6 +53,8 @@ class RolExamenServiceTest {
     @Mock
     private VerificacionExamenRepository verificacionExamenRepository;
     @Mock
+    private HistorialVerificacionRepository historialVerificacionRepository;
+    @Mock
     private RolExamenMapper mapper;
     @Mock
     private UnitepcGatewayClient unitepcGatewayClient;
@@ -72,7 +75,7 @@ class RolExamenServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, verificacionExamenRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService, salaVirtualRepository, varianteRepository, mapeoRepository);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, verificacionExamenRepository, historialVerificacionRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService, salaVirtualRepository, varianteRepository, mapeoRepository);
     }
 
     @Test

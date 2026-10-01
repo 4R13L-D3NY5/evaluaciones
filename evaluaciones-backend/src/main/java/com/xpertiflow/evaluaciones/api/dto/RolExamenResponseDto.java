@@ -47,6 +47,7 @@ public class RolExamenResponseDto {
     private boolean bancoPreguntasCargado;
     private boolean requiereVerificacion;
     private String estadoVerificacion;
+    private Integer cantidadDevoluciones;
     private String verificadoPor;
     private LocalDateTime fechaVerificacion;
     private String hashEncriptacion;

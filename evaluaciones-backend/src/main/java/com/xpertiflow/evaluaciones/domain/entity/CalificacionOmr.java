@@ -93,4 +93,13 @@ public class CalificacionOmr {
 
     @Column(name = "fecha_reprogramacion")
     private LocalDateTime fechaReprogramacion;
+
+    @Column(name = "sincronizado_sea", nullable = false)
+    private Boolean sincronizadoSea = false;
+
+    @Column(name = "fecha_sincronizacion_sea")
+    private LocalDateTime fechaSincronizacionSea;
+
+    @Column(name = "sincronizado_sea_por", length = 100)
+    private String sincronizadoSeaPor;
 }

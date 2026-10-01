@@ -30,4 +30,5 @@ public class VerificacionExamenListaDto {
     private String verificadoPor;
     private LocalDateTime fechaVerificacion;
     private Boolean tieneHistorialDevoluciones;
+    private Integer cantidadDevoluciones;
 }

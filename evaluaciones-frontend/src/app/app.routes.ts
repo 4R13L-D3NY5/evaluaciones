@@ -18,6 +18,7 @@ import { CambiarContrasenaComponent } from './pages/auth/cambiar-contrasena.comp
 import { UsuariosSistemaComponent } from './pages/usuarios-sistema/usuarios-sistema.component';
 import { RespaldosComponent } from './pages/respaldos/respaldos.component';
 import { VerificarExamenesComponent } from './pages/verificar-examenes/verificar-examenes.component';
+import { SincronizacionSeaComponent } from './pages/sincronizacion-sea/sincronizacion-sea.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard], title: 'Acceso - Sistema de Evaluaciones' },
@@ -43,6 +44,7 @@ export const routes: Routes = [
       { path: 'auditoria', component: AuditoriaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Auditoría & Bitácora - Sistema de Evaluaciones' },
       { path: 'usuarios-sistema', component: UsuariosSistemaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Usuarios y accesos - Sistema de Evaluaciones' },
       { path: 'respaldos', component: RespaldosComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Respaldos y contingencia - Sistema de Evaluaciones' },
+      { path: 'sincronizacion-sea', component: SincronizacionSeaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Sincronización SEA - Sistema de Evaluaciones' },
       { path: 'verificar-examenes', component: VerificarExamenesComponent, canActivate: [strictRoleGuard(['VERIFICADOR'])], title: 'Verificar exámenes - Sistema de Evaluaciones' }
     ]
   },

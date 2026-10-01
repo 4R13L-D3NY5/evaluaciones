@@ -125,7 +125,7 @@ public class CartillaOmrController {
     }
 
     @PostMapping("/simular-rezagado")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Simular incorporación de un estudiante rezagado para pruebas locales")
     public ResponseEntity<PreparacionCartillasOmrResponseDto> simularRezagado(
             @PathVariable String rolExamenId,

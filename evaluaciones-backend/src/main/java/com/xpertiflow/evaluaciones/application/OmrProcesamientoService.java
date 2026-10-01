@@ -54,6 +54,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Function;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.CorregirClavePatronResponseDto;
@@ -140,20 +143,75 @@ public class OmrProcesamientoService {
             throw new IllegalArgumentException("El procesamiento OMR solo corresponde a exámenes con cartilla.");
         }
 
-        int cartillasEsperadas = loteCartillasRepository.findFirstByRolExamenIdOrderByGeneradoEnDesc(rolExamenId)
-                .map(LoteCartillasOmr::getTotalCartillas)
-                .filter(total -> total != null && total > 0)
-                .orElse(rol.getEstudiantesInscritosCount() == null ? 0 : rol.getEstudiantesInscritosCount());
-        if (cartillasEsperadas <= 0) {
+        Set<Integer> cantidadesValidas = resolverCantidadesValidasCartillas(rolExamenId, rol);
+        if (cantidadesValidas.isEmpty()) {
             throw new IllegalArgumentException("No se pudo determinar la cantidad de cartillas entregadas para este rol. Genere primero el lote de cartillas.");
         }
 
         int paginas = contarPaginas(archivo);
-        if (paginas != cartillasEsperadas) {
+        if (!cantidadesValidas.contains(paginas)) {
+            int esperada = cantidadesValidas.iterator().next();
             throw new IllegalArgumentException(String.format(
-                    "El escaneado contiene %d página%s, pero el rol tiene %d cartilla%s entregada%s. Verifique que corresponda al mismo grupo y vuelva a cargar el archivo.",
-                    paginas, paginas == 1 ? "" : "s", cartillasEsperadas, cartillasEsperadas == 1 ? "" : "s", cartillasEsperadas == 1 ? "" : "s"));
+                    "El escaneado contiene %d página%s, pero el rol tiene %d cartilla%s generada%s en el lote oficial de la base de datos. Verifique que corresponda al mismo grupo y vuelva a cargar el archivo.",
+                    paginas, paginas == 1 ? "" : "s", esperada, esperada == 1 ? "" : "s", esperada == 1 ? "" : "s"));
         }
+    }
+
+    private Set<Integer> resolverCantidadesValidasCartillas(String rolExamenId, RolExamen rol) {
+        Set<Integer> validas = new java.util.LinkedHashSet<>();
+
+        // 1. Total del lote formal de cartillas OMR si existe
+        loteCartillasRepository.findFirstByRolExamenIdOrderByGeneradoEnDesc(rolExamenId)
+                .map(LoteCartillasOmr::getTotalCartillas)
+                .filter(total -> total != null && total > 0)
+                .ifPresent(validas::add);
+
+        // 2. Total de cartillas registrado en auditoría de impresión de marcas OMR
+        auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, "IMPRESION_MARCAS_OMR")
+                .ifPresent(aud -> {
+                    Integer cant = extraerCantidadAuditoria(aud.getDetallesJson());
+                    if (cant != null && cant > 0) validas.add(cant);
+                });
+
+        // 3. Estudiantes del mapeo oficial con examen generado (lote inicial oficial o cualquier cuadernillo)
+        List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);
+        if (mapeos != null && !mapeos.isEmpty()) {
+            long conOficial = mapeos.stream()
+                    .filter(m -> m.getCuadernilloIndividualPdf() != null
+                            && m.getCuadernilloIndividualPdf().contains("_Examenes_Oficiales.pdf"))
+                    .count();
+            if (conOficial > 0) {
+                validas.add((int) conOficial);
+            }
+
+            long conCualquierExamen = mapeos.stream()
+                    .filter(m -> m.getCuadernilloIndividualPdf() != null && !m.getCuadernilloIndividualPdf().isBlank())
+                    .count();
+            if (conCualquierExamen > 0) {
+                validas.add((int) conCualquierExamen);
+            }
+        }
+
+        // 4. Si aún no hay cantidades registradas, usar el conteo de inscritos del rol
+        if (validas.isEmpty()) {
+            int inscritos = rol.getEstudiantesInscritosCount() == null ? 0 : rol.getEstudiantesInscritosCount();
+            if (inscritos > 0) {
+                validas.add(inscritos);
+            }
+        }
+
+        return validas;
+    }
+
+    private Integer extraerCantidadAuditoria(String detallesJson) {
+        if (detallesJson == null || detallesJson.isBlank()) return null;
+        try {
+            JsonNode node = objectMapper.readTree(detallesJson);
+            if (node.has("cantidad") && !node.get("cantidad").isNull()) {
+                return node.get("cantidad").asInt();
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     private int contarPaginas(MultipartFile archivo) {
@@ -174,9 +232,60 @@ public class OmrProcesamientoService {
 
     @Transactional(readOnly = true)
     public List<CalificacionOmrResponseDto> listarCalificaciones(String rolExamenId) {
-        return calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId).stream()
-                .map(this::mapearCalificacion)
+        List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);
+        List<CalificacionOmr> calificaciones = calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId);
+
+        Map<String, CalificacionOmr> calificacionesMap = calificaciones.stream()
+                .filter(c -> c.getCodigoEstudiante() != null)
+                .collect(Collectors.toMap(c -> c.getCodigoEstudiante().trim(), Function.identity(), (c1, c2) -> c1));
+
+        if (mapeos == null || mapeos.isEmpty()) {
+            return calificaciones.stream().map(this::mapearCalificacion).toList();
+        }
+
+        List<CalificacionOmrResponseDto> resultado = new ArrayList<>();
+        Set<String> codigosProcesados = new HashSet<>();
+
+        List<MapeoEstudianteVariante> ordenados = mapeos.stream()
+                .sorted(Comparator.comparing((MapeoEstudianteVariante m) -> nombreCompleto(m).toLowerCase(Locale.ROOT)))
                 .toList();
+
+        for (MapeoEstudianteVariante m : ordenados) {
+            String codigo = m.getCodigoEstudiante() != null ? m.getCodigoEstudiante().trim() : "";
+            codigosProcesados.add(codigo);
+            CalificacionOmr cal = calificacionesMap.get(codigo);
+            if (cal != null) {
+                resultado.add(mapearCalificacion(cal));
+            } else {
+                CalificacionOmrResponseDto dto = new CalificacionOmrResponseDto();
+                dto.setId(null);
+                dto.setRolExamenId(rolExamenId);
+                dto.setCodigoEstudiante(codigo);
+                dto.setEstudianteNombreCompleto(nombreCompleto(m));
+                dto.setLetraVariante(m.getLetraVariante());
+                dto.setTotalReactivos(30);
+                dto.setAciertos(null);
+                dto.setFallos(null);
+                dto.setBlancos(null);
+                dto.setDoblesMarcas(null);
+                dto.setNotaSobre60(null);
+                dto.setNotaSobre100(null);
+                dto.setEstadoCalificacion("SIN_CALIFICACION");
+                dto.setEsReprogramado(false);
+                dto.setSincronizadoSea(false);
+                dto.setFechaSincronizacionSea(null);
+                dto.setSincronizadoSeaPor(null);
+                resultado.add(dto);
+            }
+        }
+
+        for (CalificacionOmr cal : calificaciones) {
+            if (!codigosProcesados.contains(cal.getCodigoEstudiante().trim())) {
+                resultado.add(mapearCalificacion(cal));
+            }
+        }
+
+        return resultado;
     }
 
     @Transactional(readOnly = true)
@@ -966,6 +1075,8 @@ public class OmrProcesamientoService {
                             .notaSobre100(c != null ? c.getNotaSobre100() : null)
                             .estadoCalificacion(c != null ? c.getEstadoCalificacion() : "SIN_CALIFICACION")
                             .fechaExamenReprogramado(c != null ? c.getFechaExamenReprogramado() : null)
+                            .sincronizadoSea(c != null && Boolean.TRUE.equals(c.getSincronizadoSea()))
+                            .fechaSincronizacionSea(c != null ? c.getFechaSincronizacionSea() : null)
                             .build();
                 })
                 .toList();
@@ -1525,6 +1636,9 @@ public class OmrProcesamientoService {
         dto.setObservacionReprogramacion(calificacion.getObservacionReprogramacion());
         dto.setReprogramadoPor(calificacion.getReprogramadoPor());
         dto.setFechaReprogramacion(calificacion.getFechaReprogramacion());
+        dto.setSincronizadoSea(calificacion.getSincronizadoSea());
+        dto.setFechaSincronizacionSea(calificacion.getFechaSincronizacionSea());
+        dto.setSincronizadoSeaPor(calificacion.getSincronizadoSeaPor());
         return dto;
     }
 

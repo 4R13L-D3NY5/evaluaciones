@@ -14,6 +14,7 @@ import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionReposito
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.DocumentoExamenSinCartillaRepository;
 import com.xpertiflow.evaluaciones.domain.entity.VerificacionExamen;
+import com.xpertiflow.evaluaciones.domain.repository.HistorialVerificacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
@@ -53,6 +54,7 @@ public class RolExamenService {
     private final BancoPreguntasRepository bancoPreguntasRepository;
     private final DocumentoExamenSinCartillaRepository documentoSinCartillaRepository;
     private final VerificacionExamenRepository verificacionExamenRepository;
+    private final HistorialVerificacionRepository historialVerificacionRepository;
     private final RolExamenMapper mapper;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final AccesoAcademicoService accesoAcademicoService;
@@ -324,10 +326,14 @@ public class RolExamenService {
             dto.setEstadoVerificacion(estadoVerif);
             dto.setVerificadoPor(verificacion != null ? verificacion.getVerificadoPor() : null);
             dto.setFechaVerificacion(verificacion != null ? verificacion.getFechaVerificacion() : null);
+            long devolucionesHistorial = historialVerificacionRepository.countByRolExamenId(rol.getId());
+            long totalDevoluciones = devolucionesHistorial + ("DEVUELTO".equalsIgnoreCase(estadoVerif) ? 1 : 0);
+            dto.setCantidadDevoluciones((int) totalDevoluciones);
         } else {
             dto.setEstadoVerificacion(null);
             dto.setVerificadoPor(null);
             dto.setFechaVerificacion(null);
+            dto.setCantidadDevoluciones(0);
         }
         // Los campos locales del rol nunca son una fuente de presentación.
         dto.setDocenteNombre(null);
