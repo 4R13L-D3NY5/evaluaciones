@@ -466,18 +466,22 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
                   <p class="text-xs font-bold text-muted-foreground">Consolidando calificaciones de la nómina...</p>
                 </div>
               } @else if (reportePrevia()) {
-                <div class="grid grid-cols-3 gap-3 p-3 bg-muted/40 rounded-xl text-center text-xs">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-muted/40 rounded-xl text-center text-xs">
                   <div>
                     <span class="text-muted-foreground block text-[10px] uppercase font-bold">Total Nómina</span>
                     <span class="font-black text-foreground text-sm">{{ reportePrevia()?.totalEstudiantes }}</span>
                   </div>
                   <div>
-                    <span class="text-emerald-600 block text-[10px] uppercase font-bold">Con Calificación</span>
-                    <span class="font-black text-emerald-600 text-sm">{{ contarEstudiantesConNota(reportePrevia()) }}</span>
+                    <span class="text-emerald-600 block text-[10px] uppercase font-bold">Ya en SEA</span>
+                    <span class="font-black text-emerald-600 text-sm">{{ contarEstudiantesYaEnSea(reportePrevia()) }}</span>
                   </div>
                   <div>
-                    <span class="text-amber-600 block text-[10px] uppercase font-bold">Sin Nota / Ausentes</span>
-                    <span class="font-black text-amber-600 text-sm">{{ contarEstudiantesSinNota(reportePrevia()) }}</span>
+                    <span class="text-sky-600 block text-[10px] uppercase font-bold">Nuevos p/ Enviar</span>
+                    <span class="font-black text-sky-600 text-sm">{{ contarEstudiantesNuevosAEnviar(reportePrevia()) }}</span>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 block text-[10px] uppercase font-bold">Sin Nota / Omitidos</span>
+                    <span class="font-black text-slate-500 text-sm">{{ contarEstudiantesSinNota(reportePrevia()) }}</span>
                   </div>
                 </div>
 
@@ -489,6 +493,7 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
                         <th class="py-2.5 px-3">Código SEA</th>
                         <th class="py-2.5 px-3">Estudiante</th>
                         <th class="py-2.5 px-3 text-center">Nota /100</th>
+                        <th class="py-2.5 px-3 text-center">Estado SEA</th>
                         <th class="py-2.5 px-3">Observación</th>
                       </tr>
                     </thead>
@@ -506,6 +511,26 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
                             } @else {
                               <span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold text-[10px]">
                                 Sin nota
+                              </span>
+                            }
+                          </td>
+                          <td class="py-2 px-3 text-center">
+                            @if (est.sincronizadoSea) {
+                              <span class="inline-flex flex-col items-center">
+                                <span class="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-black text-[10px] inline-flex items-center gap-1">
+                                  <i class="pi pi-check text-[9px]"></i> Ya en SEA
+                                </span>
+                                @if (est.fechaSincronizacionSea) {
+                                  <span class="text-[9px] text-muted-foreground mt-0.5">{{ formatearFechaHora(est.fechaSincronizacionSea) }}</span>
+                                }
+                              </span>
+                            } @else if (est.score !== null && est.score !== undefined) {
+                              <span class="px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 font-bold text-[10px] inline-flex items-center gap-1">
+                                <i class="pi pi-arrow-up-right text-[9px]"></i> Nuevo p/ enviar
+                              </span>
+                            } @else {
+                              <span class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium text-[10px] inline-flex items-center gap-1">
+                                <i class="pi pi-minus-circle text-[9px]"></i> Omitido
                               </span>
                             }
                           </td>
@@ -972,6 +997,16 @@ export class SincronizacionSeaComponent implements OnInit {
   public contarEstudiantesSinNota(reporte: SincronizacionNotasSeaReporte | null): number {
     if (!reporte || !reporte.estudiantes) return 0;
     return reporte.estudiantes.filter(e => e.score === null || e.score === undefined).length;
+  }
+
+  public contarEstudiantesYaEnSea(reporte: SincronizacionNotasSeaReporte | null): number {
+    if (!reporte || !reporte.estudiantes) return 0;
+    return reporte.estudiantes.filter(e => e.sincronizadoSea === true).length;
+  }
+
+  public contarEstudiantesNuevosAEnviar(reporte: SincronizacionNotasSeaReporte | null): number {
+    if (!reporte || !reporte.estudiantes) return 0;
+    return reporte.estudiantes.filter(e => (e.score !== null && e.score !== undefined) && !e.sincronizadoSea).length;
   }
 
   // Sincronización individual directa

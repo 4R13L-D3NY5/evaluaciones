@@ -84,6 +84,7 @@ class SincronizacionNotasSeaServiceTest {
                 .carreraCodigo("SIS")
                 .carreraNombre("INGENIERÍA DE SISTEMAS")
                 .modalidad(ModalidadExamen.PRESENCIAL_CARTILLA)
+                .tipoParcial(com.xpertiflow.evaluaciones.domain.enums.TipoParcial.PRIMER_PARCIAL)
                 .estadoFlujo(EstadoFlujo.CALIFICADO)
                 .seaGroupId(groupId.toString())
                 .seaSyllabusCourseId(syllabusId.toString())
@@ -163,6 +164,10 @@ class SincronizacionNotasSeaServiceTest {
 
         when(calificacionOmrRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId))
                 .thenReturn(List.of(cal1, cal2Reprog));
+        when(calificacionOmrRepository.findByRolExamenIdAndCodigoEstudiante(rolExamenId, "5178397"))
+                .thenReturn(Optional.of(cal1));
+        when(calificacionOmrRepository.findByRolExamenIdAndCodigoEstudiante(rolExamenId, "4466316"))
+                .thenReturn(Optional.of(cal2Reprog));
 
         when(unitepcGatewayClient.getStudentsByGroup(groupId.toString()))
                 .thenReturn(List.of());
@@ -191,6 +196,19 @@ class SincronizacionNotasSeaServiceTest {
         assertEquals(2, resultado.getTotalEstudiantes());
         assertEquals(2, resultado.getTotalExitosos());
         assertEquals(0, resultado.getTotalFallidos());
+
+        // Verificar trazabilidad individual en el reporte devuelto
+        var estSinc = resultado.getEstudiantes().stream().filter(e -> "5178397".equals(e.getCodigoEstudiante())).findFirst().orElseThrow();
+        assertTrue(estSinc.getSincronizadoSea());
+        assertNotNull(estSinc.getFechaSincronizacionSea());
+        assertEquals("admin", estSinc.getSincronizadoSeaPor());
+
+        // Verificar que la entidad individual CalificacionOmr se actualizó y guardó
+        assertTrue(cal1.getSincronizadoSea());
+        assertNotNull(cal1.getFechaSincronizacionSea());
+        assertEquals("admin", cal1.getSincronizadoSeaPor());
+        verify(calificacionOmrRepository).save(cal1);
+        verify(calificacionOmrRepository).save(cal2Reprog);
 
         // Verificar llamada al Gateway con el payload correcto
         ArgumentCaptor<ResearchStudentEvaluationRegisterInputDto> captor = ArgumentCaptor.forClass(ResearchStudentEvaluationRegisterInputDto.class);

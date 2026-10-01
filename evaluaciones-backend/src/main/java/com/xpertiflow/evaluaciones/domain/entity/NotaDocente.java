@@ -20,4 +20,13 @@ public class NotaDocente {
     @Column(name = "nota_sobre_100", nullable = false, precision = 5, scale = 2) private BigDecimal notaSobre100;
     @Column(name = "guardado_por", nullable = false, length = 100) private String guardadoPor;
     @Column(name = "guardado_en", nullable = false) private LocalDateTime guardadoEn = LocalDateTime.now();
+
+    @Column(name = "sincronizado_sea", nullable = false)
+    private Boolean sincronizadoSea = false;
+
+    @Column(name = "fecha_sincronizacion_sea")
+    private LocalDateTime fechaSincronizacionSea;
+
+    @Column(name = "sincronizado_sea_por", length = 100)
+    private String sincronizadoSeaPor;
 }

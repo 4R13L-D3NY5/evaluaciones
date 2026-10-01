@@ -56,6 +56,16 @@ public class IntentoExamenVirtual {
     private Integer advertenciasDocente = 0;
     @Column(name = "mensaje_advertencia", length = 300)
     private String mensajeAdvertencia;
+
+    @Column(name = "sincronizado_sea", nullable = false)
+    private Boolean sincronizadoSea = false;
+
+    @Column(name = "fecha_sincronizacion_sea")
+    private LocalDateTime fechaSincronizacionSea;
+
+    @Column(name = "sincronizado_sea_por", length = 100)
+    private String sincronizadoSeaPor;
+
     @CreationTimestamp
     @Column(name = "creado_en", nullable = false, updatable = false)
     private LocalDateTime creadoEn;

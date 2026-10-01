@@ -89,6 +89,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-048 — Trazabilidad individual de sincronización al SEA por estudiante y estado granular en calificaciones
+
+- Prioridad: Alta
+- Área: Integración SEA / Calificaciones Individuales / Trazabilidad y Rezagados
+- Responsable: Antigravity
+- Creada: 2026-09-30
+- Fecha límite: 2026-10-01
+- Dependencias: `sea_calificaciones_omr`, `sea_notas_docentes`, `sea_intentos_examen_virtual`, `SincronizacionNotasSeaService`, `OmrProcesamientoService`, `evaluaciones-dia.component.ts`, `sincronizacion-sea.component.ts`.
+- Criterio de cierre: 1) Migración Flyway V49 para agregar columnas de sincronización individual (`sincronizado_sea`, `fecha_sincronizacion_sea`, `sincronizado_sea_por`) en tablas de calificaciones; 2) Marcar individualmente a cada estudiante en BD cuando el Gateway SEA confirme su registro (`completed == true`); 3) Exponer el estado individual en DTOs de previsualización y listado de notas; 4) Mostrar badges/indicadores en frontend (Notas OMR y Previsualización Masiva) identificando claramente quién ya está sincronizado en el SEA, quién es rezagado pendiente y quién está ausente; 5) Auto-refresco reactivo al sincronizar nómina de rezagados en el modal de notas OMR.
+- Notas: En progreso. Implementando trazabilidad granular por estudiante para distinguir alumnos previamente transmitidos de nuevos rezagados pendientes de envío al SEA. Implementada trazabilidad individual por estudiante en sincronización SEA (Flyway V49, entidades OMR/docentes/virtuales, DTOs, vistas previas y badges en frontend)
+
 #### T-046 — Módulo de Sincronización Masiva de Calificaciones al SEA por Sede y Carrera con Filtro Teórico/Práctico
 
 - Prioridad: Alta
@@ -562,7 +573,7 @@ _Sin tareas._
 |---|---:|
 | Pendientes | 4 |
 | En progreso | 1 |
-| En revisión | 38 |
+| En revisión | 39 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 

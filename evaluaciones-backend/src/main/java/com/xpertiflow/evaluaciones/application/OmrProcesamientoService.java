@@ -272,6 +272,9 @@ public class OmrProcesamientoService {
                 dto.setNotaSobre100(null);
                 dto.setEstadoCalificacion("SIN_CALIFICACION");
                 dto.setEsReprogramado(false);
+                dto.setSincronizadoSea(false);
+                dto.setFechaSincronizacionSea(null);
+                dto.setSincronizadoSeaPor(null);
                 resultado.add(dto);
             }
         }
@@ -1072,6 +1075,8 @@ public class OmrProcesamientoService {
                             .notaSobre100(c != null ? c.getNotaSobre100() : null)
                             .estadoCalificacion(c != null ? c.getEstadoCalificacion() : "SIN_CALIFICACION")
                             .fechaExamenReprogramado(c != null ? c.getFechaExamenReprogramado() : null)
+                            .sincronizadoSea(c != null && Boolean.TRUE.equals(c.getSincronizadoSea()))
+                            .fechaSincronizacionSea(c != null ? c.getFechaSincronizacionSea() : null)
                             .build();
                 })
                 .toList();
@@ -1631,6 +1636,9 @@ public class OmrProcesamientoService {
         dto.setObservacionReprogramacion(calificacion.getObservacionReprogramacion());
         dto.setReprogramadoPor(calificacion.getReprogramadoPor());
         dto.setFechaReprogramacion(calificacion.getFechaReprogramacion());
+        dto.setSincronizadoSea(calificacion.getSincronizadoSea());
+        dto.setFechaSincronizacionSea(calificacion.getFechaSincronizacionSea());
+        dto.setSincronizadoSeaPor(calificacion.getSincronizadoSeaPor());
         return dto;
     }
 

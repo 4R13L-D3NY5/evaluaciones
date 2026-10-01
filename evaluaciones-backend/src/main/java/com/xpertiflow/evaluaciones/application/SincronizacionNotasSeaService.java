@@ -57,9 +57,12 @@ public class SincronizacionNotasSeaService {
                         .studentOldCode(e.studentOldCode())
                         .nombreCompleto(e.nombreCompleto())
                         .score(e.score())
-                        .completado(null) // aún no enviado
+                        .completado(null) // aún no enviado en esta ejecución
                         .observacion(e.observacion())
                         .esReprogramado(e.esReprogramado())
+                        .sincronizadoSea(e.sincronizadoSea())
+                        .fechaSincronizacionSea(e.fechaSincronizacionSea())
+                        .sincronizadoSeaPor(e.sincronizadoSeaPor())
                         .build())
                 .sorted(Comparator.comparing(EstudianteSincronizadoDetalleDto::getCodigoEstudiante))
                 .toList();
@@ -170,6 +173,7 @@ public class SincronizacionNotasSeaService {
                         r -> Boolean.TRUE.equals(r.getCompleted()),
                         (existente, reemplazo) -> reemplazo));
 
+        LocalDateTime ahora = LocalDateTime.now();
         int exitosos = 0;
         int fallidos = 0;
         List<EstudianteSincronizadoDetalleDto> detalleReporte = new ArrayList<>();
@@ -180,8 +184,16 @@ public class SincronizacionNotasSeaService {
                 completado = resultadoPorOldCode.get(calc.studentOldCode());
             }
 
+            Boolean sincSea = calc.sincronizadoSea();
+            LocalDateTime fechaSinc = calc.fechaSincronizacionSea();
+            String sincPor = calc.sincronizadoSeaPor();
+
             if (Boolean.TRUE.equals(completado)) {
                 exitosos++;
+                sincSea = true;
+                fechaSinc = ahora;
+                sincPor = usuario;
+                actualizarSincronizacionIndividual(rol, calc.codigoEstudiante(), ahora, usuario);
             } else if (Boolean.FALSE.equals(completado)) {
                 fallidos++;
             }
@@ -201,12 +213,13 @@ public class SincronizacionNotasSeaService {
                     .completado(completado)
                     .observacion(observacionFinal)
                     .esReprogramado(calc.esReprogramado())
+                    .sincronizadoSea(sincSea)
+                    .fechaSincronizacionSea(fechaSinc)
+                    .sincronizadoSeaPor(sincPor)
                     .build());
         }
 
         detalleReporte.sort(Comparator.comparing(EstudianteSincronizadoDetalleDto::getCodigoEstudiante));
-
-        LocalDateTime ahora = LocalDateTime.now();
 
         // 7. Persistir estado en el Rol de Examen
         rol.setSincronizadoSea(true);
@@ -276,7 +289,10 @@ public class SincronizacionNotasSeaService {
             String nombreCompleto,
             Integer score,
             Boolean esReprogramado,
-            String observacion
+            String observacion,
+            Boolean sincronizadoSea,
+            LocalDateTime fechaSincronizacionSea,
+            String sincronizadoSeaPor
     ) {}
 
     private List<EstudianteCalculado> consolidarNotasTeoricas(RolExamen rol) {
@@ -322,7 +338,10 @@ public class SincronizacionNotasSeaService {
                         estudiante.getFullName() != null ? estudiante.getFullName() : "ESTUDIANTE",
                         null,
                         false,
-                        "Pendiente de evaluación / Ausente"
+                        "Pendiente de evaluación / Ausente",
+                        false,
+                        null,
+                        null
                 ));
             }
         }
@@ -347,7 +366,10 @@ public class SincronizacionNotasSeaService {
                                 !nom.isBlank() ? nom : "ESTUDIANTE",
                                 null,
                                 false,
-                                "Pendiente de evaluación / Ausente"
+                                "Pendiente de evaluación / Ausente",
+                                false,
+                                null,
+                                null
                         ));
                     }
                 }
@@ -381,7 +403,10 @@ public class SincronizacionNotasSeaService {
                     nombre != null ? nombre : "ESTUDIANTE",
                     score,
                     reprogramado,
-                    obs
+                    obs,
+                    Boolean.TRUE.equals(cal.getSincronizadoSea()),
+                    cal.getFechaSincronizacionSea(),
+                    cal.getSincronizadoSeaPor()
             ));
         }
     }
@@ -406,7 +431,10 @@ public class SincronizacionNotasSeaService {
                     nombre != null ? nombre : "ESTUDIANTE",
                     score,
                     false,
-                    obs
+                    obs,
+                    Boolean.TRUE.equals(n.getSincronizadoSea()),
+                    n.getFechaSincronizacionSea(),
+                    n.getSincronizadoSeaPor()
             ));
         }
     }
@@ -434,8 +462,46 @@ public class SincronizacionNotasSeaService {
                         nombre != null ? nombre : "ESTUDIANTE",
                         score,
                         false,
-                        obs
+                        obs,
+                        Boolean.TRUE.equals(intento.getSincronizadoSea()),
+                        intento.getFechaSincronizacionSea(),
+                        intento.getSincronizadoSeaPor()
                 ));
+            }
+        }
+    }
+
+    private void actualizarSincronizacionIndividual(RolExamen rol, String codigoEstudiante, LocalDateTime fecha, String usuario) {
+        if (codigoEstudiante == null || codigoEstudiante.isBlank()) {
+            return;
+        }
+        ModalidadExamen modalidad = rol.getModalidad();
+        if (modalidad == ModalidadExamen.PRESENCIAL_CARTILLA || modalidad == null) {
+            calificacionOmrRepository.findByRolExamenIdAndCodigoEstudiante(rol.getId(), codigoEstudiante.trim())
+                    .ifPresent(cal -> {
+                        cal.setSincronizadoSea(true);
+                        cal.setFechaSincronizacionSea(fecha);
+                        cal.setSincronizadoSeaPor(usuario);
+                        calificacionOmrRepository.save(cal);
+                    });
+        } else if (modalidad == ModalidadExamen.PRESENCIAL_SIN_CARTILLA) {
+            notaDocenteRepository.findByRolExamenIdAndCodigoEstudiante(rol.getId(), codigoEstudiante.trim())
+                    .ifPresent(nd -> {
+                        nd.setSincronizadoSea(true);
+                        nd.setFechaSincronizacionSea(fecha);
+                        nd.setSincronizadoSeaPor(usuario);
+                        notaDocenteRepository.save(nd);
+                    });
+        } else if (modalidad == ModalidadExamen.VIRTUAL) {
+            List<SalaExamenVirtual> salas = salaVirtualRepository.findByRolExamenIdOrderByCreadoEnDesc(rol.getId());
+            if (!salas.isEmpty()) {
+                intentoVirtualRepository.findBySalaIdAndCodigoEstudiante(salas.get(0).getId(), codigoEstudiante.trim())
+                        .ifPresent(intento -> {
+                            intento.setSincronizadoSea(true);
+                            intento.setFechaSincronizacionSea(fecha);
+                            intento.setSincronizadoSeaPor(usuario);
+                            intentoVirtualRepository.save(intento);
+                        });
             }
         }
     }
@@ -520,7 +586,7 @@ public class SincronizacionNotasSeaService {
 
             // Filtro por tipo de examen: PRIMER_PARCIAL (default), SEGUNDO_PARCIAL, FINAL, SEGUNDA_INSTANCIA, TODOS
             if (tipoParcial != null && !tipoParcial.isBlank() && !"TODOS".equalsIgnoreCase(tipoParcial)) {
-                String tp = rol.getTipoParcial() != null ? rol.getTipoParcial().name() : "";
+                String tp = rol.getTipoParcial() != null ? rol.getTipoParcial().name() : "PRIMER_PARCIAL";
                 if ("PRIMER_PARCIAL".equalsIgnoreCase(tipoParcial) || "1P".equalsIgnoreCase(tipoParcial) || "1ER_PARCIAL".equalsIgnoreCase(tipoParcial)) {
                     if (!"PRIMER_PARCIAL".equalsIgnoreCase(tp)) continue;
                 } else if ("SEGUNDO_PARCIAL".equalsIgnoreCase(tipoParcial) || "2P".equalsIgnoreCase(tipoParcial) || "2DO_PARCIAL".equalsIgnoreCase(tipoParcial)) {

@@ -3270,17 +3270,25 @@ interface CampusDisponible extends Campus {
                         </span>
                         <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ !nota.id ? '—' : (nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre60) }}</strong>
                         <strong [class.text-rose-600]="nota.estadoCalificacion === 'ANULADO'">{{ !nota.id ? '—' : (nota.estadoCalificacion === 'ANULADO' ? '0' : nota.notaSobre100) }}</strong>
-                        <span class="text-[10px] font-black"
-                              [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'"
-                              [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'"
-                              [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'"
-                              [class.text-slate-500]="nota.estadoCalificacion === 'SIN_CALIFICACION'"
-                              [class.bg-slate-100]="nota.estadoCalificacion === 'SIN_CALIFICACION'"
-                              [class.px-1.5]="true"
-                              [class.py-0.5]="true"
-                              [class.rounded]="true">
-                          {{ nota.estadoCalificacion === 'SIN_CALIFICACION' ? 'SIN NOTA / AUSENTE' : nota.estadoCalificacion }}
-                        </span>
+                        <div class="flex flex-col gap-1 items-start">
+                          <span class="text-[10px] font-black px-1.5 py-0.5 rounded"
+                                [class.text-emerald-700]="nota.estadoCalificacion === 'APROBADO'"
+                                [class.text-amber-700]="nota.estadoCalificacion === 'REPROBADO'"
+                                [class.text-rose-700]="nota.estadoCalificacion === 'ANULADO'"
+                                [class.text-slate-500]="nota.estadoCalificacion === 'SIN_CALIFICACION'"
+                                [class.bg-slate-100]="nota.estadoCalificacion === 'SIN_CALIFICACION'">
+                            {{ nota.estadoCalificacion === 'SIN_CALIFICACION' ? 'SIN NOTA / AUSENTE' : nota.estadoCalificacion }}
+                          </span>
+                          @if (nota.sincronizadoSea) {
+                            <span class="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[8px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200" [title]="'Sincronizado con SEA: ' + (nota.fechaSincronizacionSea || '') + (nota.sincronizadoSeaPor ? ' por ' + nota.sincronizadoSeaPor : '')">
+                              <i class="pi pi-check text-[7px]"></i> SEA
+                            </span>
+                          } @else if (nota.id && nota.estadoCalificacion !== 'SIN_CALIFICACION') {
+                            <span class="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[8px] font-bold bg-amber-50 text-amber-800 border border-amber-200" title="Calificación pendiente de sincronizar con el SEA">
+                              <i class="pi pi-clock text-[7px]"></i> Pend. SEA
+                            </span>
+                          }
+                        </div>
                         <div class="flex items-center justify-end gap-1">
                           @if (puedeRegistrarReprogramacion()) {
                             <button type="button" (click)="abrirModalReprogramar(nota)" class="px-1.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs" [title]="nota.esReprogramado ? 'Editar reprogramación oral' : (!nota.id ? 'Asignar calificación a rezagado / ausente' : 'Registrar nota por examen oral reprogramado')">

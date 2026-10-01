@@ -6,6 +6,9 @@ export interface EstudianteSincronizadoDetalle {
   completado?: boolean | null;
   observacion?: string;
   esReprogramado?: boolean;
+  sincronizadoSea?: boolean;
+  fechaSincronizacionSea?: string;
+  sincronizadoSeaPor?: string;
 }
 
 export interface SincronizacionNotasSeaReporte {
