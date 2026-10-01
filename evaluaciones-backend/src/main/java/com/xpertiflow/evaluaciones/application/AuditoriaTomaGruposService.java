@@ -55,7 +55,7 @@ public class AuditoriaTomaGruposService {
         Optional<RolExamen> rolOpt = rolExamenRepository.findTopBySeaGroupIdOrderByVersionDesc(groupId);
         if (rolOpt.isEmpty()) {
             rolOpt = rolExamenRepository.findAll().stream()
-                    .filter(r -> groupId.equalsIgnoreCase(r.getGrupoId()) || groupId.equalsIgnoreCase(r.getSeaGroupId()))
+                    .filter(r -> groupId.equalsIgnoreCase(r.getGrupo()) || groupId.equalsIgnoreCase(r.getSeaGroupId()))
                     .findFirst();
         }
 
@@ -155,7 +155,7 @@ public class AuditoriaTomaGruposService {
                 .carreraCodigo(rol != null ? rol.getCarreraCodigo() : null)
                 .sedeNombre(rol != null ? rol.getSedeNombre() : null)
                 .docenteNombre(rol != null ? rol.getDocenteNombre() : null)
-                .term(rol != null ? rol.getGestion() : null)
+                .term("2-2026")
                 .rolExamenId(rolExamenId)
                 .estadoExamen(rol != null && rol.getEstadoFlujo() != null ? rol.getEstadoFlujo().name() : "NO_PROGRAMADO")
                 .fechaGeneracionExamen(fechaGeneracion)
@@ -174,7 +174,7 @@ public class AuditoriaTomaGruposService {
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
 
         String groupId = rol.getSeaGroupId() != null && !rol.getSeaGroupId().isBlank()
-                ? rol.getSeaGroupId() : rol.getGrupoId();
+                ? rol.getSeaGroupId() : rol.getGrupo();
 
         if (groupId == null || groupId.isBlank()) {
             throw new IllegalStateException("El rol de examen " + rolExamenId + " no tiene groupId institucional asociado.");

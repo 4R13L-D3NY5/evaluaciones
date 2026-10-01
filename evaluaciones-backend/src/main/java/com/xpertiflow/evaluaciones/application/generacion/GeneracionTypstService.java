@@ -46,9 +46,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.stream.Collectors;
 import java.util.Comparator;
 import java.util.Set;
 import java.util.UUID;
@@ -545,7 +547,7 @@ public class GeneracionTypstService {
                 .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
 
         String groupIdOficial = rol.getSeaGroupId() != null && !rol.getSeaGroupId().isBlank()
-                ? rol.getSeaGroupId() : rol.getGrupoId();
+                ? rol.getSeaGroupId() : rol.getGrupo();
         Map<String, StudentItemDto> gatewayStudentsMap = Collections.emptyMap();
         try {
             List<StudentItemDto> gatewayStudents = unitepcGatewayClient.getStudentsByGroup(groupIdOficial);
