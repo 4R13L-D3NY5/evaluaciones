@@ -450,7 +450,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                     </thead>
                     <tbody class="divide-y divide-border font-medium text-foreground">
                       @for (est of estudiantesGrupoFiltrados(); track est.studentCode; let idx = $index) {
-                        <tr class="hover:bg-muted/20 transition-colors" [class.bg-rose-50/20]="est.estadoForense === 'EXTEMPORANEO_POST_IMPRESION'">
+                        <tr class="hover:bg-muted/20 transition-colors" [class.bg-rose-50]="est.estadoForense === 'EXTEMPORANEO_POST_IMPRESION'">
                           
                           <!-- N° -->
                           <td class="p-3.5 text-center font-mono text-muted-foreground text-[11px]">
@@ -640,7 +640,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                     </thead>
                     <tbody class="divide-y divide-border font-medium text-foreground">
                       @for (mat of reporteEstudiante()?.materias; track mat.groupId; let idx = $index) {
-                        <tr class="hover:bg-muted/20 transition-colors" [class.bg-rose-50/20]="mat.estadoForense === 'EXTEMPORANEO_POST_IMPRESION'">
+                        <tr class="hover:bg-muted/20 transition-colors" [class.bg-rose-50]="mat.estadoForense === 'EXTEMPORANEO_POST_IMPRESION'">
                           
                           <!-- N° -->
                           <td class="p-3.5 text-center font-mono text-muted-foreground text-[11px]">
