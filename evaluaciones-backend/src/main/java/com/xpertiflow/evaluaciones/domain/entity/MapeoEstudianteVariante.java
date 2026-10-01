@@ -46,6 +46,12 @@ public class MapeoEstudianteVariante {
     @Column(name = "estado_asistencia", length = 20, nullable = false)
     private String estadoAsistencia = "PRESENTE";
 
+    @Column(name = "sea_enroll_created_at")
+    private java.time.OffsetDateTime seaEnrollCreatedAt;
+
+    @Column(name = "sea_enroll_updated_at")
+    private java.time.OffsetDateTime seaEnrollUpdatedAt;
+
     @CreationTimestamp
     @Column(name = "creado_en", nullable = false, updatable = false)
     private LocalDateTime creadoEn;

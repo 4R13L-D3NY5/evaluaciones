@@ -10,4 +10,6 @@ public class StudentItemDto {
     private String courseState;
     private String groupId;
     private String syllabusCourseId;
+    private java.time.OffsetDateTime enrollCreatedAt;
+    private java.time.OffsetDateTime enrollUpdatedAt;
 }

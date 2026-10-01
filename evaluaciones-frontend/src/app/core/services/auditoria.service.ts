@@ -54,4 +54,88 @@ export class AuditoriaService {
     }
     return this.http.get<AuditoriaResumen>(this.baseUrl, { params });
   }
+
+  public obtenerAuditoriaTomaGrupo(groupId: string): Observable<AuditoriaTomaGrupoReporte> {
+    const params = new HttpParams().set('groupId', groupId);
+    return this.http.get<AuditoriaTomaGrupoReporte>(`${this.baseUrl}/toma-grupos/grupo`, { params });
+  }
+
+  public obtenerAuditoriaTomaRol(rolExamenId: string): Observable<AuditoriaTomaGrupoReporte> {
+    return this.http.get<AuditoriaTomaGrupoReporte>(`${this.baseUrl}/toma-grupos/rol/${rolExamenId}`);
+  }
+
+  public buscarEstudianteTomaGrupos(studentCode: string, term?: string): Observable<AuditoriaEstudianteGlobal> {
+    let params = new HttpParams().set('studentCode', studentCode);
+    if (term) {
+      params = params.set('term', term);
+    }
+    return this.http.get<AuditoriaEstudianteGlobal>(`${this.baseUrl}/toma-grupos/estudiante`, { params });
+  }
+
+  public descargarActaForenseExcel(groupId: string): Observable<Blob> {
+    const params = new HttpParams().set('groupId', groupId);
+    return this.http.get(`${this.baseUrl}/toma-grupos/exportar-excel`, {
+      params,
+      responseType: 'blob'
+    });
+  }
+}
+
+export interface AuditoriaTomaGrupoEstudiante {
+  studentCode: string;
+  fullName: string;
+  courseState: string;
+  groupId: string;
+  groupCode?: string;
+  syllabusCourseId?: string;
+  materiaNombre?: string;
+  carreraCodigo?: string;
+  carreraNombre?: string;
+  sedeNombre?: string;
+  docenteNombre?: string;
+  enrollCreatedAt?: string;
+  enrollUpdatedAt?: string;
+  rolExamenId?: string;
+  estadoExamen?: string;
+  fechaGeneracionExamen?: string;
+  fechaImpresionExamen?: string;
+  letraVariante?: string;
+  estadoForense: 'REGULAR' | 'TOMA_TARDIA' | 'EXTEMPORANEO_POST_IMPRESION' | 'SIN_EXAMEN_GENERADO' | 'SIN_FECHA_SEA';
+  nivelAlerta: 'SUCCESS' | 'WARNING' | 'DANGER' | 'INFO';
+  mensajeForense: string;
+  diferenciaMinutosConGeneracion?: number;
+}
+
+export interface AuditoriaTomaGrupoReporte {
+  groupId: string;
+  groupCode?: string;
+  syllabusCourseId?: string;
+  materiaNombre: string;
+  carreraCodigo?: string;
+  carreraNombre?: string;
+  sedeNombre?: string;
+  docenteNombre?: string;
+  term?: string;
+  rolExamenId?: string;
+  estadoExamen?: string;
+  fechaGeneracionExamen?: string;
+  fechaImpresionExamen?: string;
+  totalEstudiantes: number;
+  totalRegulares: number;
+  totalTardios: number;
+  totalExtemporaneos: number;
+  estudiantes: AuditoriaTomaGrupoEstudiante[];
+}
+
+export interface AuditoriaEstudianteGlobal {
+  studentCode: string;
+  fullName: string;
+  carreraCodigo?: string;
+  carreraNombre?: string;
+  sedeNombre?: string;
+  totalMateriasInscritas: number;
+  totalRegulares: number;
+  totalTardios: number;
+  totalExtemporaneos: number;
+  materias: AuditoriaTomaGrupoEstudiante[];
 }
