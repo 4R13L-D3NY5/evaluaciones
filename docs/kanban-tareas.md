@@ -79,6 +79,17 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En revisión
 
+#### T-049 — Módulo de Trazabilidad y Auditoría Forense de Toma de Grupos e Inscripciones de Estudiantes
+
+- Prioridad: Alta
+- Área: Auditoría / Toma de Grupos / Nóminas y Rezagados / Gateway SEA
+- Responsable: Antigravity
+- Creada: 2026-10-01
+- Fecha límite: 2026-10-02
+- Dependencias: `UnitepcGatewayClient`, `StudentItemDto`, `MapeoEstudianteVariante`, `sea_mapeo_estudiantes_variantes`, `AuditoriaController`, `auditoria.component.ts`.
+- Criterio de cierre: 1) Enriquecer `StudentItemDto` para capturar `enrollCreatedAt` y `enrollUpdatedAt` desde el Gateway de UNITEPC; 2) Crear migración Flyway V50 para persistir `sea_enroll_created_at` y `sea_enroll_updated_at` en `sea_mapeo_estudiantes_variantes`; 3) Desarrollar servicio y endpoints en backend para consulta forense por materia/grupo y búsqueda global de todas las asignaturas inscritas por estudiante; 4) Implementar cálculo automático de dictamen forense (Regular, Toma tardía, Extemporáneo post-impresión) comparando timestamps de inscripción contra fechas de generación e impresión de exámenes; 5) Crear vista/pestaña interactiva en frontend con filtros por grupo y buscador de estudiante, badges de alerta y exportación de acta de descargo (Excel/PDF).
+- Notas: En progreso. Iniciando implementación de captura de timestamps, migración V50 y endpoints forenses. Implementacion completada: captura de enrollCreatedAt/enrollUpdatedAt en Gateway, migracion V50, AuditoriaTomaGruposService, endpoints REST, reporte Excel con POI, y pestana interactiva de peritaje forense por grupo y por estudiante en frontend. Implementacion completada y verificada. V1.3.6 lista para validacion en servidor.
+
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
 
@@ -90,17 +101,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Dependencias: Revisar el estado actual del registro, consulta, filtros, detalle de eventos y permisos del módulo.
 - Criterio de cierre: Completar la implementación funcional y visual del módulo, validar que las acciones relevantes queden registradas y que la consulta respete los permisos establecidos.
 - Notas: Tarea creada desde el comando `=new`. Ajuste en formatearFechaHoraAuditoria para parsear UTC y proyectar en America/La_Paz Implementacion integral de Auditoria y Bitacora: endpoint unificado backend, KPIs reales, filtros y exportacion Excel Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Modulo Auditoria y Bitacora funcional: endpoint unificado backend, 4 fuentes de BD, KPIs reales, filtros reactivos, normalizacion horaria Bolivia y exportacion XLSX Auditoria integral, extension de eventos y control de acceso por roles Implementación integral de bitácora y auditoría con captación de IP real, Examen Virtual, filtros por fecha y sincronización SEA
-
-#### T-049 — Módulo de Trazabilidad y Auditoría Forense de Toma de Grupos e Inscripciones de Estudiantes
-
-- Prioridad: Alta
-- Área: Auditoría / Toma de Grupos / Nóminas y Rezagados / Gateway SEA
-- Responsable: Antigravity
-- Creada: 2026-10-01
-- Fecha límite: 2026-10-02
-- Dependencias: `UnitepcGatewayClient`, `StudentItemDto`, `MapeoEstudianteVariante`, `sea_mapeo_estudiantes_variantes`, `AuditoriaController`, `auditoria.component.ts`.
-- Criterio de cierre: 1) Enriquecer `StudentItemDto` para capturar `enrollCreatedAt` y `enrollUpdatedAt` desde el Gateway de UNITEPC; 2) Crear migración Flyway V50 para persistir `sea_enroll_created_at` y `sea_enroll_updated_at` en `sea_mapeo_estudiantes_variantes`; 3) Desarrollar servicio y endpoints en backend para consulta forense por materia/grupo y búsqueda global de todas las asignaturas inscritas por estudiante; 4) Implementar cálculo automático de dictamen forense (Regular, Toma tardía, Extemporáneo post-impresión) comparando timestamps de inscripción contra fechas de generación e impresión de exámenes; 5) Crear vista/pestaña interactiva en frontend con filtros por grupo y buscador de estudiante, badges de alerta y exportación de acta de descargo (Excel/PDF).
-- Notas: En progreso. Iniciando implementación de captura de timestamps, migración V50 y endpoints forenses. Implementacion completada: captura de enrollCreatedAt/enrollUpdatedAt en Gateway, migracion V50, AuditoriaTomaGruposService, endpoints REST, reporte Excel con POI, y pestana interactiva de peritaje forense por grupo y por estudiante en frontend.
 
 #### T-048 — Trazabilidad individual de sincronización al SEA por estudiante y estado granular en calificaciones
 
