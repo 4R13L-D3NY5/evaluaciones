@@ -28,16 +28,17 @@ public class SincronizacionMasivaSeaController {
 
     @GetMapping("/grupos")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES')")
-    @Operation(summary = "Consultar grupos para sincronización al SEA por sede, carrera y tipo de clase")
+    @Operation(summary = "Consultar grupos para sincronización al SEA por sede, carrera, tipo de clase y examen")
     public ResponseEntity<List<GrupoSincronizacionResumenDto>> obtenerGruposParaSincronizacion(
             @RequestParam @Parameter(description = "Código de la sede") String sedeCodigo,
             @RequestParam @Parameter(description = "Código de la carrera") String carreraCodigo,
             @RequestParam(required = false, defaultValue = "TEORICO") @Parameter(description = "Tipo de clase: TEORICO, PRACTICO o TODOS") String tipoClase,
+            @RequestParam(required = false, defaultValue = "PRIMER_PARCIAL") @Parameter(description = "Tipo de examen: PRIMER_PARCIAL, SEGUNDO_PARCIAL, FINAL, SEGUNDA_INSTANCIA o TODOS") String tipoParcial,
             @RequestParam(required = false, defaultValue = "TODOS") @Parameter(description = "Estado de sincronización: TODOS, PENDIENTE, SINCRONIZADO o NO_CALIFICADO") String estadoSincronizacion,
             Authentication authentication) {
 
         return ResponseEntity.ok(sincronizacionService.obtenerGruposParaSincronizacion(
-                sedeCodigo, carreraCodigo, tipoClase, estadoSincronizacion, authentication));
+                sedeCodigo, carreraCodigo, tipoClase, tipoParcial, estadoSincronizacion, authentication));
     }
 
     @PostMapping("/masiva")

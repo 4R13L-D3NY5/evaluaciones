@@ -28,12 +28,14 @@ export class SincronizacionSeaService {
     sedeCodigo: string,
     carreraCodigo: string,
     tipoClase: 'TEORICO' | 'PRACTICO' | 'TODOS' = 'TEORICO',
+    tipoParcial: 'PRIMER_PARCIAL' | 'SEGUNDO_PARCIAL' | 'FINAL' | 'SEGUNDA_INSTANCIA' | 'TODOS' = 'PRIMER_PARCIAL',
     estadoSincronizacion: 'TODOS' | 'PENDIENTE' | 'SINCRONIZADO' | 'NO_CALIFICADO' = 'TODOS'
   ): Observable<GrupoSincronizacionResumen[]> {
     let params = new HttpParams()
       .set('sedeCodigo', sedeCodigo)
       .set('carreraCodigo', carreraCodigo)
       .set('tipoClase', tipoClase)
+      .set('tipoParcial', tipoParcial)
       .set('estadoSincronizacion', estadoSincronizacion);
 
     return this._http.get<GrupoSincronizacionResumen[]>(`${this._baseUrl}/grupos`, { params });

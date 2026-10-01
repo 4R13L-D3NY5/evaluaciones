@@ -485,6 +485,7 @@ public class SincronizacionNotasSeaService {
             String sedeCodigo,
             String carreraCodigo,
             String tipoClase,
+            String tipoParcial,
             String estadoSincronizacion,
             Authentication auth) {
 
@@ -515,6 +516,20 @@ public class SincronizacionNotasSeaService {
                 if (!esTeorico) continue;
             } else if ("PRACTICO".equalsIgnoreCase(tipoClase) || "PA".equalsIgnoreCase(tipoClase)) {
                 if (esTeorico) continue;
+            }
+
+            // Filtro por tipo de examen: PRIMER_PARCIAL (default), SEGUNDO_PARCIAL, FINAL, SEGUNDA_INSTANCIA, TODOS
+            if (tipoParcial != null && !tipoParcial.isBlank() && !"TODOS".equalsIgnoreCase(tipoParcial)) {
+                String tp = rol.getTipoParcial() != null ? rol.getTipoParcial().name() : "";
+                if ("PRIMER_PARCIAL".equalsIgnoreCase(tipoParcial) || "1P".equalsIgnoreCase(tipoParcial) || "1ER_PARCIAL".equalsIgnoreCase(tipoParcial)) {
+                    if (!"PRIMER_PARCIAL".equalsIgnoreCase(tp)) continue;
+                } else if ("SEGUNDO_PARCIAL".equalsIgnoreCase(tipoParcial) || "2P".equalsIgnoreCase(tipoParcial) || "2DO_PARCIAL".equalsIgnoreCase(tipoParcial)) {
+                    if (!"SEGUNDO_PARCIAL".equalsIgnoreCase(tp)) continue;
+                } else if ("FINAL".equalsIgnoreCase(tipoParcial) || "EXAMEN_FINAL".equalsIgnoreCase(tipoParcial)) {
+                    if (!"FINAL".equalsIgnoreCase(tp) && !"EXAMEN_FINAL".equalsIgnoreCase(tp)) continue;
+                } else if ("SEGUNDA_INSTANCIA".equalsIgnoreCase(tipoParcial) || "2I".equalsIgnoreCase(tipoParcial) || "2DA_INSTANCIA".equalsIgnoreCase(tipoParcial)) {
+                    if (!"SEGUNDA_INSTANCIA".equalsIgnoreCase(tp)) continue;
+                }
             }
 
             int totalCalificados = contarEstudiantesCalificados(rol);
@@ -585,6 +600,16 @@ public class SincronizacionNotasSeaService {
                 .thenComparing(GrupoSincronizacionResumenDto::getGrupo, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
 
         return resultado;
+    }
+
+    @Transactional(readOnly = true)
+    public List<GrupoSincronizacionResumenDto> obtenerGruposParaSincronizacion(
+            String sedeCodigo,
+            String carreraCodigo,
+            String tipoClase,
+            String estadoSincronizacion,
+            Authentication auth) {
+        return obtenerGruposParaSincronizacion(sedeCodigo, carreraCodigo, tipoClase, "PRIMER_PARCIAL", estadoSincronizacion, auth);
     }
 
     /**

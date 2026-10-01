@@ -61,7 +61,7 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
 
       <!-- FILTROS Y CONTROLES SUPERIORES -->
       <div class="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <!-- SELECTOR DE SEDE -->
           <div class="space-y-1.5">
             <label class="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -95,6 +95,26 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
                 @for (carrera of carreras(); track carrera.careerCode) {
                   <option [value]="carrera.careerCode">{{ carrera.careerName }}</option>
                 }
+              </select>
+              <i class="pi pi-chevron-down absolute right-3 top-3.5 text-xs text-muted-foreground pointer-events-none"></i>
+            </div>
+          </div>
+
+          <!-- SELECTOR DE EXAMEN / PARCIAL -->
+          <div class="space-y-1.5">
+            <label class="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <i class="pi pi-calendar text-xs text-primary"></i> Examen / Parcial
+            </label>
+            <div class="relative">
+              <select
+                [ngModel]="filtroTipoParcial()"
+                (ngModelChange)="alCambiarTipoParcial($event)"
+                class="w-full h-10 px-3 pr-8 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+                <option value="PRIMER_PARCIAL">1er Parcial</option>
+                <option value="SEGUNDO_PARCIAL">2do Parcial</option>
+                <option value="FINAL">Examen Final</option>
+                <option value="SEGUNDA_INSTANCIA">2da Instancia</option>
+                <option value="TODOS">Todos los exámenes</option>
               </select>
               <i class="pi pi-chevron-down absolute right-3 top-3.5 text-xs text-muted-foreground pointer-events-none"></i>
             </div>
@@ -550,6 +570,10 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
                 <span class="font-bold text-foreground">{{ nombreCarreraActual() }}</span>
               </div>
               <div class="flex justify-between">
+                <span class="text-muted-foreground">Examen / Parcial:</span>
+                <span class="font-bold text-foreground">{{ formatearParcial(filtroTipoParcial()) }}</span>
+              </div>
+              <div class="flex justify-between">
                 <span class="text-muted-foreground">Filtro de grupos:</span>
                 <span class="font-bold text-foreground">{{ filtroTipoClase() }}</span>
               </div>
@@ -681,6 +705,7 @@ export class SincronizacionSeaComponent implements OnInit {
 
   public readonly filtroSedeCodigo = signal<string>('');
   public readonly filtroCarreraCodigo = signal<string>('');
+  public readonly filtroTipoParcial = signal<'PRIMER_PARCIAL' | 'SEGUNDO_PARCIAL' | 'FINAL' | 'SEGUNDA_INSTANCIA' | 'TODOS'>('PRIMER_PARCIAL');
   public readonly filtroTipoClase = signal<'TEORICO' | 'PRACTICO' | 'TODOS'>('TEORICO');
   public readonly filtroEstadoSync = signal<'TODOS' | 'PENDIENTE' | 'SINCRONIZADO' | 'NO_CALIFICADO'>('TODOS');
   public readonly filtroBusqueda = signal<string>('');
@@ -813,7 +838,13 @@ export class SincronizacionSeaComponent implements OnInit {
     if (!sede || !carrera) return;
 
     this.cargandoGrupos.set(true);
-    this.syncService.obtenerGrupos(sede, carrera, this.filtroTipoClase(), this.filtroEstadoSync()).subscribe({
+    this.syncService.obtenerGrupos(
+      sede,
+      carrera,
+      this.filtroTipoClase(),
+      this.filtroTipoParcial(),
+      this.filtroEstadoSync()
+    ).subscribe({
       next: res => {
         this.grupos.set(res || []);
         this.cargandoGrupos.set(false);
@@ -847,6 +878,12 @@ export class SincronizacionSeaComponent implements OnInit {
 
   public alCambiarCarrera(codigo: string): void {
     this.filtroCarreraCodigo.set(codigo);
+    this.seleccionados.set(new Set());
+    this.cargarGrupos();
+  }
+
+  public alCambiarTipoParcial(tipo: 'PRIMER_PARCIAL' | 'SEGUNDO_PARCIAL' | 'FINAL' | 'SEGUNDA_INSTANCIA' | 'TODOS'): void {
+    this.filtroTipoParcial.set(tipo);
     this.seleccionados.set(new Set());
     this.cargarGrupos();
   }
@@ -994,8 +1031,10 @@ export class SincronizacionSeaComponent implements OnInit {
     switch (tipo) {
       case 'PRIMER_PARCIAL': return '1er Parcial';
       case 'SEGUNDO_PARCIAL': return '2do Parcial';
+      case 'FINAL':
       case 'EXAMEN_FINAL': return 'Examen Final';
       case 'SEGUNDA_INSTANCIA': return '2da Instancia';
+      case 'TODOS': return 'Todos los exámenes';
       default: return tipo || 'Parcial';
     }
   }

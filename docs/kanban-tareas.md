@@ -75,17 +75,6 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 
 ### En progreso
 
-#### T-047 — Optimizaciones en Verificación de Exámenes: Botón persistente de previsualización en cabecera para todos los estados y 4to filtro de Devueltos con Observaciones
-
-- Prioridad: Alta
-- Área: Verificación de Exámenes / Evaluaciones / UI
-- Responsable: Antigravity
-- Creada: 2026-09-30
-- Fecha límite: 2026-10-01
-- Dependencias: `verificar-examenes.component.ts`, `examenes-aprobados.component.ts`, `VerificacionExamenService`, `VerificacionExamenListaDto`.
-- Criterio de cierre: 1) Botón "Previsualizar examen completo" visible y anclado en la cabecera fija del modal en todos los estados (Validado, Devuelto y Aprobado); 2) Cuarto filtro/pestaña "Devueltos con observaciones" en la pantalla principal de verificación con contador reactivo; 3) Mapeo y conteo de cantidad de devoluciones por examen tanto en la lista como en el detalle.
-- Notas: En progreso. Implementando optimizaciones de cabecera persistente, nuevo filtro dedicado y conteo de devoluciones solicitadas por el usuario. Botón de previsualización anclado en cabecera para todos los estados de verificación y 4to filtro/pestaña de devueltos con observaciones con conteo de devoluciones completado y probado en contenedores. Ampliando con cards de indicadores de verificación (Validados, Observados, Aprobados, Sin banco) y estado/contador de observaciones en la vista de Evaluaciones del Día.
-
 #### T-009 — Continuar y concluir la implementación del módulo Auditoría y Bitácora
 
 
@@ -109,7 +98,18 @@ Si el usuario escribe una tarea sin usar un comando, se puede registrar como nue
 - Fecha límite: 2026-10-01
 - Dependencias: `SincronizacionNotasSeaService`, `SincronizacionSeaController`, `UnitepcGatewayClient`, `AccesoAcademicoService`, `app.routes.ts`, `sidebar.component.ts`.
 - Criterio de cierre: 1) Diseñar e implementar plan de integración para módulo dedicado de Sincronización SEA accesible por Director de Carrera, Responsable de Evaluaciones, Vicerrector y Administrador; 2) Permitir selección y filtrado reactivo por Sede y Carrera respetando el alcance académico del usuario; 3) Incluir filtro por tipo de grupo: Teóricos (default TA), Prácticos y Todos; 4) Presentar tabla interactiva con estado de sincronización (Sincronizado, Pendiente, No calificado) y checkboxes individuales con selector maestro 'Seleccionar todos'; 5) Endpoint backend y frontend para sincronización masiva con previsualización, reporte de progreso y auditoría inmutable.
-- Notas: En progreso. Elaborando el plan de implementación detallado a solicitud del usuario. Modulo implementado y verificado en Docker: endpoints GET /grupos y POST /masiva, DTOs, filtros sede/carrera/teoricos/practicos, seleccion multiple y sincronizacion al SEA exclusiva para Administrador y Responsable.
+- Notas: En progreso. Elaborando el plan de implementación detallado a solicitud del usuario. Modulo implementado y verificado en Docker: endpoints GET /grupos y POST /masiva, DTOs, filtros sede/carrera/teoricos/practicos, seleccion multiple y sincronizacion al SEA exclusiva para Administrador y Responsable. Módulo implementado y verificado en Docker: endpoints GET /grupos y POST /masiva, DTOs, filtros sede/carrera/teoricos/practicos/examen-parcial (1er Parcial default), seleccion multiple y sincronizacion al SEA exclusiva para Administrador y Responsable.
+
+#### T-047 — Optimizaciones en Verificación de Exámenes: Botón persistente de previsualización en cabecera para todos los estados y 4to filtro de Devueltos con Observaciones
+
+- Prioridad: Alta
+- Área: Verificación de Exámenes / Evaluaciones / UI
+- Responsable: Antigravity
+- Creada: 2026-09-30
+- Fecha límite: 2026-10-01
+- Dependencias: `verificar-examenes.component.ts`, `examenes-aprobados.component.ts`, `VerificacionExamenService`, `VerificacionExamenListaDto`.
+- Criterio de cierre: 1) Botón "Previsualizar examen completo" visible y anclado en la cabecera fija del modal en todos los estados (Validado, Devuelto y Aprobado); 2) Cuarto filtro/pestaña "Devueltos con observaciones" en la pantalla principal de verificación con contador reactivo; 3) Mapeo y conteo de cantidad de devoluciones por examen tanto en la lista como en el detalle.
+- Notas: En progreso. Implementando optimizaciones de cabecera persistente, nuevo filtro dedicado y conteo de devoluciones solicitadas por el usuario. Botón de previsualización anclado en cabecera para todos los estados de verificación y 4to filtro/pestaña de devueltos con observaciones con conteo de devoluciones completado y probado en contenedores. Ampliando con cards de indicadores de verificación (Validados, Observados, Aprobados, Sin banco) y estado/contador de observaciones en la vista de Evaluaciones del Día. Implementadas cards interactivas de métricas en Verificación (validados, observados, aprobados, sin banco) y visualización del badge Devuelto con observaciones con contador de devoluciones en Evaluaciones del Día.
 
 #### T-044 — Generación extemporánea para nuevos estudiantes agregados y refresco en vivo de nómina
 
@@ -561,8 +561,8 @@ _Sin tareas._
 | Indicador | Total |
 |---|---:|
 | Pendientes | 4 |
-| En progreso | 2 |
-| En revisión | 37 |
+| En progreso | 1 |
+| En revisión | 38 |
 | Bloqueadas | 0 |
 | Completadas | 4 |
 
