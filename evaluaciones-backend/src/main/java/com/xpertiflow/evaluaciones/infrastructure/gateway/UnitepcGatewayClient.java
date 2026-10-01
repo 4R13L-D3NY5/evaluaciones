@@ -28,7 +28,7 @@ public class UnitepcGatewayClient {
     @Value("${app.unitepc.system-client-id:sea-evaluaciones}")
     private String systemClientId;
 
-    @Value("${app.unitepc.mock-evaluations-enabled:true}")
+    @Value("${app.unitepc.mock-evaluations-enabled:false}")
     private boolean mockEvaluationsEnabled;
 
     @Value("${server.port:8080}")
