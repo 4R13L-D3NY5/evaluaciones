@@ -11,8 +11,6 @@ import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionReposito
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaRespaldoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaUsuarioRepository;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaVerificacionRepository;
-import com.xpertiflow.evaluaciones.domain.entity.EventoExamenVirtual;
-import com.xpertiflow.evaluaciones.domain.repository.EventoExamenVirtualRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -20,7 +18,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,24 +30,11 @@ public class AuditoriaService {
     private final AuditoriaUsuarioRepository auditoriaUsuarioRepository;
     private final AuditoriaRespaldoRepository auditoriaRespaldoRepository;
     private final AuditoriaVerificacionRepository auditoriaVerificacionRepository;
-    private final EventoExamenVirtualRepository eventoExamenVirtualRepository;
 
     @Transactional(readOnly = true)
     public AuditoriaResumenDto obtenerAuditoriaGlobal(String modulo, String nivel, String busqueda, int limite) {
-        return obtenerAuditoriaGlobal(modulo, nivel, busqueda, null, null, limite);
-    }
-
-    @Transactional(readOnly = true)
-    public AuditoriaResumenDto obtenerAuditoriaGlobal(
-            String modulo,
-            String nivel,
-            String busqueda,
-            LocalDate fechaInicio,
-            LocalDate fechaFin,
-            int limite) {
         int boundedLimit = Math.min(Math.max(limite, 50), 1000);
         PageRequest pageRequest = PageRequest.of(0, boundedLimit, Sort.by(Sort.Direction.DESC, "fechaEvento"));
-        PageRequest pageRequestVirtual = PageRequest.of(0, boundedLimit, Sort.by(Sort.Direction.DESC, "ocurridoEn"));
 
         List<AuditoriaGlobalItemDto> todosLosItems = new ArrayList<>();
 
@@ -62,7 +46,7 @@ public class AuditoriaService {
             log.warn("Error al consultar auditoria de evaluaciones: {}", ex.getMessage());
         }
 
-        // 2. Auditoría de Usuarios, Autenticación y Administración de Evaluaciones
+        // 2. Auditoría de Usuarios
         try {
             List<AuditoriaUsuario> usuarioItems = auditoriaUsuarioRepository.findAllByOrderByFechaEventoDesc(pageRequest);
             usuarioItems.forEach(u -> todosLosItems.add(mapearUsuario(u)));
@@ -86,14 +70,6 @@ public class AuditoriaService {
             log.warn("Error al consultar auditoria de verificaciones: {}", ex.getMessage());
         }
 
-        // 5. Auditoría de Examen Virtual
-        try {
-            List<EventoExamenVirtual> virtualItems = eventoExamenVirtualRepository.findAllByOrderByOcurridoEnDesc(pageRequestVirtual);
-            virtualItems.forEach(ev -> todosLosItems.add(mapearEventoVirtual(ev)));
-        } catch (Exception ex) {
-            log.warn("Error al consultar auditoria de examen virtual: {}", ex.getMessage());
-        }
-
         // Ordenar cronológicamente descendente
         todosLosItems.sort((a, b) -> {
             if (a.getFechaEvento() == null && b.getFechaEvento() == null) return 0;
@@ -110,13 +86,6 @@ public class AuditoriaService {
                         || i.getNivel().equalsIgnoreCase(nivel))
                 .filter(i -> busqueda == null || busqueda.isBlank()
                         || coincideBusqueda(i, busqueda.trim().toLowerCase()))
-                .filter(i -> {
-                    if (i.getFechaEvento() == null) return true;
-                    LocalDate fecha = i.getFechaEvento().toLocalDate();
-                    if (fechaInicio != null && fecha.isBefore(fechaInicio)) return false;
-                    if (fechaFin != null && fecha.isAfter(fechaFin)) return false;
-                    return true;
-                })
                 .collect(Collectors.toList());
 
         // Calcular KPIs sobre los registros filtrados
@@ -135,7 +104,7 @@ public class AuditoriaService {
                 .count();
 
         long alertasSeguridad = filtrados.stream()
-                .filter(i -> "ADVERTENCIA".equalsIgnoreCase(i.getNivel()) || "LOGIN_FALLIDO".equalsIgnoreCase(i.getCodigoAccion()))
+                .filter(i -> "ADVERTENCIA".equalsIgnoreCase(i.getNivel()))
                 .count();
 
         return AuditoriaResumenDto.builder()
@@ -193,130 +162,25 @@ public class AuditoriaService {
 
     private AuditoriaGlobalItemDto mapearUsuario(AuditoriaUsuario u) {
         String accion = u.getAccion() != null ? u.getAccion() : "";
-
-        // Clasificación de módulo
-        String modulo;
-        if (accion.startsWith("LOGIN_") || accion.equals("LOGOUT")) {
-            modulo = "Autenticación y Sesiones";
-        } else if (accion.startsWith("CONFIGURACION_") || accion.startsWith("CAMPUS_")) {
-            modulo = "Administración de Evaluaciones";
-        } else {
-            modulo = "Usuarios y Accesos";
-        }
-
-        // Clasificación de nivel
-        String nivel;
-        if ("LOGIN_FALLIDO".equalsIgnoreCase(accion)) {
-            nivel = "ADVERTENCIA";
-        } else if (accion.contains("RESTABLECER") || accion.contains("RESTABLECIDA")
-                || accion.contains("CONFIGURACION") || accion.contains("CREAR") || accion.contains("CREADO")
-                || accion.contains("SINCRONIZAR") || accion.contains("SINCRONIZADO")) {
-            nivel = "OPERACION_CRITICA";
-        } else if (accion.contains("DESACTIVAR") || accion.contains("BLOQUEAR") || accion.contains("FALLO")) {
-            nivel = "ADVERTENCIA";
-        } else {
-            nivel = "INFO";
-        }
-
-        String realizadoPor = (u.getRealizadoPor() != null && !u.getRealizadoPor().isBlank())
-                ? u.getRealizadoPor()
-                : (u.getUsuarioObjetivoCi() != null ? u.getUsuarioObjetivoCi() : "SISTEMA");
-
-        String ip = (u.getIpOrigen() != null && !u.getIpOrigen().isBlank()) ? u.getIpOrigen() : "127.0.0.1";
+        String nivel = accion.contains("RESTABLECER") || accion.contains("CREAR") || accion.contains("SINCRONIZAR")
+                ? "OPERACION_CRITICA"
+                : (accion.contains("DESACTIVAR") || accion.contains("BLOQUEAR") ? "ADVERTENCIA" : "INFO");
 
         return AuditoriaGlobalItemDto.builder()
                 .id("USR-" + u.getId())
                 .tipo("USUARIO")
-                .modulo(modulo)
-                .accion(describirAccionUsuario(accion, u))
+                .modulo("Usuarios y Accesos")
+                .accion(u.getAccion() != null ? u.getAccion().replace('_', ' ') : "Operación de usuario")
                 .codigoAccion(accion)
-                .usuario(realizadoPor)
-                .usuarioNombre(realizadoPor)
-                .usuarioCargo(determinarCargoUsuario(modulo, accion))
-                .ipOrigen(ip)
+                .usuario(u.getRealizadoPor() != null ? u.getRealizadoPor() : "ADMIN")
+                .usuarioNombre(u.getRealizadoPor() != null ? u.getRealizadoPor() : "Administrador")
+                .usuarioCargo("Administrador del Sistema")
+                .ipOrigen("127.0.0.1")
                 .campus("")
                 .nivel(nivel)
                 .detallesJson(u.getDetalle())
                 .fechaEvento(u.getFechaEvento())
                 .build();
-    }
-
-    private AuditoriaGlobalItemDto mapearEventoVirtual(EventoExamenVirtual ev) {
-        String tipo = ev.getTipoEvento() != null ? ev.getTipoEvento() : "";
-        String nivel;
-        if (tipo.contains("ANULACION") || tipo.contains("FRAUDE") || tipo.contains("BLOQUEO") || tipo.contains("EXPULSION") || tipo.contains("FORZADO")) {
-            nivel = "OPERACION_CRITICA";
-        } else if (tipo.contains("ADVERTENCIA") || tipo.contains("FALLO") || tipo.contains("DESCONEXION") || tipo.contains("FOCO") || tipo.contains("PESTANA")) {
-            nivel = "ADVERTENCIA";
-        } else {
-            nivel = "INFO";
-        }
-
-        String descripcion = describirAccionExamenVirtual(tipo, ev.getSalaId());
-        String usuario = (ev.getUsuario() != null && !ev.getUsuario().isBlank()) ? ev.getUsuario() : "Estudiante";
-
-        return AuditoriaGlobalItemDto.builder()
-                .id("VIRT-" + ev.getId())
-                .tipo("EXAMEN_VIRTUAL")
-                .modulo("Examen Virtual")
-                .accion(descripcion)
-                .codigoAccion(tipo)
-                .usuario(usuario)
-                .usuarioNombre(usuario)
-                .usuarioCargo("Examen Virtual")
-                .ipOrigen(ev.getIpOrigen() != null && !ev.getIpOrigen().isBlank() ? ev.getIpOrigen() : "127.0.0.1")
-                .campus("")
-                .nivel(nivel)
-                .detallesJson(ev.getDetallesJson())
-                .fechaEvento(ev.getOcurridoEn())
-                .build();
-    }
-
-    private String describirAccionUsuario(String accion, AuditoriaUsuario u) {
-        return switch (accion) {
-            case "LOGIN_EXITOSO" -> "Inicio de sesión exitoso";
-            case "LOGIN_FALLIDO" -> "Intento fallido de inicio de sesión";
-            case "LOGOUT" -> "Cierre de sesión";
-            case "CONTRASENA_CAMBIADA_USUARIO" -> "Cambio de contraseña por el propio usuario";
-            case "CONTRASENA_RESTABLECIDA_POR_ADMIN", "CONTRASENA_RESTABLECIDA" ->
-                    "Restablecimiento de contraseña por administrador" + (u.getUsuarioObjetivoCi() != null ? " para " + u.getUsuarioObjetivoCi() : "");
-            case "USUARIO_CREADO" -> "Creación de nuevo usuario en el sistema";
-            case "USUARIO_ACTUALIZADO" -> "Actualización de usuario y asignaciones";
-            case "USUARIO_IMPORTADO" -> "Usuario importado desde plantilla Excel";
-            case "USUARIO_ACTUALIZADO_IMPORTACION" -> "Usuario actualizado desde plantilla Excel";
-            case "CONFIGURACION_EXAMENES_ACTUALIZADA" -> "Actualización de parámetros globales de exámenes";
-            case "CAMPUS_CARRERAS_ASIGNADAS" -> "Asignación de carreras por campus físico";
-            case "DOCENTE_SINCRONIZADO_SEA" -> "Docente sincronizado desde catálogo SEA";
-            case "DOCENTE_ACTUALIZADO_SEA" -> "Docente actualizado desde catálogo SEA";
-            case "DOCENTE_DESACTIVADO_AUSENTE_SEA" -> "Docente desactivado por ausencia en SEA";
-            default -> accion.replace('_', ' ');
-        };
-    }
-
-    private String determinarCargoUsuario(String modulo, String accion) {
-        if ("Autenticación y Sesiones".equals(modulo)) {
-            return "Acceso y Seguridad";
-        }
-        if ("Administración de Evaluaciones".equals(modulo)) {
-            return "Gestión de Evaluaciones";
-        }
-        return "Administrador del Sistema";
-    }
-
-    private String describirAccionExamenVirtual(String tipo, String salaId) {
-        String base = switch (tipo) {
-            case "INGRESO_SALA", "ESTUDIANTE_CONECTADO" -> "Ingreso de estudiante a la sala virtual";
-            case "INICIO_EXAMEN" -> "Inicio de resolución de examen virtual";
-            case "FINALIZACION_EXAMEN", "ENTREGA_EXAMEN" -> "Finalización y entrega de respuestas virtual";
-            case "ANULACION_EXAMEN_VIRTUAL" -> "Anulación de intento de examen virtual";
-            case "ADVERTENCIA_PESTANA", "CAMBIO_PESTANA" -> "Alerta por cambio de pestaña o pérdida de foco";
-            case "SALIDA_PANTALLA_COMPLETA" -> "Alerta por abandono de pantalla completa";
-            case "DESCONEXION_SALA" -> "Desconexión de estudiante de la sala virtual";
-            case "CREACION_SALA" -> "Apertura y activación de sala virtual por docente";
-            case "CIERRE_SALA" -> "Cierre de sala virtual por docente/sistema";
-            default -> tipo.replace('_', ' ');
-        };
-        return (salaId != null && !salaId.isBlank()) ? base + " [Sala " + salaId + "]" : base;
     }
 
     private AuditoriaGlobalItemDto mapearRespaldo(AuditoriaRespaldo r) {
@@ -370,7 +234,6 @@ public class AuditoriaService {
         if (accion.contains("OMR") || accion.contains("CALIFICACION") || accion.contains("PATRON")) return "Calificación OMR";
         if (accion.contains("GENERACION") || accion.contains("CARTILLAS")) return "Generación Typst";
         if (accion.contains("VIRTUAL") || accion.contains("SALA")) return "Examen Virtual";
-        if (accion.contains("SINCRONIZACION") || accion.contains("SEA")) return "Sincronización Institucional (SEA)";
         return "Evaluaciones";
     }
 
@@ -426,12 +289,6 @@ public class AuditoriaService {
                 break;
             case "RESTABLECIMIENTO_A_VALIDADO":
                 base = "Se restableció el rol de examen a estado Validado";
-                break;
-            case "SINCRONIZACION_NOTAS_SEA":
-                base = "Sincronización oficial de notas hacia Gateway SEA";
-                break;
-            case "SINCRONIZACION_INDIVIDUAL_ESTUDIANTE_SEA":
-                base = "Sincronización individual de calificación hacia Gateway SEA";
                 break;
             default:
                 if (accion.startsWith("SUSPENSION")) {

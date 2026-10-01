@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 
 export interface AuditoriaGlobalItem {
   id: string;
-  tipo: 'EVALUACION' | 'USUARIO' | 'RESPALDO' | 'VERIFICACION' | 'EXAMEN_VIRTUAL';
+  tipo: 'EVALUACION' | 'USUARIO' | 'RESPALDO' | 'VERIFICACION';
   modulo: string;
   accion: string;
   codigoAccion: string;
@@ -31,8 +31,6 @@ export interface FiltrosAuditoria {
   nivel?: string;
   busqueda?: string;
   limite?: number;
-  fechaInicio?: string;
-  fechaFin?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -53,12 +51,6 @@ export class AuditoriaService {
     }
     if (filtros?.limite) {
       params = params.set('limite', filtros.limite.toString());
-    }
-    if (filtros?.fechaInicio) {
-      params = params.set('fechaInicio', filtros.fechaInicio);
-    }
-    if (filtros?.fechaFin) {
-      params = params.set('fechaFin', filtros.fechaFin);
     }
     return this.http.get<AuditoriaResumen>(this.baseUrl, { params });
   }

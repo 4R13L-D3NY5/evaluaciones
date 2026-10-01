@@ -3,8 +3,6 @@ package com.xpertiflow.evaluaciones.application;
 import com.xpertiflow.evaluaciones.api.dto.auth.SesionUsuarioDto;
 import com.xpertiflow.evaluaciones.domain.entity.UsuarioSistema;
 import com.xpertiflow.evaluaciones.domain.repository.UsuarioSistemaRepository;
-import com.xpertiflow.evaluaciones.domain.entity.AuditoriaUsuario;
-import com.xpertiflow.evaluaciones.domain.repository.AuditoriaUsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.Authentication;
@@ -24,65 +22,14 @@ public class AutenticacionService {
 
     private final UsuarioSistemaRepository repository;
     private final PasswordEncoder passwordEncoder;
-    private final AuditoriaUsuarioRepository auditoriaUsuarioRepository;
 
     @Transactional
-    public SesionUsuarioDto registrarIngreso(Authentication authentication, String ipOrigen) {
+    public SesionUsuarioDto registrarIngreso(Authentication authentication) {
         UsuarioSistema usuario = obtenerUsuario(authentication);
         usuario.setUltimoIngreso(LocalDateTime.now());
         usuario.setActualizadoEn(LocalDateTime.now());
         repository.save(usuario);
-
-        AuditoriaUsuario auditoria = new AuditoriaUsuario();
-        auditoria.setUsuarioObjetivoId(usuario.getId());
-        auditoria.setUsuarioObjetivoCi(usuario.getCi());
-        auditoria.setAccion("LOGIN_EXITOSO");
-        auditoria.setRealizadoPor(usuario.getUsuario());
-        auditoria.setDetalle("Inicio de sesión exitoso con rol " + usuario.getRolCodigo());
-        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
-        auditoria.setFechaEvento(LocalDateTime.now());
-        auditoriaUsuarioRepository.save(auditoria);
-
         return mapear(usuario);
-    }
-
-    @Transactional
-    public SesionUsuarioDto registrarIngreso(Authentication authentication) {
-        return registrarIngreso(authentication, "127.0.0.1");
-    }
-
-    @Transactional
-    public void registrarFalloLogin(String usuarioIntentado, String ipOrigen, String motivo) {
-        AuditoriaUsuario auditoria = new AuditoriaUsuario();
-        if (usuarioIntentado != null && !usuarioIntentado.isBlank()) {
-            repository.findByUsuarioIgnoreCase(usuarioIntentado.trim()).ifPresent(u -> {
-                auditoria.setUsuarioObjetivoId(u.getId());
-                auditoria.setUsuarioObjetivoCi(u.getCi());
-            });
-        }
-        auditoria.setAccion("LOGIN_FALLIDO");
-        auditoria.setRealizadoPor(usuarioIntentado != null && !usuarioIntentado.isBlank() ? usuarioIntentado.trim() : "DESCONOCIDO");
-        auditoria.setDetalle(motivo != null && !motivo.isBlank() ? motivo : "Credenciales incorrectas");
-        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
-        auditoria.setFechaEvento(LocalDateTime.now());
-        auditoriaUsuarioRepository.save(auditoria);
-    }
-
-    @Transactional
-    public void registrarLogout(String usuario, String ipOrigen) {
-        AuditoriaUsuario auditoria = new AuditoriaUsuario();
-        if (usuario != null && !usuario.isBlank()) {
-            repository.findByUsuarioIgnoreCase(usuario.trim()).ifPresent(u -> {
-                auditoria.setUsuarioObjetivoId(u.getId());
-                auditoria.setUsuarioObjetivoCi(u.getCi());
-            });
-        }
-        auditoria.setAccion("LOGOUT");
-        auditoria.setRealizadoPor(usuario != null && !usuario.isBlank() ? usuario.trim() : "DESCONOCIDO");
-        auditoria.setDetalle("Cierre de sesión de usuario");
-        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
-        auditoria.setFechaEvento(LocalDateTime.now());
-        auditoriaUsuarioRepository.save(auditoria);
     }
 
     @Transactional(readOnly = true)
@@ -91,7 +38,7 @@ public class AutenticacionService {
     }
 
     @Transactional
-    public void cambiarContrasena(Authentication authentication, String contrasenaActual, String contrasenaNueva, String ipOrigen) {
+    public void cambiarContrasena(Authentication authentication, String contrasenaActual, String contrasenaNueva) {
         UsuarioSistema usuario = obtenerUsuario(authentication);
         verificarContrasenaActual(usuario, contrasenaActual);
         if (contrasenaNueva == null || contrasenaNueva.length() < 8) {
@@ -104,21 +51,6 @@ public class AutenticacionService {
         usuario.setDebeCambiarContrasena(false);
         usuario.setActualizadoEn(LocalDateTime.now());
         repository.save(usuario);
-
-        AuditoriaUsuario auditoria = new AuditoriaUsuario();
-        auditoria.setUsuarioObjetivoId(usuario.getId());
-        auditoria.setUsuarioObjetivoCi(usuario.getCi());
-        auditoria.setAccion("CONTRASENA_CAMBIADA_USUARIO");
-        auditoria.setRealizadoPor(usuario.getUsuario());
-        auditoria.setDetalle("El usuario actualizó su propia contraseña");
-        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
-        auditoria.setFechaEvento(LocalDateTime.now());
-        auditoriaUsuarioRepository.save(auditoria);
-    }
-
-    @Transactional
-    public void cambiarContrasena(Authentication authentication, String contrasenaActual, String contrasenaNueva) {
-        cambiarContrasena(authentication, contrasenaActual, contrasenaNueva, "127.0.0.1");
     }
 
     @Transactional(readOnly = true)

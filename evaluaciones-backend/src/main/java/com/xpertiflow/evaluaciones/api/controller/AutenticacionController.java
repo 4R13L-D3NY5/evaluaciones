@@ -5,7 +5,6 @@ import com.xpertiflow.evaluaciones.api.dto.auth.CambiarContrasenaRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.SesionUsuarioDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.VerificarContrasenaActualRequestDto;
 import com.xpertiflow.evaluaciones.application.AutenticacionService;
-import com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -41,7 +40,6 @@ public class AutenticacionController {
             @Valid @RequestBody LoginRequestDto request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
         try {
             Authentication authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(request.getUsuario(), request.getContrasena()));
@@ -49,9 +47,8 @@ public class AutenticacionController {
             context.setAuthentication(authentication);
             SecurityContextHolder.setContext(context);
             securityContextRepository.saveContext(context, httpRequest, httpResponse);
-            return ResponseEntity.ok(conEstadoSesion(service.registrarIngreso(authentication, ipOrigen), httpRequest));
+            return ResponseEntity.ok(conEstadoSesion(service.registrarIngreso(authentication), httpRequest));
         } catch (BadCredentialsException exception) {
-            service.registrarFalloLogin(request.getUsuario(), ipOrigen, "Credenciales incorrectas");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
     }
@@ -80,13 +77,7 @@ public class AutenticacionController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request, Authentication authentication) {
-        String usuario = (authentication != null && authentication.isAuthenticated()
-                && !"anonymousUser".equals(authentication.getPrincipal()))
-                ? authentication.getName() : null;
-        String ipOrigen = ClientIpUtil.obtenerIpCliente(request);
-        service.registrarLogout(usuario, ipOrigen);
-
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
         SecurityContextHolder.clearContext();
         HttpSession session = request.getSession(false);
         if (session != null) {
@@ -100,8 +91,7 @@ public class AutenticacionController {
             @Valid @RequestBody CambiarContrasenaRequestDto request,
             Authentication authentication,
             HttpServletRequest httpRequest) {
-        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
-        service.cambiarContrasena(authentication, request.getContrasenaActual(), request.getContrasenaNueva(), ipOrigen);
+        service.cambiarContrasena(authentication, request.getContrasenaActual(), request.getContrasenaNueva());
         return ResponseEntity.ok(conEstadoSesion(service.obtenerSesion(authentication), httpRequest));
     }
 

@@ -10,8 +10,6 @@ import com.xpertiflow.evaluaciones.api.dto.auth.SincronizacionDocentesSeaRespons
 import com.xpertiflow.evaluaciones.api.dto.auth.UsuarioSistemaRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.auth.UsuarioSistemaResponseDto;
 import com.xpertiflow.evaluaciones.application.UsuariosSistemaService;
-import com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
@@ -79,40 +77,32 @@ public class UsuariosSistemaController {
     public ResponseEntity<SincronizacionDocentesSeaResponseDto> sincronizarDocentesSea(
             @RequestParam(defaultValue = "2-2026") String gestion,
             @RequestBody(required = false) SincronizacionDocentesSeaRequestDto request,
-            Authentication authentication,
-            HttpServletRequest httpRequest) {
-        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
+            Authentication authentication) {
         return ResponseEntity.ok(service.sincronizarDocentesSea(
                 gestion, request == null ? new SincronizacionDocentesSeaRequestDto() : request,
-                authentication.getName(), ipOrigen));
+                authentication.getName()));
     }
 
     @PostMapping
     public ResponseEntity<UsuarioSistemaResponseDto> crear(
             @Valid @RequestBody UsuarioSistemaRequestDto request,
-            Authentication authentication,
-            HttpServletRequest httpRequest) {
-        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
-        return ResponseEntity.ok(service.crear(request, authentication.getName(), rol(authentication), ipOrigen));
+            Authentication authentication) {
+        return ResponseEntity.ok(service.crear(request, authentication.getName(), rol(authentication)));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioSistemaResponseDto> actualizar(
             @PathVariable Long id,
             @Valid @RequestBody UsuarioSistemaRequestDto request,
-            Authentication authentication,
-            HttpServletRequest httpRequest) {
-        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
-        return ResponseEntity.ok(service.actualizar(id, request, authentication.getName(), rol(authentication), ipOrigen));
+            Authentication authentication) {
+        return ResponseEntity.ok(service.actualizar(id, request, authentication.getName(), rol(authentication)));
     }
 
     @PostMapping("/importar")
     public ResponseEntity<ImportacionUsuariosResponseDto> importar(
             @RequestPart("archivo") MultipartFile archivo,
-            Authentication authentication,
-            HttpServletRequest httpRequest) {
-        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
-        return ResponseEntity.ok(service.importar(archivo, authentication.getName(), rol(authentication), ipOrigen));
+            Authentication authentication) {
+        return ResponseEntity.ok(service.importar(archivo, authentication.getName(), rol(authentication)));
     }
 
     @GetMapping("/plantilla")
@@ -129,10 +119,8 @@ public class UsuariosSistemaController {
     @PostMapping("/{id}/restablecer-contrasena")
     public ResponseEntity<CredencialTemporalDto> restablecerContrasena(
             @PathVariable Long id,
-            Authentication authentication,
-            HttpServletRequest httpRequest) {
-        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
-        return ResponseEntity.ok(service.restablecerContrasena(id, authentication.getName(), ipOrigen));
+            Authentication authentication) {
+        return ResponseEntity.ok(service.restablecerContrasena(id, authentication.getName()));
     }
 
     private String rol(Authentication authentication) {
