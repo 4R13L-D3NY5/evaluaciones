@@ -68,7 +68,7 @@ class AuditoriaTomaGruposServiceTest {
         when(rolExamenRepository.findTopBySeaGroupIdOrderByVersionDesc(groupId)).thenReturn(Optional.of(rol));
 
         AuditoriaEvaluacion audImp = AuditoriaEvaluacion.builder()
-                .rolExamenId(rolId)
+                .rolExamen(rol)
                 .accion("IMPRESION_MARCAS_OMR")
                 .fechaEvento(impLdt)
                 .build();
