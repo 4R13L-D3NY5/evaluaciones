@@ -348,11 +348,11 @@ export class SidebarComponent implements OnInit {
       roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES']
     },
     {
-      label: 'Auditoría & Bitácora',
+      label: 'Auditoría & Trazabilidad',
       route: '/auditoria',
-      icon: 'pi pi-history',
-      description: 'Seguimiento de accesos, terminales MAC, IPs públicas y trazabilidad',
-      roles: ['ADMINISTRADOR_SISTEMA']
+      icon: 'pi pi-shield-check',
+      description: 'Peritaje forense de toma de grupos, nóminas, bitácora de IPs y accesos',
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA']
     },
     {
       label: 'Respaldos y contingencia',

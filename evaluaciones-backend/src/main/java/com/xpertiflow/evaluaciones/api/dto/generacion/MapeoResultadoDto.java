@@ -12,4 +12,6 @@ public class MapeoResultadoDto {
     private String letraVariante;
     private String hashControl;
     private String cuadernilloPdfPath;
+    private java.time.OffsetDateTime seaEnrollCreatedAt;
+    private java.time.OffsetDateTime seaEnrollUpdatedAt;
 }

@@ -541,6 +541,23 @@ public class GeneracionTypstService {
         }
 
         // 3. Insertar nuevos mapeos estudiante-variante
+        RolExamen rol = rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
+
+        String groupIdOficial = rol.getSeaGroupId() != null && !rol.getSeaGroupId().isBlank()
+                ? rol.getSeaGroupId() : rol.getGrupoId();
+        Map<String, StudentItemDto> gatewayStudentsMap = Collections.emptyMap();
+        try {
+            List<StudentItemDto> gatewayStudents = unitepcGatewayClient.getStudentsByGroup(groupIdOficial);
+            if (gatewayStudents != null) {
+                gatewayStudentsMap = gatewayStudents.stream()
+                        .filter(s -> s.getStudentCode() != null)
+                        .collect(Collectors.toMap(StudentItemDto::getStudentCode, s -> s, (a, b) -> a));
+            }
+        } catch (Exception ex) {
+            log.warn("No se pudo obtener información de toma de grupos del Gateway para el rol {}: {}", rolExamenId, ex.getMessage());
+        }
+
         List<MapeoResultadoDto> mapeosDto = resultado.getMapeos() != null ? resultado.getMapeos() : List.of();
         for (MapeoResultadoDto dto : mapeosDto) {
             if (dto.getCodigoEstudiante() == null || dto.getCodigoEstudiante().isBlank()
@@ -563,12 +580,17 @@ public class GeneracionTypstService {
             mapeo.setHashControlSeguridad(dto.getHashControl());
             mapeo.setCuadernilloIndividualPdf(dto.getCuadernilloPdfPath());
             mapeo.setEstadoAsistencia("PRESENTE");
+
+            StudentItemDto gwEst = gatewayStudentsMap.get(dto.getCodigoEstudiante().trim());
+            if (gwEst != null) {
+                mapeo.setSeaEnrollCreatedAt(gwEst.getEnrollCreatedAt());
+                mapeo.setSeaEnrollUpdatedAt(gwEst.getEnrollUpdatedAt());
+            }
+
             mapeoRepository.save(mapeo);
         }
 
         // 4. Actualizar contadores del rol
-        RolExamen rol = rolRepository.findById(rolExamenId)
-                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
         rol.setVariantesGeneradasCount(variantesDto.size());
         rol.setEstudiantesInscritosCount(mapeosDto.size());
         rolRepository.save(rol);

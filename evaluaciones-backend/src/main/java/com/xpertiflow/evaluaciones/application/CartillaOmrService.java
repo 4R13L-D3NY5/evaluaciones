@@ -230,6 +230,8 @@ public class CartillaOmrService {
                     nuevoMapeo.setHashControlSeguridad("CTL-" + codigo + "-" + letra);
                     nuevoMapeo.setCuadernilloIndividualPdf(null);
                     nuevoMapeo.setEstadoAsistencia("PRESENTE");
+                    nuevoMapeo.setSeaEnrollCreatedAt(estudianteNuevo.getEnrollCreatedAt());
+                    nuevoMapeo.setSeaEnrollUpdatedAt(estudianteNuevo.getEnrollUpdatedAt());
                     mapeoRepository.save(nuevoMapeo);
 
                     conteoPorLetra.put(letra, conteoPorLetra.getOrDefault(letra, 0L) + 1);

@@ -41,7 +41,7 @@ export const routes: Routes = [
       { path: 'administracion-evaluaciones', component: AdministracionEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Administración - Sistema de Evaluaciones' },
       { path: 'reporte-evaluaciones', component: ReporteEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA'])], title: 'Reporte Evaluaciones - Sistema de Evaluaciones' },
       { path: 'rol-examenes', component: RolExamenesComponent, canActivate: [roleGuard(['DIRECTOR_CARRERA', 'VICERRECTOR'])], title: 'Rol de Exámenes - Sistema de Evaluaciones' },
-      { path: 'auditoria', component: AuditoriaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Auditoría & Bitácora - Sistema de Evaluaciones' },
+      { path: 'auditoria', component: AuditoriaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA'])], title: 'Auditoría & Bitácora - Sistema de Evaluaciones' },
       { path: 'usuarios-sistema', component: UsuariosSistemaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Usuarios y accesos - Sistema de Evaluaciones' },
       { path: 'respaldos', component: RespaldosComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Respaldos y contingencia - Sistema de Evaluaciones' },
       { path: 'sincronizacion-sea', component: SincronizacionSeaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Sincronización SEA - Sistema de Evaluaciones' },
