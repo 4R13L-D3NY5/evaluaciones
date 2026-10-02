@@ -7458,7 +7458,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (!item?.id) return false;
     const esEstadoFinal = item.etapa === 'Calificado' || item.etapa === 'Confirmado' ||
                           item.estado === 'CALIFICADO' || item.estado === 'CONFIRMADO';
-    const tienePermiso = this.esPersonalEvaluaciones() || this.esResponsableEvaluaciones() || this.esAdministradorSistema();
+    const tienePermiso = this.esResponsableEvaluaciones() || this.esAdministradorSistema();
     return Boolean(esEstadoFinal && tienePermiso);
   }
 

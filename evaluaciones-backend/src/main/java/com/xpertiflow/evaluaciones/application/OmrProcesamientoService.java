@@ -152,7 +152,7 @@ public class OmrProcesamientoService {
         if (!cantidadesValidas.contains(paginas)) {
             int esperada = cantidadesValidas.iterator().next();
             throw new IllegalArgumentException(String.format(
-                    "El escaneado contiene %d página%s, pero el rol tiene %d cartilla%s generada%s en el lote oficial de la base de datos. Verifique que corresponda al mismo grupo y vuelva a cargar el archivo.",
+                    "El escaneado contiene %d página%s, pero el rol tiene %d cartilla%s generada%s para los exámenes oficiales en la base de datos. Verifique que corresponda al mismo grupo y vuelva a cargar el archivo.",
                     paginas, paginas == 1 ? "" : "s", esperada, esperada == 1 ? "" : "s", esperada == 1 ? "" : "s"));
         }
     }
@@ -160,36 +160,47 @@ public class OmrProcesamientoService {
     private Set<Integer> resolverCantidadesValidasCartillas(String rolExamenId, RolExamen rol) {
         Set<Integer> validas = new java.util.LinkedHashSet<>();
 
-        // 1. Total del lote formal de cartillas OMR si existe
-        loteCartillasRepository.findFirstByRolExamenIdOrderByGeneradoEnDesc(rolExamenId)
-                .map(LoteCartillasOmr::getTotalCartillas)
-                .filter(total -> total != null && total > 0)
-                .ifPresent(validas::add);
-
-        // 2. Total de cartillas registrado en auditoría de impresión de marcas OMR
-        auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, "IMPRESION_MARCAS_OMR")
-                .ifPresent(aud -> {
-                    Integer cant = extraerCantidadAuditoria(aud.getDetallesJson());
-                    if (cant != null && cant > 0) validas.add(cant);
-                });
-
-        // 3. Estudiantes del mapeo oficial con examen generado (lote inicial oficial o cualquier cuadernillo)
+        // 1. PRIORIDAD ABSOLUTA: Exámenes generados guardados en la base de datos (sea_mapeo_estudiantes_variantes)
         List<MapeoEstudianteVariante> mapeos = mapeoRepository.findByRolExamenId(rolExamenId);
         if (mapeos != null && !mapeos.isEmpty()) {
+            // A. Estudiantes con examen formalmente generado (cuadernillo oficial o individual generado)
+            long conExamenGenerado = mapeos.stream()
+                    .filter(m -> m.getCuadernilloIndividualPdf() != null && !m.getCuadernilloIndividualPdf().isBlank())
+                    .count();
+            if (conExamenGenerado > 0) {
+                validas.add((int) conExamenGenerado);
+            }
+
+            // B. Conteo de lote inicial oficial si contiene la convención de nombre oficial
             long conOficial = mapeos.stream()
                     .filter(m -> m.getCuadernilloIndividualPdf() != null
-                            && m.getCuadernilloIndividualPdf().contains("_Examenes_Oficiales.pdf"))
+                            && m.getCuadernilloIndividualPdf().contains("_Examenes_Oficiales"))
                     .count();
             if (conOficial > 0) {
                 validas.add((int) conOficial);
             }
 
-            long conCualquierExamen = mapeos.stream()
-                    .filter(m -> m.getCuadernilloIndividualPdf() != null && !m.getCuadernilloIndividualPdf().isBlank())
-                    .count();
-            if (conCualquierExamen > 0) {
-                validas.add((int) conCualquierExamen);
+            // C. Si por compatibilidad histórica no tenían guardada la ruta del PDF, usar los mapeos asignados
+            if (validas.isEmpty()) {
+                validas.add(mapeos.size());
             }
+        }
+
+        // 2. Si aún no hay exámenes generados en mapeo, recurrir al lote formal de cartillas OMR
+        if (validas.isEmpty()) {
+            loteCartillasRepository.findFirstByRolExamenIdOrderByGeneradoEnDesc(rolExamenId)
+                    .map(LoteCartillasOmr::getTotalCartillas)
+                    .filter(total -> total != null && total > 0)
+                    .ifPresent(validas::add);
+        }
+
+        // 3. Auditoría de impresión de marcas OMR
+        if (validas.isEmpty()) {
+            auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rolExamenId, "IMPRESION_MARCAS_OMR")
+                    .ifPresent(aud -> {
+                        Integer cant = extraerCantidadAuditoria(aud.getDetallesJson());
+                        if (cant != null && cant > 0) validas.add(cant);
+                    });
         }
 
         // 4. Si aún no hay cantidades registradas, usar el conteo de inscritos del rol

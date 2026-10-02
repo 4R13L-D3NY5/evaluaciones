@@ -208,7 +208,7 @@ public class UnitepcGatewayClient {
             if (mockEvaluationsEnabled) {
                 RestClient localClient = RestClient.builder().baseUrl("http://127.0.0.1:" + serverPort).build();
                 return localClient.post()
-                        .uri("/api/mock-gateway/api/v1/university/externals/research/student-evaluations")
+                        .uri("/api/mock-gateway/api/v1/student/externals/research/student-evaluations")
                         .headers(h -> {
                             h.setBearerAuth(getToken());
                             h.set("clientId", systemClientId);
@@ -220,7 +220,7 @@ public class UnitepcGatewayClient {
             }
 
             return restClient.post()
-                    .uri("/api/v1/university/externals/research/student-evaluations")
+                    .uri("/api/v1/student/externals/research/student-evaluations")
                     .headers(h -> {
                         h.setBearerAuth(getToken());
                         h.set("clientId", systemClientId);

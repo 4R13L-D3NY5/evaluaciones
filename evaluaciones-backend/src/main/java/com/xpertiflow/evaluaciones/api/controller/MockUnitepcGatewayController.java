@@ -55,6 +55,8 @@ public class MockUnitepcGatewayController {
      * Persiste los registros en la tabla de sandbox sea_mock_gateway_calificaciones.
      */
     @PostMapping({
+            "/mock-gateway/api/v1/student/externals/research/student-evaluations",
+            "/api/mock-gateway/api/v1/student/externals/research/student-evaluations",
             "/mock-gateway/api/v1/university/externals/research/student-evaluations",
             "/api/mock-gateway/api/v1/university/externals/research/student-evaluations",
             "/api/mock-gateway/student-evaluations"
