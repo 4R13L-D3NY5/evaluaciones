@@ -11,6 +11,7 @@ import com.xpertiflow.evaluaciones.domain.entity.AnulacionPreguntaOmr;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
+import com.xpertiflow.evaluaciones.domain.entity.LoteCartillasOmr;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
@@ -29,9 +30,18 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.springframework.mock.web.MockMultipartFile;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -440,5 +450,94 @@ class OmrProcesamientoServiceTest {
         ArgumentCaptor<AuditoriaEvaluacion> audCaptor = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
         verify(auditoriaRepository).save(audCaptor.capture());
         assertThat(audCaptor.getValue().getAccion()).isEqualTo("REPROGRAMACION_EXAMEN_REVERTIDA");
+    }
+
+    private MockMultipartFile crearPdfDePaginas(int cantidad) throws IOException {
+        try (PDDocument doc = new PDDocument()) {
+            for (int i = 0; i < cantidad; i++) {
+                doc.addPage(new PDPage());
+            }
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            doc.save(baos);
+            return new MockMultipartFile("archivo", "escaneado.pdf", "application/pdf", baos.toByteArray());
+        }
+    }
+
+    @Test
+    void validarCantidadPaginas_priorizaExamenesGeneradosFrenteALoteOMatricula() throws Exception {
+        rol.setEstudiantesInscritosCount(36);
+
+        LoteCartillasOmr lote = new LoteCartillasOmr();
+        lote.setTotalCartillas(36);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        List<MapeoEstudianteVariante> mapeos = new ArrayList<>();
+        for (int i = 1; i <= 35; i++) {
+            MapeoEstudianteVariante m = new MapeoEstudianteVariante();
+            m.setRolExamenId(rolId);
+            m.setCodigoEstudiante("EST-" + i);
+            m.setCuadernilloIndividualPdf("/storage/generados/" + rolId + "/MAT-101_Examenes_Oficiales.pdf");
+            mapeos.add(m);
+        }
+        when(mapeoRepository.findByRolExamenId(rolId)).thenReturn(mapeos);
+
+        Path tempDir = Files.createTempDirectory("omr_test_");
+        AppProperties.Storage storage = new AppProperties.Storage();
+        storage.setBasePath(tempDir.toString());
+        when(appProperties.getStorage()).thenReturn(storage);
+
+        MockMultipartFile archivo35 = crearPdfDePaginas(35);
+        var resp = service.solicitar(rolId, archivo35);
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.path("jobId").asText()).isNotBlank();
+        assertThat(resp.path("estado").asText()).isEqualTo("EN_COLA");
+        verify(rabbitTemplate).convertAndSend(eq("evaluaciones.omr.procesar"), any(String.class));
+    }
+
+    @Test
+    void validarCantidadPaginas_rechazaSiDifiereDeExamenesGenerados() throws Exception {
+        rol.setEstudiantesInscritosCount(36);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        List<MapeoEstudianteVariante> mapeos = new ArrayList<>();
+        for (int i = 1; i <= 35; i++) {
+            MapeoEstudianteVariante m = new MapeoEstudianteVariante();
+            m.setRolExamenId(rolId);
+            m.setCodigoEstudiante("EST-" + i);
+            m.setCuadernilloIndividualPdf("/storage/generados/" + rolId + "/MAT-101_Examenes_Oficiales.pdf");
+            mapeos.add(m);
+        }
+        when(mapeoRepository.findByRolExamenId(rolId)).thenReturn(mapeos);
+
+        MockMultipartFile archivo36 = crearPdfDePaginas(36);
+
+        assertThatThrownBy(() -> service.solicitar(rolId, archivo36))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("36 páginas")
+                .hasMessageContaining("35 cartillas generadas para los exámenes oficiales en la base de datos");
+    }
+
+    @Test
+    void validarCantidadPaginas_rechazaSiFaltaUnaCartilla() throws Exception {
+        rol.setEstudiantesInscritosCount(36);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        List<MapeoEstudianteVariante> mapeos = new ArrayList<>();
+        for (int i = 1; i <= 35; i++) {
+            MapeoEstudianteVariante m = new MapeoEstudianteVariante();
+            m.setRolExamenId(rolId);
+            m.setCodigoEstudiante("EST-" + i);
+            m.setCuadernilloIndividualPdf("/storage/generados/" + rolId + "/MAT-101_Examenes_Oficiales.pdf");
+            mapeos.add(m);
+        }
+        when(mapeoRepository.findByRolExamenId(rolId)).thenReturn(mapeos);
+
+        MockMultipartFile archivo34 = crearPdfDePaginas(34);
+
+        assertThatThrownBy(() -> service.solicitar(rolId, archivo34))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("34 páginas")
+                .hasMessageContaining("35 cartillas generadas para los exámenes oficiales en la base de datos");
     }
 }

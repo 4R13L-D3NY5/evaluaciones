@@ -87,7 +87,7 @@ public class SincronizacionNotasSeaService {
 
     /**
      * Ejecuta el envío vía POST hacia el servicio del SEA:
-     * POST https://gw-dev.unitepc.solutions/api/v1/university/externals/research/student-evaluations
+     * POST https://gw-dev.unitepc.solutions/api/v1/student/externals/research/student-evaluations
      * Registra auditoría inmutable y persiste el estado de sincronización en el Rol de Examen.
      */
     @Transactional
