@@ -6,10 +6,11 @@ import * as XLSX from 'xlsx';
 import { 
   AuditoriaService, 
   AuditoriaGlobalItem, 
-  AuditoriaResumen,
-  AuditoriaTomaGrupoReporte,
-  AuditoriaTomaGrupoEstudiante,
-  AuditoriaEstudianteGlobal
+  AuditoriaResumen, 
+  AuditoriaTomaGrupoReporte, 
+  AuditoriaTomaGrupoEstudiante, 
+  AuditoriaEstudianteGlobal,
+  AuditoriaEvaluacionItem
 } from '../../core/services/auditoria.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
@@ -28,11 +29,11 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
               <i class="pi pi-shield-check text-xl"></i>
             </div>
             <div>
-              <h2 class="text-2xl font-black tracking-tight text-foreground">Auditoría, Trazabilidad & Peritaje SEA</h2>
+              <h2 class="text-2xl font-black tracking-tight text-foreground">Auditoría, Peritaje & Bitácora SEA</h2>
             </div>
           </div>
           <p class="text-xs text-muted-foreground mt-1">
-            Certificación forense de fechas de toma de grupo en SEA vs generación e impresión de exámenes, y bitácora de seguridad institucional.
+            Certificación forense de calificaciones, alteraciones de notas, reprogramaciones orales y trazabilidad inmutable de toma de grupos.
           </p>
         </div>
 
@@ -42,7 +43,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
             <button 
               (click)="cargarAuditoria()"
               [disabled]="cargando()"
-              class="bg-muted hover:bg-muted/80 text-foreground border border-border font-bold text-xs py-2.5 px-3.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors disabled:opacity-50"
+              class="bg-muted hover:bg-muted/80 text-foreground border border-border font-bold text-xs py-2.5 px-3.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
               title="Recargar eventos">
               <i class="pi pi-refresh" [class.animate-spin]="cargando()"></i>
               <span class="hidden sm:inline">Actualizar</span>
@@ -52,7 +53,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
             <button 
               (click)="exportarExcel()"
               [disabled]="cargando() || registrosFiltrados().length === 0"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100">
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 cursor-pointer">
               <i class="pi pi-file-excel"></i>
               <span>Exportar Bitácora (.xlsx)</span>
             </button>
@@ -61,25 +62,32 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
             <button 
               (click)="imprimirActa()"
               [disabled]="cargando() || registrosFiltrados().length === 0"
-              class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100">
+              class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 cursor-pointer">
               <i class="pi pi-print"></i>
               <span>Imprimir Acta</span>
             </button>
           } @else {
-            <!-- Acciones en Pestaña Toma de Grupos -->
-            @if (modoBusquedaToma() === 'grupo' && reporteGrupo()) {
+            <!-- Acciones en Pestaña Toma de Grupos y Peritaje -->
+            @if (reporteGrupo()) {
+              <button 
+                (click)="exportarTablaGrupoExcel()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 cursor-pointer">
+                <i class="pi pi-file-excel"></i>
+                <span>Exportar Calificaciones (.xlsx)</span>
+              </button>
+
               <button 
                 (click)="descargarActaExcel()"
                 [disabled]="descargandoExcel() || cargandoForense()"
-                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100">
-                <i class="pi" [ngClass]="descargandoExcel() ? 'pi-spin pi-spinner' : 'pi-file-excel'"></i>
-                <span>Descargar Acta Forense (.xlsx)</span>
+                class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 cursor-pointer">
+                <i class="pi" [ngClass]="descargandoExcel() ? 'pi-spin pi-spinner' : 'pi-shield'"></i>
+                <span>Acta Forense Institucional</span>
               </button>
             } @else if (modoBusquedaToma() === 'estudiante' && reporteEstudiante()) {
               <button 
                 (click)="exportarEstudianteExcel()"
                 [disabled]="cargandoForense()"
-                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100">
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 cursor-pointer">
                 <i class="pi pi-file-excel"></i>
                 <span>Exportar Historial (.xlsx)</span>
               </button>
@@ -95,10 +103,10 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
           (click)="cambiarTab('toma-grupos')"
           [class]="tabActual() === 'toma-grupos' ? 'border-purple-700 text-purple-800 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-950/40 font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
           class="px-4 py-3 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
-          <i class="pi pi-user-edit text-sm"></i>
-          <span>Trazabilidad Forense de Nómina & Toma de Grupos</span>
+          <i class="pi pi-verified text-sm"></i>
+          <span>Peritaje de Calificaciones, Alteraciones & Toma de Grupos</span>
           <span class="bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-            Peritaje SEA
+            Auditoría Forense
           </span>
         </button>
 
@@ -116,43 +124,166 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
       </div>
 
       <!-- =================================================================== -->
-      <!-- PESTAÑA 1: TRAZABILIDAD FORENSE DE NÓMINA & TOMA DE GRUPOS         -->
+      <!-- PESTAÑA 1: PERITAJE DE CALIFICACIONES & TRAZABILIDAD DE NÓMINA     -->
       <!-- =================================================================== -->
       @if (tabActual() === 'toma-grupos') {
         
         <div class="space-y-6">
 
-          <!-- Selector de Sub-Modalidad: Por Grupo vs Por Estudiante -->
+          <!-- Selector de Sub-Modalidad: Buscador de Evaluaciones / ID Grupo / Por Estudiante -->
           <div class="bg-card border border-border rounded-2xl p-4 shadow-xs">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
               
               <div class="flex items-center gap-2 bg-muted/60 p-1 rounded-xl border border-border self-start">
                 <button 
+                  (click)="modoBusquedaToma.set('evaluacion')"
+                  [class]="modoBusquedaToma() === 'evaluacion' ? 'bg-card text-purple-800 dark:text-purple-300 shadow-xs font-black' : 'text-muted-foreground hover:text-foreground font-bold'"
+                  class="px-3.5 py-2 text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer">
+                  <i class="pi pi-search"></i>
+                  <span>Buscador de Evaluaciones</span>
+                </button>
+                <button 
                   (click)="modoBusquedaToma.set('grupo')"
                   [class]="modoBusquedaToma() === 'grupo' ? 'bg-card text-purple-800 dark:text-purple-300 shadow-xs font-black' : 'text-muted-foreground hover:text-foreground font-bold'"
-                  class="px-4 py-2 text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer">
-                  <i class="pi pi-book"></i>
-                  <span>Peritaje por Materia / Grupo</span>
+                  class="px-3.5 py-2 text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer">
+                  <i class="pi pi-hashtag"></i>
+                  <span>Por ID Grupo SEA</span>
                 </button>
                 <button 
                   (click)="modoBusquedaToma.set('estudiante')"
                   [class]="modoBusquedaToma() === 'estudiante' ? 'bg-card text-purple-800 dark:text-purple-300 shadow-xs font-black' : 'text-muted-foreground hover:text-foreground font-bold'"
-                  class="px-4 py-2 text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer">
+                  class="px-3.5 py-2 text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer">
                   <i class="pi pi-user"></i>
-                  <span>Historial Global por Estudiante</span>
+                  <span>Historial por Estudiante</span>
                 </button>
               </div>
 
               <div class="text-[11px] text-muted-foreground flex items-center gap-1.5">
                 <i class="pi pi-info-circle text-blue-600"></i>
-                <span>Compara el timestamp exacto de inscripción del SEA contra el hito de impresión de cartillas.</span>
+                <span>Permite auditar el origen OMR vs reprogramaciones orales y modificaciones manuales.</span>
               </div>
 
             </div>
 
-            <!-- Formulario de Búsqueda según la modalidad -->
+            <!-- Formulario de Búsqueda según la sub-modalidad -->
             <div class="mt-4 pt-4 border-t border-border">
               
+              <!-- MODO 1: BUSCADOR INTERACTIVO DE EVALUACIONES -->
+              @if (modoBusquedaToma() === 'evaluacion') {
+                <div class="space-y-3">
+                  <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    
+                    <div class="md:col-span-6">
+                      <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                        <i class="pi pi-book text-primary text-[10px]"></i> Asignatura, Grupo (ej. TA-02), Código o Docente
+                      </label>
+                      <div class="relative">
+                        <input 
+                          type="text" 
+                          [ngModel]="criterioBusquedaEvaluacion()"
+                          (ngModelChange)="criterioBusquedaEvaluacion.set($event)"
+                          (keyup.enter)="buscarEvaluaciones()"
+                          placeholder="Ej. Farmacología, TA-01, MED-101, Pérez..."
+                          class="w-full bg-muted/60 border border-border rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold text-foreground outline-none focus:border-primary">
+                        <i class="pi pi-search absolute left-3 top-3 text-muted-foreground text-xs"></i>
+                      </div>
+                    </div>
+
+                    <div class="md:col-span-3">
+                      <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                        <i class="pi pi-map-marker text-primary text-[10px]"></i> Sede
+                      </label>
+                      <select 
+                        [ngModel]="filtroSedeEvaluacion()"
+                        (ngModelChange)="filtroSedeEvaluacion.set($event)"
+                        class="w-full bg-muted/60 border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground outline-none focus:border-primary">
+                        <option value="TODAS">Todas las sedes</option>
+                        <option value="CBBA">Cochabamba</option>
+                        <option value="LPZ">La Paz</option>
+                        <option value="SCZ">Santa Cruz</option>
+                        <option value="CAR">Caranavi</option>
+                        <option value="YAC">Yacuiba</option>
+                      </select>
+                    </div>
+
+                    <div class="md:col-span-3 flex gap-2">
+                      <button 
+                        (click)="buscarEvaluaciones()"
+                        [disabled]="buscandoEvaluaciones()"
+                        class="flex-1 bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-transform hover:scale-102 disabled:opacity-50 disabled:hover:scale-100 cursor-pointer">
+                        <i class="pi" [ngClass]="buscandoEvaluaciones() ? 'pi-spin pi-spinner' : 'pi-search'"></i>
+                        <span>Buscar Evaluaciones</span>
+                      </button>
+                      
+                      @if (criterioBusquedaEvaluacion()) {
+                        <button 
+                          (click)="limpiarBusquedaEvaluaciones()"
+                          class="bg-muted hover:bg-muted/80 text-foreground border border-border p-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+                          title="Limpiar">
+                          <i class="pi pi-times"></i>
+                        </button>
+                      }
+                    </div>
+
+                  </div>
+
+                  <!-- Resultados rápidos del buscador de evaluaciones -->
+                  @if (listaEvaluaciones().length > 0) {
+                    <div class="mt-4 pt-4 border-t border-border space-y-2">
+                      <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-black uppercase tracking-wider text-foreground">
+                          Evaluaciones Encontradas ({{ listaEvaluaciones().length }})
+                        </span>
+                        <span class="text-[10px] text-muted-foreground">Selecciona una para iniciar el peritaje forense</span>
+                      </div>
+
+                      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                        @for (ev of listaEvaluaciones(); track ev.rolExamenId) {
+                          <div 
+                            class="p-3 rounded-xl border transition-all text-xs flex flex-col justify-between gap-2.5"
+                            [class.bg-purple-50]="reporteGrupo()?.rolExamenId === ev.rolExamenId"
+                            [class.border-purple-400]="reporteGrupo()?.rolExamenId === ev.rolExamenId"
+                            [class.bg-card]="reporteGrupo()?.rolExamenId !== ev.rolExamenId"
+                            [class.border-border]="reporteGrupo()?.rolExamenId !== ev.rolExamenId"
+                            [class.hover:border-purple-300]="reporteGrupo()?.rolExamenId !== ev.rolExamenId">
+                            
+                            <div>
+                              <div class="flex items-center justify-between gap-1 mb-1">
+                                <span class="bg-purple-100 text-purple-900 font-mono font-black text-[9px] px-1.5 py-0.5 rounded">
+                                  Grupo {{ ev.grupo }}
+                                </span>
+                                <span class="bg-muted text-muted-foreground font-mono text-[9px] px-1.5 py-0.5 rounded">
+                                  {{ ev.sedeNombre || ev.campus || 'General' }}
+                                </span>
+                              </div>
+                              <h5 class="font-black text-foreground text-xs leading-snug line-clamp-1" [title]="ev.materiaNombre">
+                                {{ ev.materiaNombre }}
+                              </h5>
+                              <p class="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">
+                                {{ ev.carreraNombre || ev.carreraCodigo }} · Docente: <span class="font-bold text-foreground">{{ ev.docenteNombre || 'No asignado' }}</span>
+                              </p>
+                              <div class="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono">
+                                <span>{{ ev.estudiantesInscritosCount || 0 }} inscritos</span>
+                                <span>·</span>
+                                <span class="text-purple-700 dark:text-purple-300 font-bold">{{ ev.modalidad || 'PRESENCIAL' }}</span>
+                              </div>
+                            </div>
+
+                            <button 
+                              (click)="seleccionarEvaluacion(ev)"
+                              class="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold text-[11px] py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer">
+                              <i class="pi pi-shield-check text-xs"></i>
+                              <span>Auditar Esta Evaluación</span>
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- MODO 2: BUSCADOR POR ID DE GRUPO SEA -->
               @if (modoBusquedaToma() === 'grupo') {
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                   
@@ -184,7 +315,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                     @if (inputGrupoId()) {
                       <button 
                         (click)="limpiarBusquedaGrupo()"
-                        class="bg-muted hover:bg-muted/80 text-foreground border border-border p-2.5 rounded-xl text-xs transition-colors"
+                        class="bg-muted hover:bg-muted/80 text-foreground border border-border p-2.5 rounded-xl text-xs transition-colors cursor-pointer"
                         title="Limpiar">
                         <i class="pi pi-times"></i>
                       </button>
@@ -192,7 +323,10 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                   </div>
 
                 </div>
-              } @else {
+              }
+
+              <!-- MODO 3: HISTORIAL GLOBAL POR ESTUDIANTE -->
+              @if (modoBusquedaToma() === 'estudiante') {
                 <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                   
                   <div class="sm:col-span-6">
@@ -235,7 +369,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                     @if (inputEstudianteCodigo()) {
                       <button 
                         (click)="limpiarBusquedaEstudiante()"
-                        class="bg-muted hover:bg-muted/80 text-foreground border border-border p-2.5 rounded-xl text-xs transition-colors"
+                        class="bg-muted hover:bg-muted/80 text-foreground border border-border p-2.5 rounded-xl text-xs transition-colors cursor-pointer"
                         title="Limpiar">
                         <i class="pi pi-times"></i>
                       </button>
@@ -253,36 +387,41 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
           @if (cargandoForense()) {
             <div class="bg-card border border-border rounded-2xl p-12 text-center shadow-xs">
               <i class="pi pi-spin pi-spinner text-3xl text-purple-700 mb-3 inline-block"></i>
-              <h4 class="text-sm font-black text-foreground">Consultando Trazabilidad Forense en UNITEPC Gateway</h4>
+              <h4 class="text-sm font-black text-foreground">Consultando Trazabilidad Forense & Calificaciones</h4>
               <p class="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-                Verificando fechas exactas de inscripción (<code class="font-mono text-[10px]">enrollCreatedAt</code>) y contrastando con las marcas de tiempo de generación e impresión de cartillas OMR...
+                Verificando calificaciones OMR automáticas, notas de reprogramación oral, alteraciones manuales e inscripciones de nómina...
               </p>
             </div>
           }
 
           <!-- =============================================================== -->
-          <!-- RESULTADO MODO A: AUDITORÍA POR MATERIA / GRUPO               -->
+          <!-- RESULTADO MODO A: AUDITORÍA POR MATERIA / EVALUACIÓN           -->
           <!-- =============================================================== -->
-          @if (!cargandoForense() && modoBusquedaToma() === 'grupo' && reporteGrupo()) {
+          @if (!cargandoForense() && reporteGrupo()) {
             
             <div class="space-y-6 animate-fade-in">
               
-              <!-- Ficha Informativa del Grupo y Fechas de Examen -->
+              <!-- Ficha Informativa de la Evaluación -->
               <div class="bg-card border border-border rounded-2xl p-6 shadow-xs">
                 
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border">
                   <div>
-                    <div class="flex items-center gap-2 mb-1">
+                    <div class="flex items-center gap-2 mb-1.5 flex-wrap">
                       <span class="bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">
-                        Grupo ID: {{ reporteGrupo()?.groupId }}
+                        Grupo: {{ reporteGrupo()?.groupCode || reporteGrupo()?.groupId }}
                       </span>
-                      @if (reporteGrupo()?.groupCode) {
+                      @if (reporteGrupo()?.syllabusCourseId) {
                         <span class="bg-muted text-muted-foreground text-[10px] font-mono px-2 py-0.5 rounded-md">
-                          Código: {{ reporteGrupo()?.groupCode }}
+                          Código: {{ reporteGrupo()?.syllabusCourseId }}
+                        </span>
+                      }
+                      @if (reporteGrupo()?.estadoExamen) {
+                        <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                          Estado: {{ reporteGrupo()?.estadoExamen }}
                         </span>
                       }
                       @if (reporteGrupo()?.term) {
-                        <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                        <span class="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
                           Gestión: {{ reporteGrupo()?.term }}
                         </span>
                       }
@@ -343,62 +482,101 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
                 </div>
 
-                <!-- KPI Summary Cards Forenses -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                <!-- KPI Summary Cards Forenses & Calificaciones -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mt-6">
                   
                   <!-- Total Estudiantes -->
                   <div class="bg-muted/30 border border-border rounded-xl p-4">
-                    <span class="text-[10px] font-mono font-bold uppercase text-muted-foreground block mb-1">Total Alumnos Nómina SEA</span>
+                    <span class="text-[10px] font-mono font-bold uppercase text-muted-foreground block mb-1">Total Estudiantes</span>
                     <div class="text-2xl font-black text-foreground font-mono">
                       {{ reporteGrupo()?.totalEstudiantes }}
                     </div>
-                    <span class="text-[10px] text-muted-foreground mt-0.5 block">Registrados en Gateway</span>
+                    <span class="text-[10px] text-muted-foreground mt-0.5 block">Nómina auditada</span>
                   </div>
 
-                  <!-- Regulares -->
+                  <!-- Calificados (Aprobados / Reprobados) -->
                   <div class="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
-                    <span class="text-[10px] font-mono font-bold uppercase text-emerald-700 dark:text-emerald-400 block mb-1">Nómina Regular (Oportuna)</span>
-                    <div class="text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">
-                      {{ reporteGrupo()?.totalRegulares }}
+                    <span class="text-[10px] font-mono font-bold uppercase text-emerald-800 dark:text-emerald-400 block mb-1">Calificados</span>
+                    <div class="text-2xl font-black text-emerald-700 dark:text-emerald-300 font-mono">
+                      {{ reporteGrupo()?.totalCalificados }}
                     </div>
-                    <span class="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold mt-0.5 block">
-                      Inscritos antes de generar examen
+                    <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold mt-0.5 block">
+                      {{ reporteGrupo()?.totalAprobados }} Aprobados · {{ reporteGrupo()?.totalReprobados }} Reprobados
                     </span>
                   </div>
 
-                  <!-- Toma Tardía -->
-                  <div class="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-                    <span class="text-[10px] font-mono font-bold uppercase text-amber-700 dark:text-amber-400 block mb-1">Toma Tardía (Post-Gen)</span>
-                    <div class="text-2xl font-black text-amber-700 dark:text-amber-400 font-mono">
-                      {{ reporteGrupo()?.totalTardios }}
+                  <!-- Notas Reprogramadas / Examen Oral -->
+                  <div 
+                    class="rounded-xl p-4 border"
+                    [ngClass]="(reporteGrupo()?.totalReprogramados ?? 0) !== 0 ? 'bg-amber-50 border-amber-300' : 'bg-muted/30 border-border'">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-[10px] font-mono font-bold uppercase text-amber-900 dark:text-amber-300">
+                        🚨 Reprogramados Orales
+                      </span>
+                      @if ((reporteGrupo()?.totalReprogramados ?? 0) > 0) {
+                        <span class="bg-amber-200 text-amber-900 text-[9px] font-black px-1.5 py-0.5 rounded-full">ALERTA</span>
+                      }
                     </div>
-                    <span class="text-[10px] text-amber-600 dark:text-amber-500 font-bold mt-0.5 block">
-                      Inscritos post-generación Typst
+                    <div class="text-2xl font-black font-mono text-amber-800 dark:text-amber-300">
+                      {{ reporteGrupo()?.totalReprogramados }}
+                    </div>
+                    <span class="text-[10px] text-amber-700 dark:text-amber-400 font-bold mt-0.5 block">
+                      Sin cartilla OMR (Oral)
                     </span>
                   </div>
 
-                  <!-- Extemporáneos Post-Impresión -->
-                  <div class="bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-xl p-4">
-                    <span class="text-[10px] font-mono font-bold uppercase text-rose-700 dark:text-rose-400 block mb-1">Extemporáneo (Post-Impr)</span>
-                    <div class="text-2xl font-black text-rose-700 dark:text-rose-400 font-mono">
-                      {{ reporteGrupo()?.totalExtemporaneos }}
+                  <!-- Ajustes Manuales -->
+                  <div 
+                    class="rounded-xl p-4 border"
+                    [ngClass]="(reporteGrupo()?.totalAjustados ?? 0) !== 0 ? 'bg-purple-50 border-purple-300' : 'bg-muted/30 border-border'">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-[10px] font-mono font-bold uppercase text-purple-900 dark:text-purple-300">
+                        ⚠️ Ajustes Manuales
+                      </span>
+                      @if ((reporteGrupo()?.totalAjustados ?? 0) > 0) {
+                        <span class="bg-purple-200 text-purple-900 text-[9px] font-black px-1.5 py-0.5 rounded-full">AUDITAR</span>
+                      }
                     </div>
-                    <span class="text-[10px] text-rose-600 dark:text-rose-500 font-bold mt-0.5 block">
-                      Inscritos DESPUÉS de imprimir
+                    <div class="text-2xl font-black font-mono text-purple-800 dark:text-purple-300">
+                      {{ reporteGrupo()?.totalAjustados }}
+                    </div>
+                    <span class="text-[10px] text-purple-700 dark:text-purple-400 font-bold mt-0.5 block">
+                      Modificaciones registradas
+                    </span>
+                  </div>
+
+                  <!-- Tomas Tardías y Extemporáneas -->
+                  <div 
+                    class="rounded-xl p-4 border"
+                    [ngClass]="((reporteGrupo()?.totalExtemporaneos ?? 0) + (reporteGrupo()?.totalTardios ?? 0)) !== 0 ? 'bg-rose-50 border-rose-300' : 'bg-muted/30 border-border'">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-[10px] font-mono font-bold uppercase text-rose-900 dark:text-rose-300">
+                        Inscripción Tardía
+                      </span>
+                    </div>
+                    <div class="text-2xl font-black font-mono text-rose-800 dark:text-rose-300">
+                      {{ (reporteGrupo()?.totalExtemporaneos ?? 0) + (reporteGrupo()?.totalTardios ?? 0) }}
+                    </div>
+                    <span class="text-[10px] text-rose-700 dark:text-rose-400 font-bold mt-0.5 block">
+                      {{ reporteGrupo()?.totalExtemporaneos }} Post-Impr · {{ reporteGrupo()?.totalTardios }} Post-Gen
                     </span>
                   </div>
 
                 </div>
 
-                <!-- Dictamen / Alerta Pericial si hay extemporáneos o tardíos -->
-                @if ((reporteGrupo()?.totalExtemporaneos ?? 0) > 0 || (reporteGrupo()?.totalTardios ?? 0) > 0) {
+                <!-- Dictamen / Alerta Pericial si hay alteraciones de notas o extemporáneos -->
+                @if ((reporteGrupo()?.totalReprogramados ?? 0) > 0 || (reporteGrupo()?.totalAjustados ?? 0) > 0 || (reporteGrupo()?.totalExtemporaneos ?? 0) > 0) {
                   <div class="mt-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 flex items-start gap-3">
                     <i class="pi pi-exclamation-triangle text-xl text-amber-600 mt-0.5 shrink-0"></i>
                     <div>
-                      <h5 class="text-xs font-black uppercase tracking-wide">Dictamen Institucional de Trazabilidad</h5>
+                      <h5 class="text-xs font-black uppercase tracking-wide">Dictamen Institucional de Peritaje & Auditoría</h5>
                       <p class="text-xs mt-1 leading-relaxed">
-                        Se evidencia que <strong>{{ (reporteGrupo()?.totalExtemporaneos ?? 0) + (reporteGrupo()?.totalTardios ?? 0) }} estudiantes</strong> fueron incorporados a la nómina de esta materia con posterioridad a la fecha en que se generaron o imprimieron los instrumentos de evaluación. 
-                        Las cartillas físicas no incluyeron a estos estudiantes debido a que su toma de grupo fue realizada de forma extemporánea por la Dirección de Carrera o la administración académica.
+                        @if ((reporteGrupo()?.totalReprogramados ?? 0) > 0 || (reporteGrupo()?.totalAjustados ?? 0) > 0) {
+                          Se identificaron <strong>{{ reporteGrupo()?.totalReprogramados }} notas de examen oral reprogramado</strong> y <strong>{{ reporteGrupo()?.totalAjustados }} alteraciones manuales</strong> en las calificaciones. Cada una cuenta con responsable, fecha y justificación auditable.
+                        }
+                        @if ((reporteGrupo()?.totalExtemporaneos ?? 0) > 0) {
+                          Adicionalmente, <strong>{{ reporteGrupo()?.totalExtemporaneos }} estudiantes</strong> fueron incorporados a la nómina con posterioridad a la impresión de cartillas OMR.
+                        }
                       </p>
                     </div>
                   </div>
@@ -406,30 +584,128 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
               </div>
 
-              <!-- Tabla de Alumnos con su Dictamen Forense Individual -->
+              <!-- SECCIÓN DESPLEGABLE: LÍNEA DE TIEMPO & BITÁCORA INMUTABLE DE LA EVALUACIÓN -->
+              <div class="bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
+                <button 
+                  (click)="mostrarTimelineEvaluacion.set(!mostrarTimelineEvaluacion())"
+                  class="w-full p-4 flex items-center justify-between bg-muted/40 hover:bg-muted/60 transition-colors text-left cursor-pointer">
+                  <div class="flex items-center gap-2.5">
+                    <div class="h-8 w-8 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center">
+                      <i class="pi pi-history text-sm"></i>
+                    </div>
+                    <div>
+                      <h4 class="text-xs font-black text-foreground uppercase tracking-wider">
+                        Línea de Tiempo & Bitácora Inmutable de la Evaluación
+                      </h4>
+                      <p class="text-[11px] text-muted-foreground">
+                        Trazabilidad forense de transiciones, impresiones y calificaciones ({{ reporteGrupo()?.eventosAuditoria?.length || 0 }} eventos)
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-[11px] font-bold text-purple-700">
+                      {{ mostrarTimelineEvaluacion() ? 'Ocultar Bitácora' : 'Ver Bitácora de la Evaluación' }}
+                    </span>
+                    <i class="pi" [ngClass]="mostrarTimelineEvaluacion() ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
+                  </div>
+                </button>
+
+                @if (mostrarTimelineEvaluacion()) {
+                  <div class="p-4 border-t border-border space-y-3">
+                    @if (!reporteGrupo()?.eventosAuditoria || reporteGrupo()!.eventosAuditoria!.length === 0) {
+                      <p class="text-xs text-muted-foreground italic py-3 text-center">
+                        No hay eventos de auditoría específicos registrados aún para este rol de examen.
+                      </p>
+                    } @else {
+                      <div class="overflow-x-auto">
+                        <table class="w-full border-collapse text-left text-xs">
+                          <thead>
+                            <tr class="bg-muted/60 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                              <th class="p-3 w-36">Fecha y Hora</th>
+                              <th class="p-3 w-44">Operador & Cargo</th>
+                              <th class="p-3 w-28">IP Origen</th>
+                              <th class="p-3">Acción Registrada</th>
+                              <th class="p-3 w-28 text-center">Severidad</th>
+                              <th class="p-3 w-16 text-center">JSON</th>
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-border">
+                            @for (ev of reporteGrupo()!.eventosAuditoria; track ev.id) {
+                              <tr class="hover:bg-muted/20 transition-colors">
+                                <td class="p-3 font-mono text-[11px] text-foreground font-bold">
+                                  {{ formatearFechaHora(ev.fechaEvento) }}
+                                </td>
+                                <td class="p-3">
+                                  <div class="font-bold text-foreground">{{ ev.usuarioNombre || ev.usuario }}</div>
+                                  <div class="text-[10px] text-muted-foreground">{{ ev.usuarioCargo }}</div>
+                                </td>
+                                <td class="p-3 font-mono text-[11px] text-muted-foreground">
+                                  {{ ev.ipOrigen }}
+                                </td>
+                                <td class="p-3">
+                                  <div class="font-bold text-foreground">{{ ev.accion }}</div>
+                                  <div class="text-[10px] text-muted-foreground font-mono">{{ ev.codigoAccion }}</div>
+                                </td>
+                                <td class="p-3 text-center">
+                                  @if (ev.nivel === 'OPERACION_CRITICA') {
+                                    <span class="bg-rose-100 text-rose-800 border border-rose-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                                      CRÍTICO
+                                    </span>
+                                  } @else if (ev.nivel === 'ADVERTENCIA') {
+                                    <span class="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                                      ALERTA
+                                    </span>
+                                  } @else {
+                                    <span class="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                                      INFO
+                                    </span>
+                                  }
+                                </td>
+                                <td class="p-3 text-center">
+                                  <button 
+                                    (click)="abrirDetalle(ev)"
+                                    class="h-7 w-7 rounded-lg bg-muted hover:bg-purple-100 text-muted-foreground hover:text-purple-800 inline-flex items-center justify-center transition-colors cursor-pointer"
+                                    title="Ver Ficha Completa del Evento">
+                                    <i class="pi pi-eye text-xs"></i>
+                                  </button>
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+
+              <!-- Tabla de Alumnos con Calificaciones, Reprogramaciones & Dictamen Forense -->
               <div class="bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
                 
                 <div class="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/30">
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-xs font-black text-foreground uppercase tracking-wider">
-                      Detalle de Estudiantes & Peritaje Individual
+                      Nómina de Estudiantes & Peritaje de Calificaciones
                     </span>
                     <span class="bg-purple-100 text-purple-800 text-[10px] font-mono font-black px-2 py-0.5 rounded-full">
-                      {{ estudiantesGrupoFiltrados().length }} alumnos
+                      {{ estudiantesGrupoFiltrados().length }} de {{ reporteGrupo()?.totalEstudiantes }} alumnos
                     </span>
                   </div>
 
-                  <!-- Filtro por Dictamen Forense -->
+                  <!-- Filtro Rápido de Tabla -->
                   <div class="flex items-center gap-2">
                     <label class="text-[10px] font-bold text-muted-foreground uppercase">Filtrar:</label>
                     <select 
-                      [ngModel]="filtroDictamenEstudiantes()"
-                      (ngModelChange)="filtroDictamenEstudiantes.set($event)"
+                      [ngModel]="filtroEstudiantesTabla()"
+                      (ngModelChange)="filtroEstudiantesTabla.set($event)"
                       class="bg-card border border-border rounded-xl px-2.5 py-1 text-xs font-bold text-foreground outline-none">
                       <option value="TODOS">Todos los alumnos</option>
-                      <option value="REGULAR">Solo Regulares (Oportunos)</option>
-                      <option value="TOMA_TARDIA">Solo Tomas Tardías</option>
-                      <option value="EXTEMPORANEO_POST_IMPRESION">Solo Extemporáneos Post-Impresión</option>
+                      <option value="REPROGRAMADOS_MODIFICADOS">🚨 Solo Reprogramados & Modificados</option>
+                      <option value="CALIFICADOS">Solo Calificados</option>
+                      <option value="APROBADOS">Solo Aprobados (>= 51)</option>
+                      <option value="REPROBADOS">Solo Reprobados (< 51)</option>
+                      <option value="EXTEMPORANEOS_TARDIOS">Solo Extemporáneos & Tardíos</option>
+                      <option value="PENDIENTES">Solo Pendientes / Ausentes</option>
                     </select>
                   </div>
                 </div>
@@ -439,18 +715,23 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                     <thead>
                       <tr class="bg-muted/60 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
                         <th class="p-3.5 w-12 text-center">N°</th>
-                        <th class="p-3.5 w-32">Código SIS</th>
+                        <th class="p-3.5 w-28">Código SIS</th>
                         <th class="p-3.5 min-w-[200px]">Apellidos y Nombres</th>
-                        <th class="p-3.5 w-36">Fecha Registro SEA</th>
-                        <th class="p-3.5 w-36">Última Modif. SEA</th>
-                        <th class="p-3.5 text-center w-36">Dictamen Forense</th>
-                        <th class="p-3.5 min-w-[260px]">Diagnóstico Pericial</th>
-                        <th class="p-3.5 text-center w-20">Variante</th>
+                        <th class="p-3.5 w-36 text-center">Nota / 100 & Estado</th>
+                        <th class="p-3.5 min-w-[180px]">Origen Calificación</th>
+                        <th class="p-3.5 min-w-[200px]">Modificado / Reprog. Por</th>
+                        <th class="p-3.5 text-center w-36">Dictamen Nómina</th>
+                        <th class="p-3.5 min-w-[220px]">Diagnóstico Forense</th>
+                        <th class="p-3.5 text-center w-16">Variante</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-border font-medium text-foreground">
                       @for (est of estudiantesGrupoFiltrados(); track est.studentCode; let idx = $index) {
-                        <tr class="hover:bg-muted/20 transition-colors" [class.bg-rose-50]="est.estadoForense === 'EXTEMPORANEO_POST_IMPRESION'">
+                        <tr 
+                          class="hover:bg-muted/20 transition-colors"
+                          [class.bg-amber-50]="est.esReprogramado"
+                          [class.bg-purple-50]="est.modificadoManualmente && !est.esReprogramado"
+                          [class.bg-rose-50]="est.estadoForense === 'EXTEMPORANEO_POST_IMPRESION' && !est.esReprogramado && !est.modificadoManualmente">
                           
                           <!-- N° -->
                           <td class="p-3.5 text-center font-mono text-muted-foreground text-[11px]">
@@ -465,38 +746,81 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                           <!-- Nombre Completo -->
                           <td class="p-3.5">
                             <div class="font-black text-foreground">{{ est.fullName }}</div>
-                            <span class="text-[10px] text-muted-foreground">Estado: {{ est.courseState }}</span>
+                            <span class="text-[10px] text-muted-foreground">Estado SEA: {{ est.courseState }}</span>
                           </td>
 
-                          <!-- Fecha de Registro en SEA -->
-                          <td class="p-3.5 font-mono text-[11px]">
-                            @if (est.enrollCreatedAt) {
-                              <div class="font-bold text-foreground">
-                                {{ formatearSoloFecha(est.enrollCreatedAt) }}
+                          <!-- Nota / 100 & Estado -->
+                          <td class="p-3.5 text-center">
+                            @if (est.notaSobre100 !== null && est.notaSobre100 !== undefined) {
+                              <div class="font-mono font-black text-sm" [class.text-emerald-700]="est.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="est.estadoCalificacion === 'REPROBADO'">
+                                {{ est.notaSobre100 }} <span class="text-[10px] font-normal text-muted-foreground">/ 100</span>
                               </div>
-                              <div class="text-[10px] text-muted-foreground">
-                                {{ formatearSoloHora(est.enrollCreatedAt) }}
-                              </div>
+                              <span 
+                                class="text-[9px] font-black px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block"
+                                [class.bg-emerald-100]="est.estadoCalificacion === 'APROBADO'"
+                                [class.text-emerald-800]="est.estadoCalificacion === 'APROBADO'"
+                                [class.bg-rose-100]="est.estadoCalificacion === 'REPROBADO'"
+                                [class.text-rose-800]="est.estadoCalificacion === 'REPROBADO'">
+                                {{ est.estadoCalificacion }}
+                              </span>
                             } @else {
-                              <span class="text-muted-foreground italic text-[10px]">No registrado</span>
+                              <span class="bg-muted text-muted-foreground text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
+                                PENDIENTE
+                              </span>
                             }
                           </td>
 
-                          <!-- Fecha de Modificación en SEA -->
-                          <td class="p-3.5 font-mono text-[11px]">
-                            @if (est.enrollUpdatedAt) {
-                              <div class="font-bold text-foreground">
-                                {{ formatearSoloFecha(est.enrollUpdatedAt) }}
-                              </div>
-                              <div class="text-[10px] text-muted-foreground">
-                                {{ formatearSoloHora(est.enrollUpdatedAt) }}
-                              </div>
-                            } @else {
-                              <span class="text-muted-foreground italic text-[10px]">-</span>
+                          <!-- Origen Calificación (Badge Oficial) -->
+                          <td class="p-3.5">
+                            <span 
+                              [class]="obtenerClaseBadgeOrigen(est.origenCalificacion)"
+                              class="text-[9px] font-black px-2 py-0.5 rounded-full border inline-flex items-center gap-1 uppercase tracking-tight">
+                              <i [class]="obtenerIconoOrigen(est.origenCalificacion)" class="text-[9px]"></i>
+                              <span>{{ obtenerTextoOrigen(est.origenCalificacion) }}</span>
+                            </span>
+                            @if (est.esReprogramado) {
+                              <span class="text-[10px] text-amber-800 font-bold block mt-1">
+                                Examen Oral Reprogramado
+                              </span>
+                            } @else if (est.modificadoManualmente) {
+                              <span class="text-[10px] text-purple-800 font-bold block mt-1">
+                                Alteración Registrada
+                              </span>
                             }
                           </td>
 
-                          <!-- Dictamen Forense Badge -->
+                          <!-- Modificado / Reprogramado Por -->
+                          <td class="p-3.5">
+                            @if (est.esReprogramado) {
+                              <div class="font-bold text-amber-900 dark:text-amber-300 text-xs flex items-center gap-1">
+                                <i class="pi pi-user text-[10px]"></i> {{ est.reprogramadoPor || 'Comisión / Dirección' }}
+                              </div>
+                              <div class="text-[10px] text-muted-foreground font-mono">
+                                {{ formatearFechaHora(est.fechaReprogramacion) }}
+                              </div>
+                              <button 
+                                (click)="abrirModalEstudiante(est)"
+                                class="text-[10px] text-amber-700 hover:text-amber-800 underline font-bold mt-0.5 inline-flex items-center gap-1 cursor-pointer">
+                                <i class="pi pi-file text-[9px]"></i> Ver Motivo & Comprobante
+                              </button>
+                            } @else if (est.modificadoManualmente) {
+                              <div class="font-bold text-purple-900 dark:text-purple-300 text-xs flex items-center gap-1">
+                                <i class="pi pi-user text-[10px]"></i> {{ est.procesadoPor || 'Operador' }}
+                              </div>
+                              <div class="text-[10px] text-muted-foreground font-mono">
+                                {{ formatearFechaHora(est.fechaProcesamiento) }}
+                              </div>
+                              <button 
+                                (click)="abrirModalEstudiante(est)"
+                                class="text-[10px] text-purple-700 hover:text-purple-800 underline font-bold mt-0.5 inline-flex items-center gap-1 cursor-pointer">
+                                <i class="pi pi-info-circle text-[9px]"></i> Ver Detalle de Ajuste
+                              </button>
+                            } @else {
+                              <span class="text-muted-foreground text-[11px]">— Proceso Normal</span>
+                            }
+                          </td>
+
+                          <!-- Dictamen Forense Nómina SEA -->
                           <td class="p-3.5 text-center">
                             <span 
                               [class]="obtenerClaseBadgeForense(est.estadoForense)"
@@ -506,7 +830,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                             </span>
                           </td>
 
-                          <!-- Diagnóstico Pericial -->
+                          <!-- Diagnóstico Forense -->
                           <td class="p-3.5">
                             <p class="text-xs leading-snug" [class.text-rose-700]="est.estadoForense === 'EXTEMPORANEO_POST_IMPRESION'" [class.text-amber-700]="est.estadoForense === 'TOMA_TARDIA'">
                               {{ est.mensajeForense }}
@@ -613,14 +937,14 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                 <div class="p-4 border-b border-border flex items-center justify-between bg-muted/30">
                   <div class="flex items-center gap-2">
                     <span class="text-xs font-black text-foreground uppercase tracking-wider">
-                      Historial de Inscripciones & Materias Asignadas
+                      Historial de Asignaturas & Calificaciones Obtenidas
                     </span>
                     <span class="bg-purple-100 text-purple-800 text-[10px] font-mono font-black px-2 py-0.5 rounded-full">
                       {{ reporteEstudiante()?.materias?.length || 0 }} materias
                     </span>
                   </div>
                   <span class="text-[11px] text-muted-foreground">
-                    Peritaje cruzado con exámenes impresos
+                    Peritaje cruzado con exámenes e inscripciones
                   </span>
                 </div>
 
@@ -629,18 +953,19 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                     <thead>
                       <tr class="bg-muted/60 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
                         <th class="p-3.5 w-12 text-center">N°</th>
-                        <th class="p-3.5 min-w-[220px]">Asignatura / Materia</th>
-                        <th class="p-3.5 min-w-[140px]">Grupo & Docente</th>
-                        <th class="p-3.5 w-36">Fecha Registro SEA</th>
-                        <th class="p-3.5 w-36">Generación Examen</th>
-                        <th class="p-3.5 text-center w-36">Dictamen Forense</th>
-                        <th class="p-3.5 min-w-[260px]">Diagnóstico Pericial</th>
-                        <th class="p-3.5 text-center w-20">Variante</th>
+                        <th class="p-3.5 min-w-[200px]">Asignatura</th>
+                        <th class="p-3.5 min-w-[130px]">Grupo & Docente</th>
+                        <th class="p-3.5 text-center w-28">Nota / 100</th>
+                        <th class="p-3.5 min-w-[160px]">Origen Nota</th>
+                        <th class="p-3.5 w-32">Registro SEA</th>
+                        <th class="p-3.5 text-center w-32">Dictamen Nómina</th>
+                        <th class="p-3.5 min-w-[220px]">Diagnóstico</th>
+                        <th class="p-3.5 text-center w-16">Variante</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-border font-medium text-foreground">
                       @for (mat of reporteEstudiante()?.materias; track mat.groupId; let idx = $index) {
-                        <tr class="hover:bg-muted/20 transition-colors" [class.bg-rose-50]="mat.estadoForense === 'EXTEMPORANEO_POST_IMPRESION'">
+                        <tr class="hover:bg-muted/20 transition-colors">
                           
                           <!-- N° -->
                           <td class="p-3.5 text-center font-mono text-muted-foreground text-[11px]">
@@ -663,6 +988,28 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                             </span>
                           </td>
 
+                          <!-- Nota / 100 -->
+                          <td class="p-3.5 text-center">
+                            @if (mat.notaSobre100 !== null && mat.notaSobre100 !== undefined) {
+                              <div class="font-mono font-black text-sm" [class.text-emerald-700]="mat.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="mat.estadoCalificacion === 'REPROBADO'">
+                                {{ mat.notaSobre100 }} pts.
+                              </div>
+                              <span class="text-[9px] font-bold text-muted-foreground">{{ mat.estadoCalificacion }}</span>
+                            } @else {
+                              <span class="text-muted-foreground text-[10px] italic">Sin nota</span>
+                            }
+                          </td>
+
+                          <!-- Origen Nota -->
+                          <td class="p-3.5">
+                            <span 
+                              [class]="obtenerClaseBadgeOrigen(mat.origenCalificacion)"
+                              class="text-[9px] font-black px-2 py-0.5 rounded-full border inline-flex items-center gap-1 uppercase tracking-tight">
+                              <i [class]="obtenerIconoOrigen(mat.origenCalificacion)" class="text-[9px]"></i>
+                              <span>{{ obtenerTextoOrigen(mat.origenCalificacion) }}</span>
+                            </span>
+                          </td>
+
                           <!-- Fecha Registro SEA -->
                           <td class="p-3.5 font-mono text-[11px]">
                             @if (mat.enrollCreatedAt) {
@@ -674,20 +1021,6 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                               </div>
                             } @else {
                               <span class="text-muted-foreground italic text-[10px]">No registrado</span>
-                            }
-                          </td>
-
-                          <!-- Fecha de Generación de Examen -->
-                          <td class="p-3.5 font-mono text-[11px]">
-                            @if (mat.fechaGeneracionExamen) {
-                              <div class="font-bold text-foreground">
-                                {{ formatearSoloFecha(mat.fechaGeneracionExamen) }}
-                              </div>
-                              <div class="text-[10px] text-muted-foreground">
-                                {{ formatearSoloHora(mat.fechaGeneracionExamen) }}
-                              </div>
-                            } @else {
-                              <span class="text-muted-foreground italic text-[10px]">Sin examen</span>
                             }
                           </td>
 
@@ -799,14 +1132,14 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                 </span>
               </div>
               <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl">
-                <i class="pi pi-shield"></i>
+                <i class="pi pi-bolt"></i>
               </div>
             </div>
 
-            <!-- Bloqueos / Advertencias -->
+            <!-- Alertas de Seguridad -->
             <div class="bg-card border border-border rounded-2xl p-5 shadow-xs flex items-center justify-between">
               <div>
-                <span class="text-[10px] font-mono font-bold uppercase text-muted-foreground tracking-wider block mb-1">Alertas de Seguridad</span>
+                <span class="text-[10px] font-mono font-bold uppercase text-muted-foreground tracking-wider block mb-1">Alertas & Advertencias</span>
                 <div class="text-2xl font-black text-amber-600 font-mono">
                   @if (cargando()) {
                     <span class="text-base text-muted-foreground animate-pulse">...</span>
@@ -815,91 +1148,89 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                   }
                 </div>
                 <span class="text-[10px] text-amber-600 font-bold mt-1 inline-flex items-center gap-1">
-                  <i class="pi pi-exclamation-triangle text-[9px]"></i> Devoluciones y alertas
+                  <i class="pi pi-exclamation-triangle text-[9px]"></i> Auditoría de seguridad
                 </span>
               </div>
               <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
-                <i class="pi pi-lock"></i>
+                <i class="pi pi-shield"></i>
               </div>
             </div>
 
           </div>
 
-          <!-- Barra de Filtros y Búsqueda -->
-          <div class="bg-card border border-border rounded-2xl p-5 shadow-xs space-y-4">
-            
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- Filtros de Bitácora -->
+          <div class="bg-card border border-border rounded-2xl p-4 shadow-xs">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
               
-              <!-- Búsqueda General -->
-              <div class="lg:col-span-2">
-                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
-                  <i class="pi pi-search text-primary text-[10px]"></i> Buscar por Usuario, IP, Acción o Detalle
+              <div class="md:col-span-5">
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Buscar en Bitácora
                 </label>
                 <div class="relative">
                   <input 
                     type="text" 
                     [ngModel]="busquedaTexto()"
                     (ngModelChange)="busquedaTexto.set($event)"
-                    placeholder="Ej. Docente, 192.168, Creación, Impresión, ROL-..."
+                    placeholder="Buscar por usuario, acción, IP, campus o detalle técnico..."
                     class="w-full bg-muted/60 border border-border rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
                   <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
                 </div>
               </div>
 
-              <!-- Filtro por Módulo -->
-              <div>
-                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
-                  <i class="pi pi-th-large text-primary text-[10px]"></i> Módulo
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Módulo
                 </label>
                 <select 
                   [ngModel]="filtroModulo()"
                   (ngModelChange)="filtroModulo.set($event)"
                   class="w-full bg-muted/60 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
-                  <option value="TODOS">Todos los Módulos</option>
+                  <option value="TODOS">Todos los módulos</option>
                   <option value="Evaluaciones">Evaluaciones</option>
                   <option value="Banco de Preguntas">Banco de Preguntas</option>
-                  <option value="Generación Typst">Generación de exámenes</option>
                   <option value="Calificación OMR">Calificación OMR</option>
-                  <option value="Examen Virtual">Examen Virtual</option>
+                  <option value="Generación Typst">Generación Typst</option>
                   <option value="Usuarios y Accesos">Usuarios y Accesos</option>
                   <option value="Respaldos">Respaldos</option>
                   <option value="Verificación de Exámenes">Verificación de Exámenes</option>
                 </select>
               </div>
 
-              <!-- Filtro por Nivel de Criticidad -->
-              <div>
-                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
-                  <i class="pi pi-flag text-primary text-[10px]"></i> Nivel de Severidad
+              <div class="md:col-span-3">
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Nivel de Severidad
                 </label>
                 <select 
                   [ngModel]="filtroNivel()"
                   (ngModelChange)="filtroNivel.set($event)"
                   class="w-full bg-muted/60 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
-                  <option value="TODOS">Todos los Niveles</option>
-                  <option value="INFO">INFO (Informativo)</option>
-                  <option value="ADVERTENCIA">ADVERTENCIA (Alerta)</option>
-                  <option value="OPERACION_CRITICA">OPERACIÓN CRÍTICA</option>
+                  <option value="TODOS">Todos los niveles</option>
+                  <option value="INFO">Informativo (INFO)</option>
+                  <option value="ADVERTENCIA">Advertencias (ADVERTENCIA)</option>
+                  <option value="OPERACION_CRITICA">Operación Crítica (CRÍTICA)</option>
                 </select>
               </div>
 
-            </div>
+              <div class="md:col-span-1 flex justify-end">
+                <button 
+                  (click)="busquedaTexto.set(''); filtroModulo.set('TODOS'); filtroNivel.set('TODOS')"
+                  class="w-full bg-muted hover:bg-muted/80 text-foreground border border-border py-2 px-2 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  title="Restablecer Filtros">
+                  <i class="pi pi-filter-slash"></i>
+                </button>
+              </div>
 
+            </div>
           </div>
 
-          <!-- Tabla Principal de Auditoría -->
+          <!-- Tabla de Eventos de Bitácora -->
           <div class="bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
-            
             <div class="p-4 border-b border-border flex items-center justify-between bg-muted/30">
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-black text-foreground uppercase tracking-wider">Registros de Trazabilidad</span>
-                <span class="bg-purple-100 text-purple-800 text-[10px] font-mono font-black px-2 py-0.5 rounded-full">
-                  {{ registrosFiltrados().length }} eventos
-                </span>
-              </div>
-              <span class="text-[11px] text-muted-foreground flex items-center gap-1">
-                <i class="pi pi-shield text-[10px] text-emerald-600"></i>
-                Trazabilidad institucional en tiempo real
+              <span class="text-xs font-black text-foreground uppercase tracking-wider">
+                Registros de Auditoría Institucional
+              </span>
+              <span class="text-[11px] text-muted-foreground font-mono">
+                Mostrando {{ registrosFiltrados().length }} de {{ items().length }} eventos
               </span>
             </div>
 
@@ -907,92 +1238,63 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
               <table class="w-full border-collapse text-left text-xs">
                 <thead>
                   <tr class="bg-muted/60 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                    <th class="p-3.5 w-32">Fecha / Hora</th>
-                    <th class="p-3.5 min-w-[200px]">Usuario & Cargo</th>
-                    <th class="p-3.5 min-w-[150px]">IP & Origen</th>
+                    <th class="p-3.5 w-36">Fecha y Hora</th>
+                    <th class="p-3.5 w-44">Usuario & Terminal</th>
                     <th class="p-3.5 w-36">Módulo</th>
-                    <th class="p-3.5 min-w-[260px]">Acción Realizada</th>
-                    <th class="p-3.5 text-center w-28">Nivel</th>
-                    <th class="p-3.5 text-right w-16">Detalle</th>
+                    <th class="p-3.5">Acción Ejecutada</th>
+                    <th class="p-3.5 w-28 text-center">Nivel</th>
+                    <th class="p-3.5 w-16 text-right">Detalle</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-border font-medium text-foreground">
                   @if (cargando()) {
                     <tr>
-                      <td colspan="7" class="p-10 text-center text-xs text-muted-foreground">
-                        <i class="pi pi-spin pi-spinner text-xl text-purple-700 block mb-2"></i>
-                        Cargando bitácora de auditoría desde el servidor...
+                      <td colspan="6" class="p-8 text-center text-muted-foreground">
+                        <i class="pi pi-spin pi-spinner text-2xl text-purple-700 mb-2 block mx-auto"></i>
+                        Cargando bitácora de auditoría...
                       </td>
                     </tr>
                   } @else if (registrosFiltrados().length === 0) {
                     <tr>
-                      <td colspan="7" class="p-10 text-center text-xs text-muted-foreground">
-                        <i class="pi pi-inbox text-2xl block mb-2 text-slate-400"></i>
-                        No se encontraron registros de auditoría que coincidan con los filtros seleccionados.
+                      <td colspan="6" class="p-8 text-center text-muted-foreground">
+                        No se encontraron registros que coincidan con los filtros aplicados.
                       </td>
                     </tr>
                   } @else {
                     @for (item of registrosFiltrados(); track item.id) {
                       <tr class="hover:bg-muted/20 transition-colors">
                         
-                        <!-- Fecha y Hora Formateada en Hora Boliviana -->
-                        <td class="p-3.5 font-mono text-[11px]">
-                          <div class="font-bold text-foreground">
-                            {{ formatearSoloFecha(item.fechaEvento) }}
-                          </div>
-                          <div class="text-[10px] text-muted-foreground">
-                            {{ formatearSoloHora(item.fechaEvento) }}
-                          </div>
+                        <!-- Fecha y Hora Oficial -->
+                        <td class="p-3.5 font-mono text-[11px] text-foreground font-bold whitespace-nowrap">
+                          {{ formatearFechaHora(item.fechaEvento) }}
                         </td>
 
-                        <!-- Usuario & Cargo -->
+                        <!-- Usuario & Terminal -->
                         <td class="p-3.5">
-                          <div class="font-black text-foreground text-xs">{{ item.usuarioNombre || item.usuario }}</div>
-                          <div class="text-[10px] text-muted-foreground mt-0.5">
-                            {{ item.usuarioCargo }}
-                            @if (item.campus) {
-                              · <span class="font-mono text-purple-700 dark:text-purple-400 font-bold">{{ item.campus }}</span>
-                            }
-                          </div>
-                        </td>
-
-                        <!-- IP Pública / Origen -->
-                        <td class="p-3.5 font-mono text-[11px]">
-                          <div class="flex items-center gap-1.5 font-bold text-foreground">
-                            <i class="pi pi-globe text-blue-600 text-[10px]"></i>
-                            <span class="bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded text-[10px]">
-                              {{ item.ipOrigen }}
-                            </span>
-                          </div>
-                          <div class="text-[10px] text-muted-foreground mt-1 font-sans">
-                            Terminal Segura
+                          <div class="font-black text-foreground">{{ item.usuarioNombre || item.usuario }}</div>
+                          <div class="text-[10px] text-muted-foreground font-mono">
+                            IP: {{ item.ipOrigen }} · {{ item.campus || 'General' }}
                           </div>
                         </td>
 
                         <!-- Módulo -->
                         <td class="p-3.5">
-                          <span class="bg-muted px-2.5 py-1 rounded-lg text-[10px] font-bold border border-border inline-block">
+                          <span class="bg-muted px-2 py-0.5 rounded text-[10px] font-bold text-foreground border border-border">
                             {{ item.modulo }}
                           </span>
                         </td>
 
                         <!-- Acción Realizada -->
                         <td class="p-3.5">
-                          <p class="text-xs leading-relaxed text-slate-800 dark:text-slate-200 font-medium">
-                            {{ item.accion }}
-                          </p>
-                          @if (item.codigoAccion && item.codigoAccion !== item.accion) {
-                            <span class="text-[10px] text-muted-foreground block mt-0.5 font-mono">
-                              Código: {{ item.codigoAccion }}
-                            </span>
-                          }
+                          <p class="font-bold text-foreground leading-snug">{{ item.accion }}</p>
+                          <span class="text-[10px] text-muted-foreground font-mono">{{ item.codigoAccion }}</span>
                         </td>
 
                         <!-- Nivel de Severidad -->
                         <td class="p-3.5 text-center">
                           @if (item.nivel === 'OPERACION_CRITICA') {
                             <span class="bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
-                              CRÍTICO
+                              CRÍTICA
                             </span>
                           } @else if (item.nivel === 'ADVERTENCIA') {
                             <span class="bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
@@ -1010,7 +1312,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                           <button 
                             (click)="abrirDetalle(item)"
                             title="Ver Ficha Completa del Evento"
-                            class="h-7 w-7 rounded-lg bg-muted hover:bg-purple-100 text-muted-foreground hover:text-purple-800 inline-flex items-center justify-center transition-colors">
+                            class="h-7 w-7 rounded-lg bg-muted hover:bg-purple-100 text-muted-foreground hover:text-purple-800 inline-flex items-center justify-center transition-colors cursor-pointer">
                             <i class="pi pi-eye text-xs"></i>
                           </button>
                         </td>
@@ -1028,7 +1330,9 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
       }
 
-      <!-- MODAL DETALLE DE EVENTO DE AUDITORÍA -->
+      <!-- =================================================================== -->
+      <!-- MODAL 1: DETALLE DE EVENTO DE AUDITORÍA / BITÁCORA                 -->
+      <!-- =================================================================== -->
       @if (registroSeleccionado()) {
         <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div class="bg-card border border-border rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-scale-in">
@@ -1043,7 +1347,7 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                   <p class="text-xs text-white/80 font-mono">{{ formatearFechaHora(registroSeleccionado()?.fechaEvento) }}</p>
                 </div>
               </div>
-              <button (click)="cerrarDetalle()" class="text-white/80 hover:text-white text-base">
+              <button (click)="cerrarDetalle()" class="text-white/80 hover:text-white text-base cursor-pointer">
                 <i class="pi pi-times"></i>
               </button>
             </div>
@@ -1103,8 +1407,117 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
             <div class="bg-muted/30 border-t border-border p-4 flex justify-end">
               <button 
                 (click)="cerrarDetalle()"
-                class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors">
+                class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
                 Cerrar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      }
+
+      <!-- =================================================================== -->
+      <!-- MODAL 2: DETALLE FORENSE DE REPROGRAMACIÓN O AJUSTE MANUAL         -->
+      <!-- =================================================================== -->
+      @if (estudianteModalDetalle()) {
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-scale-in">
+            
+            <div class="bg-gradient-to-r from-amber-700 to-purple-800 text-white p-5 flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center text-white text-lg">
+                  <i class="pi" [ngClass]="estudianteModalDetalle()?.esReprogramado ? 'pi-microphone' : 'pi-pencil'"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-black tracking-tight">
+                    {{ estudianteModalDetalle()?.esReprogramado ? 'Peritaje de Examen Oral Reprogramado' : 'Peritaje de Modificación Manual de Nota' }}
+                  </h3>
+                  <p class="text-xs text-white/90">Estudiante: {{ estudianteModalDetalle()?.fullName }} ({{ estudianteModalDetalle()?.studentCode }})</p>
+                </div>
+              </div>
+              <button (click)="cerrarModalEstudiante()" class="text-white/80 hover:text-white text-base cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <div class="p-6 space-y-4 text-xs">
+              
+              <!-- Calificación Registrada -->
+              <div class="grid grid-cols-2 gap-3">
+                <div class="p-3.5 rounded-xl bg-muted/60 border border-border">
+                  <span class="text-[10px] uppercase font-bold text-muted-foreground block mb-0.5">Nota Final Sobre 100</span>
+                  <div class="text-xl font-mono font-black" [class.text-emerald-600]="estudianteModalDetalle()?.estadoCalificacion === 'APROBADO'" [class.text-rose-600]="estudianteModalDetalle()?.estadoCalificacion === 'REPROBADO'">
+                    {{ estudianteModalDetalle()?.notaSobre100 !== null && estudianteModalDetalle()?.notaSobre100 !== undefined ? estudianteModalDetalle()?.notaSobre100 : '—' }} pts.
+                  </div>
+                  <span class="text-[10px] font-bold" [class.text-emerald-700]="estudianteModalDetalle()?.estadoCalificacion === 'APROBADO'" [class.text-rose-700]="estudianteModalDetalle()?.estadoCalificacion === 'REPROBADO'">
+                    Estado: {{ estudianteModalDetalle()?.estadoCalificacion }}
+                  </span>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-muted/60 border border-border">
+                  <span class="text-[10px] uppercase font-bold text-muted-foreground block mb-0.5">Nota Sobre 60</span>
+                  <div class="text-xl font-mono font-black text-foreground">
+                    {{ estudianteModalDetalle()?.notaSobre60 !== null && estudianteModalDetalle()?.notaSobre60 !== undefined ? estudianteModalDetalle()?.notaSobre60 : '—' }} pts.
+                  </div>
+                  <span class="text-[10px] text-muted-foreground">Ponderación Oficial</span>
+                </div>
+              </div>
+
+              <!-- Responsable y Fecha -->
+              <div class="p-3.5 rounded-xl bg-card border border-border space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] uppercase font-bold text-muted-foreground">
+                    {{ estudianteModalDetalle()?.esReprogramado ? 'Reprogramado Por' : 'Modificado / Procesado Por' }}
+                  </span>
+                  <span class="font-mono font-bold text-foreground">
+                    {{ estudianteModalDetalle()?.reprogramadoPor || estudianteModalDetalle()?.procesadoPor || 'Sistema' }}
+                  </span>
+                </div>
+                <div class="flex items-center justify-between pt-2 border-t border-border">
+                  <span class="text-[10px] uppercase font-bold text-muted-foreground">Fecha y Hora de la Acción</span>
+                  <span class="font-mono text-muted-foreground">
+                    {{ formatearFechaHora(estudianteModalDetalle()?.fechaReprogramacion || estudianteModalDetalle()?.fechaProcesamiento) }}
+                  </span>
+                </div>
+                @if (estudianteModalDetalle()?.comprobanteReprogramacion) {
+                  <div class="flex items-center justify-between pt-2 border-t border-border">
+                    <span class="text-[10px] uppercase font-bold text-muted-foreground">N° Comprobante / Solicitud</span>
+                    <span class="font-mono font-black text-purple-700 dark:text-purple-300">
+                      {{ estudianteModalDetalle()?.comprobanteReprogramacion }}
+                    </span>
+                  </div>
+                }
+              </div>
+
+              <!-- Motivo / Justificación Forense -->
+              <div class="p-3.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 space-y-1">
+                <span class="text-[10px] uppercase font-bold text-amber-800 dark:text-amber-300 block">
+                  Motivo / Justificación Pericial Registrada
+                </span>
+                <p class="text-xs text-foreground font-medium leading-relaxed">
+                  {{ estudianteModalDetalle()?.motivoReprogramacion || estudianteModalDetalle()?.detalleAjusteManual || 'Sin justificación detallada registrada.' }}
+                </p>
+              </div>
+
+              <!-- Observaciones Adicionales -->
+              @if (estudianteModalDetalle()?.observacionReprogramacion) {
+                <div class="p-3.5 rounded-xl bg-muted/60 border border-border space-y-1">
+                  <span class="text-[10px] uppercase font-bold text-muted-foreground block">
+                    Observaciones Adicionales
+                  </span>
+                  <p class="text-xs text-muted-foreground">
+                    {{ estudianteModalDetalle()?.observacionReprogramacion }}
+                  </p>
+                </div>
+              }
+
+            </div>
+
+            <div class="bg-muted/30 border-t border-border p-4 flex justify-end">
+              <button 
+                (click)="cerrarModalEstudiante()"
+                class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
+                Cerrar Ficha
               </button>
             </div>
 
@@ -1121,7 +1534,7 @@ export class AuditoriaComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  // Control de Pestañas
+  // Control de Pestañas Principales
   public tabActual = signal<'toma-grupos' | 'bitacora'>('toma-grupos');
 
   // Bitácora de Accesos
@@ -1133,16 +1546,28 @@ export class AuditoriaComponent implements OnInit {
   public filtroNivel = signal<string>('TODOS');
   public registroSeleccionado = signal<AuditoriaGlobalItem | null>(null);
 
-  // Trazabilidad Forense de Toma de Grupos
-  public modoBusquedaToma = signal<'grupo' | 'estudiante'>('grupo');
+  // Peritaje de Calificaciones y Trazabilidad Forense
+  public modoBusquedaToma = signal<'evaluacion' | 'grupo' | 'estudiante'>('evaluacion');
   public cargandoForense = signal<boolean>(false);
   public descargandoExcel = signal<boolean>(false);
+  
+  // Búsqueda interactiva de evaluaciones
+  public buscandoEvaluaciones = signal<boolean>(false);
+  public criterioBusquedaEvaluacion = signal<string>('');
+  public filtroSedeEvaluacion = signal<string>('TODAS');
+  public listaEvaluaciones = signal<AuditoriaEvaluacionItem[]>([]);
+
+  // Búsqueda por Grupo y Estudiante
   public inputGrupoId = signal<string>('');
   public inputEstudianteCodigo = signal<string>('');
   public inputEstudianteGestion = signal<string>('2-2026');
   public reporteGrupo = signal<AuditoriaTomaGrupoReporte | null>(null);
   public reporteEstudiante = signal<AuditoriaEstudianteGlobal | null>(null);
-  public filtroDictamenEstudiantes = signal<string>('TODOS');
+  public filtroEstudiantesTabla = signal<string>('TODOS');
+
+  // Detalle de estudiante y timeline
+  public mostrarTimelineEvaluacion = signal<boolean>(false);
+  public estudianteModalDetalle = signal<AuditoriaTomaGrupoEstudiante | null>(null);
 
   public ngOnInit(): void {
     // Escuchar parámetros de consulta en la URL (permite navegación directa desde otros módulos)
@@ -1155,23 +1580,24 @@ export class AuditoriaComponent implements OnInit {
       if (tab === 'bitacora') {
         this.tabActual.set('bitacora');
         this.cargarAuditoria();
+      } else if (rolExamenId) {
+        this.tabActual.set('toma-grupos');
+        this.modoBusquedaToma.set('evaluacion');
+        this.consultarPorRol(rolExamenId);
       } else if (groupId) {
         this.tabActual.set('toma-grupos');
         this.modoBusquedaToma.set('grupo');
         this.inputGrupoId.set(groupId);
         this.buscarTomaGrupo();
-      } else if (rolExamenId) {
-        this.tabActual.set('toma-grupos');
-        this.modoBusquedaToma.set('grupo');
-        this.consultarPorRol(rolExamenId);
       } else if (studentCode) {
         this.tabActual.set('toma-grupos');
         this.modoBusquedaToma.set('estudiante');
         this.inputEstudianteCodigo.set(studentCode);
         this.buscarTomaEstudiante();
       } else {
-        // Carga por defecto
+        // Carga por defecto: buscar evaluaciones disponibles para auditar
         this.tabActual.set('toma-grupos');
+        this.buscarEvaluaciones();
       }
     });
   }
@@ -1180,12 +1606,73 @@ export class AuditoriaComponent implements OnInit {
     this.tabActual.set(tab);
     if (tab === 'bitacora' && this.items().length === 0) {
       this.cargarAuditoria();
+    } else if (tab === 'toma-grupos' && this.listaEvaluaciones().length === 0 && !this.reporteGrupo()) {
+      this.buscarEvaluaciones();
     }
   }
 
   // =========================================================================
-  // Métodos de Trazabilidad Forense de Toma de Grupos
+  // Métodos de Peritaje de Evaluaciones y Calificaciones
   // =========================================================================
+
+  public buscarEvaluaciones(): void {
+    this.buscandoEvaluaciones.set(true);
+    const crit = this.criterioBusquedaEvaluacion().trim() || undefined;
+    const sede = this.filtroSedeEvaluacion() !== 'TODAS' ? this.filtroSedeEvaluacion() : undefined;
+
+    this.auditoriaService.buscarEvaluaciones(crit, sede).subscribe({
+      next: (data) => {
+        this.listaEvaluaciones.set(data || []);
+        this.buscandoEvaluaciones.set(false);
+      },
+      error: (err) => {
+        console.error('Error al buscar evaluaciones para auditoría:', err);
+        this.buscandoEvaluaciones.set(false);
+      }
+    });
+  }
+
+  public limpiarBusquedaEvaluaciones(): void {
+    this.criterioBusquedaEvaluacion.set('');
+    this.filtroSedeEvaluacion.set('TODAS');
+    this.buscarEvaluaciones();
+  }
+
+  public seleccionarEvaluacion(ev: AuditoriaEvaluacionItem): void {
+    this.consultarPorRol(ev.rolExamenId);
+  }
+
+  public consultarPorRol(rolExamenId: string): void {
+    this.cargandoForense.set(true);
+    this.reporteGrupo.set(null);
+
+    this.auditoriaService.obtenerAuditoriaPorRol(rolExamenId).subscribe({
+      next: (data) => {
+        this.reporteGrupo.set(data);
+        this.inputGrupoId.set(data.groupId || '');
+        this.cargandoForense.set(false);
+        const anomalos = (data.totalReprogramados ?? 0) + (data.totalAjustados ?? 0) + (data.totalExtemporaneos ?? 0);
+        if (anomalos > 0) {
+          void this.feedback.mostrar(
+            `Auditoría cargada: Se identificaron ${data.totalReprogramados} reprogramaciones, ${data.totalAjustados} alteraciones y ${data.totalExtemporaneos} extemporáneos.`,
+            'Peritaje Forense Activo',
+            'warning'
+          );
+        } else {
+          void this.feedback.mostrar(
+            `Evaluación auditada: Todos los ${data.totalEstudiantes} estudiantes se encuentran regulares y calificados por OMR estándar.`,
+            'Conforme',
+            'success'
+          );
+        }
+      },
+      error: (err) => {
+        console.error('Error al consultar auditoría por rol:', err);
+        this.cargandoForense.set(false);
+        void this.feedback.mostrar('No se encontró el rol de examen solicitado.', 'Error', 'error');
+      }
+    });
+  }
 
   public buscarTomaGrupo(): void {
     const groupId = this.inputGrupoId().trim();
@@ -1197,20 +1684,20 @@ export class AuditoriaComponent implements OnInit {
     this.cargandoForense.set(true);
     this.reporteGrupo.set(null);
 
-    this.auditoriaService.obtenerAuditoriaTomaGrupo(groupId).subscribe({
+    this.auditoriaService.obtenerAuditoriaPorGrupo(groupId).subscribe({
       next: (data) => {
         this.reporteGrupo.set(data);
         this.cargandoForense.set(false);
-        const tardios = data.totalTardios + data.totalExtemporaneos;
-        if (tardios > 0) {
+        const anomalos = (data.totalReprogramados ?? 0) + (data.totalAjustados ?? 0) + (data.totalExtemporaneos ?? 0);
+        if (anomalos > 0) {
           void this.feedback.mostrar(
-            `Auditoría completada: Se identificaron ${tardios} estudiante(s) con registro posterior a la generación/impresión.`,
+            `Auditoría completada: Se identificaron ${data.totalReprogramados} reprogramaciones y ${data.totalAjustados} ajustes manuales.`,
             'Dictamen Forense Detectado',
             'warning'
           );
         } else {
           void this.feedback.mostrar(
-            `Nómina auditada: Todos los ${data.totalEstudiantes} estudiantes cuentan con registro oportuno previo al examen.`,
+            `Nómina auditada: Todos los ${data.totalEstudiantes} estudiantes cuentan con calificación y registro conforme.`,
             'Nómina Conforme',
             'success'
           );
@@ -1224,24 +1711,6 @@ export class AuditoriaComponent implements OnInit {
           'Error de Consulta',
           'error'
         );
-      }
-    });
-  }
-
-  public consultarPorRol(rolExamenId: string): void {
-    this.cargandoForense.set(true);
-    this.reporteGrupo.set(null);
-
-    this.auditoriaService.obtenerAuditoriaTomaRol(rolExamenId).subscribe({
-      next: (data) => {
-        this.reporteGrupo.set(data);
-        this.inputGrupoId.set(data.groupId || '');
-        this.cargandoForense.set(false);
-      },
-      error: (err) => {
-        console.error('Error al consultar auditoría por rol:', err);
-        this.cargandoForense.set(false);
-        void this.feedback.mostrar('No se encontró el rol de examen solicitado.', 'Error', 'error');
       }
     });
   }
@@ -1299,6 +1768,14 @@ export class AuditoriaComponent implements OnInit {
     this.reporteEstudiante.set(null);
   }
 
+  public abrirModalEstudiante(est: AuditoriaTomaGrupoEstudiante): void {
+    this.estudianteModalDetalle.set(est);
+  }
+
+  public cerrarModalEstudiante(): void {
+    this.estudianteModalDetalle.set(null);
+  }
+
   public descargarActaExcel(): void {
     const rep = this.reporteGrupo();
     if (!rep || !rep.groupId) {
@@ -1314,14 +1791,14 @@ export class AuditoriaComponent implements OnInit {
         const a = document.createElement('a');
         a.href = url;
         const materiaLimpia = (rep.materiaNombre || 'MATERIA').replace(/[^a-zA-Z0-9]/g, '_');
-        a.download = `DICTAMEN_FORENSE_GRUPO_${rep.groupId}_${materiaLimpia}.xlsx`;
+        a.download = `ACTA_FORENSE_CALIFICACIONES_${rep.groupId}_${materiaLimpia}.xlsx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
 
         void this.feedback.mostrar(
-          'Acta forense oficial descargada exitosamente en formato Excel institucional.',
+          'Acta forense oficial de calificaciones descargada en formato Excel institucional.',
           'Descarga Completa',
           'success'
         );
@@ -1332,6 +1809,53 @@ export class AuditoriaComponent implements OnInit {
         void this.feedback.mostrar('No se pudo descargar el archivo Excel del servidor.', 'Error', 'error');
       }
     });
+  }
+
+  public exportarTablaGrupoExcel(): void {
+    const rep = this.reporteGrupo();
+    if (!rep || !rep.estudiantes || rep.estudiantes.length === 0) {
+      void this.feedback.mostrar('No hay estudiantes para exportar.', 'Atención', 'warning');
+      return;
+    }
+
+    const lista = this.estudiantesGrupoFiltrados();
+    const datos = lista.map((e, idx) => ({
+      'N°': idx + 1,
+      'Código SIS': e.studentCode,
+      'Apellidos y Nombres': e.fullName,
+      'Estado Alumno': e.courseState,
+      'Nota / 100': e.notaSobre100 !== null && e.notaSobre100 !== undefined ? e.notaSobre100 : '—',
+      'Nota / 60': e.notaSobre60 !== null && e.notaSobre60 !== undefined ? e.notaSobre60 : '—',
+      'Estado Calificación': e.estadoCalificacion || 'PENDIENTE',
+      'Origen Calificación': this.obtenerTextoOrigen(e.origenCalificacion),
+      'Es Reprogramado': e.esReprogramado ? 'SÍ (ORAL)' : 'NO',
+      'Reprogramado Por': e.reprogramadoPor || '—',
+      'Fecha Reprogramación': this.formatearFechaHora(e.fechaReprogramacion),
+      'Motivo Reprogramación': e.motivoReprogramacion || '—',
+      'Comprobante Reprogramación': e.comprobanteReprogramacion || '—',
+      'Modificado Manualmente': e.modificadoManualmente ? 'SÍ' : 'NO',
+      'Procesado / Modificado Por': e.procesadoPor || '—',
+      'Fecha Procesamiento': this.formatearFechaHora(e.fechaProcesamiento),
+      'Detalle Ajuste Manual': e.detalleAjusteManual || '—',
+      'Variante Cartilla': e.letraVariante || '—',
+      'Dictamen Forense SEA': this.obtenerTextoEstadoForense(e.estadoForense),
+      'Fecha Registro SEA': this.formatearFechaHora(e.enrollCreatedAt),
+      'Fecha Modif. SEA': this.formatearFechaHora(e.enrollUpdatedAt),
+      'Diagnóstico Pericial': e.mensajeForense
+    }));
+
+    const hoja = XLSX.utils.json_to_sheet(datos);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Peritaje_Calificaciones');
+    const fechaStr = new Date().toISOString().slice(0, 10);
+    const materiaLimpia = (rep.materiaNombre || 'MATERIA').replace(/[^a-zA-Z0-9]/g, '_');
+    XLSX.writeFile(libro, `PERITAJE_CALIFICACIONES_${rep.groupId}_${materiaLimpia}_${fechaStr}.xlsx`);
+
+    void this.feedback.mostrar(
+      `Planilla de peritaje y calificaciones exportada exitosamente (${datos.length} alumnos).`,
+      'Exportación Completa',
+      'success'
+    );
   }
 
   public exportarEstudianteExcel(): void {
@@ -1350,10 +1874,12 @@ export class AuditoriaComponent implements OnInit {
       'Materia': m.materiaNombre || m.syllabusCourseId || '',
       'Grupo ID': m.groupId,
       'Docente': m.docenteNombre || '',
+      'Nota / 100': m.notaSobre100 !== null && m.notaSobre100 !== undefined ? m.notaSobre100 : '—',
+      'Nota / 60': m.notaSobre60 !== null && m.notaSobre60 !== undefined ? m.notaSobre60 : '—',
+      'Estado Calificación': m.estadoCalificacion || 'PENDIENTE',
+      'Origen Calificación': this.obtenerTextoOrigen(m.origenCalificacion),
       'Fecha Registro SEA': this.formatearFechaHora(m.enrollCreatedAt),
-      'Fecha Modificación SEA': this.formatearFechaHora(m.enrollUpdatedAt),
       'Fecha Generación Examen': this.formatearFechaHora(m.fechaGeneracionExamen),
-      'Fecha Impresión Examen': this.formatearFechaHora(m.fechaImpresionExamen),
       'Dictamen Forense': this.obtenerTextoEstadoForense(m.estadoForense),
       'Diagnóstico Pericial': m.mensajeForense,
       'Variante Cartilla': m.letraVariante || 'N/A'
@@ -1375,10 +1901,70 @@ export class AuditoriaComponent implements OnInit {
   public estudiantesGrupoFiltrados = computed(() => {
     const rep = this.reporteGrupo();
     if (!rep || !rep.estudiantes) return [];
-    const filtro = this.filtroDictamenEstudiantes();
-    if (filtro === 'TODOS') return rep.estudiantes;
-    return rep.estudiantes.filter(e => e.estadoForense === filtro);
+    const filtro = this.filtroEstudiantesTabla();
+
+    switch (filtro) {
+      case 'REPROGRAMADOS_MODIFICADOS':
+        return rep.estudiantes.filter(e => e.esReprogramado || e.modificadoManualmente);
+      case 'CALIFICADOS':
+        return rep.estudiantes.filter(e => e.notaSobre100 !== null && e.notaSobre100 !== undefined);
+      case 'APROBADOS':
+        return rep.estudiantes.filter(e => e.estadoCalificacion?.toUpperCase() === 'APROBADO');
+      case 'REPROBADOS':
+        return rep.estudiantes.filter(e => e.estadoCalificacion?.toUpperCase() === 'REPROBADO');
+      case 'EXTEMPORANEOS_TARDIOS':
+        return rep.estudiantes.filter(e => e.estadoForense === 'EXTEMPORANEO_POST_IMPRESION' || e.estadoForense === 'TOMA_TARDIA');
+      case 'PENDIENTES':
+        return rep.estudiantes.filter(e => e.notaSobre100 === null || e.notaSobre100 === undefined);
+      default:
+        return rep.estudiantes;
+    }
   });
+
+  public obtenerClaseBadgeOrigen(origen?: string): string {
+    switch (origen) {
+      case 'OMR_AUTOMATICO':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 font-bold';
+      case 'EXAMEN_ORAL_REPROGRAMADO':
+        return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800 font-black';
+      case 'AJUSTADO_MANUAL':
+        return 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950/60 dark:text-purple-200 dark:border-purple-800 font-black';
+      case 'DOCENTE_SIN_CARTILLA':
+        return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800 font-bold';
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+    }
+  }
+
+  public obtenerIconoOrigen(origen?: string): string {
+    switch (origen) {
+      case 'OMR_AUTOMATICO':
+        return 'pi pi-check-circle';
+      case 'EXAMEN_ORAL_REPROGRAMADO':
+        return 'pi pi-megaphone';
+      case 'AJUSTADO_MANUAL':
+        return 'pi pi-pencil';
+      case 'DOCENTE_SIN_CARTILLA':
+        return 'pi pi-file';
+      default:
+        return 'pi pi-clock';
+    }
+  }
+
+  public obtenerTextoOrigen(origen?: string): string {
+    switch (origen) {
+      case 'OMR_AUTOMATICO':
+        return 'OMR Automático';
+      case 'EXAMEN_ORAL_REPROGRAMADO':
+        return '🚨 Oral Reprog.';
+      case 'AJUSTADO_MANUAL':
+        return '⚠️ Ajuste Manual';
+      case 'DOCENTE_SIN_CARTILLA':
+        return 'Docente s/ Cartilla';
+      default:
+        return 'Pendiente';
+    }
+  }
 
   public obtenerClaseBadgeForense(estado: string): string {
     switch (estado) {
@@ -1503,7 +2089,7 @@ export class AuditoriaComponent implements OnInit {
     this.registroSeleccionado.set(null);
   }
 
-  public formatearFechaHora(fecha?: string): string {
+  public formatearFechaHora(fecha?: string | null): string {
     if (!fecha) return 'Fecha no disponible';
     const fechaNormalizada = fecha.includes('T') ? fecha : fecha.replace(' ', 'T');
     const tieneZona = fechaNormalizada.endsWith('Z') || /[+-]\d{2}(:\d{2})?$/.test(fechaNormalizada);
@@ -1521,12 +2107,12 @@ export class AuditoriaComponent implements OnInit {
     }).format(valor);
   }
 
-  public formatearSoloFecha(fecha?: string): string {
+  public formatearSoloFecha(fecha?: string | null): string {
     const completa = this.formatearFechaHora(fecha);
     return completa.split(',')[0] || completa;
   }
 
-  public formatearSoloHora(fecha?: string): string {
+  public formatearSoloHora(fecha?: string | null): string {
     const completa = this.formatearFechaHora(fecha);
     const partes = completa.split(',');
     return partes[1] ? partes[1].trim() : '';

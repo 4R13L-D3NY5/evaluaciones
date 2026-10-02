@@ -127,8 +127,18 @@ public class AuditoriaService {
                 || (item.getDetallesJson() != null && item.getDetallesJson().toLowerCase().contains(q));
     }
 
-    private AuditoriaGlobalItemDto mapearEvaluacion(AuditoriaEvaluacion a) {
-        RolExamen rol = a.getRolExamen();
+    public AuditoriaGlobalItemDto mapearEvaluacion(AuditoriaEvaluacion a) {
+        return mapearEvaluacion(a, null);
+    }
+
+    public AuditoriaGlobalItemDto mapearEvaluacion(AuditoriaEvaluacion a, RolExamen rolFallback) {
+        RolExamen rol = null;
+        try {
+            rol = a.getRolExamen();
+        } catch (Exception ignored) {}
+        if (rol == null) {
+            rol = rolFallback;
+        }
         String campus = "";
         String materiaInfo = "";
         if (rol != null) {
