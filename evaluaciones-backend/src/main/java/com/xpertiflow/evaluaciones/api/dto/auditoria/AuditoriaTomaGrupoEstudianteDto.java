@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 @Data
@@ -41,4 +43,20 @@ public class AuditoriaTomaGrupoEstudianteDto {
     private String nivelAlerta;   // SUCCESS, WARNING, DANGER, INFO
     private String mensajeForense;
     private Long diferenciaMinutosConGeneracion;
+
+    // Peritaje de Calificaciones, Alteraciones de Notas y Reprogramaciones
+    private BigDecimal notaSobre100;
+    private BigDecimal notaSobre60;
+    private String estadoCalificacion; // APROBADO, REPROBADO, AUSENTE, PENDIENTE
+    private String origenCalificacion; // OMR_AUTOMATICO, EXAMEN_ORAL_REPROGRAMADO, AJUSTADO_MANUAL, DOCENTE_SIN_CARTILLA, PENDIENTE
+    private Boolean esReprogramado;
+    private String reprogramadoPor;
+    private LocalDateTime fechaReprogramacion;
+    private String motivoReprogramacion;
+    private String comprobanteReprogramacion;
+    private String observacionReprogramacion;
+    private String procesadoPor;
+    private LocalDateTime fechaProcesamiento;
+    private Boolean modificadoManualmente;
+    private String detalleAjusteManual;
 }

@@ -1,6 +1,7 @@
 package com.xpertiflow.evaluaciones.api.controller;
 
 import com.xpertiflow.evaluaciones.api.dto.auditoria.AuditoriaEstudianteGlobalDto;
+import com.xpertiflow.evaluaciones.api.dto.auditoria.AuditoriaEvaluacionItemDto;
 import com.xpertiflow.evaluaciones.api.dto.auditoria.AuditoriaTomaGrupoReporteDto;
 import com.xpertiflow.evaluaciones.application.AuditoriaTomaGruposService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -23,6 +25,16 @@ import java.io.IOException;
 public class AuditoriaTomaGruposController {
 
     private final AuditoriaTomaGruposService auditoriaTomaGruposService;
+
+    @GetMapping("/buscar-evaluaciones")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @Operation(summary = "Buscar evaluaciones para auditoría forense y peritaje de calificaciones")
+    public ResponseEntity<List<AuditoriaEvaluacionItemDto>> buscarEvaluaciones(
+            @RequestParam(required = false) String criterio,
+            @RequestParam(required = false) String sede,
+            @RequestParam(required = false) String carrera) {
+        return ResponseEntity.ok(auditoriaTomaGruposService.buscarEvaluaciones(criterio, sede, carrera));
+    }
 
     @GetMapping("/grupo")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")

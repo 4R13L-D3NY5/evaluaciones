@@ -11,9 +11,24 @@ import { OmrLecturaResponse, OmrProcesamientoService } from '../../core/services
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
+import { 
+  ReportesService, 
+  ReporteCalidadResumen, 
+  ReporteCalidadItem, 
+  ReporteCoberturaBancosResumen, 
+  ReporteCoberturaBancosItem, 
+  ReporteConsolidadoOmrResumen, 
+  ReporteConsolidadoOmrItem 
+} from '../../core/services/reportes.service';
 import * as XLSX from 'xlsx';
 
-type TipoReporte = 'REPORTE_EVALUACIONES' | 'PLANILLA_RECEPCION' | 'COBERTURA_BANCOS' | 'CONSOLIDADO_OMR' | 'AUDITORIA_TRAZABILIDAD' | 'CONCILIACION_REMARK';
+type TipoReporte = 
+  | 'REPORTE_EVALUACIONES' 
+  | 'CALIDAD_VERIFICACION' 
+  | 'COBERTURA_BANCOS' 
+  | 'CONSOLIDADO_OMR' 
+  | 'PLANILLA_RECEPCION' 
+  | 'CONCILIACION_REMARK';
 
 type EstadoConciliacion = 'COINCIDE' | 'DIFERENCIA_RESPUESTAS' | 'SOLO_REMARK' | 'SOLO_SISTEMA';
 
@@ -46,34 +61,43 @@ interface FilaRemark {
   template: `
     <div class="space-y-6 animate-fade-in pb-12">
       
-      <!-- 1. CABECERA PRINCIPAL DEL MÓDULO DE REPORTES (referencia SIDOPA) -->
+      <!-- 1. CABECERA PRINCIPAL DEL MÓDULO DE REPORTES -->
       <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div class="space-y-1">
           <div class="flex items-center gap-3">
-            <div class="h-11 w-11 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center border border-purple-200">
+            <div class="h-11 w-11 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 flex items-center justify-center border border-purple-200 dark:border-purple-800">
               <i class="pi pi-clipboard text-xl"></i>
             </div>
             <div>
-              <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight">Reporte Evaluaciones</h1>
-              <p class="text-xs text-muted-foreground font-medium">Seguimiento institucional de evaluaciones programadas y su flujo operativo.</p>
+              <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight">Reportes y Control de Calidad</h1>
+              <p class="text-xs text-muted-foreground font-medium">Auditoría institucional, control de calidad de bancos, seguimiento operativo y rendimiento OMR.</p>
             </div>
           </div>
         </div>
 
         <!-- Botones de Acción Global -->
         <div class="flex flex-wrap items-center gap-3">
-          <button (click)="actualizarReportePrincipal()" [disabled]="cargandoReporte()" class="bg-card hover:bg-muted border border-border text-foreground font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50">
-            <i class="pi" [class.pi-refresh]="!cargandoReporte()" [class.pi-spin]="cargandoReporte()" [class.pi-spinner]="cargandoReporte()"></i>
+          <button 
+            type="button"
+            (click)="actualizarReportePrincipal()" 
+            [disabled]="cargandoReporte() || cargandoCalidad() || cargandoCobertura() || cargandoConsolidado()" 
+            class="bg-card hover:bg-muted border border-border text-foreground font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50">
+            <i class="pi" 
+               [class.pi-refresh]="!(cargandoReporte() || cargandoCalidad() || cargandoCobertura() || cargandoConsolidado())" 
+               [class.pi-spin]="cargandoReporte() || cargandoCalidad() || cargandoCobertura() || cargandoConsolidado()" 
+               [class.pi-spinner]="cargandoReporte() || cargandoCalidad() || cargandoCobertura() || cargandoConsolidado()"></i>
             <span>Actualizar reporte</span>
           </button>
           <button 
+            type="button"
             (click)="exportarReportePrincipal()"
             [disabled]="tipoReporteActivo() === 'CONCILIACION_REMARK' && !resultadosConciliacion().length"
             class="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-            <i class="pi pi-download text-sm"></i>
-            <span>Exportar PDF</span>
+            <i class="pi" [class.pi-file-excel]="tipoReporteActivo() !== 'REPORTE_EVALUACIONES'" [class.pi-download]="tipoReporteActivo() === 'REPORTE_EVALUACIONES'"></i>
+            <span>{{ tipoReporteActivo() === 'REPORTE_EVALUACIONES' ? 'Exportar PDF' : 'Exportar Excel' }}</span>
           </button>
           <button 
+            type="button"
             (click)="imprimirReporte()" 
             class="bg-card hover:bg-muted border border-border text-foreground font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs cursor-pointer">
             <i class="pi pi-print text-sm"></i>
@@ -82,43 +106,69 @@ interface FilaRemark {
         </div>
       </div>
 
-      <!-- 2. El reporte principal sigue el patrón de SIDOPA; los demás quedan pendientes. -->
+      <!-- 2. PESTAÑAS DE NAVEGACIÓN DE REPORTES -->
       <div class="flex flex-wrap items-center gap-2 border-b border-border pb-3">
         <button
-          (click)="tipoReporteActivo.set('REPORTE_EVALUACIONES')"
+          type="button"
+          (click)="cambiarPestana('REPORTE_EVALUACIONES')"
           [class]="tipoReporteActivo() === 'REPORTE_EVALUACIONES' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
           class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
           <i class="pi pi-chart-bar"></i>
-          <span>Reporte de evaluaciones</span>
+          <span>1. Seguimiento operativo</span>
         </button>
-        <span class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 bg-muted text-muted-foreground font-bold"><i class="pi pi-clock"></i> Cobertura de bancos · Pendiente</span>
-        <span class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 bg-muted text-muted-foreground font-bold"><i class="pi pi-clock"></i> Consolidado OMR · Pendiente</span>
-        <span class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 bg-muted text-muted-foreground font-bold"><i class="pi pi-clock"></i> Auditoría · Pendiente</span>
+
+        <button
+          type="button"
+          (click)="cambiarPestana('CALIDAD_VERIFICACION')"
+          [class]="tipoReporteActivo() === 'CALIDAD_VERIFICACION' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
+          class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
+          <i class="pi pi-verified"></i>
+          <span>2. Control de Calidad</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="cambiarPestana('COBERTURA_BANCOS')"
+          [class]="tipoReporteActivo() === 'COBERTURA_BANCOS' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
+          class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
+          <i class="pi pi-database"></i>
+          <span>3. Cobertura de bancos</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="cambiarPestana('CONSOLIDADO_OMR')"
+          [class]="tipoReporteActivo() === 'CONSOLIDADO_OMR' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
+          class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
+          <i class="pi pi-check-square"></i>
+          <span>4. Consolidado OMR</span>
+        </button>
 
         @if (puedeConciliarRemark()) {
           <button
-          (click)="abrirConciliacionRemark()"
-          [class]="tipoReporteActivo() === 'CONCILIACION_REMARK' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
-          class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
-          <i class="pi pi-sync"></i>
-          <span>5. Conciliación Remark vs. OMR</span>
+            type="button"
+            (click)="abrirConciliacionRemark()"
+            [class]="tipoReporteActivo() === 'CONCILIACION_REMARK' ? 'bg-primary text-white shadow-xs font-black' : 'bg-card text-muted-foreground hover:text-foreground border border-border font-bold'"
+            class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all cursor-pointer">
+            <i class="pi pi-sync"></i>
+            <span>5. Conciliación Remark vs. OMR</span>
           </button>
         }
       </div>
 
-      <!-- 3. BARRA DE FILTROS ESPECÍFICOS SEGÚN EL REPORTE -->
+      <!-- 3. BARRA DE FILTROS GLOBALES -->
       <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-4">
-          
           <div class="flex flex-wrap items-center gap-3">
             <div class="space-y-1">
-              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Alcance:</label>
-              <select [ngModel]="filtroAlcance" (ngModelChange)="filtroAlcance = $event" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer"><option value="nacional">Nacional</option><option value="sede">Por sede</option><option value="carrera">Por carrera</option></select>
-            </div>
-            <div class="space-y-1">
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Gestión:</label>
-              <select [ngModel]="storage.gestionActiva()" (ngModelChange)="storage.setGestionActiva($event)" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer"><option value="II-2026">II-2026 (Activa)</option><option value="I-2026">I-2026</option><option value="II-2025">II-2025</option></select>
+              <select [ngModel]="storage.gestionActiva()" (ngModelChange)="storage.setGestionActiva($event)" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
+                <option value="II-2026">II-2026 (Activa)</option>
+                <option value="I-2026">I-2026</option>
+                <option value="II-2025">II-2025</option>
+              </select>
             </div>
+
             <!-- Filtro de Sede -->
             <div class="space-y-1">
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Sede / Campus:</label>
@@ -149,65 +199,69 @@ interface FilaRemark {
               </select>
             </div>
 
-            <!-- Filtro de Modalidad (Con/Sin Cartilla) -->
-            <div class="space-y-1">
-              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Modalidad:</label>
-              <select 
-                [ngModel]="filtroModalidad"
-                (ngModelChange)="filtroModalidad = $event; refrescarFiltros()"
-                class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
-                <option value="Todos">Todas las Modalidades</option>
-                <option value="CON_CARTILLA">Solo Con Cartilla</option>
-                <option value="SIN_CARTILLA">Solo Sin Cartilla</option>
-              </select>
-            </div>
-
-            <!-- Filtro de Fecha -->
-            <div class="space-y-1">
-              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Fecha de Evaluación:</label>
-              <input 
-                type="text" 
-                [ngModel]="filtroFecha"
-                (ngModelChange)="filtroFecha = $event; refrescarFiltros()"
-                placeholder="Ej. 08/06/2026 o vacio para todas"
-                class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none placeholder:text-muted-foreground/60 w-44" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Desde:</label>
-              <input type="date" [ngModel]="filtroFechaInicio" (ngModelChange)="filtroFechaInicio = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none" />
-            </div>
-            <div class="space-y-1">
-              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Hasta:</label>
-              <input type="date" [ngModel]="filtroFechaFin" (ngModelChange)="filtroFechaFin = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none" />
-            </div>
-
+            <!-- Filtro de Parcial -->
             <div class="space-y-1">
               <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Parcial:</label>
               <select [ngModel]="filtroParcial" (ngModelChange)="filtroParcial = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
-                <option value="Todos">Todos los parciales</option><option value="1er Parcial">1er Parcial</option><option value="2do Parcial">2do Parcial</option><option value="Final">Final</option><option value="2da Instancia">2da Instancia</option>
+                <option value="Todos">Todos los parciales</option>
+                <option value="1er Parcial">1er Parcial</option>
+                <option value="2do Parcial">2do Parcial</option>
+                <option value="Final">Final</option>
+                <option value="2da Instancia">2da Instancia</option>
               </select>
             </div>
 
-            <div class="space-y-1">
-              <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Estado:</label>
-              <select [ngModel]="filtroEstadoReporte" (ngModelChange)="filtroEstadoReporte = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
-                <option value="Todos">Todos los estados</option><option value="PROGRAMADO">Programado</option><option value="VALIDADO">Validado</option><option value="GENERADO">Generado</option><option value="IMPRESO">Impreso</option><option value="ENTREGADO">Entregado</option><option value="DEVUELTO">Devuelto</option><option value="CALIFICADO">Calificado</option><option value="CONFIRMADO">Confirmado</option>
-              </select>
-            </div>
+            @if (tipoReporteActivo() === 'REPORTE_EVALUACIONES') {
+              <!-- Filtro de Modalidad -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Modalidad:</label>
+                <select 
+                  [ngModel]="filtroModalidad"
+                  (ngModelChange)="filtroModalidad = $event; refrescarFiltros()"
+                  class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
+                  <option value="Todos">Todas las Modalidades</option>
+                  <option value="CON_CARTILLA">Solo Con Cartilla</option>
+                  <option value="SIN_CARTILLA">Solo Sin Cartilla</option>
+                </select>
+              </div>
+
+              <!-- Filtro de Estado Operativo -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Estado flujo:</label>
+                <select [ngModel]="filtroEstadoReporte" (ngModelChange)="filtroEstadoReporte = $event; refrescarFiltros()" class="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground outline-none cursor-pointer">
+                  <option value="Todos">Todos los estados</option>
+                  <option value="PROGRAMADO">Programado</option>
+                  <option value="VALIDADO">Validado</option>
+                  <option value="GENERADO">Generado</option>
+                  <option value="IMPRESO">Impreso</option>
+                  <option value="ENTREGADO">Entregado</option>
+                  <option value="DEVUELTO">Devuelto</option>
+                  <option value="CALIFICADO">Calificado</option>
+                  <option value="CONFIRMADO">Confirmado</option>
+                </select>
+              </div>
+            }
           </div>
 
           <!-- Resumen Rápido de Registros -->
           <div class="text-right">
-            <span class="text-xs text-muted-foreground font-medium">Registros Encontrados:</span>
+            <span class="text-xs text-muted-foreground font-medium">Registros Visibles:</span>
             <div class="text-xl font-black text-foreground font-mono">
-              {{ datosFiltrados().length }}
+              @if (tipoReporteActivo() === 'CALIDAD_VERIFICACION') {
+                {{ itemsCalidadFiltrados().length }}
+              } @else if (tipoReporteActivo() === 'COBERTURA_BANCOS') {
+                {{ itemsCoberturaFiltrados().length }}
+              } @else if (tipoReporteActivo() === 'CONSOLIDADO_OMR') {
+                {{ itemsConsolidadoFiltrados().length }}
+              } @else {
+                {{ rolesReporteFiltrados().length }}
+              }
             </div>
           </div>
-
         </div>
       </div>
 
+      <!-- ALERTA DE ALCANCE ACADÉMICO -->
       @if (esConsultaAcademica() && !cargandoSedes() && sedes().length === 0) {
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-sm text-amber-900 shadow-xs">
           <i class="pi pi-lock mt-0.5"></i>
@@ -216,16 +270,671 @@ interface FilaRemark {
             <p class="text-xs mt-1">Solicita al administrador que registre las sedes correspondientes bajo tu alcance institucional.</p>
           </div>
         </div>
-      } @else if (esConsultaAcademica() && !cargandoCarreras() && filtroSede && carreras().length === 0) {
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-sm text-amber-900 shadow-xs">
-          <i class="pi pi-lock mt-0.5"></i>
-          <div>
-            <p class="font-black">No hay carreras disponibles para la sede seleccionada</p>
-            <p class="text-xs mt-1">Verifica que la sede esté publicada correctamente en el catálogo académico oficial.</p>
+      }
+
+      <!-- ========================================================================= -->
+      <!-- PESTAÑA 2: CONTROL DE CALIDAD Y OBSERVACIONES DE VERIFICACIÓN (REPORTE CALIDAD) -->
+      <!-- ========================================================================= -->
+      @if (tipoReporteActivo() === 'CALIDAD_VERIFICACION') {
+        <section class="space-y-4 print-area">
+          @if (errorCalidad()) {
+            <div class="rounded-xl border border-rose-200 bg-rose-50 text-rose-800 p-4 text-sm flex items-center gap-2">
+              <i class="pi pi-exclamation-triangle"></i>{{ errorCalidad() }}
+            </div>
+          }
+
+          <!-- Tarjetas KPI -->
+          <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+            <!-- Total Evaluadas -->
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-muted-foreground font-black">Total Evaluadas</span>
+              <strong class="block text-2xl font-black text-foreground mt-2">{{ resumenCalidad().totalExamenes }}</strong>
+              <span class="text-[11px] text-muted-foreground">exámenes en alcance</span>
+            </div>
+            
+            <!-- Aprobados Directos -->
+            <div class="bg-card border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/20 rounded-2xl p-4 shadow-2xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-black">Aprobados Directos</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  {{ resumenCalidad().porcentajeAprobadosDirectos }}%
+                </span>
+              </div>
+              <strong class="block text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-2">{{ resumenCalidad().aprobadosDirectos }}</strong>
+              <span class="text-[11px] text-muted-foreground">sin observaciones</span>
+            </div>
+
+            <!-- Observados y Aprobados -->
+            <div class="bg-card border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/20 rounded-2xl p-4 shadow-2xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 font-black">Observados & Aprobados</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                  {{ resumenCalidad().porcentajeObservados }}%
+                </span>
+              </div>
+              <strong class="block text-2xl font-black text-amber-700 dark:text-amber-400 mt-2">{{ resumenCalidad().observadosYLuegoAprobados }}</strong>
+              <span class="text-[11px] text-muted-foreground">corregidos y validados</span>
+            </div>
+
+            <!-- Observados Pendientes -->
+            <div class="bg-card border border-rose-200/60 dark:border-rose-800/40 bg-rose-50/20 rounded-2xl p-4 shadow-2xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] uppercase tracking-wider text-rose-700 dark:text-rose-400 font-black">Observados Pendientes</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">Alerta</span>
+              </div>
+              <strong class="block text-2xl font-black text-rose-700 dark:text-rose-400 mt-2">{{ resumenCalidad().observadosPendientes }}</strong>
+              <span class="text-[11px] text-muted-foreground">requieren corrección</span>
+            </div>
+
+            <!-- Pendientes de Revisión -->
+            <div class="bg-card border border-blue-200/60 dark:border-blue-800/40 bg-blue-50/20 rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-blue-700 dark:text-blue-400 font-black">Pendientes Revisión</span>
+              <strong class="block text-2xl font-black text-blue-700 dark:text-blue-400 mt-2">{{ resumenCalidad().pendientesRevision }}</strong>
+              <span class="text-[11px] text-muted-foreground">en cola de verificación</span>
+            </div>
+
+            <!-- Sin Banco de Preguntas -->
+            <div class="bg-card border border-orange-200/60 dark:border-orange-800/40 bg-orange-50/20 rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-orange-700 dark:text-orange-400 font-black">Sin Banco</span>
+              <strong class="block text-2xl font-black text-orange-700 dark:text-orange-400 mt-2">{{ resumenCalidad().sinBanco }}</strong>
+              <span class="text-[11px] text-muted-foreground">sin preguntas cargadas</span>
+            </div>
+          </div>
+
+          <!-- Filtros Rápidos por Estado de Calidad y Buscador -->
+          <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-[10px] font-black uppercase text-muted-foreground mr-1">Dictamen:</span>
+              <button
+                type="button"
+                (click)="filtrarCalidadEstado('TODOS')"
+                [class]="filtroCalidadEstado === 'TODOS' ? 'bg-primary text-white shadow-xs font-black' : 'bg-muted text-muted-foreground hover:text-foreground font-bold'"
+                class="px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer">
+                Todos ({{ resumenCalidad().totalExamenes }})
+              </button>
+              <button
+                type="button"
+                (click)="filtrarCalidadEstado('APROBADO_DIRECTO')"
+                [class]="filtroCalidadEstado === 'APROBADO_DIRECTO' ? 'bg-emerald-600 text-white shadow-xs font-black' : 'bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold'"
+                class="px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5">
+                <span>🟢 Aprobados Directos ({{ resumenCalidad().aprobadosDirectos }})</span>
+              </button>
+              <button
+                type="button"
+                (click)="filtrarCalidadEstado('OBSERVADO_Y_APROBADO')"
+                [class]="filtroCalidadEstado === 'OBSERVADO_Y_APROBADO' ? 'bg-amber-600 text-white shadow-xs font-black' : 'bg-amber-50 text-amber-800 border border-amber-200 font-bold'"
+                class="px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5">
+                <span>🟡 Observados y Aprobados ({{ resumenCalidad().observadosYLuegoAprobados }})</span>
+              </button>
+              <button
+                type="button"
+                (click)="filtrarCalidadEstado('OBSERVADO_PENDIENTE')"
+                [class]="filtroCalidadEstado === 'OBSERVADO_PENDIENTE' ? 'bg-rose-600 text-white shadow-xs font-black' : 'bg-rose-50 text-rose-800 border border-rose-200 font-bold'"
+                class="px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5">
+                <span>🔴 Observados Pendientes ({{ resumenCalidad().observadosPendientes }})</span>
+              </button>
+              <button
+                type="button"
+                (click)="filtrarCalidadEstado('PENDIENTE_REVISION')"
+                [class]="filtroCalidadEstado === 'PENDIENTE_REVISION' ? 'bg-blue-600 text-white shadow-xs font-black' : 'bg-blue-50 text-blue-800 border border-blue-200 font-bold'"
+                class="px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5">
+                <span>⏳ Pendientes de Revisión ({{ resumenCalidad().pendientesRevision }})</span>
+              </button>
+              <button
+                type="button"
+                (click)="filtrarCalidadEstado('SIN_BANCO')"
+                [class]="filtroCalidadEstado === 'SIN_BANCO' ? 'bg-orange-600 text-white shadow-xs font-black' : 'bg-orange-50 text-orange-800 border border-orange-200 font-bold'"
+                class="px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5">
+                <span>⚠️ Sin Banco ({{ resumenCalidad().sinBanco }})</span>
+              </button>
+            </div>
+
+            <!-- Buscador y Exportar Excel -->
+            <div class="flex items-center gap-2">
+              <div class="relative">
+                <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
+                <input
+                  type="text"
+                  [(ngModel)]="busquedaCalidad"
+                  placeholder="Buscar materia, docente, código, grupo..."
+                  class="bg-muted border border-border rounded-xl pl-8 pr-3 py-2 text-xs outline-none w-64 focus:border-primary" />
+              </div>
+              <button
+                type="button"
+                (click)="exportarCalidadExcel()"
+                [disabled]="!itemsCalidadFiltrados().length"
+                class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-40 shadow-xs">
+                <i class="pi pi-file-excel"></i>
+                <span>Exportar Excel</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabla de Calidad de Verificación -->
+          <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden">
+            <div class="p-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-black text-foreground">Sábana de Control de Calidad de Exámenes</h3>
+                <p class="text-xs text-muted-foreground mt-0.5">Auditoría retroactiva del flujo de verificación y observaciones por docente.</p>
+              </div>
+              <span class="text-xs font-mono font-bold text-muted-foreground">
+                {{ itemsCalidadFiltrados().length }} registros mostrados
+              </span>
+            </div>
+
+            @if (cargandoCalidad()) {
+              <div class="p-12 text-center text-sm text-muted-foreground">
+                <i class="pi pi-spinner pi-spin mr-2 text-primary"></i>Cargando control de calidad...
+              </div>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                      <th class="p-3">Materia / Grupo</th>
+                      <th class="p-3">Docente Titular</th>
+                      <th class="p-3">Sede / Carrera</th>
+                      <th class="p-3">Parcial / Fecha</th>
+                      <th class="p-3 text-center">Dictamen de Calidad</th>
+                      <th class="p-3 text-center">Observaciones</th>
+                      <th class="p-3 text-center">Aprobación / Verificación</th>
+                      <th class="p-3 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    @for (item of itemsCalidadFiltrados(); track item.rolExamenId) {
+                      <tr class="hover:bg-muted/30 transition-colors">
+                        <td class="p-3">
+                          <span class="font-mono text-primary font-black">{{ item.materiaCodigo }}</span>
+                          <div class="font-bold text-foreground leading-tight">{{ item.materiaNombre }}</div>
+                          <span class="text-[10px] text-muted-foreground font-semibold">Grupo {{ item.grupo }}</span>
+                        </td>
+                        <td class="p-3">
+                          <div class="font-medium text-foreground uppercase">{{ item.docenteNombre || 'Por asignar' }}</div>
+                          <span class="text-[10px] text-muted-foreground font-mono">{{ item.docenteCi ? 'CI: ' + item.docenteCi : 'Sin CI' }}</span>
+                        </td>
+                        <td class="p-3">
+                          <div class="font-bold text-foreground">{{ item.sedeNombre }}</div>
+                          <span class="text-[10px] text-muted-foreground">{{ item.carreraNombre }}</span>
+                        </td>
+                        <td class="p-3 whitespace-nowrap">
+                          <div class="font-bold text-foreground">{{ item.tipoParcial }}</div>
+                          <span class="text-[10px] text-muted-foreground font-mono block">{{ item.fechaExamen }} {{ item.horaExamen || '' }}</span>
+                        </td>
+                        <td class="p-3 text-center">
+                          <span [class]="obtenerClaseDictamen(item.estadoCalidad)" class="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase inline-flex items-center gap-1 border">
+                            {{ obtenerEtiquetaDictamen(item.estadoCalidad) }}
+                          </span>
+                        </td>
+                        <td class="p-3 text-center">
+                          @if (item.totalObservaciones > 0) {
+                            <span class="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg text-[10px] font-black inline-flex items-center gap-1">
+                              <i class="pi pi-history text-[9px]"></i>
+                              {{ item.totalObservaciones }} {{ item.totalObservaciones === 1 ? 'observación' : 'observaciones' }}
+                            </span>
+                          } @else {
+                            <span class="text-muted-foreground text-[10px] font-mono">0 observaciones</span>
+                          }
+                        </td>
+                        <td class="p-3 text-center">
+                          @if (item.aprobadoPor) {
+                            <div class="text-[11px] font-bold text-foreground truncate max-w-40">{{ item.aprobadoPor }}</div>
+                            <span class="text-[9.5px] text-muted-foreground font-mono block">{{ formatearFechaBoliviana(item.fechaAprobacion) }}</span>
+                          } @else if (item.ultimoVerificador) {
+                            <div class="text-[11px] font-medium text-foreground truncate max-w-40">{{ item.ultimoVerificador }}</div>
+                            <span class="text-[9.5px] text-muted-foreground font-mono block">{{ formatearFechaBoliviana(item.ultimaObservacionFecha) }}</span>
+                          } @else {
+                            <span class="text-muted-foreground text-[10px] font-mono">Sin verificación</span>
+                          }
+                        </td>
+                        <td class="p-3 text-center">
+                          @if (item.observaciones && item.observaciones.length > 0) {
+                            <button
+                              type="button"
+                              (click)="abrirModalObservaciones(item)"
+                              title="Ver observaciones previas"
+                              class="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-black inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs">
+                              <i class="pi pi-comments"></i>
+                              <span>Ver historial</span>
+                            </button>
+                          } @else {
+                            <span class="text-muted-foreground/60 text-[10px]">—</span>
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="8" class="p-12 text-center text-sm text-muted-foreground">
+                          No existen registros de exámenes para los filtros seleccionados.
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- MODAL DETALLADO DE OBSERVACIONES Y TIMELINE -->
+      @if (itemCalidadSeleccionado(); as item) {
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-3xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-border bg-purple-50/60 dark:bg-purple-950/20 flex items-start justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-lg bg-primary/10 text-primary font-mono font-black text-xs">{{ item.materiaCodigo }}</span>
+                  <h3 class="text-sm font-black text-foreground">{{ item.materiaNombre }} (Grupo {{ item.grupo }})</h3>
+                </div>
+                <p class="text-xs text-muted-foreground mt-1">
+                  Docente: <strong class="text-foreground">{{ item.docenteNombre }}</strong> · {{ item.sedeNombre }} · {{ item.carreraNombre }}
+                </p>
+              </div>
+              <button
+                type="button"
+                (click)="cerrarModalObservaciones()"
+                class="text-muted-foreground hover:text-foreground cursor-pointer p-1">
+                <i class="pi pi-times text-lg"></i>
+              </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-border">
+                <h4 class="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                  <i class="pi pi-history text-purple-700"></i>
+                  <span>Línea de Tiempo de Devoluciones ({{ item.observaciones.length }})</span>
+                </h4>
+                <span [class]="obtenerClaseDictamen(item.estadoCalidad)" class="px-2 py-0.5 rounded-lg text-[10px] font-black border">
+                  {{ obtenerEtiquetaDictamen(item.estadoCalidad) }}
+                </span>
+              </div>
+
+              <!-- Lista cronológica de devoluciones -->
+              <div class="space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-purple-200">
+                @for (obs of item.observaciones; track obs.devolucionId; let i = $index) {
+                  <div class="relative flex items-start gap-3 pl-1">
+                    <div class="h-6 w-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 z-10 shadow-xs">
+                      {{ item.observaciones.length - i }}
+                    </div>
+                    <div class="flex-1 bg-muted/40 border border-border rounded-xl p-4 space-y-3">
+                      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
+                        <div>
+                          <span class="text-[10px] font-black uppercase text-purple-700">Devolución #{{ item.observaciones.length - i }}</span>
+                          <div class="text-xs font-bold text-foreground">
+                            Verificado por: {{ obs.verificadoPor || 'Verificador oficial' }}
+                          </div>
+                        </div>
+                        <span class="text-[11px] font-mono font-bold text-muted-foreground bg-card px-2.5 py-1 rounded-lg border border-border">
+                          <i class="pi pi-calendar mr-1 text-[10px]"></i>
+                          {{ formatearFechaBoliviana(obs.fechaDevolucion) }}
+                        </span>
+                      </div>
+
+                      @if (obs.observacionesGenerales) {
+                        <div>
+                          <span class="text-[10px] font-extrabold uppercase text-muted-foreground block mb-1">Motivo general de la observación:</span>
+                          <p class="text-xs text-foreground bg-card border border-border/70 rounded-lg p-2.5 leading-relaxed font-medium">
+                            {{ obs.observacionesGenerales }}
+                          </p>
+                        </div>
+                      }
+
+                      @if (parsearPreguntasObservadas(obs.observacionesPreguntasJson); as preguntas) {
+                        @if (preguntas.length > 0) {
+                          <div>
+                            <span class="text-[10px] font-extrabold uppercase text-muted-foreground block mb-1.5">
+                              Preguntas observadas en detalle ({{ preguntas.length }}):
+                            </span>
+                            <div class="grid grid-cols-1 gap-2">
+                              @for (p of preguntas; track p.numero) {
+                                <div class="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-lg p-2.5 flex items-start gap-2.5">
+                                  <span class="px-2 py-0.5 rounded bg-rose-600 text-white font-black font-mono text-[10px] shrink-0 mt-0.5">
+                                    P{{ p.numero }}
+                                  </span>
+                                  <p class="text-xs text-rose-900 dark:text-rose-200 font-medium leading-relaxed">
+                                    {{ p.motivo }}
+                                  </p>
+                                </div>
+                              }
+                            </div>
+                          </div>
+                        }
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="p-4 border-t border-border flex justify-end">
+              <button
+                type="button"
+                (click)="cerrarModalObservaciones()"
+                class="px-4 py-2 rounded-xl bg-muted hover:bg-border text-xs font-bold text-foreground cursor-pointer">
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       }
 
+      <!-- ========================================================================= -->
+      <!-- PESTAÑA 3: COBERTURA Y VALIDACIÓN DE BANCOS DE PREGUNTAS -->
+      <!-- ========================================================================= -->
+      @if (tipoReporteActivo() === 'COBERTURA_BANCOS') {
+        <section class="space-y-4 print-area">
+          @if (errorCobertura()) {
+            <div class="rounded-xl border border-rose-200 bg-rose-50 text-rose-800 p-4 text-sm flex items-center gap-2">
+              <i class="pi pi-exclamation-triangle"></i>{{ errorCobertura() }}
+            </div>
+          }
+
+          <!-- Tarjetas KPI Cobertura -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-muted-foreground font-black">Total Asignaturas</span>
+              <strong class="block text-2xl font-black text-foreground mt-2">{{ resumenCobertura().totalMaterias }}</strong>
+              <span class="text-[11px] text-muted-foreground">materias programadas</span>
+            </div>
+            <div class="bg-card border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/20 rounded-2xl p-4 shadow-2xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-black">Con Banco Cargado</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  {{ resumenCobertura().porcentajeCobertura }}%
+                </span>
+              </div>
+              <strong class="block text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-2">{{ resumenCobertura().materiasConBanco }}</strong>
+              <span class="text-[11px] text-muted-foreground">bancos validados</span>
+            </div>
+            <div class="bg-card border border-rose-200/60 dark:border-rose-800/40 bg-rose-50/20 rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-rose-700 dark:text-rose-400 font-black">Sin Banco (Pendientes)</span>
+              <strong class="block text-2xl font-black text-rose-700 dark:text-rose-400 mt-2">{{ resumenCobertura().materiasSinBanco }}</strong>
+              <span class="text-[11px] text-muted-foreground">requieren entrega</span>
+            </div>
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-purple-700 font-black">Efectividad General</span>
+              <strong class="block text-2xl font-black text-purple-700 mt-2">{{ resumenCobertura().porcentajeCobertura }}%</strong>
+              <span class="text-[11px] text-muted-foreground">cumplimiento global</span>
+            </div>
+          </div>
+
+          <!-- Barra de Búsqueda y Exportación -->
+          <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-black text-foreground">Auditoría de Bancos de Preguntas</h3>
+              <p class="text-xs text-muted-foreground mt-0.5">Control de cumplimiento docente por carrera y asignatura.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="relative">
+                <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
+                <input
+                  type="text"
+                  [(ngModel)]="busquedaCobertura"
+                  placeholder="Buscar asignatura, docente o carrera..."
+                  class="bg-muted border border-border rounded-xl pl-8 pr-3 py-2 text-xs outline-none w-64 focus:border-primary" />
+              </div>
+              <button
+                type="button"
+                (click)="exportarCoberturaExcel()"
+                [disabled]="!itemsCoberturaFiltrados().length"
+                class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-40 shadow-xs">
+                <i class="pi pi-file-excel"></i>
+                <span>Exportar Excel</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabla de Cobertura -->
+          <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden">
+            @if (cargandoCobertura()) {
+              <div class="p-12 text-center text-sm text-muted-foreground">
+                <i class="pi pi-spinner pi-spin mr-2 text-primary"></i>Cargando cobertura de bancos...
+              </div>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                      <th class="p-3">Carrera / Sede</th>
+                      <th class="p-3">Asignatura & Código</th>
+                      <th class="p-3">Grupo / Sem.</th>
+                      <th class="p-3">Docente Titular</th>
+                      <th class="p-3">Parcial & Fecha</th>
+                      <th class="p-3 text-center">Estado del Banco</th>
+                      <th class="p-3 text-center">Reactivos</th>
+                      <th class="p-3 text-center">Alerta de Seguimiento</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    @for (item of itemsCoberturaFiltrados(); track item.rolExamenId) {
+                      <tr class="hover:bg-muted/30 transition-colors">
+                        <td class="p-3">
+                          <div class="font-bold text-foreground">{{ item.carreraNombre }}</div>
+                          <span class="text-[10px] text-muted-foreground">{{ item.sedeNombre }}</span>
+                        </td>
+                        <td class="p-3">
+                          <span class="font-mono text-primary font-black">{{ item.materiaCodigo }}</span>
+                          <div class="font-bold text-foreground leading-tight">{{ item.materiaNombre }}</div>
+                        </td>
+                        <td class="p-3 font-mono font-bold">
+                          <span class="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded">
+                            G{{ item.grupo }}
+                          </span>
+                          <span class="text-[10px] text-muted-foreground ml-1">{{ item.semestre ? item.semestre + '°' : '' }}</span>
+                        </td>
+                        <td class="p-3">
+                          <div class="font-medium text-foreground uppercase">{{ item.docenteNombre || 'Por asignar' }}</div>
+                          <span class="text-[10px] text-muted-foreground font-mono">{{ item.docenteCi ? 'CI: ' + item.docenteCi : '' }}</span>
+                        </td>
+                        <td class="p-3 whitespace-nowrap">
+                          <div class="font-bold">{{ item.tipoParcial }}</div>
+                          <span class="text-[10px] text-muted-foreground font-mono">{{ item.fechaExamen }}</span>
+                        </td>
+                        <td class="p-3 text-center">
+                          <span [class]="item.tieneBanco ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-rose-100 text-rose-800 border-rose-200'" class="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase inline-flex items-center gap-1 border">
+                            <i class="pi" [class.pi-check-circle]="item.tieneBanco" [class.pi-times-circle]="!item.tieneBanco"></i>
+                            {{ item.tieneBanco ? 'Cargado (' + item.estadoBanco + ')' : 'Sin Banco' }}
+                          </span>
+                        </td>
+                        <td class="p-3 text-center">
+                          @if (item.tieneBanco) {
+                            <div class="font-mono font-black text-foreground">{{ item.totalReactivos }} reactivos</div>
+                            <span class="text-[9.5px] text-muted-foreground font-mono">
+                              {{ item.facilesCount }}F / {{ item.mediasCount }}M / {{ item.dificilesCount }}D
+                            </span>
+                          } @else {
+                            <span class="text-muted-foreground text-[10px] font-mono">0 reactivos</span>
+                          }
+                        </td>
+                        <td class="p-3 text-center">
+                          @if (!item.tieneBanco) {
+                            <span class="bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-xl text-[10px] font-black inline-flex items-center gap-1">
+                              <i class="pi pi-exclamation-triangle text-[9px]"></i>
+                              Docente pendiente
+                            </span>
+                          } @else {
+                            <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-xl text-[10px] font-black inline-flex items-center gap-1">
+                              <i class="pi pi-check text-[9px]"></i>
+                              Validado
+                            </span>
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="8" class="p-12 text-center text-sm text-muted-foreground">
+                          No existen registros de cobertura para los filtros seleccionados.
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- ========================================================================= -->
+      <!-- PESTAÑA 4: CONSOLIDADO DE CALIFICACIONES Y RENDIMIENTO OMR -->
+      <!-- ========================================================================= -->
+      @if (tipoReporteActivo() === 'CONSOLIDADO_OMR') {
+        <section class="space-y-4 print-area">
+          @if (errorConsolidado()) {
+            <div class="rounded-xl border border-rose-200 bg-rose-50 text-rose-800 p-4 text-sm flex items-center gap-2">
+              <i class="pi pi-exclamation-triangle"></i>{{ errorConsolidado() }}
+            </div>
+          }
+
+          <!-- Tarjetas KPI Consolidado OMR -->
+          <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-muted-foreground font-black">Exámenes Evaluados</span>
+              <strong class="block text-2xl font-black text-foreground mt-2">{{ resumenConsolidado().totalExamenesCalificados }}</strong>
+              <span class="text-[11px] text-muted-foreground">procesados con OMR</span>
+            </div>
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-blue-700 font-black">Total Inscritos</span>
+              <strong class="block text-2xl font-black text-blue-700 mt-2">{{ resumenConsolidado().totalInscritos }}</strong>
+              <span class="text-[11px] text-muted-foreground">estudiantes convocados</span>
+            </div>
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-purple-700 font-black">Cartillas Calificadas</span>
+              <strong class="block text-2xl font-black text-purple-700 mt-2">{{ resumenConsolidado().totalCalificados }}</strong>
+              <span class="text-[11px] text-muted-foreground">hojas procesadas</span>
+            </div>
+            <div class="bg-card border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/20 rounded-2xl p-4 shadow-2xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-black">Total Aprobados</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  {{ resumenConsolidado().porcentajeAprobacionGeneral }}%
+                </span>
+              </div>
+              <strong class="block text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-2">{{ resumenConsolidado().totalAprobados }}</strong>
+              <span class="text-[11px] text-muted-foreground">nota &ge; 51</span>
+            </div>
+            <div class="bg-card border border-rose-200/60 dark:border-rose-800/40 bg-rose-50/20 rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-rose-700 dark:text-rose-400 font-black">Total Reprobados</span>
+              <strong class="block text-2xl font-black text-rose-700 dark:text-rose-400 mt-2">{{ resumenConsolidado().totalReprobados }}</strong>
+              <span class="text-[11px] text-muted-foreground">nota &lt; 51</span>
+            </div>
+            <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+              <span class="text-[10px] uppercase tracking-wider text-foreground font-black">Promedio General</span>
+              <strong class="block text-2xl font-black text-foreground mt-2">{{ resumenConsolidado().promedioGeneral }}</strong>
+              <span class="text-[11px] text-muted-foreground">escala sobre 100</span>
+            </div>
+          </div>
+
+          <!-- Barra de Búsqueda y Exportación -->
+          <div class="bg-card border border-border rounded-2xl p-4 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-black text-foreground">Rendimiento por Grupo y Asignatura</h3>
+              <p class="text-xs text-muted-foreground mt-0.5">Consolidado de lecturas ópticas procesadas y aprobaciones institucionales.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="relative">
+                <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
+                <input
+                  type="text"
+                  [(ngModel)]="busquedaConsolidado"
+                  placeholder="Buscar materia, docente o carrera..."
+                  class="bg-muted border border-border rounded-xl pl-8 pr-3 py-2 text-xs outline-none w-64 focus:border-primary" />
+              </div>
+              <button
+                type="button"
+                (click)="exportarConsolidadoExcel()"
+                [disabled]="!itemsConsolidadoFiltrados().length"
+                class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-40 shadow-xs">
+                <i class="pi pi-file-excel"></i>
+                <span>Exportar Excel</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabla de Consolidado OMR -->
+          <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden">
+            @if (cargandoConsolidado()) {
+              <div class="p-12 text-center text-sm text-muted-foreground">
+                <i class="pi pi-spinner pi-spin mr-2 text-primary"></i>Cargando consolidado OMR...
+              </div>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                      <th class="p-3">Sede & Carrera</th>
+                      <th class="p-3">Asignatura & Código</th>
+                      <th class="p-3">Grupo</th>
+                      <th class="p-3">Docente Titular</th>
+                      <th class="p-3 text-center">Inscritos</th>
+                      <th class="p-3 text-center">Calificados OMR</th>
+                      <th class="p-3 text-center">Promedio (/100)</th>
+                      <th class="p-3 text-center">Aprobados</th>
+                      <th class="p-3 text-center">Reprobados</th>
+                      <th class="p-3 text-center">Sincronización SEA</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    @for (item of itemsConsolidadoFiltrados(); track item.rolExamenId) {
+                      <tr class="hover:bg-muted/30 transition-colors">
+                        <td class="p-3">
+                          <div class="font-bold text-foreground">{{ item.sedeNombre }}</div>
+                          <span class="text-[10px] text-muted-foreground">{{ item.carreraNombre }}</span>
+                        </td>
+                        <td class="p-3">
+                          <span class="font-mono text-primary font-black">{{ item.materiaCodigo }}</span>
+                          <div class="font-bold text-foreground leading-tight">{{ item.materiaNombre }}</div>
+                        </td>
+                        <td class="p-3 font-mono font-bold">
+                          <span class="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded">
+                            G{{ item.grupo }}
+                          </span>
+                        </td>
+                        <td class="p-3">
+                          <div class="font-medium text-foreground uppercase">{{ item.docenteNombre || 'Por asignar' }}</div>
+                          <span class="text-[10px] text-muted-foreground font-mono">{{ item.tipoParcial }} · {{ item.fechaExamen }}</span>
+                        </td>
+                        <td class="p-3 text-center font-mono font-bold text-foreground">
+                          {{ item.totalInscritos }}
+                        </td>
+                        <td class="p-3 text-center font-mono font-black text-purple-700">
+                          {{ item.totalCalificados }}
+                        </td>
+                        <td class="p-3 text-center font-mono font-black text-foreground">
+                          {{ item.totalCalificados > 0 ? item.promedioNota : '—' }}
+                        </td>
+                        <td class="p-3 text-center font-mono font-bold text-emerald-600">
+                          {{ item.totalCalificados > 0 ? item.totalAprobados + ' (' + item.porcentajeAprobacion + '%)' : '—' }}
+                        </td>
+                        <td class="p-3 text-center font-mono font-bold text-rose-600">
+                          {{ item.totalCalificados > 0 ? item.totalReprobados : '—' }}
+                        </td>
+                        <td class="p-3 text-center">
+                          <span [class]="item.estadoSincronizacionSea === 'SINCRONIZADO' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-200'" class="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase inline-flex items-center gap-1 border">
+                            <i class="pi" [class.pi-check]="item.estadoSincronizacionSea === 'SINCRONIZADO'" [class.pi-clock]="item.estadoSincronizacionSea !== 'SINCRONIZADO'"></i>
+                            {{ item.estadoSincronizacionSea }}
+                          </span>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="10" class="p-12 text-center text-sm text-muted-foreground">
+                          No existen registros consolidados OMR para los filtros seleccionados.
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- ========================================================================= -->
+      <!-- PESTAÑA 1: SEGUIMIENTO OPERATIVO SIDOPA (CONSERVADO Y ADAPTADO) -->
+      <!-- ========================================================================= -->
       @if (tipoReporteActivo() === 'REPORTE_EVALUACIONES') {
         <section class="space-y-4 print-area">
           @if (errorReporte()) {
@@ -246,6 +955,9 @@ interface FilaRemark {
         </section>
       }
 
+      <!-- ========================================================================= -->
+      <!-- PESTAÑA 5: CONCILIACIÓN REMARK VS OMR -->
+      <!-- ========================================================================= -->
       @if (tipoReporteActivo() === 'CONCILIACION_REMARK') {
         <section class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden print-area">
           <div class="p-5 border-b border-border bg-purple-50/60 dark:bg-purple-950/20 flex flex-wrap items-start justify-between gap-4">
@@ -378,358 +1090,6 @@ interface FilaRemark {
         }
       }
 
-      <!-- 4. CONTENIDO DEL REPORTE 1: PLANILLA DE CONTROL DE RECEPCIÓN Y ENTREGA -->
-      @if (tipoReporteActivo() === 'PLANILLA_RECEPCION') {
-        <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden print-area">
-          
-          <!-- Encabezado Institucional del Reporte para Impresión -->
-          <div class="p-6 border-b border-border bg-gradient-to-b from-muted/40 to-card flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 flex items-center justify-center font-black text-lg border border-purple-200 dark:border-purple-800">
-                <i class="pi pi-file-edit"></i>
-              </div>
-              <div>
-                <h2 class="text-base font-black text-foreground uppercase tracking-tight">
-                  Planilla Oficial de Control de Entrega y Recepción de Evaluaciones
-                </h2>
-                <p class="text-xs text-muted-foreground font-medium">
-                  Universidad Técnica Privada Cosmos · Jefatura de Evaluaciones y Acreditación (Gestión {{ storage.gestionActiva() }})
-                </p>
-              </div>
-            </div>
-
-            <div class="text-right">
-              <span class="bg-purple-100 text-purple-800 text-[10px] font-black px-3 py-1 rounded-full uppercase border border-purple-200">
-                Formato oficial de seguimiento DOC-04
-              </span>
-              <span class="text-[10px] text-muted-foreground font-mono block mt-1">Generado: 20/08/2026 17:00</span>
-            </div>
-          </div>
-
-          <!-- Tabla con el Formato Idéntico al Sistema Macro -->
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr class="border-b border-border bg-muted/80 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                  <th class="p-3">Hora / Fecha</th>
-                  <th class="p-3">Materia & Código</th>
-                  <th class="p-3">Grupo</th>
-                  <th class="p-3">Docente Titular</th>
-                  <th class="p-3 text-center">Modalidad</th>
-                  <th class="p-3 text-center bg-blue-50/50 dark:bg-blue-950/20 text-blue-900 dark:text-blue-200">H. Retiro</th>
-                  <th class="p-3 text-center bg-blue-50/50 dark:bg-blue-950/20 text-blue-900 dark:text-blue-200">Cant. Entregada</th>
-                  <th class="p-3 text-center bg-blue-50/50 dark:bg-blue-950/20 text-blue-900 dark:text-blue-200">Firma Entrega Docente</th>
-                  <th class="p-3 text-center bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200">H. Devolución</th>
-                  <th class="p-3 text-center bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200">Cant. Cartillas</th>
-                  <th class="p-3 text-center bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200">Firma Recepción Jefatura</th>
-                  <th class="p-3 text-center">Estado</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border">
-                @for (item of datosFiltrados(); track item.id) {
-                  <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="p-3">
-                      <span class="font-mono font-black text-foreground block">{{ item.hora }}</span>
-                      <span class="text-[10px] text-muted-foreground font-mono">{{ item.fecha }}</span>
-                    </td>
-                    <td class="p-3">
-                      <div class="font-bold text-foreground leading-tight">{{ item.materia }}</div>
-                      <span class="font-mono text-[10px] text-primary">{{ item.codigo }}</span>
-                    </td>
-                    <td class="p-3 font-mono font-bold text-center">
-                      <span class="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded">
-                        {{ item.grupo }}
-                      </span>
-                    </td>
-                    <td class="p-3 font-medium text-foreground uppercase">
-                      {{ item.docente }}
-                    </td>
-                    <td class="p-3 text-center">
-                      @if (item.conCartilla) {
-                        <span class="bg-purple-100 text-purple-800 text-[9.5px] font-black px-2 py-0.5 rounded uppercase">
-                          Con Cartilla
-                        </span>
-                      } @else {
-                        <span class="bg-slate-100 text-slate-800 text-[9.5px] font-black px-2 py-0.5 rounded uppercase">
-                          Sin Cartilla
-                        </span>
-                      }
-                    </td>
-
-                    <!-- Bloque Entrega (Retiro) -->
-                    <td class="p-3 text-center font-mono font-bold text-blue-700 bg-blue-50/30 dark:bg-blue-950/10">
-                      {{ item.etapa !== 'Programado' ? '07:45' : '___:___' }}
-                    </td>
-                    <td class="p-3 text-center font-mono font-bold text-blue-700 bg-blue-50/30 dark:bg-blue-950/10">
-                      {{ item.etapa !== 'Programado' ? '45 unid.' : '____' }}
-                    </td>
-                    <td class="p-3 text-center bg-blue-50/30 dark:bg-blue-950/10">
-                      <div class="h-8 border-b border-dashed border-blue-300 flex items-center justify-center text-[10px] text-blue-400 italic">
-                        {{ item.etapa !== 'Programado' && item.etapa !== 'Generado' ? 'Firma Registrada' : 'Firma Docente' }}
-                      </div>
-                    </td>
-
-                    <!-- Bloque Devolución (Recepción) -->
-                    <td class="p-3 text-center font-mono font-bold text-emerald-700 bg-emerald-50/30 dark:bg-emerald-950/10">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '10:20' : '___:___' }}
-                    </td>
-                    <td class="p-3 text-center font-mono font-bold text-emerald-700 bg-emerald-50/30 dark:bg-emerald-950/10">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '42 resueltas' : '____' }}
-                    </td>
-                    <td class="p-3 text-center bg-emerald-50/30 dark:bg-emerald-950/10">
-                      <div class="h-8 border-b border-dashed border-emerald-300 flex items-center justify-center text-[10px] text-emerald-400 italic">
-                        {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? 'Sello Jefatura' : 'Firma Jefatura' }}
-                      </div>
-                    </td>
-
-                    <td class="p-3 text-center">
-                      <span [class]="getEstadoBadge(item.etapa)" class="text-[9.5px] font-black px-2 py-0.5 rounded uppercase">
-                        {{ item.etapa }}
-                      </span>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Pie de Firma de Planilla Oficial -->
-          <div class="p-6 border-t border-border grid grid-cols-1 sm:grid-cols-3 gap-6 text-center text-xs">
-            <div class="space-y-2">
-              <div class="h-14 border-b border-foreground/30 flex items-end justify-center pb-1">
-                <span class="font-bold text-foreground">Responsable no identificado</span>
-              </div>
-              <p class="text-[11px] text-muted-foreground font-bold uppercase">Jefatura de Evaluaciones</p>
-            </div>
-            <div class="space-y-2">
-              <div class="h-14 border-b border-foreground/30 flex items-end justify-center pb-1">
-                <span class="font-bold text-foreground">Lic. María Luz del Castillo</span>
-              </div>
-              <p class="text-[11px] text-muted-foreground font-bold uppercase">Secretaría Académica UNITEPC</p>
-            </div>
-            <div class="space-y-2">
-              <div class="h-14 border-b border-foreground/30 flex items-end justify-center pb-1">
-                <span class="font-bold text-foreground">Decanato de Facultad</span>
-              </div>
-              <p class="text-[11px] text-muted-foreground font-bold uppercase">Visto Bueno Institucional</p>
-            </div>
-          </div>
-
-        </div>
-      }
-
-      <!-- 5. CONTENIDO DEL REPORTE 2: COBERTURA Y VALIDACIÓN DE BANCOS -->
-      @if (tipoReporteActivo() === 'COBERTURA_BANCOS') {
-        <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden">
-          
-          <div class="p-5 border-b border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 class="text-sm font-black text-foreground uppercase tracking-wide">
-                Auditoría de Bancos de Preguntas Validadas
-              </h3>
-              <p class="text-xs text-muted-foreground">Estado de entrega de preguntas por docente y cumplimiento de la norma psicométrica.</p>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <span class="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-lg border border-emerald-200">
-                100% Bancos Validados para generación
-              </span>
-            </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                  <th class="p-3">Código</th>
-                  <th class="p-3">Asignatura</th>
-                  <th class="p-3">Docente Titular</th>
-                  <th class="p-3 text-center">Sem.</th>
-                  <th class="p-3 text-center">Total Preguntas</th>
-                  <th class="p-3 text-center">Fácil (30%)</th>
-                  <th class="p-3 text-center">Medio (50%)</th>
-                  <th class="p-3 text-center">Difícil (20%)</th>
-                  <th class="p-3 text-center">% Cobertura</th>
-                  <th class="p-3 text-center">Generación del examen</th>
-                  <th class="p-3 text-center">Estado</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border">
-                @for (item of datosFiltrados(); track item.id) {
-                  <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="p-3 font-mono font-bold text-primary">{{ item.codigo }}</td>
-                    <td class="p-3 font-bold text-foreground">{{ item.materia }}</td>
-                    <td class="p-3 text-foreground font-medium uppercase">{{ item.docente }}</td>
-                    <td class="p-3 text-center font-mono font-bold">{{ item.semestre }}°</td>
-                    <td class="p-3 text-center font-mono font-black text-foreground">
-                      {{ item.bancoExcelCargado ? '60 preguntas' : '0 preguntas' }}
-                    </td>
-                    <td class="p-3 text-center font-mono text-emerald-600 font-bold">
-                      {{ item.bancoExcelCargado ? '18' : '0' }}
-                    </td>
-                    <td class="p-3 text-center font-mono text-indigo-600 font-bold">
-                      {{ item.bancoExcelCargado ? '30' : '0' }}
-                    </td>
-                    <td class="p-3 text-center font-mono text-rose-600 font-bold">
-                      {{ item.bancoExcelCargado ? '12' : '0' }}
-                    </td>
-                    <td class="p-3 text-center">
-                      <span class="font-mono font-black text-xs" [class]="item.bancoExcelCargado ? 'text-emerald-600' : 'text-amber-600'">
-                        {{ item.bancoExcelCargado ? '100%' : '0%' }}
-                      </span>
-                    </td>
-                    <td class="p-3 text-center">
-                      @if (item.bancoExcelCargado) {
-                        <span class="bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-0.5 rounded flex items-center justify-center gap-1">
-                          <i class="pi pi-bolt text-[9px]"></i> 4 Variantes A-D
-                        </span>
-                      } @else {
-                        <span class="text-muted-foreground text-[10px] font-mono">Pendiente</span>
-                      }
-                    </td>
-                    <td class="p-3 text-center">
-                      <span [class]="item.bancoExcelCargado ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" class="text-[9.5px] font-black px-2 py-0.5 rounded uppercase">
-                        {{ item.bancoExcelCargado ? 'APROBADO' : 'PENDIENTE' }}
-                      </span>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      }
-
-      <!-- 6. CONTENIDO DEL REPORTE 3: CONSOLIDADO DE RENDIMIENTO Y OMR -->
-      @if (tipoReporteActivo() === 'CONSOLIDADO_OMR') {
-        <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden">
-          
-          <div class="p-5 border-b border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 class="text-sm font-black text-foreground uppercase tracking-wide">
-                Consolidado de Calificaciones y Lectura Óptica OMR
-              </h3>
-              <p class="text-xs text-muted-foreground">Resultados del procesamiento automatizado de cartillas ópticas y notas promedios.</p>
-            </div>
-            <span class="text-xs font-mono font-bold text-muted-foreground">Efectividad de Lectura: 100%</span>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                  <th class="p-3">Código</th>
-                  <th class="p-3">Asignatura</th>
-                  <th class="p-3">Grupo</th>
-                  <th class="p-3">Docente Titular</th>
-                  <th class="p-3 text-center">Inscritos</th>
-                  <th class="p-3 text-center">Cartillas OMR Leídas</th>
-                  <th class="p-3 text-center">Promedio (/100)</th>
-                  <th class="p-3 text-center">Aprobados</th>
-                  <th class="p-3 text-center">Reprobados</th>
-                  <th class="p-3 text-center">Sincronización Central</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border">
-                @for (item of datosFiltrados(); track item.id) {
-                  <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="p-3 font-mono font-bold text-primary">{{ item.codigo }}</td>
-                    <td class="p-3 font-bold text-foreground">{{ item.materia }}</td>
-                    <td class="p-3 font-mono font-bold text-center">
-                      <span class="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded">
-                        {{ item.grupo }}
-                      </span>
-                    </td>
-                    <td class="p-3 text-foreground font-medium uppercase">{{ item.docente }}</td>
-                    <td class="p-3 text-center font-mono font-bold">45</td>
-                    <td class="p-3 text-center font-mono font-black text-purple-700">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '42 (100%)' : '0' }}
-                    </td>
-                    <td class="p-3 text-center font-mono font-black text-foreground">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '74.5' : '--' }}
-                    </td>
-                    <td class="p-3 text-center font-mono font-bold text-emerald-600">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '38 (90%)' : '--' }}
-                    </td>
-                    <td class="p-3 text-center font-mono font-bold text-rose-600">
-                      {{ item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '4 (10%)' : '--' }}
-                    </td>
-                    <td class="p-3 text-center">
-                      @if (item.etapa === 'Calificado') {
-                        <span class="bg-emerald-100 text-emerald-800 text-[9.5px] font-black px-2 py-0.5 rounded uppercase flex items-center justify-center gap-1">
-                          <i class="pi pi-check"></i> SINCRONIZADO
-                        </span>
-                      } @else {
-                        <span class="bg-amber-100 text-amber-800 text-[9.5px] font-black px-2 py-0.5 rounded uppercase">
-                          PENDIENTE ACTA
-                        </span>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      }
-
-      <!-- 7. CONTENIDO DEL REPORTE 4: BITÁCORA DE AUDITORÍA Y TRAZABILIDAD -->
-      @if (tipoReporteActivo() === 'AUDITORIA_TRAZABILIDAD') {
-        <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden">
-          
-          <div class="p-5 border-b border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 class="text-sm font-black text-foreground uppercase tracking-wide">
-                Bitácora Institucional de Auditoría y Trazabilidad Digital
-              </h3>
-              <p class="text-xs text-muted-foreground">Registro inmutable de transiciones, generaciones, restablecimientos y restauraciones.</p>
-            </div>
-            <span class="bg-purple-100 text-purple-800 text-xs font-black px-3 py-1 rounded-lg border border-purple-200">
-              Auditoría Criptográfica Activa
-            </span>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                  <th class="p-3">Fecha y Hora</th>
-                  <th class="p-3">Responsable & Cargo</th>
-                  <th class="p-3">Módulo</th>
-                  <th class="p-3">Acción Registrada</th>
-                  <th class="p-3">IP Pública</th>
-                  <th class="p-3">Dirección MAC</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border">
-                @for (act of storage.bitacoraAuditoria(); track act.id) {
-                  <tr class="hover:bg-muted/30 transition-colors">
-                    <td class="p-3 font-mono font-bold text-foreground">{{ act.fechaHora }}</td>
-                    <td class="p-3">
-                      <div class="font-bold text-foreground">{{ act.usuarioNombre }}</div>
-                      <span class="text-[10px] text-muted-foreground">Jefatura de Evaluaciones</span>
-                    </td>
-                    <td class="p-3 font-mono font-bold">
-                      <span class="bg-purple-50 text-purple-700 text-[10px] font-black px-2 py-0.5 rounded">
-                        {{ act.modulo }}
-                      </span>
-                    </td>
-                    <td class="p-3 text-foreground font-medium">
-                      {{ act.accion }}
-                    </td>
-                    <td class="p-3 font-mono text-muted-foreground text-[11px]">{{ act.ipPublica }}</td>
-                    <td class="p-3 font-mono text-muted-foreground text-[11px]">{{ act.direccionMac }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      }
-
     </div>
   `
 })
@@ -739,6 +1099,7 @@ export class ReporteEvaluacionesComponent implements OnInit {
   private readonly _omr = inject(OmrProcesamientoService);
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _auth = inject(AuthService);
+  private readonly _reportes = inject(ReportesService);
 
   public readonly esDirectorCarrera = computed(
     () => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA'
@@ -753,6 +1114,7 @@ export class ReporteEvaluacionesComponent implements OnInit {
   public readonly esConsultaAcademica = computed(
     () => this.esDirectorCarrera() || this.esVicerrector()
   );
+
   public sedes = signal<BranchOffice[]>([]);
   public carreras = signal<Career[]>([]);
   public cargandoSedes = signal(false);
@@ -760,68 +1122,45 @@ export class ReporteEvaluacionesComponent implements OnInit {
 
   public tipoReporteActivo = signal<TipoReporte>('REPORTE_EVALUACIONES');
 
+  // Filtros globales
+  public filtroSede = 'Todos';
+  public filtroCarrera = 'Todos';
+  public filtroParcial = 'Todos';
+  public filtroModalidad = 'Todos';
+  public filtroEstadoReporte = 'Todos';
+  public filtroFecha = '';
+  public filtroFechaInicio = '';
+  public filtroFechaFin = '';
+  public filtroAlcance = 'nacional';
+
+  // 1. Reporte Operativo SIDOPA
   public rolesReporte = signal<RolExamenResponse[]>([]);
   public cargandoReporte = signal(false);
   public errorReporte = signal<string | null>(null);
   public reporteGeneradoEn = signal(new Date());
   public busquedaReporte = '';
-  public filtroParcial = 'Todos';
-  public filtroEstadoReporte = 'Todos';
-  public filtroFechaInicio = '';
-  public filtroFechaFin = '';
-  public filtroAlcance = 'nacional';
 
-  public rolesReporteFiltrados(): RolExamenResponse[] {
-    const texto = this.busquedaReporte.trim().toLowerCase();
-    return this.rolesReporte().filter(rol => {
-      if (this.filtroSede !== 'Todos' && rol.sedeCodigo !== this.filtroSede) return false;
-      if (this.filtroCarrera !== 'Todos' && this.filtroCarrera && rol.carreraCodigo !== this.filtroCarrera) return false;
-      if (this.filtroParcial !== 'Todos' && rol.tipoParcial !== this.filtroParcial) return false;
-      if (this.filtroEstadoReporte !== 'Todos' && rol.estadoFlujo !== this.filtroEstadoReporte) return false;
-      if (this.filtroModalidad === 'CON_CARTILLA' && rol.modalidad !== 'PRESENCIAL_CARTILLA') return false;
-      if (this.filtroModalidad === 'SIN_CARTILLA' && rol.modalidad === 'PRESENCIAL_CARTILLA') return false;
-      if (this.filtroFechaInicio && rol.fecha < this.filtroFechaInicio) return false;
-      if (this.filtroFechaFin && rol.fecha > this.filtroFechaFin) return false;
-      if (this.filtroFecha && rol.fecha !== this.filtroFecha) return false;
-      if (!texto) return true;
-      return `${rol.materiaCodigo} ${rol.materiaNombre} ${rol.docenteNombre} ${rol.aula} ${rol.carreraNombre} ${rol.campus}`.toLowerCase().includes(texto);
-    });
-  }
+  // 2. Control de Calidad
+  public reporteCalidadResumen = signal<ReporteCalidadResumen | null>(null);
+  public cargandoCalidad = signal<boolean>(false);
+  public errorCalidad = signal<string | null>(null);
+  public filtroCalidadEstado = 'TODOS';
+  public busquedaCalidad = '';
+  public itemCalidadSeleccionado = signal<ReporteCalidadItem | null>(null);
 
-  public reporteResumen() {
-    const filas = this.rolesReporteFiltrados();
-    return {
-      total: filas.length,
-      generadas: filas.filter(rol => ['GENERADO', 'IMPRESO', 'ENTREGADO', 'DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO'].includes(rol.estadoFlujo)).length,
-      conBanco: filas.filter(rol => rol.bancoPreguntasCargado).length,
-      estudiantes: filas.reduce((total, rol) => total + (rol.estudiantesInscritosCount || 0), 0)
-    };
-  }
+  // 3. Cobertura de Bancos
+  public reporteCoberturaResumen = signal<ReporteCoberturaBancosResumen | null>(null);
+  public cargandoCobertura = signal<boolean>(false);
+  public errorCobertura = signal<string | null>(null);
+  public busquedaCobertura = '';
 
-  public reporteEstados() {
-    const filas = this.rolesReporteFiltrados();
-    const total = filas.length || 1;
-    const estados: Array<[string, RolExamenResponse['estadoFlujo']]> = [
-      ['Programado', 'PROGRAMADO'], ['Validado', 'VALIDADO'], ['Generado', 'GENERADO'],
-      ['Impreso', 'IMPRESO'], ['Entregado', 'ENTREGADO'], ['Devuelto', 'DEVUELTO'], ['Calificado', 'CALIFICADO']
-    ];
-    return estados.map(([nombre, codigo]) => {
-      const cantidad = filas.filter(rol => rol.estadoFlujo === codigo).length;
-      return { nombre, total: cantidad, porcentaje: Math.round((cantidad / total) * 100) };
-    }).filter(item => item.total > 0);
-  }
+  // 4. Consolidado OMR
+  public reporteConsolidadoResumen = signal<ReporteConsolidadoOmrResumen | null>(null);
+  public cargandoConsolidado = signal<boolean>(false);
+  public errorConsolidado = signal<string | null>(null);
+  public busquedaConsolidado = '';
 
-  public reportePorSede() { return this.agruparReportePor(rol => rol.sedeNombre); }
-
-  private agruparReportePor(selector: (rol: RolExamenResponse) => string): Array<{ nombre: string; total: number }> {
-    const conteo = new Map<string, number>();
-    for (const rol of this.rolesReporteFiltrados()) {
-      const nombre = selector(rol) || 'Sin dato';
-      conteo.set(nombre, (conteo.get(nombre) || 0) + 1);
-    }
-    return Array.from(conteo, ([nombre, total]) => ({ nombre, total })).sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
-  }
-
+  // 5. Conciliación Remark
   public rolesConciliacion = signal<RolExamenResponse[]>([]);
   public rolConciliacionId = '';
   public archivoOmrNombre = signal<string | null>(null);
@@ -854,17 +1193,126 @@ export class ReporteEvaluacionesComponent implements OnInit {
     };
   });
 
-  public filtroSede = 'Todos';
-  public filtroCarrera = 'Todos';
-  public filtroModalidad = 'Todos';
-  public filtroFecha = '';
+  // Computed Calidad
+  public resumenCalidad = computed(() => {
+    return this.reporteCalidadResumen() || {
+      totalExamenes: 0,
+      aprobadosDirectos: 0,
+      observadosYLuegoAprobados: 0,
+      observadosPendientes: 0,
+      pendientesRevision: 0,
+      sinBanco: 0,
+      porcentajeAprobadosDirectos: 0,
+      porcentajeObservados: 0,
+      items: []
+    };
+  });
+
+  public itemsCalidadFiltrados = computed(() => {
+    const resumen = this.reporteCalidadResumen();
+    if (!resumen) return [];
+    let items = resumen.items || [];
+    if (this.filtroCalidadEstado !== 'TODOS') {
+      items = items.filter(i => i.estadoCalidad === this.filtroCalidadEstado);
+    }
+    const texto = this.busquedaCalidad.trim().toLowerCase();
+    if (texto) {
+      items = items.filter(i => {
+        const busq = `${i.materiaCodigo} ${i.materiaNombre} ${i.docenteNombre} ${i.docenteCi} ${i.grupo} ${i.carreraNombre} ${i.sedeNombre}`.toLowerCase();
+        return busq.includes(texto);
+      });
+    }
+    return items;
+  });
+
+  // Computed Cobertura
+  public resumenCobertura = computed(() => {
+    return this.reporteCoberturaResumen() || {
+      totalMaterias: 0,
+      materiasConBanco: 0,
+      materiasSinBanco: 0,
+      porcentajeCobertura: 0,
+      carreras: [],
+      items: []
+    };
+  });
+
+  public itemsCoberturaFiltrados = computed(() => {
+    const resumen = this.reporteCoberturaResumen();
+    if (!resumen) return [];
+    let items = resumen.items || [];
+    const texto = this.busquedaCobertura.trim().toLowerCase();
+    if (texto) {
+      items = items.filter(i => {
+        const busq = `${i.materiaCodigo} ${i.materiaNombre} ${i.docenteNombre} ${i.docenteCi} ${i.carreraNombre} ${i.sedeNombre} ${i.grupo}`.toLowerCase();
+        return busq.includes(texto);
+      });
+    }
+    return items;
+  });
+
+  // Computed Consolidado
+  public resumenConsolidado = computed(() => {
+    return this.reporteConsolidadoResumen() || {
+      totalExamenesCalificados: 0,
+      totalInscritos: 0,
+      totalCalificados: 0,
+      totalAprobados: 0,
+      totalReprobados: 0,
+      promedioGeneral: 0,
+      porcentajeAprobacionGeneral: 0,
+      items: []
+    };
+  });
+
+  public itemsConsolidadoFiltrados = computed(() => {
+    const resumen = this.reporteConsolidadoResumen();
+    if (!resumen) return [];
+    let items = resumen.items || [];
+    const texto = this.busquedaConsolidado.trim().toLowerCase();
+    if (texto) {
+      items = items.filter(i => {
+        const busq = `${i.materiaCodigo} ${i.materiaNombre} ${i.docenteNombre} ${i.carreraNombre} ${i.sedeNombre} ${i.grupo}`.toLowerCase();
+        return busq.includes(texto);
+      });
+    }
+    return items;
+  });
 
   public ngOnInit(): void {
     this.cargarSedes();
     this.actualizarReportePrincipal();
   }
 
+  public cambiarPestana(tipo: TipoReporte): void {
+    this.tipoReporteActivo.set(tipo);
+    if (tipo === 'CALIDAD_VERIFICACION') {
+      this.cargarReporteCalidad();
+    } else if (tipo === 'COBERTURA_BANCOS') {
+      this.cargarCoberturaBancos();
+    } else if (tipo === 'CONSOLIDADO_OMR') {
+      this.cargarConsolidadoOmr();
+    } else if (tipo === 'REPORTE_EVALUACIONES') {
+      this.cargarReporteEvaluacionesOperativo();
+    }
+  }
+
   public actualizarReportePrincipal(): void {
+    const activo = this.tipoReporteActivo();
+    if (activo === 'CALIDAD_VERIFICACION') {
+      this.cargarReporteCalidad();
+    } else if (activo === 'COBERTURA_BANCOS') {
+      this.cargarCoberturaBancos();
+    } else if (activo === 'CONSOLIDADO_OMR') {
+      this.cargarConsolidadoOmr();
+    } else if (activo === 'CONCILIACION_REMARK') {
+      // Sin recarga automática
+    } else {
+      this.cargarReporteEvaluacionesOperativo();
+    }
+  }
+
+  public cargarReporteEvaluacionesOperativo(): void {
     this.cargandoReporte.set(true);
     this.errorReporte.set(null);
     this._roles.listar().subscribe({
@@ -883,24 +1331,259 @@ export class ReporteEvaluacionesComponent implements OnInit {
     });
   }
 
-  public etiquetaEstadoReporte(estado: RolExamenResponse['estadoFlujo']): string {
-    const etiquetas: Record<string, string> = {
-      PROGRAMADO: 'Programado', VALIDADO: 'Validado', GENERADO: 'Generado', IMPRESO: 'Impreso',
-      ENTREGADO: 'Entregado', DEVUELTO: 'Devuelto', PENDIENTE_NOTAS: 'Pendiente de notas',
-      CALIFICADO: 'Calificado', CONFIRMADO: 'Confirmado', SUSPENDIDO: 'Suspendido'
-    };
-    return etiquetas[estado] || estado;
+  public cargarReporteCalidad(): void {
+    this.cargandoCalidad.set(true);
+    this.errorCalidad.set(null);
+    this._reportes.obtenerReporteCalidad({
+      sedeCodigo: this.filtroSede,
+      carreraCodigo: this.filtroCarrera,
+      tipoParcial: this.filtroParcial,
+      estadoCalidad: this.filtroCalidadEstado,
+      busqueda: this.busquedaCalidad
+    }).subscribe({
+      next: data => {
+        this.reporteCalidadResumen.set(data);
+        this.cargandoCalidad.set(false);
+      },
+      error: err => {
+        this.cargandoCalidad.set(false);
+        this.errorCalidad.set(err?.status === 403
+          ? 'Tu usuario no tiene permisos para ver este reporte de calidad.'
+          : 'No se pudo cargar el reporte de calidad. Verifica la conexión con el servidor.');
+      }
+    });
   }
 
-  public refrescarFiltros(): void {
-    // Los filtros son propiedades simples para mantener compatibles los reportes pendientes;
-    // el detalle principal se calcula nuevamente en cada ciclo de renderizado.
+  public cargarCoberturaBancos(): void {
+    this.cargandoCobertura.set(true);
+    this.errorCobertura.set(null);
+    this._reportes.obtenerCoberturaBancos({
+      sedeCodigo: this.filtroSede,
+      carreraCodigo: this.filtroCarrera,
+      tipoParcial: this.filtroParcial
+    }).subscribe({
+      next: data => {
+        this.reporteCoberturaResumen.set(data);
+        this.cargandoCobertura.set(false);
+      },
+      error: err => {
+        this.cargandoCobertura.set(false);
+        this.errorCobertura.set(err?.status === 403
+          ? 'Tu usuario no tiene permisos para ver la cobertura de bancos.'
+          : 'No se pudo cargar la cobertura de bancos. Verifica la conexión con el servidor.');
+      }
+    });
   }
 
-  /** El PDF se obtiene mediante el diálogo de impresión, igual que SIDOPA. */
+  public cargarConsolidadoOmr(): void {
+    this.cargandoConsolidado.set(true);
+    this.errorConsolidado.set(null);
+    this._reportes.obtenerConsolidadoOmr({
+      sedeCodigo: this.filtroSede,
+      carreraCodigo: this.filtroCarrera,
+      tipoParcial: this.filtroParcial
+    }).subscribe({
+      next: data => {
+        this.reporteConsolidadoResumen.set(data);
+        this.cargandoConsolidado.set(false);
+      },
+      error: err => {
+        this.cargandoConsolidado.set(false);
+        this.errorConsolidado.set(err?.status === 403
+          ? 'Tu usuario no tiene permisos para ver el consolidado OMR.'
+          : 'No se pudo cargar el consolidado OMR. Verifica la conexión con el servidor.');
+      }
+    });
+  }
+
+  public filtrarCalidadEstado(estado: string): void {
+    this.filtroCalidadEstado = estado;
+    this.cargarReporteCalidad();
+  }
+
+  public abrirModalObservaciones(item: ReporteCalidadItem): void {
+    this.itemCalidadSeleccionado.set(item);
+  }
+
+  public cerrarModalObservaciones(): void {
+    this.itemCalidadSeleccionado.set(null);
+  }
+
+  public obtenerEtiquetaDictamen(estado: string): string {
+    switch (estado) {
+      case 'APROBADO_DIRECTO': return 'Aprobado Directo';
+      case 'OBSERVADO_Y_APROBADO': return 'Observado y Aprobado';
+      case 'OBSERVADO_PENDIENTE': return 'Observado Pendiente';
+      case 'PENDIENTE_REVISION': return 'Pendiente de Revisión';
+      case 'SIN_BANCO': return 'Sin Banco de Preguntas';
+      default: return estado || 'Pendiente';
+    }
+  }
+
+  public obtenerClaseDictamen(estado: string): string {
+    switch (estado) {
+      case 'APROBADO_DIRECTO':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800';
+      case 'OBSERVADO_Y_APROBADO':
+        return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800';
+      case 'OBSERVADO_PENDIENTE':
+        return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800';
+      case 'PENDIENTE_REVISION':
+        return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800';
+      case 'SIN_BANCO':
+        return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800';
+      default:
+        return 'bg-muted text-muted-foreground border-border';
+    }
+  }
+
+  public formatearFechaBoliviana(fechaStr?: string | Date | null): string {
+    if (!fechaStr) return '—';
+    try {
+      const d = new Date(fechaStr);
+      if (isNaN(d.getTime())) return String(fechaStr);
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const anio = d.getFullYear();
+      const hora = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${dia}/${mes}/${anio} ${hora}:${min}`;
+    } catch {
+      return String(fechaStr);
+    }
+  }
+
+  public parsearPreguntasObservadas(json?: string): Array<{ numero: string; motivo: string }> {
+    if (!json || !json.trim() || json.trim() === '{}') return [];
+    try {
+      const parsed = JSON.parse(json);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return Object.entries(parsed)
+          .filter(([_, val]) => val && String(val).trim() !== '')
+          .map(([key, val]) => ({ numero: key, motivo: String(val) }))
+          .sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+      }
+    } catch {
+      // Formato no JSON
+    }
+    return [];
+  }
+
+  public exportarCalidadExcel(): void {
+    const items = this.itemsCalidadFiltrados();
+    if (!items.length) return;
+    const filas = items.map(item => {
+      const observacionesDetalle = (item.observaciones || [])
+        .map((obs, idx) => `[Devolución #${idx + 1} - ${this.formatearFechaBoliviana(obs.fechaDevolucion)} - Por: ${obs.verificadoPor || 'N/A'}]: ${obs.observacionesGenerales || 'Sin motivo general'}`)
+        .join(' | ');
+
+      return {
+        'Código Rol': item.rolExamenId,
+        'Código Materia': item.materiaCodigo,
+        'Materia': item.materiaNombre,
+        'Grupo': item.grupo,
+        'Sede': item.sedeNombre,
+        'Campus': item.campus || 'N/A',
+        'Carrera': item.carreraNombre,
+        'Docente': item.docenteNombre || 'Por asignar',
+        'CI Docente': item.docenteCi || '',
+        'Parcial': item.tipoParcial,
+        'Fecha Examen': item.fechaExamen,
+        'Horario': item.horaExamen || '',
+        'Estado Flujo': item.estadoFlujo,
+        'Dictamen de Calidad': this.obtenerEtiquetaDictamen(item.estadoCalidad),
+        'Total Observaciones': item.totalObservaciones,
+        'Último Verificador': item.ultimoVerificador || '',
+        'Fecha Última Obs': this.formatearFechaBoliviana(item.ultimaObservacionFecha),
+        'Aprobado Por': item.aprobadoPor || '',
+        'Fecha Aprobación': this.formatearFechaBoliviana(item.fechaAprobacion),
+        'Historial Observaciones': observacionesDetalle || 'Ninguna'
+      };
+    });
+
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Calidad de Verificacion');
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(libro, `Reporte_Calidad_Verificacion_${fecha}.xlsx`);
+  }
+
+  public exportarCoberturaExcel(): void {
+    const items = this.itemsCoberturaFiltrados();
+    if (!items.length) return;
+    const filas = items.map(item => ({
+      'Código Rol': item.rolExamenId,
+      'Sede': item.sedeNombre,
+      'Carrera': item.carreraNombre,
+      'Código Materia': item.materiaCodigo,
+      'Materia': item.materiaNombre,
+      'Grupo': item.grupo,
+      'Semestre': item.semestre ? `${item.semestre}°` : '',
+      'Docente': item.docenteNombre || 'Por asignar',
+      'CI Docente': item.docenteCi || '',
+      'Parcial': item.tipoParcial,
+      'Fecha Examen': item.fechaExamen,
+      'Tiene Banco': item.tieneBanco ? 'Sí' : 'No',
+      'Estado Banco': item.estadoBanco,
+      'Total Reactivos': item.totalReactivos || 0,
+      'Fáciles': item.facilesCount || 0,
+      'Medias': item.mediasCount || 0,
+      'Difíciles': item.dificilesCount || 0,
+      'Fecha Aprobación Banco': this.formatearFechaBoliviana(item.fechaAprobacionBanco)
+    }));
+
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Cobertura de Bancos');
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(libro, `Reporte_Cobertura_Bancos_${fecha}.xlsx`);
+  }
+
+  public exportarConsolidadoExcel(): void {
+    const items = this.itemsConsolidadoFiltrados();
+    if (!items.length) return;
+    const filas = items.map(item => ({
+      'Código Rol': item.rolExamenId,
+      'Sede': item.sedeNombre,
+      'Carrera': item.carreraNombre,
+      'Código Materia': item.materiaCodigo,
+      'Materia': item.materiaNombre,
+      'Grupo': item.grupo,
+      'Docente': item.docenteNombre || 'Por asignar',
+      'Parcial': item.tipoParcial,
+      'Fecha Examen': item.fechaExamen,
+      'Total Inscritos': item.totalInscritos,
+      'Cartillas Calificadas': item.totalCalificados,
+      'Promedio (/100)': item.promedioNota,
+      'Aprobados': item.totalAprobados,
+      'Reprobados': item.totalReprobados,
+      '% Aprobación': `${item.porcentajeAprobacion}%`,
+      'Sincronización SEA': item.estadoSincronizacionSea
+    }));
+
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Consolidado OMR');
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(libro, `Reporte_Consolidado_OMR_${fecha}.xlsx`);
+  }
+
   public exportarReportePrincipal(): void {
-    if (this.tipoReporteActivo() === 'CONCILIACION_REMARK') {
+    const tipo = this.tipoReporteActivo();
+    if (tipo === 'CONCILIACION_REMARK') {
       this.exportarConciliacion();
+      return;
+    }
+    if (tipo === 'CALIDAD_VERIFICACION') {
+      this.exportarCalidadExcel();
+      return;
+    }
+    if (tipo === 'COBERTURA_BANCOS') {
+      this.exportarCoberturaExcel();
+      return;
+    }
+    if (tipo === 'CONSOLIDADO_OMR') {
+      this.exportarConsolidadoExcel();
       return;
     }
     window.print();
@@ -911,6 +1594,7 @@ export class ReporteEvaluacionesComponent implements OnInit {
       this.filtroSede = 'Todos';
       this.filtroCarrera = 'Todos';
       this.carreras.set([]);
+      this.recargarReporteSegunPestana();
       return;
     }
 
@@ -920,15 +1604,35 @@ export class ReporteEvaluacionesComponent implements OnInit {
     this.filtroCarrera = this.esDirectorCarrera() ? '' : 'Todos';
     this.carreras.set([]);
     this.cargarCarreras(sede.code);
+    this.recargarReporteSegunPestana();
   }
 
   public onCarreraChange(codigoCarrera: string): void {
     if (codigoCarrera === 'Todos') {
       this.filtroCarrera = 'Todos';
+      this.recargarReporteSegunPestana();
       return;
     }
     if (this.carreras().some(item => item.careerCode === codigoCarrera)) {
       this.filtroCarrera = codigoCarrera;
+      this.recargarReporteSegunPestana();
+    }
+  }
+
+  public refrescarFiltros(): void {
+    this.recargarReporteSegunPestana();
+  }
+
+  private recargarReporteSegunPestana(): void {
+    const pestana = this.tipoReporteActivo();
+    if (pestana === 'CALIDAD_VERIFICACION') {
+      this.cargarReporteCalidad();
+    } else if (pestana === 'COBERTURA_BANCOS') {
+      this.cargarCoberturaBancos();
+    } else if (pestana === 'CONSOLIDADO_OMR') {
+      this.cargarConsolidadoOmr();
+    } else if (pestana === 'REPORTE_EVALUACIONES') {
+      // El filtrado en memoria se recalcula reactivamente
     }
   }
 
@@ -981,35 +1685,70 @@ export class ReporteEvaluacionesComponent implements OnInit {
     });
   }
 
-  public datosFiltrados = computed(() => {
-    return this.storage.gestionEvaluaciones().filter(item => {
-      if (this.esConsultaAcademica()) {
-        const sedeItem = String((item as GestionEvaluacionItem & { sede?: string; sedeCodigo?: string }).sedeCodigo
-          || (item as GestionEvaluacionItem & { sede?: string }).sede || '').trim().toLowerCase();
-        if (!this.filtroSede || this.filtroSede === 'Todos' || !sedeItem
-            || !sedeItem.includes(this.filtroSede.toLowerCase())) {
-          return false;
-        }
-      }
-      const carrera = this.carreras().find(c => c.careerCode === this.filtroCarrera);
-      const textoCarrera = `${item.carrera} ${carrera?.careerName || ''} ${carrera?.careerCode || ''}`.toLowerCase();
-      if (this.filtroCarrera && this.filtroCarrera !== 'Todos'
-          && !textoCarrera.includes(this.filtroCarrera.toLowerCase())) {
-        return false;
-      }
-      if (this.filtroModalidad === 'CON_CARTILLA' && !item.conCartilla) {
-        return false;
-      }
-      if (this.filtroModalidad === 'SIN_CARTILLA' && item.conCartilla) {
-        return false;
-      }
-      if (this.filtroFecha && !item.fecha.includes(this.filtroFecha)) {
-        return false;
-      }
-      return true;
+  // Métodos Reporte Operativo SIDOPA
+  public rolesReporteFiltrados(): RolExamenResponse[] {
+    const texto = this.busquedaReporte.trim().toLowerCase();
+    return this.rolesReporte().filter(rol => {
+      if (this.filtroSede !== 'Todos' && rol.sedeCodigo !== this.filtroSede) return false;
+      if (this.filtroCarrera !== 'Todos' && this.filtroCarrera && rol.carreraCodigo !== this.filtroCarrera) return false;
+      if (this.filtroParcial !== 'Todos' && rol.tipoParcial !== this.filtroParcial) return false;
+      if (this.filtroEstadoReporte !== 'Todos' && rol.estadoFlujo !== this.filtroEstadoReporte) return false;
+      if (this.filtroModalidad === 'CON_CARTILLA' && rol.modalidad !== 'PRESENCIAL_CARTILLA') return false;
+      if (this.filtroModalidad === 'SIN_CARTILLA' && rol.modalidad === 'PRESENCIAL_CARTILLA') return false;
+      if (this.filtroFechaInicio && rol.fecha < this.filtroFechaInicio) return false;
+      if (this.filtroFechaFin && rol.fecha > this.filtroFechaFin) return false;
+      if (this.filtroFecha && rol.fecha !== this.filtroFecha) return false;
+      if (!texto) return true;
+      return `${rol.materiaCodigo} ${rol.materiaNombre} ${rol.docenteNombre} ${rol.aula} ${rol.carreraNombre} ${rol.campus}`.toLowerCase().includes(texto);
     });
-  });
+  }
 
+  public reporteResumen() {
+    const filas = this.rolesReporteFiltrados();
+    return {
+      total: filas.length,
+      generadas: filas.filter(rol => ['GENERADO', 'IMPRESO', 'ENTREGADO', 'DEVUELTO', 'PENDIENTE_NOTAS', 'CALIFICADO'].includes(rol.estadoFlujo)).length,
+      conBanco: filas.filter(rol => rol.bancoPreguntasCargado).length,
+      estudiantes: filas.reduce((total, rol) => total + (rol.estudiantesInscritosCount || 0), 0)
+    };
+  }
+
+  public reporteEstados() {
+    const filas = this.rolesReporteFiltrados();
+    const total = filas.length || 1;
+    const estados: Array<[string, RolExamenResponse['estadoFlujo']]> = [
+      ['Programado', 'PROGRAMADO'], ['Validado', 'VALIDADO'], ['Generado', 'GENERADO'],
+      ['Impreso', 'IMPRESO'], ['Entregado', 'ENTREGADO'], ['Devuelto', 'DEVUELTO'], ['Calificado', 'CALIFICADO']
+    ];
+    return estados.map(([nombre, codigo]) => {
+      const cantidad = filas.filter(rol => rol.estadoFlujo === codigo).length;
+      return { nombre, total: cantidad, porcentaje: Math.round((cantidad / total) * 100) };
+    }).filter(item => item.total > 0);
+  }
+
+  public reportePorSede() { 
+    return this.agruparReportePor(rol => rol.sedeNombre); 
+  }
+
+  private agruparReportePor(selector: (rol: RolExamenResponse) => string): Array<{ nombre: string; total: number }> {
+    const conteo = new Map<string, number>();
+    for (const rol of this.rolesReporteFiltrados()) {
+      const nombre = selector(rol) || 'Sin dato';
+      conteo.set(nombre, (conteo.get(nombre) || 0) + 1);
+    }
+    return Array.from(conteo, ([nombre, total]) => ({ nombre, total })).sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
+  }
+
+  public etiquetaEstadoReporte(estado: RolExamenResponse['estadoFlujo']): string {
+    const etiquetas: Record<string, string> = {
+      PROGRAMADO: 'Programado', VALIDADO: 'Validado', GENERADO: 'Generado', IMPRESO: 'Impreso',
+      ENTREGADO: 'Entregado', DEVUELTO: 'Devuelto', PENDIENTE_NOTAS: 'Pendiente de notas',
+      CALIFICADO: 'Calificado', CONFIRMADO: 'Confirmado', SUSPENDIDO: 'Suspendido'
+    };
+    return etiquetas[estado] || estado;
+  }
+
+  // Métodos Conciliación Remark
   public abrirConciliacionRemark(): void {
     if (!this.puedeConciliarRemark()) return;
     this.tipoReporteActivo.set('CONCILIACION_REMARK');
@@ -1231,8 +1970,6 @@ export class ReporteEvaluacionesComponent implements OnInit {
     const remarkPorCodigo = new Map(filasRemark.map(fila => [fila.codigoEstudiante, fila]));
     const sistemaPorCodigo = new Map(lecturas
       .map(lectura => {
-        // El OCR puede devolver varios candidatos. Si Remark contiene uno de ellos,
-        // se usa ese candidato para evitar falsos "Solo Remark" por ruido de lectura.
         const candidatos = [lectura.codigoEstudiante, ...(lectura.codigoOcr || [])]
           .map(candidato => this._normalizarCodigo(candidato))
           .filter(Boolean);
@@ -1284,99 +2021,6 @@ export class ReporteEvaluacionesComponent implements OnInit {
     const texto = String(valor ?? '').trim().toUpperCase();
     if (!texto || ['BLANK', 'BLANCO', 'VACIO', 'VACÍA', 'VACIA', '—', '-'].includes(texto)) return '';
     return [...new Set(texto.match(/[A-E]/g) || [])].sort().join('');
-  }
-
-  public getEstadoBadge(etapa: EtapaEvaluacion): string {
-    switch (etapa) {
-      case 'Programado': return 'bg-purple-100 text-purple-800 border border-purple-300 font-bold';
-      case 'Generado': return 'bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold';
-      case 'Impreso': return 'bg-blue-100 text-blue-800 border border-blue-300 font-bold';
-      case 'Entregado': return 'bg-amber-100 text-amber-800 border border-amber-300 font-bold';
-      case 'Devuelto': return 'bg-rose-100 text-rose-800 border border-rose-300 font-bold';
-      case 'Pendiente de notas': return 'bg-amber-100 text-amber-800 border border-amber-300 font-bold';
-      case 'Calificado': return 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold';
-      default: return 'bg-slate-100 text-slate-800 font-bold';
-    }
-  }
-
-  public exportarReporteActualExcel(): void {
-    const tipo = this.tipoReporteActivo();
-    const gestion = this.storage.gestionActiva();
-    const items = this.datosFiltrados();
-
-    if (tipo === 'CONCILIACION_REMARK') {
-      this.exportarConciliacion();
-      return;
-    }
-
-    let dataToExport: any[] = [];
-    let fileName = '';
-
-    if (tipo === 'PLANILLA_RECEPCION') {
-      fileName = `Planilla_Control_Recepcion_Entrega_UNITEPC_${gestion}.xlsx`;
-      dataToExport = items.map((item, idx) => ({
-        'N°': idx + 1,
-        'FECHA': item.fecha,
-        'HORA PROGRAMADA': item.hora,
-        'CÓDIGO': item.codigo,
-        'ASIGNATURA': item.materia,
-        'GRUPO': item.grupo,
-        'CARRERA': item.carrera,
-        'DOCENTE TITULAR': item.docente,
-        'MODALIDAD': item.conCartilla ? 'CON CARTILLA' : 'SIN CARTILLA',
-        'HORA RETIRO': item.etapa !== 'Programado' ? '07:45' : '',
-        'CANT. ENTREGADA': item.etapa !== 'Programado' ? '45 unid.' : '',
-        'FIRMA ENTREGA DOCENTE': item.etapa !== 'Programado' && item.etapa !== 'Generado' ? 'REGISTRADA' : '',
-        'HORA DEVOLUCIÓN': item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '10:20' : '',
-        'CANT. CARTILLAS DEVUELTAS': item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? '42' : '',
-        'FIRMA RECEPCIÓN JEFATURA': item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? 'SELLO OFICIAL' : '',
-        'ESTADO ACTUAL': item.etapa
-      }));
-    } else if (tipo === 'COBERTURA_BANCOS') {
-      fileName = `Reporte_Cobertura_Bancos_Preguntas_${gestion}.xlsx`;
-      dataToExport = items.map((item, idx) => ({
-        'N°': idx + 1,
-        'CÓDIGO': item.codigo,
-        'ASIGNATURA': item.materia,
-        'DOCENTE TITULAR': item.docente,
-        'SEMESTRE': item.semestre,
-        'TOTAL PREGUNTAS': item.bancoExcelCargado ? 60 : 0,
-        'FÁCIL (30%)': item.bancoExcelCargado ? 18 : 0,
-        'MEDIO (50%)': item.bancoExcelCargado ? 30 : 0,
-        'DIFÍCIL (20%)': item.bancoExcelCargado ? 12 : 0,
-        '% COBERTURA': item.bancoExcelCargado ? '100%' : '0%',
-        'ESTADO BANCO': item.bancoExcelCargado ? 'APROBADO' : 'PENDIENTE'
-      }));
-    } else if (tipo === 'CONSOLIDADO_OMR') {
-      fileName = `Consolidado_Rendimiento_Lectura_OMR_${gestion}.xlsx`;
-      dataToExport = items.map((item, idx) => ({
-        'N°': idx + 1,
-        'CÓDIGO': item.codigo,
-        'ASIGNATURA': item.materia,
-        'GRUPO': item.grupo,
-        'DOCENTE TITULAR': item.docente,
-        'ESTUDIANTES INSCRITOS': 45,
-        'CARTILLAS LEÍDAS': item.etapa === 'Devuelto' || item.etapa === 'Pendiente de notas' || item.etapa === 'Calificado' ? 42 : 0,
-        'PROMEDIO NOTA': item.etapa === 'Calificado' ? 74.5 : '--',
-        'ESTADO SINCRONIZACIÓN': item.etapa === 'Calificado' ? 'CALIFICADO' : 'PENDIENTE'
-      }));
-    } else {
-      fileName = `Bitacora_Auditoria_Seguridad_${gestion}.xlsx`;
-      dataToExport = this.storage.bitacoraAuditoria().map((act, idx) => ({
-        'N°': idx + 1,
-        'FECHA Y HORA': act.fechaHora,
-        'RESPONSABLE': act.usuarioNombre,
-        'MÓDULO': act.modulo,
-        'ACCIÓN': act.accion,
-        'IP PÚBLICA': act.ipPublica,
-        'DIRECCIÓN MAC': act.direccionMac
-      }));
-    }
-
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Reporte_Oficial');
-    XLSX.writeFile(wb, fileName);
   }
 
   public imprimirReporte(): void {

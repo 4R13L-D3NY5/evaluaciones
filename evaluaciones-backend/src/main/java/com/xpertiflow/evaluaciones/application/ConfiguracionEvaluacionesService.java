@@ -6,6 +6,8 @@ import com.xpertiflow.evaluaciones.domain.entity.ConfiguracionEvaluaciones;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaUsuario;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaUsuarioRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ConfiguracionEvaluacionesRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,14 +38,19 @@ public class ConfiguracionEvaluacionesService {
 
     private final ConfiguracionEvaluacionesRepository repository;
     private final ObjectMapper objectMapper;
+    private final AuditoriaUsuarioRepository auditoriaUsuarioRepository;
 
     @Transactional(readOnly = true)
     public ConfiguracionEvaluacionesDto obtener() {
         return mapear(repository.findById(CONFIGURACION_ID).orElseGet(this::configuracionDefecto));
     }
 
-    @Transactional
     public ConfiguracionEvaluacionesDto guardar(ConfiguracionEvaluacionesDto request) {
+        return guardar(request, request.getActualizadoPor(), "127.0.0.1");
+    }
+
+    @Transactional
+    public ConfiguracionEvaluacionesDto guardar(ConfiguracionEvaluacionesDto request, String actor, String ipOrigen) {
         ConfiguracionEvaluaciones configuracion = repository.findById(CONFIGURACION_ID)
                 .orElseGet(this::configuracionDefecto);
         configuracion.setId(CONFIGURACION_ID);
@@ -65,8 +72,28 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setHorasCandado72(valorORango(request.getHorasCandado72(), HORAS_CANDADO_POR_DEFECTO, 0, 720));
         configuracion.setMinutosMinimosDevolucion(valorORango(request.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         configuracion.setActualizadoEn(LocalDateTime.now());
-        configuracion.setActualizadoPor(usuarioValido(request.getActualizadoPor()));
-        return mapear(repository.save(configuracion));
+        String actorReal = (actor != null && !actor.isBlank()) ? actor : usuarioValido(request.getActualizadoPor());
+        configuracion.setActualizadoPor(actorReal);
+        ConfiguracionEvaluaciones guardado = repository.save(configuracion);
+
+        String parcialesInfo = (request.getEstructuraPreguntas() != null && !request.getEstructuraPreguntas().isEmpty())
+                ? request.getEstructuraPreguntas().entrySet().stream()
+                    .map(e -> e.getKey() + ": " + (e.getValue() != null ? e.getValue().getCantidadPreguntas() : "?") + " preg")
+                    .collect(java.util.stream.Collectors.joining(", "))
+                : "estándar";
+
+        String resumen = String.format("Formato hoja: %s, Tipo letra: %s (%dpt), Preguntas por parcial: [%s]",
+                guardado.getFormatoHoja(), guardado.getTipoLetra(), guardado.getTamanoLetraPt(), parcialesInfo);
+
+        AuditoriaUsuario auditoria = new AuditoriaUsuario();
+        auditoria.setAccion("CONFIGURACION_EXAMENES_ACTUALIZADA");
+        auditoria.setRealizadoPor(actorReal);
+        auditoria.setDetalle(resumen.length() > 500 ? resumen.substring(0, 500) : resumen);
+        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
+        auditoria.setFechaEvento(LocalDateTime.now());
+        auditoriaUsuarioRepository.save(auditoria);
+
+        return mapear(guardado);
     }
 
     private ConfiguracionEvaluaciones configuracionDefecto() {

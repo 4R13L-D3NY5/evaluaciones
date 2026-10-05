@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -42,6 +43,15 @@ class AuditoriaTomaGruposServiceTest {
 
     @Mock
     private AuditoriaEvaluacionRepository auditoriaRepository;
+
+    @Mock
+    private CalificacionOmrRepository calificacionOmrRepository;
+
+    @Mock
+    private NotaDocenteRepository notaDocenteRepository;
+
+    @Mock
+    private AuditoriaService auditoriaService;
 
     @InjectMocks
     private AuditoriaTomaGruposService service;
@@ -162,5 +172,38 @@ class AuditoriaTomaGruposServiceTest {
 
         assertNotNull(bytes);
         assertTrue(bytes.length > 100);
+    }
+
+    @Test
+    @DisplayName("Debe buscar evaluaciones filtrando por criterio, sede y carrera")
+    void testBuscarEvaluaciones() {
+        RolExamen r1 = new RolExamen();
+        r1.setId("ROL-1");
+        r1.setMateriaCodigo("MED-101");
+        r1.setMateriaNombre("FARMACOLOGÍA");
+        r1.setGrupo("TA-01");
+        r1.setSedeNombre("Cochabamba");
+        r1.setSedeCodigo("CBBA");
+        r1.setCarreraCodigo("MED");
+        r1.setCarreraNombre("Medicina");
+        r1.setFecha(LocalDate.of(2026, 9, 15));
+
+        RolExamen r2 = new RolExamen();
+        r2.setId("ROL-2");
+        r2.setMateriaCodigo("DER-201");
+        r2.setMateriaNombre("DERECHO CIVIL");
+        r2.setGrupo("TB-01");
+        r2.setSedeNombre("La Paz");
+        r2.setSedeCodigo("LPZ");
+        r2.setCarreraCodigo("DER");
+        r2.setCarreraNombre("Derecho");
+        r2.setFecha(LocalDate.of(2026, 9, 16));
+
+        when(rolExamenRepository.findAll()).thenReturn(List.of(r1, r2));
+
+        var resultados = service.buscarEvaluaciones("farma", "CBBA", "MED");
+        assertEquals(1, resultados.size());
+        assertEquals("ROL-1", resultados.get(0).getRolExamenId());
+        assertEquals("FARMACOLOGÍA", resultados.get(0).getMateriaNombre());
     }
 }

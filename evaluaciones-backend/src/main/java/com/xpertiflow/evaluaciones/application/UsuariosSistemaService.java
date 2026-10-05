@@ -283,6 +283,15 @@ public class UsuariosSistemaService {
             String gestion,
             SincronizacionDocentesSeaRequestDto request,
             String actor) {
+        return sincronizarDocentesSea(gestion, request, actor, "127.0.0.1");
+    }
+
+    @Transactional
+    public SincronizacionDocentesSeaResponseDto sincronizarDocentesSea(
+            String gestion,
+            SincronizacionDocentesSeaRequestDto request,
+            String actor,
+            String ipOrigen) {
         String term = gestion == null || gestion.isBlank() ? "2-2026" : gestion.trim();
         Map<String, DocenteSeaAcumulado> docentesSea = agruparDocentesSea(term);
         Set<String> seleccionados = request == null || request.getCis() == null
@@ -336,7 +345,8 @@ public class UsuariosSistemaService {
                     usuario,
                     nuevo ? "DOCENTE_SINCRONIZADO_SEA" : "DOCENTE_ACTUALIZADO_SEA",
                     actor,
-                    "Gestión " + term + " · " + sea.grupos + " grupo(s) SEA"));
+                    "Gestión " + term + " · " + sea.grupos + " grupo(s) SEA",
+                    ipOrigen));
         }
 
         int desactivados = 0;
@@ -352,7 +362,8 @@ public class UsuariosSistemaService {
                         usuario,
                         "DOCENTE_DESACTIVADO_AUSENTE_SEA",
                         actor,
-                        "No encontrado en SEA para la gestión " + term));
+                        "No encontrado en SEA para la gestión " + term,
+                        ipOrigen));
                 desactivados++;
             }
         }
@@ -424,12 +435,18 @@ public class UsuariosSistemaService {
         private final String accion;
         private final String actor;
         private final String detalle;
+        private final String ipOrigen;
 
-        private AuditoriaPendiente(UsuarioSistema usuario, String accion, String actor, String detalle) {
+        private AuditoriaPendiente(UsuarioSistema usuario, String accion, String actor, String detalle, String ipOrigen) {
             this.usuario = usuario;
             this.accion = accion;
             this.actor = actor;
             this.detalle = detalle;
+            this.ipOrigen = ipOrigen;
+        }
+
+        private AuditoriaPendiente(UsuarioSistema usuario, String accion, String actor, String detalle) {
+            this(usuario, accion, actor, detalle, "127.0.0.1");
         }
     }
 
@@ -440,12 +457,17 @@ public class UsuariosSistemaService {
         auditoria.setAccion(pendiente.accion);
         auditoria.setRealizadoPor(pendiente.actor == null || pendiente.actor.isBlank() ? "SISTEMA" : pendiente.actor);
         auditoria.setDetalle(pendiente.detalle);
+        auditoria.setIpOrigen(pendiente.ipOrigen != null && !pendiente.ipOrigen.isBlank() ? pendiente.ipOrigen : "127.0.0.1");
         auditoria.setFechaEvento(java.time.LocalDateTime.now());
         return auditoria;
     }
 
-    @Transactional
     public UsuarioSistemaResponseDto crear(UsuarioSistemaRequestDto request, String actor, String rolActor) {
+        return crear(request, actor, rolActor, "127.0.0.1");
+    }
+
+    @Transactional
+    public UsuarioSistemaResponseDto crear(UsuarioSistemaRequestDto request, String actor, String rolActor, String ipOrigen) {
         validarRolAsignable(request.getRolCodigo(), rolActor);
         String ci = normalizarCi(request.getCi());
         if (usuarioRepository.existsByCi(ci)) {
@@ -465,12 +487,16 @@ public class UsuariosSistemaService {
         usuario.setActualizadoEn(java.time.LocalDateTime.now());
         completarAlcances(usuario, request);
         UsuarioSistema guardado = usuarioRepository.save(usuario);
-        registrarAuditoria(guardado, "USUARIO_CREADO", actor, "Rol " + guardado.getRolCodigo());
+        registrarAuditoria(guardado, "USUARIO_CREADO", actor, "Rol " + guardado.getRolCodigo(), ipOrigen);
         return mapearUsuario(guardado);
     }
 
-    @Transactional
     public UsuarioSistemaResponseDto actualizar(Long id, UsuarioSistemaRequestDto request, String actor, String rolActor) {
+        return actualizar(id, request, actor, rolActor, "127.0.0.1");
+    }
+
+    @Transactional
+    public UsuarioSistemaResponseDto actualizar(Long id, UsuarioSistemaRequestDto request, String actor, String rolActor, String ipOrigen) {
         validarRolAsignable(request.getRolCodigo(), rolActor);
         UsuarioSistema usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + id));
@@ -486,12 +512,16 @@ public class UsuariosSistemaService {
         completarAlcances(usuario, request);
         usuario.setActualizadoEn(java.time.LocalDateTime.now());
         UsuarioSistema guardado = usuarioRepository.save(usuario);
-        registrarAuditoria(guardado, "USUARIO_ACTUALIZADO", actor, "Rol " + guardado.getRolCodigo());
+        registrarAuditoria(guardado, "USUARIO_ACTUALIZADO", actor, "Rol " + guardado.getRolCodigo(), ipOrigen);
         return mapearUsuario(guardado);
     }
 
-    @Transactional
     public CredencialTemporalDto restablecerContrasena(Long id, String actor) {
+        return restablecerContrasena(id, actor, "127.0.0.1");
+    }
+
+    @Transactional
+    public CredencialTemporalDto restablecerContrasena(Long id, String actor, String ipOrigen) {
         UsuarioSistema usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + id));
         String ci = normalizarCi(usuario.getCi() == null ? usuario.getUsuario() : usuario.getCi());
@@ -499,12 +529,19 @@ public class UsuariosSistemaService {
         usuario.setDebeCambiarContrasena(true);
         usuario.setActualizadoEn(java.time.LocalDateTime.now());
         usuarioRepository.save(usuario);
-        registrarAuditoria(usuario, "CONTRASENA_RESTABLECIDA", actor, "La clave temporal vuelve a ser el CI");
+        String detalle = "El operador " + (actor == null || actor.isBlank() ? "SISTEMA" : actor)
+                + " restableció la contraseña temporal del usuario " + usuario.getUsuario()
+                + " (CI: " + ci + ") a su número de documento";
+        registrarAuditoria(usuario, "CONTRASENA_RESTABLECIDA_POR_ADMIN", actor, detalle, ipOrigen);
         return new CredencialTemporalDto(0, ci, usuario.getNombreCompleto(), usuario.getRolCodigo(), ci, ci, "RESTABLECIDA");
     }
 
-    @Transactional
     public ImportacionUsuariosResponseDto importar(MultipartFile archivo, String actor, String rolActor) {
+        return importar(archivo, actor, rolActor, "127.0.0.1");
+    }
+
+    @Transactional
+    public ImportacionUsuariosResponseDto importar(MultipartFile archivo, String actor, String rolActor, String ipOrigen) {
         if (archivo == null || archivo.isEmpty()) {
             throw new IllegalArgumentException("Selecciona un archivo Excel con usuarios");
         }
@@ -577,7 +614,7 @@ public class UsuariosSistemaService {
                         actualizados++;
                         credenciales.add(new CredencialTemporalDto(fila, normalizarCi(ci), nombre, rol, normalizarCi(ci), "CONSERVADA", "ACTUALIZADO"));
                     }
-                    registrarAuditoria(guardado, existente == null ? "USUARIO_IMPORTADO" : "USUARIO_ACTUALIZADO_IMPORTACION", actor, "Fila " + fila);
+                    registrarAuditoria(guardado, existente == null ? "USUARIO_IMPORTADO" : "USUARIO_ACTUALIZADO_IMPORTACION", actor, "Fila " + fila, ipOrigen);
                 } catch (RuntimeException exception) {
                     errores.add(new ErrorImportacionUsuarioDto(fila, ci, exception.getMessage()));
                 }
@@ -869,15 +906,20 @@ public class UsuariosSistemaService {
         }
     }
 
-    private void registrarAuditoria(UsuarioSistema usuario, String accion, String actor, String detalle) {
+    private void registrarAuditoria(UsuarioSistema usuario, String accion, String actor, String detalle, String ipOrigen) {
         AuditoriaUsuario auditoria = new AuditoriaUsuario();
         auditoria.setUsuarioObjetivoId(usuario.getId());
         auditoria.setUsuarioObjetivoCi(usuario.getCi());
         auditoria.setAccion(accion);
         auditoria.setRealizadoPor(actor == null || actor.isBlank() ? "SISTEMA" : actor);
         auditoria.setDetalle(detalle);
+        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
         auditoria.setFechaEvento(java.time.LocalDateTime.now());
         auditoriaRepository.save(auditoria);
+    }
+
+    private void registrarAuditoria(UsuarioSistema usuario, String accion, String actor, String detalle) {
+        registrarAuditoria(usuario, accion, actor, detalle, "127.0.0.1");
     }
 
     private Row encontrarEncabezado(Sheet sheet) {

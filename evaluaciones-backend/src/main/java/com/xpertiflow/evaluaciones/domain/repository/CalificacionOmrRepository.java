@@ -4,6 +4,7 @@ import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +12,8 @@ import java.util.Optional;
 public interface CalificacionOmrRepository extends JpaRepository<CalificacionOmr, Long> {
 
     List<CalificacionOmr> findByRolExamenIdOrderByCodigoEstudianteAsc(String rolExamenId);
+
+    List<CalificacionOmr> findByRolExamenIdIn(Collection<String> rolExamenIds);
 
     Optional<CalificacionOmr> findByRolExamenIdAndCodigoEstudiante(String rolExamenId, String codigoEstudiante);
 

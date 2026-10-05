@@ -4,8 +4,10 @@ import com.xpertiflow.evaluaciones.api.dto.gateway.*;
 import com.xpertiflow.evaluaciones.application.AccesoAcademicoService;
 import com.xpertiflow.evaluaciones.application.CampusCarrerasService;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
+import com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -139,8 +141,11 @@ public class CatalogoAcademicoController {
     @Operation(summary = "Guardar carreras asignadas a un campus")
     public ResponseEntity<List<CampusCarreraItemDto>> guardarCampusCarreras(
             @Valid @RequestBody CampusCarrerasRequestDto request,
-            Authentication authentication) {
-        return ResponseEntity.ok(campusCarrerasService.guardar(request, authentication));
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        String actor = authentication != null ? authentication.getName() : "SISTEMA";
+        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
+        return ResponseEntity.ok(campusCarrerasService.guardar(request, authentication, actor, ipOrigen));
     }
 
     private boolean puedeConsultarSedePorId(String branchOfficeId, Authentication authentication) {

@@ -4,6 +4,8 @@ import com.xpertiflow.evaluaciones.api.dto.gateway.CampusCarreraItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.CampusCarrerasRequestDto;
 import com.xpertiflow.evaluaciones.domain.entity.CampusCarrera;
 import com.xpertiflow.evaluaciones.domain.repository.CampusCarreraRepository;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaUsuario;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaUsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -20,6 +22,7 @@ public class CampusCarrerasService {
 
     private final CampusCarreraRepository repository;
     private final AccesoAcademicoService accesoAcademicoService;
+    private final AuditoriaUsuarioRepository auditoriaUsuarioRepository;
 
     @Transactional(readOnly = true)
     public List<CampusCarreraItemDto> listar(CampusCarrerasRequestDto request,
@@ -42,9 +45,16 @@ public class CampusCarrerasService {
                 .toList();
     }
 
-    @Transactional
     public List<CampusCarreraItemDto> guardar(CampusCarrerasRequestDto request,
                                                Authentication authentication) {
+        return guardar(request, authentication, authentication != null ? authentication.getName() : "SISTEMA", "127.0.0.1");
+    }
+
+    @Transactional
+    public List<CampusCarreraItemDto> guardar(CampusCarrerasRequestDto request,
+                                               Authentication authentication,
+                                               String actor,
+                                               String ipOrigen) {
         exigirSede(request, authentication);
         String claveCampus = claveCampus(request);
         repository.deleteBySedeCodigoAndCampusClave(request.getSedeCodigo(), claveCampus);
@@ -61,6 +71,16 @@ public class CampusCarrerasService {
                         && item.getNombre() != null && !item.getNombre().isBlank())
                 .map(item -> entidad(request, claveCampus, item))
                 .forEach(repository::save);
+
+        String actorReal = (actor != null && !actor.isBlank()) ? actor : (authentication != null ? authentication.getName() : "SISTEMA");
+        AuditoriaUsuario aud = new AuditoriaUsuario();
+        aud.setAccion("CAMPUS_CARRERAS_ASIGNADAS");
+        aud.setRealizadoPor(actorReal);
+        aud.setDetalle("Asignadas " + carreras.size() + " carreras al campus '" + request.getCampusNombre() + "' (Sede " + request.getSedeCodigo() + ")");
+        aud.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
+        aud.setFechaEvento(LocalDateTime.now());
+        auditoriaUsuarioRepository.save(aud);
+
         return listar(request, authentication);
     }
 

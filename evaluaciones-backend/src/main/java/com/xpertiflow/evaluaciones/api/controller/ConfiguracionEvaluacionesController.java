@@ -4,8 +4,10 @@ import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
 import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
 import com.xpertiflow.evaluaciones.application.ConfiguracionVerificacionService;
 import com.xpertiflow.evaluaciones.api.dto.verificacion.ConfiguracionVerificacionDto;
+import com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,8 +41,12 @@ public class ConfiguracionEvaluacionesController {
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Guardar la configuración vigente de evaluaciones")
     public ResponseEntity<ConfiguracionEvaluacionesDto> guardar(
-            @Valid @RequestBody ConfiguracionEvaluacionesDto request) {
-        return ResponseEntity.ok(service.guardar(request));
+            @Valid @RequestBody ConfiguracionEvaluacionesDto request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        String actor = authentication != null ? authentication.getName() : "ADMIN_EVALUACIONES";
+        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
+        return ResponseEntity.ok(service.guardar(request, actor, ipOrigen));
     }
 
     @GetMapping("/verificacion")
