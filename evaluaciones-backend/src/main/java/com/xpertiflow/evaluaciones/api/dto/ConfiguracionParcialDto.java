@@ -27,4 +27,8 @@ public class ConfiguracionParcialDto {
     @Min(0)
     @Max(1000)
     private Integer dificil;
+
+    public Integer getCantidadPreguntas() {
+        return totalPreguntas;
+    }
 }
