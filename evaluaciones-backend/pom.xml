@@ -14,7 +14,7 @@
 
     <groupId>com.xpertiflow</groupId>
     <artifactId>evaluaciones-backend</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.3.9</version>
     <packaging>jar</packaging>
 
     <name>evaluaciones-backend</name>
