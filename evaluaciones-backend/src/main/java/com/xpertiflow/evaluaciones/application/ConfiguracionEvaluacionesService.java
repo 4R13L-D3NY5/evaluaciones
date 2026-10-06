@@ -78,7 +78,7 @@ public class ConfiguracionEvaluacionesService {
 
         String parcialesInfo = (request.getEstructuraPreguntas() != null && !request.getEstructuraPreguntas().isEmpty())
                 ? request.getEstructuraPreguntas().entrySet().stream()
-                    .map(e -> e.getKey() + ": " + (e.getValue() != null ? e.getValue().getCantidadPreguntas() : "?") + " preg")
+                    .map(e -> e.getKey() + ": " + (e.getValue() != null ? e.getValue().getTotalPreguntas() : "?") + " preg")
                     .collect(java.util.stream.Collectors.joining(", "))
                 : "estándar";
 
