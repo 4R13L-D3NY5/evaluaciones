@@ -307,4 +307,30 @@ class CartillaOmrServiceTest {
         assertNotNull(resp);
         verify(examenIndividualTypstService).generarCuadernilloEstudiante(rolId, "9990001", "B", "admin");
     }
+
+    @Test
+    @DisplayName("obtenerPreparacion marca esIndividual correctamente para estudiante rezagado")
+    void obtenerPreparacionMarcaEsIndividualCorrectamente() {
+        String rolId = "ROL-005";
+        RolExamen rol = crearRolExamen(rolId, EstadoFlujo.GENERADO, 1);
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+
+        MapeoEstudianteVariante m1 = new MapeoEstudianteVariante();
+        m1.setId(1L);
+        m1.setRolExamenId(rolId);
+        m1.setCodigoEstudiante("9990001");
+        m1.setNombres("REZAGADO PEDRO");
+        m1.setLetraVariante("C");
+        m1.setCuadernilloIndividualPdf(null);
+
+        when(mapeoRepository.findByRolExamenId(rolId)).thenReturn(List.of(m1));
+        when(varianteRepository.findByRolExamenId(rolId)).thenReturn(List.of());
+
+        PreparacionCartillasOmrResponseDto resp = service.obtenerPreparacion(rolId);
+
+        assertNotNull(resp);
+        assertEquals(1, resp.estudiantes().size());
+        assertTrue(resp.estudiantes().get(0).esIndividual());
+        assertEquals("C", resp.estudiantes().get(0).letraVariante());
+    }
 }

@@ -35,6 +35,7 @@ class ExamenIndividualTypstServiceTest {
     private MapeoEstudianteVarianteRepository mapeoRepository;
     private ExamenVarianteRepository varianteRepository;
     private AuditoriaEvaluacionRepository auditoriaRepository;
+    private com.xpertiflow.evaluaciones.security.BancoCifradoService cifradoService;
 
     private ExamenIndividualTypstService service;
 
@@ -52,13 +53,15 @@ class ExamenIndividualTypstServiceTest {
         mapeoRepository = mock(MapeoEstudianteVarianteRepository.class);
         varianteRepository = mock(ExamenVarianteRepository.class);
         auditoriaRepository = mock(AuditoriaEvaluacionRepository.class);
+        cifradoService = mock(com.xpertiflow.evaluaciones.security.BancoCifradoService.class);
 
         service = new ExamenIndividualTypstService(
                 appProperties,
                 rolExamenRepository,
                 mapeoRepository,
                 varianteRepository,
-                auditoriaRepository
+                auditoriaRepository,
+                cifradoService
         );
     }
 

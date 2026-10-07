@@ -5,6 +5,7 @@ import com.xpertiflow.evaluaciones.api.dto.verificacion.ConfiguracionVerificacio
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionDecisionRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionExamenDetalleDto;
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionExamenListaDto;
+import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionHistorialDevolucionDto;
 import com.xpertiflow.evaluaciones.application.VerificacionExamenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +64,13 @@ public class VerificacionExamenController {
     public ResponseEntity<VerificacionExamenDetalleDto> obtenerAprobado(
             @PathVariable String rolExamenId, Authentication authentication) {
         return ResponseEntity.ok(service.obtenerDetalleAprobado(rolExamenId, authentication));
+    }
+
+    @GetMapping("/{rolExamenId}/historial-devoluciones")
+    @PreAuthorize("hasAnyRole('VERIFICADOR','ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    public ResponseEntity<List<VerificacionHistorialDevolucionDto>> obtenerHistorialDevoluciones(
+            @PathVariable String rolExamenId, Authentication authentication) {
+        return ResponseEntity.ok(service.obtenerHistorialDevoluciones(rolExamenId, authentication));
     }
 
     @PostMapping("/{rolExamenId}/previsualizacion")

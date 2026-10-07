@@ -14,6 +14,7 @@ export interface CartillaOmr {
   notaSobre100?: number;
   letraVariante?: string;
   cuadernilloPdfPath?: string;
+  esIndividual?: boolean;
 }
 
 export interface SincronizacionNominaResponse {

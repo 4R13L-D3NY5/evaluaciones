@@ -136,17 +136,21 @@ public class CartillaOmrService {
                     MapeoEstudianteVariante mapeo = mapeosPorCodigo.get(estudiante.codigo().trim());
                     String letraVariante = mapeo != null ? mapeo.getLetraVariante() : null;
                     String cuadernilloPdf = mapeo != null ? mapeo.getCuadernilloIndividualPdf() : null;
+                    boolean esIndividual = (mapeo == null)
+                            || (cuadernilloPdf == null)
+                            || (!cuadernilloPdf.contains("_Examenes_Oficiales.pdf"));
 
                     // Si apunta al documento unificado del lote completo, validar si este estudiante está en él
                     if (cuadernilloPdf != null && cuadernilloPdf.contains("_Examenes_Oficiales.pdf")) {
                         if (typOficialContenido == null || !typOficialContenido.contains(estudiante.codigo().trim())) {
                             cuadernilloPdf = null;
+                            esIndividual = true;
                         }
                     }
 
                     return new DatosCartillaOmrDto(indice + 1, rol.getMateriaCodigo(), rol.getGrupo(),
                             estudiante.codigo(), estudiante.nombreCompleto(), estadoCalif, obs, n60, n100,
-                            letraVariante, cuadernilloPdf);
+                            letraVariante, cuadernilloPdf, esIndividual);
                 }).toList();
 
         return new PreparacionCartillasOmrResponseDto(

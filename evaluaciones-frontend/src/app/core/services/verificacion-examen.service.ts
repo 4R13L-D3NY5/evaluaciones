@@ -122,6 +122,10 @@ export class VerificacionExamenService {
     return this.http.post<GeneracionTypstResultado>(`${this.baseUrl}/${rolExamenId}/previsualizacion`, {}).pipe(catchError(this.error));
   }
 
+  obtenerHistorialDevoluciones(rolExamenId: string): Observable<VerificacionHistorialDevolucion[]> {
+    return this.http.get<VerificacionHistorialDevolucion[]>(`${this.baseUrl}/${rolExamenId}/historial-devoluciones`).pipe(catchError(this.error));
+  }
+
   decidir(rolExamenId: string, decision: VerificacionDecision): Observable<VerificacionExamenDetalle> {
     return this.http.post<VerificacionExamenDetalle>(`${this.baseUrl}/${rolExamenId}/decision`, decision).pipe(catchError(this.error));
   }

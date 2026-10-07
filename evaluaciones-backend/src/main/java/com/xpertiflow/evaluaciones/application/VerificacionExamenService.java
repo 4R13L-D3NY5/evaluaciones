@@ -250,7 +250,7 @@ public class VerificacionExamenService {
         VerificacionExamenDetalleDto dto = mapearDetalle(rol, banco, verificacion);
         List<VerificacionPreguntaDto> preguntasActuales = mapearPreguntas(reactivos, observaciones);
         dto.setPreguntas(preguntasActuales);
-        dto.setHistorialDevoluciones(mapearHistorialDevoluciones(rol.getId(), reactivos));
+        dto.setHistorialDevoluciones(mapearHistorialDevoluciones(rol.getId(), reactivos, verificacion));
         return dto;
     }
 
@@ -398,10 +398,15 @@ public class VerificacionExamenService {
     }
 
     private List<VerificacionHistorialDevolucionDto> mapearHistorialDevoluciones(
-            String rolExamenId, List<Reactivo> reactivosActuales) {
+            String rolExamenId, List<Reactivo> reactivosActuales, VerificacionExamen verificacionActual) {
         List<HistorialVerificacion> historial = historialVerificacionRepository
                 .findByRolExamenIdOrderByFechaDevolucionDescIdDesc(rolExamenId);
         List<VerificacionHistorialDevolucionDto> resultado = new ArrayList<>();
+
+        if (verificacionActual != null && "DEVUELTO".equalsIgnoreCase(verificacionActual.getEstado())) {
+            resultado.add(mapearDevolucionActiva(verificacionActual, reactivosActuales));
+        }
+
         for (int indice = 0; indice < historial.size(); indice++) {
             HistorialVerificacion devolucion = historial.get(indice);
             List<Reactivo> reactivosCorregidos = indice == 0
@@ -410,6 +415,38 @@ public class VerificacionExamenService {
             resultado.add(mapearHistorialDevolucion(devolucion, reactivosCorregidos));
         }
         return resultado;
+    }
+
+    private VerificacionHistorialDevolucionDto mapearDevolucionActiva(
+            VerificacionExamen verificacion, List<Reactivo> reactivosActuales) {
+        Map<Integer, Reactivo> actualesPorNumero = new HashMap<>();
+        reactivosActuales.forEach(r -> actualesPorNumero.put(r.getNumeroOrden(), r));
+        Map<String, String> observaciones = observaciones(verificacion.getObservacionesPreguntasJson());
+
+        VerificacionHistorialDevolucionDto dto = new VerificacionHistorialDevolucionDto();
+        dto.setId(0L);
+        dto.setBancoPreguntasId(verificacion.getBancoPreguntasId());
+        dto.setFechaDevolucion(verificacion.getFechaVerificacion() != null ? verificacion.getFechaVerificacion() : LocalDateTime.now());
+        dto.setVerificadoPor(verificacion.getVerificadoPor());
+        dto.setObservacionesGenerales(verificacion.getObservacionesGenerales());
+        dto.setPreguntasObservadas(observaciones.entrySet().stream()
+                .filter(entrada -> entrada.getValue() != null && !entrada.getValue().isBlank()
+                        && numeroSeguro(entrada.getKey()) != Integer.MAX_VALUE)
+                .sorted(Comparator.comparingInt(entrada -> numeroSeguro(entrada.getKey())))
+                .map(entrada -> {
+                    Integer numero = numeroSeguro(entrada.getKey());
+                    Reactivo reactivo = actualesPorNumero.get(numero);
+                    VerificacionHistorialPreguntaDto pregunta = new VerificacionHistorialPreguntaDto();
+                    pregunta.setNumeroPregunta(numero);
+                    pregunta.setObservacion(entrada.getValue());
+                    if (reactivo != null) {
+                        pregunta.setPreguntaEnviada(mapearPregunta(reactivo, null));
+                    }
+                    pregunta.setPreguntaCorregida(null);
+                    return pregunta;
+                })
+                .toList());
+        return dto;
     }
 
     private VerificacionHistorialDevolucionDto mapearHistorialDevolucion(
@@ -464,8 +501,47 @@ public class VerificacionExamenService {
         VerificacionExamenDetalleDto dto = mapearDetalle(rol, banco, verificacion);
         Map<String, String> notas = observaciones(verificacion);
         dto.setPreguntas(mapearPreguntas(reactivos, notas));
-        dto.setHistorialDevoluciones(mapearHistorialDevoluciones(rolExamenId, reactivos));
+        dto.setHistorialDevoluciones(mapearHistorialDevoluciones(rolExamenId, reactivos, verificacion));
         return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public List<VerificacionHistorialDevolucionDto> obtenerHistorialDevoluciones(
+            String rolExamenId, Authentication authentication) {
+        RolExamen rol = rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        if (!accesoAcademicoService.puedeAcceder(rol, authentication)) {
+            throw new AccessDeniedException("No tiene permisos para acceder a esta evaluación");
+        }
+        BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId).orElse(null);
+        List<Reactivo> reactivosActuales = banco != null ? descifrarReactivos(banco) : List.of();
+        VerificacionExamen verificacion = verificacionRepository.findByRolExamenId(rolExamenId).orElse(null);
+        return mapearHistorialDevoluciones(rolExamenId, reactivosActuales, verificacion);
+    }
+
+    @Transactional
+    public GeneracionTypstResultadoDto solicitarPrevisualizacionDocente(
+            String rolExamenId, Authentication authentication) {
+        RolExamen rol = rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        if (!accesoAcademicoService.puedeAcceder(rol, authentication)) {
+            throw new AccessDeniedException("No tiene permisos para acceder a esta evaluación");
+        }
+        BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("El examen no cuenta con un banco de preguntas cargado"));
+        List<Map<String, Object>> preguntas = descifrarReactivos(banco).stream()
+                .sorted(Comparator.comparingInt(this::ordenTipo).thenComparing(Reactivo::getNumeroOrden,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(this::mapaParaWorker)
+                .toList();
+        PrevisualizacionTypstRequestDto request = new PrevisualizacionTypstRequestDto();
+        request.setRolExamenId(rol.getId());
+        request.setPreguntas(preguntas);
+        request.setModoVerificacion(false);
+        request.setIncluirClave(false);
+        registrarAuditoria(rolExamenId, "PREVISUALIZACION_TYPST_SEGUIMIENTO", authentication.getName(),
+                "Previsualización Typst consultada desde Seguimiento Operativo por verificador");
+        return generacionTypstService.solicitarPrevisualizacion(request);
     }
 
     private Map<String, String> observaciones(String json) {

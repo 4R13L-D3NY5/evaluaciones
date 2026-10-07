@@ -2034,41 +2034,36 @@ interface CampusDisponible extends Campus {
                       </div>
                     </div>
                     <div class="max-h-56 overflow-y-auto divide-y divide-border text-xs">
-                      <div class="grid grid-cols-[36px_100px_1fr_75px_100px_110px] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
-                        <span>N°</span><span>Código</span><span>Estudiante</span><span class="text-center">Variante</span><span class="text-center">Examen</span><span>Observaciones</span>
+                      <div class="grid grid-cols-[36px_110px_1fr_110px_120px] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
+                        <span>N°</span><span>Código</span><span>Estudiante</span><span class="text-center">Examen</span><span>Observaciones</span>
                       </div>
                     @for (estudiante of preparacion.estudiantes; track estudiante.codigoEstudiante) {
-                      <div class="grid grid-cols-[36px_100px_1fr_75px_100px_110px] gap-2 px-3 py-2.5 items-center">
+                      <div class="grid grid-cols-[36px_110px_1fr_110px_120px] gap-2 px-3 py-2.5 items-center">
                         <span class="font-mono text-muted-foreground">{{ estudiante.numeroOrden }}</span>
                         <span class="font-mono font-bold">{{ estudiante.codigoEstudiante }}</span>
                         <span class="truncate font-medium">{{ estudiante.nombreCompleto }}</span>
                         <div class="text-center">
-                          @if (estudiante.letraVariante) {
-                            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-purple-50 text-purple-700 border border-purple-200">
-                              Tipo {{ estudiante.letraVariante }}
-                            </span>
+                          @if (estudiante.esIndividual) {
+                            @if (estudiante.cuadernilloPdfPath) {
+                              <button
+                                (click)="descargarExamenEstudiante(estudiante)"
+                                class="px-2.5 py-1 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                                title="Descargar examen asignado a este estudiante">
+                                <i class="pi pi-file-pdf"></i>
+                                <span>Examen</span>
+                              </button>
+                            } @else {
+                              <button
+                                (click)="abrirModalGenerarExamen(estudiante)"
+                                [disabled]="generandoExamenIndividual()"
+                                class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                                title="Generar examen individual para este estudiante rezagado">
+                                <i class="pi pi-file-plus"></i>
+                                <span>Generar</span>
+                              </button>
+                            }
                           } @else {
                             <span class="text-[10px] text-muted-foreground">—</span>
-                          }
-                        </div>
-                        <div class="text-center">
-                          @if (estudiante.cuadernilloPdfPath) {
-                            <button
-                              (click)="descargarExamenEstudiante(estudiante)"
-                              class="px-2 py-1 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
-                              title="Descargar PDF de examen asignado a este estudiante">
-                              <i class="pi pi-file-pdf"></i>
-                              <span>Descargar</span>
-                            </button>
-                          } @else {
-                            <button
-                              (click)="abrirModalGenerarExamen(estudiante)"
-                              [disabled]="generandoExamenIndividual()"
-                              class="px-2 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
-                              title="Generar examen personalizado para este estudiante rezagado">
-                              <i class="pi pi-file-plus"></i>
-                              <span>Generar</span>
-                            </button>
                           }
                         </div>
                         @if (estudiante.estadoCalificacion === 'ANULADO' || (estudiante.observacion && estudiante.observacion.includes('ANULADO'))) {
@@ -2166,31 +2161,79 @@ interface CampusDisponible extends Campus {
                   </div>
                 </div>
 
-                <div class="space-y-2">
-                  <label class="block text-xs font-bold text-foreground">
-                    Seleccione la variante a generar:
-                  </label>
-                  <p class="text-[11px] text-muted-foreground">
-                    El examen compilará exactamente las mismas preguntas, opciones y formato que la variante seleccionada, asignándole un código de control exclusivo.
-                  </p>
-                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-                    @for (v of variantesDisponibles(); track v) {
-                      <button
-                        type="button"
-                        (click)="varianteSeleccionada.set(v)"
-                        [class.border-purple-600]="varianteSeleccionada() === v"
-                        [class.bg-purple-50]="varianteSeleccionada() === v"
-                        [class.text-purple-900]="varianteSeleccionada() === v"
-                        [class.font-black]="varianteSeleccionada() === v"
-                        class="p-2.5 rounded-xl border border-border text-center text-xs font-bold hover:bg-muted/50 cursor-pointer transition-all flex flex-col items-center gap-1">
-                        <span class="text-base font-black">Tipo {{ v }}</span>
-                        @if (varianteSeleccionada() === v) {
-                          <span class="text-[10px] text-purple-700 font-semibold"><i class="pi pi-check text-[9px] mr-0.5"></i>Seleccionado</span>
+                <div class="space-y-3">
+                  <div>
+                    <label class="block text-xs font-bold text-foreground">
+                      Seleccione la variante a generar:
+                    </label>
+                    <p class="text-[11px] text-muted-foreground mt-0.5">
+                      Puede asignar una de las variantes ya generadas o compilar una <strong>nueva variante</strong> con código de control exclusivo.
+                    </p>
+                  </div>
+
+                  <!-- Variantes existentes en el lote -->
+                  <div class="space-y-1.5">
+                    <span class="text-[10px] uppercase font-black text-muted-foreground tracking-wide">
+                      Variantes existentes en el lote
+                    </span>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      @for (v of variantesDisponibles(); track v) {
+                        <button
+                          type="button"
+                          (click)="seleccionarVarianteExistente(v)"
+                          [class.border-purple-600]="!esModoNuevaVariante() && varianteSeleccionada() === v"
+                          [class.bg-purple-50]="!esModoNuevaVariante() && varianteSeleccionada() === v"
+                          [class.text-purple-900]="!esModoNuevaVariante() && varianteSeleccionada() === v"
+                          [class.font-black]="!esModoNuevaVariante() && varianteSeleccionada() === v"
+                          class="p-2.5 rounded-xl border border-border text-center text-xs font-bold hover:bg-muted/50 cursor-pointer transition-all flex flex-col items-center gap-1">
+                          <span class="text-base font-black">Tipo {{ v }}</span>
+                          @if (!esModoNuevaVariante() && varianteSeleccionada() === v) {
+                            <span class="text-[10px] text-purple-700 font-semibold"><i class="pi pi-check text-[9px] mr-0.5"></i>Seleccionado</span>
+                          } @else {
+                            <span class="text-[10px] text-muted-foreground">Ya generada</span>
+                          }
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Opción: Generar Nueva Variante -->
+                  <div class="pt-2 border-t border-border space-y-1.5">
+                    <span class="text-[10px] uppercase font-black text-emerald-800 dark:text-emerald-400 tracking-wide flex items-center gap-1">
+                      <i class="pi pi-sparkles text-[10px]"></i> Nueva variante
+                    </span>
+                    <button
+                      type="button"
+                      (click)="seleccionarNuevaVariante()"
+                      [class.border-emerald-600]="esModoNuevaVariante()"
+                      [class.bg-emerald-50]="esModoNuevaVariante()"
+                      [class.text-emerald-950]="esModoNuevaVariante()"
+                      [class.ring-2]="esModoNuevaVariante()"
+                      class="w-full p-3 rounded-xl border border-dashed border-emerald-400 hover:bg-emerald-50/50 cursor-pointer transition-all flex items-center justify-between gap-3 text-left ring-emerald-500/20">
+                      <div class="flex items-center gap-2.5">
+                        <div class="h-9 w-9 rounded-lg bg-emerald-100 text-emerald-800 font-black text-sm flex items-center justify-center shrink-0">
+                          {{ siguienteVarianteNueva() }}
+                        </div>
+                        <div>
+                          <div class="text-xs font-black text-foreground flex items-center gap-1.5">
+                            <span>Generar Tipo {{ siguienteVarianteNueva() }}</span>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-100 text-emerald-800">Nueva</span>
+                          </div>
+                          <p class="text-[11px] text-muted-foreground">Compila una variante nueva para evitar coincidencias con el grupo regular.</p>
+                        </div>
+                      </div>
+                      <div class="shrink-0">
+                        @if (esModoNuevaVariante()) {
+                          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-700 text-white text-[11px] font-black shadow-xs">
+                            <i class="pi pi-check text-[10px]"></i> Seleccionada
+                          </span>
                         } @else {
-                          <span class="text-[10px] text-muted-foreground">Disponible</span>
+                          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-emerald-300 text-emerald-800 text-[11px] font-bold bg-white dark:bg-card">
+                            <i class="pi pi-plus text-[9px]"></i> Elegir
+                          </span>
                         }
-                      </button>
-                    }
+                      </div>
+                    </button>
                   </div>
                 </div>
               }
@@ -4042,6 +4085,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public estudianteSeleccionadoParaExamen = signal<CartillaOmr | null>(null);
   public variantesDisponibles = signal<string[]>(['A']);
   public varianteSeleccionada = signal<string>('A');
+  public esModoNuevaVariante = signal<boolean>(false);
+  public siguienteVarianteNueva = computed<string>(() => {
+    const existentes = this.variantesDisponibles().map(v => v.toUpperCase().trim());
+    const abcd = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    for (const l of abcd) {
+      if (!existentes.includes(l)) return l;
+    }
+    return 'Z';
+  });
   public generandoExamenIndividual = signal<boolean>(false);
   public simulandoRezagado = signal<boolean>(false);
   public readonly esEntornoLocal: boolean = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -5112,6 +5164,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (!item) return;
 
     this.estudianteSeleccionadoParaExamen.set(estudiante);
+    this.esModoNuevaVariante.set(false);
     this.varianteSeleccionada.set(estudiante.letraVariante || 'A');
     this.dialogGenerarExamenIndividual.set(true);
 
@@ -5128,10 +5181,21 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     });
   }
 
+  public seleccionarVarianteExistente(v: string): void {
+    this.esModoNuevaVariante.set(false);
+    this.varianteSeleccionada.set(v);
+  }
+
+  public seleccionarNuevaVariante(letra?: string): void {
+    this.esModoNuevaVariante.set(true);
+    this.varianteSeleccionada.set(letra || this.siguienteVarianteNueva());
+  }
+
   public cerrarModalGenerarExamen(): void {
     if (this.generandoExamenIndividual()) return;
     this.dialogGenerarExamenIndividual.set(false);
     this.estudianteSeleccionadoParaExamen.set(null);
+    this.esModoNuevaVariante.set(false);
   }
 
   public confirmarGeneracionExamenIndividual(): void {

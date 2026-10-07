@@ -1,6 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { GeneracionTypstResultado } from '../models/generacion-typst.model';
+import { VerificacionHistorialDevolucion } from './verificacion-examen.service';
 
 export interface HistorialObservacionItem {
   devolucionId: number;
@@ -206,5 +208,13 @@ export class ReportesService {
     }
 
     return this._http.get<ReporteConsolidadoOmrResumen>(`${this._baseUrl}/consolidado-omr`, { params });
+  }
+
+  public solicitarPrevisualizacionTypst(rolExamenId: string): Observable<GeneracionTypstResultado> {
+    return this._http.post<GeneracionTypstResultado>(`${this._baseUrl}/evaluaciones/${rolExamenId}/previsualizacion-typst`, {});
+  }
+
+  public obtenerHistorialDevoluciones(rolExamenId: string): Observable<VerificacionHistorialDevolucion[]> {
+    return this._http.get<VerificacionHistorialDevolucion[]>(`${this._baseUrl}/evaluaciones/${rolExamenId}/historial-devoluciones`);
   }
 }

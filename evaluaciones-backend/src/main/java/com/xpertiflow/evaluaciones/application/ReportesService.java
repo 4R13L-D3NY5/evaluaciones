@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -92,18 +93,38 @@ public class ReportesService {
             VerificacionExamen verificacion = verificacionesPorRolId.get(rol.getId());
             List<HistorialVerificacion> devoluciones = devolucionesPorRolId.getOrDefault(rol.getId(), Collections.emptyList());
 
+            List<HistorialObservacionItemDto> observacionesDtos = new ArrayList<>();
+            if (verificacion != null && "DEVUELTO".equalsIgnoreCase(verificacion.getEstado())) {
+                observacionesDtos.add(HistorialObservacionItemDto.builder()
+                        .devolucionId(0L)
+                        .fechaDevolucion(verificacion.getFechaVerificacion() != null ? verificacion.getFechaVerificacion() : (verificacion.getActualizadoEn() != null ? verificacion.getActualizadoEn() : LocalDateTime.now()))
+                        .verificadoPor(verificacion.getVerificadoPor())
+                        .observacionesGenerales(verificacion.getObservacionesGenerales())
+                        .observacionesPreguntasJson(verificacion.getObservacionesPreguntasJson())
+                        .totalPreguntasObservadas(contarPreguntasObservadas(verificacion.getObservacionesPreguntasJson()))
+                        .build());
+            }
+            devoluciones.forEach(d -> observacionesDtos.add(HistorialObservacionItemDto.builder()
+                    .devolucionId(d.getId())
+                    .fechaDevolucion(d.getFechaDevolucion())
+                    .verificadoPor(d.getVerificadoPor())
+                    .observacionesGenerales(d.getObservacionesGenerales())
+                    .observacionesPreguntasJson(d.getObservacionesPreguntasJson())
+                    .totalPreguntasObservadas(contarPreguntasObservadas(d.getObservacionesPreguntasJson()))
+                    .build()));
+
             String estadoCalidad;
             if (banco == null) {
                 estadoCalidad = "SIN_BANCO";
             } else {
-                boolean esAprobado = esEstadoAprobado(rol, verificacion);
                 boolean esDevuelto = esEstadoDevuelto(rol, verificacion);
+                boolean esAprobado = !esDevuelto && esEstadoAprobado(rol, verificacion);
 
-                if (!devoluciones.isEmpty()) {
-                    if (esAprobado) {
-                        estadoCalidad = "OBSERVADO_Y_APROBADO";
-                    } else if (esDevuelto) {
+                if (!observacionesDtos.isEmpty()) {
+                    if (esDevuelto) {
                         estadoCalidad = "OBSERVADO_PENDIENTE";
+                    } else if (esAprobado) {
+                        estadoCalidad = "OBSERVADO_Y_APROBADO";
                     } else {
                         estadoCalidad = "PENDIENTE_REVISION";
                     }
@@ -118,23 +139,12 @@ public class ReportesService {
                 }
             }
 
-            List<HistorialObservacionItemDto> observacionesDtos = devoluciones.stream().map(d ->
-                    HistorialObservacionItemDto.builder()
-                            .devolucionId(d.getId())
-                            .fechaDevolucion(d.getFechaDevolucion())
-                            .verificadoPor(d.getVerificadoPor())
-                            .observacionesGenerales(d.getObservacionesGenerales())
-                            .observacionesPreguntasJson(d.getObservacionesPreguntasJson())
-                            .totalPreguntasObservadas(contarPreguntasObservadas(d.getObservacionesPreguntasJson()))
-                            .build()
-            ).toList();
-
-            String ultimoVerificador = !devoluciones.isEmpty()
-                    ? devoluciones.get(0).getVerificadoPor()
+            String ultimoVerificador = !observacionesDtos.isEmpty()
+                    ? observacionesDtos.get(0).getVerificadoPor()
                     : (verificacion != null ? verificacion.getVerificadoPor() : null);
 
-            var ultimaObsFecha = !devoluciones.isEmpty()
-                    ? devoluciones.get(0).getFechaDevolucion()
+            var ultimaObsFecha = !observacionesDtos.isEmpty()
+                    ? observacionesDtos.get(0).getFechaDevolucion()
                     : null;
 
             String aprobadoPor = (verificacion != null && "VERIFICADO".equalsIgnoreCase(verificacion.getEstado()))
@@ -162,7 +172,7 @@ public class ReportesService {
                     .horaExamen(rol.getHorario())
                     .estadoFlujo(rol.getEstadoFlujo() != null ? rol.getEstadoFlujo().name() : "")
                     .estadoCalidad(estadoCalidad)
-                    .totalObservaciones(devoluciones.size())
+                    .totalObservaciones(observacionesDtos.size())
                     .ultimaObservacionFecha(ultimaObsFecha)
                     .ultimoVerificador(ultimoVerificador)
                     .aprobadoPor(aprobadoPor)
@@ -211,6 +221,11 @@ public class ReportesService {
                 })
                 .toList();
 
+        List<ReporteCalidadItemDto> itemsOrdenados = itemsFiltrados.stream()
+                .sorted(Comparator.comparing(ReporteCalidadItemDto::getMateriaCodigo, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(ReporteCalidadItemDto::getGrupo, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+
         return ReporteCalidadResumenDto.builder()
                 .totalExamenes(totalExamenes)
                 .aprobadosDirectos(aprobadosDirectos)
@@ -220,7 +235,7 @@ public class ReportesService {
                 .sinBanco(sinBanco)
                 .porcentajeAprobadosDirectos(porcentajeAprobadosDirectos)
                 .porcentajeObservados(porcentajeObservados)
-                .items(itemsFiltrados)
+                .items(itemsOrdenados)
                 .build();
     }
 
@@ -491,20 +506,18 @@ public class ReportesService {
                     }
                     return true;
                 })
-                .sorted(Comparator.comparing(RolExamen::getFecha, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(RolExamen::getHorario, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(RolExamen::getMateriaCodigo, Comparator.nullsLast(Comparator.naturalOrder())))
+                .sorted(Comparator.comparing(RolExamen::getMateriaCodigo, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(RolExamen::getGrupo, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }
 
     private boolean esEstadoAprobado(RolExamen rol, VerificacionExamen verificacion) {
-        if (verificacion != null && "VERIFICADO".equalsIgnoreCase(verificacion.getEstado())) {
-            return true;
+        if (verificacion != null) {
+            return "VERIFICADO".equalsIgnoreCase(verificacion.getEstado());
         }
         if (rol.getEstadoFlujo() != null) {
             EstadoFlujo ef = rol.getEstadoFlujo();
-            return ef == EstadoFlujo.VALIDADO
-                    || ef == EstadoFlujo.GENERADO
+            return ef == EstadoFlujo.GENERADO
                     || ef == EstadoFlujo.IMPRESO
                     || ef == EstadoFlujo.ENTREGADO
                     || ef == EstadoFlujo.PENDIENTE_NOTAS
