@@ -1,6 +1,8 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { 
   EvaluacionesStorageService, 
   GestionEvaluacionItem, 
@@ -20,6 +22,8 @@ import {
   ReporteConsolidadoOmrResumen, 
   ReporteConsolidadoOmrItem 
 } from '../../core/services/reportes.service';
+import { MathContentDirective } from '../../shared/components/math-content.directive';
+import { VerificacionHistorialDevolucion, VerificacionPregunta, VerificacionOpcion } from '../../core/services/verificacion-examen.service';
 import * as XLSX from 'xlsx';
 
 type TipoReporte = 
@@ -57,7 +61,7 @@ interface FilaRemark {
 @Component({
   selector: 'sea-reporte-evaluaciones',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MathContentDirective],
   template: `
     <div class="space-y-6 animate-fade-in pb-12">
       
@@ -239,6 +243,24 @@ interface FilaRemark {
                   <option value="CALIFICADO">Calificado</option>
                   <option value="CONFIRMADO">Confirmado</option>
                 </select>
+              </div>
+
+              <!-- Buscador Rápido por código o materia -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Buscar código / materia:</label>
+                <div class="relative">
+                  <i class="pi pi-search absolute left-2.5 top-2 text-muted-foreground text-xs"></i>
+                  <input
+                    type="text"
+                    [(ngModel)]="busquedaReporte"
+                    placeholder="SIS-114, materia, docente..."
+                    class="bg-muted border border-border rounded-xl pl-7 pr-6 py-1.5 text-xs font-semibold text-foreground outline-none w-52 focus:border-primary shadow-2xs" />
+                  @if (busquedaReporte) {
+                    <button type="button" (click)="busquedaReporte = ''" class="absolute right-2 top-1.5 text-muted-foreground hover:text-foreground text-xs cursor-pointer">
+                      <i class="pi pi-times text-[10px]"></i>
+                    </button>
+                  }
+                </div>
               </div>
             }
           </div>
@@ -519,100 +541,222 @@ interface FilaRemark {
 
       <!-- MODAL DETALLADO DE OBSERVACIONES Y TIMELINE -->
       @if (itemCalidadSeleccionado(); as item) {
-        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div class="bg-card border border-border rounded-2xl max-w-3xl w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
-            <div class="p-5 border-b border-border bg-purple-50/60 dark:bg-purple-950/20 flex items-start justify-between gap-3">
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 rounded-lg bg-primary/10 text-primary font-mono font-black text-xs">{{ item.materiaCodigo }}</span>
-                  <h3 class="text-sm font-black text-foreground">{{ item.materiaNombre }} (Grupo {{ item.grupo }})</h3>
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" (click)="cerrarModalObservaciones()">
+          <div class="bg-card border border-border rounded-2xl max-w-4xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col" (click)="$event.stopPropagation()">
+            <div class="p-5 border-b border-border bg-purple-50/60 dark:bg-purple-950/20 flex items-start justify-between gap-3 shrink-0">
+              <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 shrink-0">
+                  <i class="pi pi-history text-lg"></i>
+                </span>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-lg bg-primary/10 text-primary font-mono font-black text-xs">{{ item.materiaCodigo }}</span>
+                    <h3 class="text-sm font-black text-foreground">{{ item.materiaNombre }} (Grupo {{ item.grupo }})</h3>
+                    <span [class]="obtenerClaseDictamen(item.estadoCalidad)" class="px-2 py-0.5 rounded-lg text-[10px] font-black border">
+                      {{ obtenerEtiquetaDictamen(item.estadoCalidad) }}
+                    </span>
+                  </div>
+                  <p class="text-xs text-muted-foreground mt-1">
+                    Docente: <strong class="text-foreground">{{ item.docenteNombre }}</strong> · {{ item.sedeNombre }} · {{ item.carreraNombre }}
+                  </p>
                 </div>
-                <p class="text-xs text-muted-foreground mt-1">
-                  Docente: <strong class="text-foreground">{{ item.docenteNombre }}</strong> · {{ item.sedeNombre }} · {{ item.carreraNombre }}
-                </p>
               </div>
               <button
                 type="button"
+                aria-label="Cerrar modal"
                 (click)="cerrarModalObservaciones()"
                 class="text-muted-foreground hover:text-foreground cursor-pointer p-1">
                 <i class="pi pi-times text-lg"></i>
               </button>
             </div>
 
-            <div class="p-5 overflow-y-auto space-y-4">
-              <div class="flex items-center justify-between pb-2 border-b border-border">
-                <h4 class="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
-                  <i class="pi pi-history text-purple-700"></i>
-                  <span>Línea de Tiempo de Devoluciones ({{ item.observaciones.length }})</span>
-                </h4>
-                <span [class]="obtenerClaseDictamen(item.estadoCalidad)" class="px-2 py-0.5 rounded-lg text-[10px] font-black border">
-                  {{ obtenerEtiquetaDictamen(item.estadoCalidad) }}
-                </span>
-              </div>
-
-              <!-- Lista cronológica de devoluciones -->
-              <div class="space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-purple-200">
-                @for (obs of item.observaciones; track obs.devolucionId; let i = $index) {
-                  <div class="relative flex items-start gap-3 pl-1">
-                    <div class="h-6 w-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 z-10 shadow-xs">
-                      {{ item.observaciones.length - i }}
-                    </div>
-                    <div class="flex-1 bg-muted/40 border border-border rounded-xl p-4 space-y-3">
-                      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
-                        <div>
-                          <span class="text-[10px] font-black uppercase text-purple-700">Devolución #{{ item.observaciones.length - i }}</span>
-                          <div class="text-xs font-bold text-foreground">
-                            Verificado por: {{ obs.verificadoPor || 'Verificador oficial' }}
-                          </div>
+            <div class="p-5 overflow-y-auto space-y-5 flex-1">
+              @if (cargandoHistorialCalidad()) {
+                <div class="py-12 text-center text-sm text-muted-foreground">
+                  <i class="pi pi-spinner pi-spin text-2xl text-primary block mb-2"></i>
+                  Cargando detalle de preguntas y observaciones...
+                </div>
+              } @else if (historialCalidadModal().length > 0) {
+                <div class="space-y-6">
+                  @for (devolucion of historialCalidadModal(); track devolucion.id || $index; let idx = $index) {
+                    <article class="rounded-2xl border-2 border-amber-300/80 bg-amber-50/30 dark:border-amber-700/60 dark:bg-amber-950/15 overflow-hidden shadow-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/80 dark:border-amber-800/80 bg-amber-100/60 dark:bg-amber-900/30 px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <span class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-600 text-white text-xs font-black">
+                            {{ historialCalidadModal().length - idx }}
+                          </span>
+                          <span class="text-xs font-black text-amber-950 dark:text-amber-200 uppercase tracking-wide">
+                            Devolución #{{ historialCalidadModal().length - idx }}
+                          </span>
                         </div>
-                        <span class="text-[11px] font-mono font-bold text-muted-foreground bg-card px-2.5 py-1 rounded-lg border border-border">
-                          <i class="pi pi-calendar mr-1 text-[10px]"></i>
-                          {{ formatearFechaBoliviana(obs.fechaDevolucion) }}
-                        </span>
+                        <div class="flex items-center gap-2 text-[11px] font-bold text-amber-900 dark:text-amber-300">
+                          <i class="pi pi-calendar"></i>
+                          <span>{{ devolucion.fechaDevolucion | date:'dd/MM/yyyy HH:mm' }}</span>
+                          <span class="text-amber-400">·</span>
+                          <i class="pi pi-user"></i>
+                          <span>Por: {{ devolucion.verificadoPor || 'Verificador oficial' }}</span>
+                        </div>
                       </div>
 
-                      @if (obs.observacionesGenerales) {
-                        <div>
-                          <span class="text-[10px] font-extrabold uppercase text-muted-foreground block mb-1">Motivo general de la observación:</span>
-                          <p class="text-xs text-foreground bg-card border border-border/70 rounded-lg p-2.5 leading-relaxed font-medium">
-                            {{ obs.observacionesGenerales }}
-                          </p>
-                        </div>
-                      }
+                      <div class="p-4 space-y-4">
+                        @if (devolucion.observacionesGenerales) {
+                          <div class="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3.5 text-xs text-amber-950 dark:text-amber-100 shadow-2xs">
+                            <div class="flex items-center gap-1.5 font-black text-amber-900 dark:text-amber-300 mb-1">
+                              <i class="pi pi-comment"></i>
+                              <span>Observación General del Verificador:</span>
+                            </div>
+                            <p class="leading-relaxed whitespace-pre-wrap pl-5">{{ devolucion.observacionesGenerales }}</p>
+                          </div>
+                        }
 
-                      @if (parsearPreguntasObservadas(obs.observacionesPreguntasJson); as preguntas) {
-                        @if (preguntas.length > 0) {
+                        @if (devolucion.preguntasObservadas && devolucion.preguntasObservadas.length > 0) {
                           <div>
-                            <span class="text-[10px] font-extrabold uppercase text-muted-foreground block mb-1.5">
-                              Preguntas observadas en detalle ({{ preguntas.length }}):
-                            </span>
-                            <div class="grid grid-cols-1 gap-2">
-                              @for (p of preguntas; track p.numero) {
-                                <div class="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-lg p-2.5 flex items-start gap-2.5">
-                                  <span class="px-2 py-0.5 rounded bg-rose-600 text-white font-black font-mono text-[10px] shrink-0 mt-0.5">
-                                    P{{ p.numero }}
-                                  </span>
-                                  <p class="text-xs text-rose-900 dark:text-rose-200 font-medium leading-relaxed">
-                                    {{ p.motivo }}
-                                  </p>
+                            <p class="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                              <i class="pi pi-list"></i>
+                              <span>Preguntas observadas en esta revisión ({{ devolucion.preguntasObservadas.length }}):</span>
+                            </p>
+
+                            <div class="space-y-4">
+                              @for (itemPregunta of devolucion.preguntasObservadas; track itemPregunta.numeroPregunta) {
+                                <div class="rounded-xl border border-border bg-card p-4 shadow-2xs space-y-3">
+                                  <div class="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2.5">
+                                    <div class="flex items-center gap-2">
+                                      <span class="rounded-lg bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 px-2 py-0.5 text-xs font-black border border-purple-200 dark:border-purple-700">
+                                        Pregunta {{ itemPregunta.numeroPregunta }}
+                                      </span>
+                                      @if (itemPregunta.preguntaEnviada?.tipoReactivo) {
+                                        <span class="text-[10px] font-bold uppercase text-muted-foreground">
+                                          {{ itemPregunta.preguntaEnviada?.tipoReactivo }}
+                                        </span>
+                                      }
+                                    </div>
+                                    @if (itemPregunta.preguntaCorregida) {
+                                      <span class="rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-bold border border-emerald-300 dark:border-emerald-800">
+                                        <i class="pi pi-check mr-1"></i>Corregida en versión posterior
+                                      </span>
+                                    }
+                                  </div>
+
+                                  <div class="rounded-lg border border-rose-200 bg-rose-50/80 dark:bg-rose-950/30 dark:border-rose-900 p-2.5 text-xs text-rose-900 dark:text-rose-200">
+                                    <strong class="text-rose-950 dark:text-rose-100 font-black flex items-center gap-1 mb-1">
+                                      <i class="pi pi-exclamation-triangle text-rose-600"></i> Observación del verificador:
+                                    </strong>
+                                    <p class="leading-relaxed whitespace-pre-wrap pl-4">{{ itemPregunta.observacion }}</p>
+                                  </div>
+
+                                  @if (itemPregunta.preguntaEnviada) {
+                                    <div class="rounded-lg bg-muted/40 p-3 border border-border/60 text-xs space-y-2">
+                                      <div class="font-extrabold uppercase text-[10px] text-muted-foreground">Enunciado de la pregunta:</div>
+                                      <div [seaMathContent]="itemPregunta.preguntaEnviada.enunciado" class="whitespace-pre-wrap text-foreground font-medium"></div>
+
+                                      @if (imagenDataUrl(itemPregunta.preguntaEnviada.imagenBase64); as img) {
+                                        <img [src]="img" alt="Imagen del reactivo" class="max-h-56 max-w-full rounded-lg border border-border object-contain my-2" />
+                                      }
+
+                                      @if (itemPregunta.preguntaEnviada.opciones && itemPregunta.preguntaEnviada.opciones.length > 0) {
+                                        <div class="mt-2.5 pt-2.5 border-t border-border/50 space-y-1.5">
+                                          <div class="font-bold text-[10px] uppercase text-muted-foreground">Opciones registradas:</div>
+                                          <div class="space-y-1">
+                                            @for (opc of itemPregunta.preguntaEnviada.opciones; track opc.letra) {
+                                              <div class="flex items-start gap-1.5 text-xs" [class.font-black]="esOpcionCorrecta(itemPregunta.preguntaEnviada, opc)" [class.text-emerald-700]="esOpcionCorrecta(itemPregunta.preguntaEnviada, opc)">
+                                                <span class="w-5 shrink-0">{{ opc.letra }})</span>
+                                                <span [seaMathContent]="opc.texto" class="flex-1"></span>
+                                                @if (esOpcionCorrecta(itemPregunta.preguntaEnviada, opc)) {
+                                                  <span class="rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[9px] px-1.5 py-0.2 font-black shrink-0 border border-emerald-300 dark:border-emerald-800">CLAVE</span>
+                                                }
+                                              </div>
+                                            }
+                                          </div>
+                                        </div>
+                                      }
+                                      @if (itemPregunta.preguntaEnviada.respuestaCorrecta) {
+                                        <div class="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 mt-1">
+                                          Clave correcta indicada: <strong>{{ itemPregunta.preguntaEnviada.respuestaCorrecta }}</strong>
+                                        </div>
+                                      }
+                                    </div>
+                                  } @else {
+                                    <p class="text-xs text-muted-foreground italic">No se pudo recuperar el reactivo original.</p>
+                                  }
                                 </div>
                               }
                             </div>
                           </div>
                         }
-                      }
+                      </div>
+                    </article>
+                  }
+                </div>
+              } @else if (item.observaciones && item.observaciones.length > 0) {
+                <!-- Vista de respaldo si no se obtuvo detalle completo de reactivos -->
+                <div class="space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-purple-200">
+                  @for (obs of item.observaciones; track obs.devolucionId; let i = $index) {
+                    <div class="relative flex items-start gap-3 pl-1">
+                      <div class="h-6 w-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 z-10 shadow-xs">
+                        {{ item.observaciones.length - i }}
+                      </div>
+                      <div class="flex-1 bg-muted/40 border border-border rounded-xl p-4 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
+                          <div>
+                            <span class="text-[10px] font-black uppercase text-purple-700">Devolución #{{ item.observaciones.length - i }}</span>
+                            <div class="text-xs font-bold text-foreground">
+                              Verificado por: {{ obs.verificadoPor || 'Verificador oficial' }}
+                            </div>
+                          </div>
+                          <span class="text-[11px] font-mono font-bold text-muted-foreground bg-card px-2.5 py-1 rounded-lg border border-border">
+                            <i class="pi pi-calendar mr-1 text-[10px]"></i>
+                            {{ formatearFechaBoliviana(obs.fechaDevolucion) }}
+                          </span>
+                        </div>
+
+                        @if (obs.observacionesGenerales) {
+                          <div>
+                            <span class="text-[10px] font-extrabold uppercase text-muted-foreground block mb-1">Motivo general de la observación:</span>
+                            <p class="text-xs text-foreground bg-card border border-border/70 rounded-lg p-2.5 leading-relaxed font-medium">
+                              {{ obs.observacionesGenerales }}
+                            </p>
+                          </div>
+                        }
+
+                        @if (parsearPreguntasObservadas(obs.observacionesPreguntasJson); as preguntas) {
+                          @if (preguntas.length > 0) {
+                            <div>
+                              <span class="text-[10px] font-extrabold uppercase text-muted-foreground block mb-1.5">
+                                Preguntas observadas en detalle ({{ preguntas.length }}):
+                              </span>
+                              <div class="grid grid-cols-1 gap-2">
+                                @for (p of preguntas; track p.numero) {
+                                  <div class="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-lg p-2.5 flex items-start gap-2.5">
+                                    <span class="px-2 py-0.5 rounded bg-rose-600 text-white font-black font-mono text-[10px] shrink-0 mt-0.5">
+                                      P{{ p.numero }}
+                                    </span>
+                                    <p class="text-xs text-rose-900 dark:text-rose-200 font-medium leading-relaxed">
+                                      {{ p.motivo }}
+                                    </p>
+                                  </div>
+                                }
+                              </div>
+                            </div>
+                          }
+                        }
+                      </div>
                     </div>
-                  </div>
-                }
-              </div>
+                  }
+                </div>
+              } @else {
+                <div class="rounded-xl border border-border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
+                  <i class="pi pi-info-circle text-2xl text-muted-foreground block mb-2"></i>
+                  No se registran devoluciones ni observaciones para esta evaluación.
+                </div>
+              }
             </div>
 
-            <div class="p-4 border-t border-border flex justify-end">
+            <div class="p-4 border-t border-border flex justify-end shrink-0 bg-muted/30">
               <button
                 type="button"
                 (click)="cerrarModalObservaciones()"
-                class="px-4 py-2 rounded-xl bg-muted hover:bg-border text-xs font-bold text-foreground cursor-pointer">
-                Cerrar
+                class="px-4 py-2 rounded-xl bg-card border border-border hover:bg-muted text-xs font-bold text-foreground cursor-pointer transition">
+                Cerrar bitácora
               </button>
             </div>
           </div>
@@ -951,7 +1095,103 @@ interface FilaRemark {
             <div class="bg-card border border-border rounded-2xl p-5 shadow-2xs"><div class="flex items-center justify-between border-b border-border pb-3 mb-3"><h2 class="text-sm font-black text-foreground">Distribución por estado</h2><span class="text-[11px] text-muted-foreground">{{ reporteResumen().total }} evaluaciones</span></div><div class="space-y-2">@for (estado of reporteEstados(); track estado.nombre) {<div class="flex items-center gap-3 text-xs"><span class="w-24 font-bold text-muted-foreground">{{ estado.nombre }}</span><div class="h-2 flex-1 rounded-full bg-muted overflow-hidden"><div class="h-full rounded-full bg-primary" [style.width.%]="estado.porcentaje"></div></div><strong class="w-8 text-right">{{ estado.total }}</strong></div>}</div></div>
             <div class="bg-card border border-border rounded-2xl p-5 shadow-2xs"><div class="flex items-center justify-between border-b border-border pb-3 mb-3"><h2 class="text-sm font-black text-foreground">Resumen por sede</h2><span class="text-[11px] text-muted-foreground">cobertura del alcance</span></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2">@for (sede of reportePorSede(); track sede.nombre) {<div class="rounded-xl bg-muted/50 border border-border p-3 flex justify-between gap-2 text-xs"><span class="font-bold truncate">{{ sede.nombre }}</span><strong>{{ sede.total }}</strong></div>} @if (!reportePorSede().length) {<span class="text-xs text-muted-foreground">No existen registros para los filtros seleccionados.</span>}</div></div>
           </div>
-          <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden"><div class="p-5 border-b border-border flex flex-wrap items-center justify-between gap-3"><div><h2 class="text-sm font-black text-foreground">Detalle de evaluaciones</h2><p class="text-xs text-muted-foreground mt-1">Inspección de las evaluaciones programadas, su estado y cobertura de banco.</p></div><div class="relative"><i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i><input [(ngModel)]="busquedaReporte" placeholder="Buscar materia, docente o aula..." class="bg-muted border border-border rounded-xl pl-8 pr-3 py-2 text-xs outline-none w-72" /></div></div>@if (cargandoReporte()) {<div class="p-10 text-center text-sm text-muted-foreground"><i class="pi pi-spinner pi-spin mr-2"></i>Cargando reporte...</div>} @else {<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-xs"><thead><tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground"><th class="p-3">Materia / Grupo</th><th class="p-3">Docente titular</th><th class="p-3">Sede / Campus</th><th class="p-3">Carrera</th><th class="p-3">Parcial</th><th class="p-3">Fecha / Hora</th><th class="p-3 text-center">Banco</th><th class="p-3 text-center">Estado</th></tr></thead><tbody class="divide-y divide-border">@for (rol of rolesReporteFiltrados(); track rol.id) {<tr class="hover:bg-muted/30"><td class="p-3"><span class="font-mono text-primary font-black">{{ rol.materiaCodigo }}</span><div class="font-bold text-foreground">{{ rol.materiaNombre }}</div><span class="text-[10px] text-muted-foreground">Grupo {{ rol.grupo }}</span></td><td class="p-3 font-medium uppercase">{{ rol.docenteNombre || 'Por asignar' }}</td><td class="p-3"><div class="font-bold">{{ rol.sedeNombre }}</div><span class="text-[10px] text-muted-foreground">{{ rol.campus || 'Campus no informado' }}</span></td><td class="p-3 font-medium">{{ rol.carreraNombre }} <span class="text-[10px] text-muted-foreground">({{ rol.carreraCodigo }})</span></td><td class="p-3 whitespace-nowrap">{{ rol.tipoParcial }}</td><td class="p-3 whitespace-nowrap"><div class="font-mono font-bold">{{ rol.fecha }}</div><span class="text-[10px] text-muted-foreground">{{ rol.horario || 'Horario no informado' }}</span></td><td class="p-3 text-center"><span [class]="rol.bancoPreguntasCargado ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" class="px-2 py-1 rounded-lg text-[10px] font-black">{{ rol.bancoPreguntasCargado ? 'Sí' : 'Pendiente' }}</span></td><td class="p-3 text-center"><span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-lg text-[10px] font-black">{{ etiquetaEstadoReporte(rol.estadoFlujo) }}</span></td></tr>} @empty {<tr><td colspan="8" class="p-10 text-center text-sm text-muted-foreground">No hay evaluaciones para los filtros seleccionados.</td></tr>}</tbody></table></div>}</div>
+          <div class="bg-card border border-border rounded-2xl shadow-2xs overflow-hidden">
+            <div class="p-5 border-b border-border flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-black text-foreground">Detalle de evaluaciones</h2>
+                <p class="text-xs text-muted-foreground mt-1">Inspección de las evaluaciones programadas, su estado y cobertura de banco.</p>
+              </div>
+              <div class="relative">
+                <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
+                <input [(ngModel)]="busquedaReporte" placeholder="Buscar por código (ej. SIS-114), materia, docente o aula..." class="bg-muted border border-border rounded-xl pl-8 pr-7 py-2 text-xs outline-none w-80 focus:border-primary shadow-2xs" />
+                @if (busquedaReporte) {
+                  <button type="button" (click)="busquedaReporte = ''" class="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground text-xs cursor-pointer p-0.5">
+                    <i class="pi pi-times"></i>
+                  </button>
+                }
+              </div>
+            </div>
+            @if (cargandoReporte()) {
+              <div class="p-10 text-center text-sm text-muted-foreground">
+                <i class="pi pi-spinner pi-spin mr-2"></i>Cargando reporte...
+              </div>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="border-b border-border bg-muted/60 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                      <th class="p-3">Materia / Grupo</th>
+                      <th class="p-3">Docente titular</th>
+                      <th class="p-3">Sede / Campus</th>
+                      <th class="p-3">Carrera</th>
+                      <th class="p-3">Parcial</th>
+                      <th class="p-3">Fecha / Hora</th>
+                      <th class="p-3 text-center">Banco</th>
+                      <th class="p-3 text-center">Estado</th>
+                      @if (esVerificador()) {
+                        <th class="p-3 text-center">Examen Typst</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    @for (rol of rolesReporteFiltrados(); track rol.id) {
+                      <tr class="hover:bg-muted/30">
+                        <td class="p-3">
+                          <span class="font-mono text-primary font-black">{{ rol.materiaCodigo }}</span>
+                          <div class="font-bold text-foreground">{{ rol.materiaNombre }}</div>
+                          <span class="text-[10px] text-muted-foreground">Grupo {{ rol.grupo }}</span>
+                        </td>
+                        <td class="p-3 font-medium uppercase">{{ rol.docenteNombre || 'Por asignar' }}</td>
+                        <td class="p-3">
+                          <div class="font-bold">{{ rol.sedeNombre }}</div>
+                          <span class="text-[10px] text-muted-foreground">{{ rol.campus || 'Campus no informado' }}</span>
+                        </td>
+                        <td class="p-3 font-medium">{{ rol.carreraNombre }} <span class="text-[10px] text-muted-foreground">({{ rol.carreraCodigo }})</span></td>
+                        <td class="p-3 whitespace-nowrap">{{ rol.tipoParcial }}</td>
+                        <td class="p-3 whitespace-nowrap">
+                          <div class="font-mono font-bold">{{ rol.fecha }}</div>
+                          <span class="text-[10px] text-muted-foreground">{{ rol.horario || 'Horario no informado' }}</span>
+                        </td>
+                        <td class="p-3 text-center">
+                          <span [class]="rol.bancoPreguntasCargado ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" class="px-2 py-1 rounded-lg text-[10px] font-black">
+                            {{ rol.bancoPreguntasCargado ? 'Sí' : 'Pendiente' }}
+                          </span>
+                        </td>
+                        <td class="p-3 text-center">
+                          <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-lg text-[10px] font-black">
+                            {{ etiquetaEstadoReporte(rol.estadoFlujo) }}
+                          </span>
+                        </td>
+                        @if (esVerificador()) {
+                          <td class="p-3 text-center">
+                            @if (rol.bancoPreguntasCargado) {
+                              <button
+                                type="button"
+                                (click)="previsualizarExamenTypst(rol)"
+                                [disabled]="previsualizandoTypst() && rolPrevisualizando() === rol.id"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-purple-300 bg-purple-50 text-purple-800 hover:bg-purple-100 text-[11px] font-bold shadow-2xs transition cursor-pointer disabled:opacity-50"
+                                title="Previsualizar examen generado por Typst (vista docente sin claves)">
+                                <i class="pi" [class.pi-file-pdf]="!(previsualizandoTypst() && rolPrevisualizando() === rol.id)" [class.pi-spin]="previsualizandoTypst() && rolPrevisualizando() === rol.id" [class.pi-spinner]="previsualizandoTypst() && rolPrevisualizando() === rol.id"></i>
+                                <span>{{ previsualizandoTypst() && rolPrevisualizando() === rol.id ? 'Generando...' : 'Ver examen' }}</span>
+                              </button>
+                            } @else {
+                              <span class="text-[10px] text-muted-foreground italic font-medium">Sin banco</span>
+                            }
+                          </td>
+                        }
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td [attr.colspan]="esVerificador() ? 9 : 8" class="p-10 text-center text-sm text-muted-foreground">
+                          No hay evaluaciones para los filtros seleccionados.
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
         </section>
       }
 
@@ -1090,22 +1330,47 @@ interface FilaRemark {
         }
       }
 
+      @if (pdfUrlPrevisualizacion()) {
+        <div class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-3 animate-fade-in" (click)="cerrarModalPrevisualizacionTypst()">
+          <div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card shadow-2xl flex flex-col" (click)="$event.stopPropagation()">
+            <div class="flex items-center justify-between border-b border-border px-5 py-3.5 bg-muted/40 shrink-0">
+              <div class="flex items-center gap-2">
+                <i class="pi pi-file-pdf text-purple-700 text-lg"></i>
+                <div>
+                  <strong class="text-sm font-black text-foreground">Vista Previa Typst (Versión Docente)</strong>
+                  <span class="text-xs text-muted-foreground ml-2">Examen formateado tal como lo previsualizó el docente</span>
+                </div>
+              </div>
+              <button type="button" class="text-muted-foreground hover:text-foreground cursor-pointer p-1" (click)="cerrarModalPrevisualizacionTypst()">
+                <i class="pi pi-times text-base"></i>
+              </button>
+            </div>
+            <iframe [src]="pdfUrlPrevisualizacion()" class="flex-1 w-full border-none" title="Previsualización Typst Docente"></iframe>
+          </div>
+        </div>
+      }
+
     </div>
   `
 })
-export class ReporteEvaluacionesComponent implements OnInit {
+export class ReporteEvaluacionesComponent implements OnInit, OnDestroy {
   public readonly storage = inject(EvaluacionesStorageService);
   private readonly _roles = inject(RolExamenService);
   private readonly _omr = inject(OmrProcesamientoService);
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _auth = inject(AuthService);
   private readonly _reportes = inject(ReportesService);
+  private readonly _generacionTypst = inject(GeneracionTypstService);
+  private readonly _sanitizer = inject(DomSanitizer);
 
   public readonly esDirectorCarrera = computed(
     () => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA'
   );
   public readonly esVicerrector = computed(
     () => this._auth.usuario()?.rol === 'VICERRECTOR'
+  );
+  public readonly esVerificador = computed(
+    () => this._auth.usuario()?.rol === 'VERIFICADOR'
   );
   public readonly puedeConciliarRemark = computed(() => {
     const rol = this._auth.usuario()?.rol;
@@ -1114,6 +1379,11 @@ export class ReporteEvaluacionesComponent implements OnInit {
   public readonly esConsultaAcademica = computed(
     () => this.esDirectorCarrera() || this.esVicerrector()
   );
+
+  public readonly previsualizandoTypst = signal(false);
+  public readonly rolPrevisualizando = signal<string | null>(null);
+  public readonly pdfUrlPrevisualizacion = signal<SafeResourceUrl | null>(null);
+  private pdfPrevisualizacionObjectUrl: string | null = null;
 
   public sedes = signal<BranchOffice[]>([]);
   public carreras = signal<Career[]>([]);
@@ -1147,6 +1417,8 @@ export class ReporteEvaluacionesComponent implements OnInit {
   public filtroCalidadEstado = 'TODOS';
   public busquedaCalidad = '';
   public itemCalidadSeleccionado = signal<ReporteCalidadItem | null>(null);
+  public historialCalidadModal = signal<VerificacionHistorialDevolucion[]>([]);
+  public cargandoHistorialCalidad = signal<boolean>(false);
 
   // 3. Cobertura de Bancos
   public reporteCoberturaResumen = signal<ReporteCoberturaBancosResumen | null>(null);
@@ -1222,7 +1494,11 @@ export class ReporteEvaluacionesComponent implements OnInit {
         return busq.includes(texto);
       });
     }
-    return items;
+    return [...items].sort((a, b) => {
+      const cmp = (a.materiaCodigo || '').localeCompare(b.materiaCodigo || '', undefined, { numeric: true, sensitivity: 'base' });
+      if (cmp !== 0) return cmp;
+      return (a.grupo || '').localeCompare(b.grupo || '', undefined, { numeric: true, sensitivity: 'base' });
+    });
   });
 
   // Computed Cobertura
@@ -1403,10 +1679,41 @@ export class ReporteEvaluacionesComponent implements OnInit {
 
   public abrirModalObservaciones(item: ReporteCalidadItem): void {
     this.itemCalidadSeleccionado.set(item);
+    this.historialCalidadModal.set([]);
+    this.cargandoHistorialCalidad.set(true);
+    this._reportes.obtenerHistorialDevoluciones(item.rolExamenId).subscribe({
+      next: (historial) => {
+        this.historialCalidadModal.set(historial || []);
+        this.cargandoHistorialCalidad.set(false);
+      },
+      error: (err) => {
+        console.error('Error cargando historial de devoluciones:', err);
+        this.cargandoHistorialCalidad.set(false);
+      }
+    });
   }
 
   public cerrarModalObservaciones(): void {
     this.itemCalidadSeleccionado.set(null);
+    this.historialCalidadModal.set([]);
+    this.cargandoHistorialCalidad.set(false);
+  }
+
+  public esOpcionCorrecta(pregunta: VerificacionPregunta, opcion: VerificacionOpcion): boolean {
+    if (pregunta.tipoReactivo === 'VERDADERO_O_FALSO_COMPLEJAS') {
+      return false;
+    }
+    const claves: string[] = (pregunta.respuestaCorrecta || '').toUpperCase().match(/[A-Z0-9]+/g) || [];
+    return opcion.correcta || (!!opcion.letra && claves.includes(opcion.letra.trim().toUpperCase()));
+  }
+
+  public imagenDataUrl(valor?: string): string | null {
+    const contenido = (valor || '').split('#', 1)[0].trim();
+    if (!contenido) return null;
+    const uri = contenido.startsWith('data:')
+      ? contenido.replace(/,(.*)$/s, (_coincidencia, base64: string) => `,${base64.replace(/\s+/g, '')}`)
+      : `data:image/png;base64,${contenido.replace(/\s+/g, '')}`;
+    return /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(uri) ? uri : null;
   }
 
   public obtenerEtiquetaDictamen(estado: string): string {
@@ -1688,19 +1995,27 @@ export class ReporteEvaluacionesComponent implements OnInit {
   // Métodos Reporte Operativo SIDOPA
   public rolesReporteFiltrados(): RolExamenResponse[] {
     const texto = this.busquedaReporte.trim().toLowerCase();
-    return this.rolesReporte().filter(rol => {
-      if (this.filtroSede !== 'Todos' && rol.sedeCodigo !== this.filtroSede) return false;
-      if (this.filtroCarrera !== 'Todos' && this.filtroCarrera && rol.carreraCodigo !== this.filtroCarrera) return false;
-      if (this.filtroParcial !== 'Todos' && rol.tipoParcial !== this.filtroParcial) return false;
-      if (this.filtroEstadoReporte !== 'Todos' && rol.estadoFlujo !== this.filtroEstadoReporte) return false;
-      if (this.filtroModalidad === 'CON_CARTILLA' && rol.modalidad !== 'PRESENCIAL_CARTILLA') return false;
-      if (this.filtroModalidad === 'SIN_CARTILLA' && rol.modalidad === 'PRESENCIAL_CARTILLA') return false;
-      if (this.filtroFechaInicio && rol.fecha < this.filtroFechaInicio) return false;
-      if (this.filtroFechaFin && rol.fecha > this.filtroFechaFin) return false;
-      if (this.filtroFecha && rol.fecha !== this.filtroFecha) return false;
-      if (!texto) return true;
-      return `${rol.materiaCodigo} ${rol.materiaNombre} ${rol.docenteNombre} ${rol.aula} ${rol.carreraNombre} ${rol.campus}`.toLowerCase().includes(texto);
-    });
+    return this.rolesReporte()
+      .filter(rol => {
+        if (this.filtroSede !== 'Todos' && rol.sedeCodigo !== this.filtroSede) return false;
+        if (this.filtroCarrera !== 'Todos' && this.filtroCarrera && rol.carreraCodigo !== this.filtroCarrera) return false;
+        if (this.filtroParcial !== 'Todos' && rol.tipoParcial !== this.filtroParcial) return false;
+        if (this.filtroEstadoReporte !== 'Todos' && rol.estadoFlujo !== this.filtroEstadoReporte) return false;
+        if (this.filtroModalidad === 'CON_CARTILLA' && rol.modalidad !== 'PRESENCIAL_CARTILLA') return false;
+        if (this.filtroModalidad === 'SIN_CARTILLA' && rol.modalidad === 'PRESENCIAL_CARTILLA') return false;
+        if (this.filtroFechaInicio && rol.fecha < this.filtroFechaInicio) return false;
+        if (this.filtroFechaFin && rol.fecha > this.filtroFechaFin) return false;
+        if (this.filtroFecha && rol.fecha !== this.filtroFecha) return false;
+        if (!texto) return true;
+        return `${rol.materiaCodigo} ${rol.materiaNombre} ${rol.docenteNombre} ${rol.aula} ${rol.carreraNombre} ${rol.campus}`.toLowerCase().includes(texto);
+      })
+      .sort((a, b) => {
+        const codA = (a.materiaCodigo || '').trim();
+        const codB = (b.materiaCodigo || '').trim();
+        const cmp = codA.localeCompare(codB, undefined, { numeric: true, sensitivity: 'base' });
+        if (cmp !== 0) return cmp;
+        return (a.grupo || '').localeCompare(b.grupo || '', undefined, { numeric: true, sensitivity: 'base' });
+      });
   }
 
   public reporteResumen() {
@@ -2025,5 +2340,76 @@ export class ReporteEvaluacionesComponent implements OnInit {
 
   public imprimirReporte(): void {
     window.print();
+  }
+
+  public previsualizarExamenTypst(rol: RolExamenResponse): void {
+    if (!this.esVerificador() || !rol.bancoPreguntasCargado) return;
+    this.rolPrevisualizando.set(rol.id);
+    this.previsualizandoTypst.set(true);
+    this._reportes.solicitarPrevisualizacionTypst(rol.id).subscribe({
+      next: resultado => {
+        if (resultado.estado === 'COMPLETADO') {
+          this.cargarPdfPrevisualizacion(resultado);
+        } else {
+          this.esperarPdfPrevisualizacion(resultado.jobId);
+        }
+      },
+      error: err => {
+        this.previsualizandoTypst.set(false);
+        this.rolPrevisualizando.set(null);
+        alert(err?.error?.mensaje || err?.error?.message || 'No se pudo generar la previsualización del examen.');
+      }
+    });
+  }
+
+  private esperarPdfPrevisualizacion(jobId: string): void {
+    this._generacionTypst.esperarResultado(jobId, 1500, 80).subscribe({
+      next: resultado => {
+        if (resultado.estado === 'COMPLETADO') {
+          this.cargarPdfPrevisualizacion(resultado);
+        } else {
+          this.previsualizandoTypst.set(false);
+          this.rolPrevisualizando.set(null);
+          alert(resultado.mensaje || 'Typst no pudo generar la previsualización del examen.');
+        }
+      },
+      error: err => {
+        this.previsualizandoTypst.set(false);
+        this.rolPrevisualizando.set(null);
+        alert(err?.error?.mensaje || 'Error al esperar la generación del PDF.');
+      }
+    });
+  }
+
+  private cargarPdfPrevisualizacion(resultado: any): void {
+    this.previsualizandoTypst.set(false);
+    this.rolPrevisualizando.set(null);
+    const path = resultado?.variantes?.[0]?.archivoPdfPath;
+    if (!path) {
+      alert('La previsualización finalizó sin archivo PDF generado.');
+      return;
+    }
+    this._generacionTypst.descargarArchivo(path).subscribe({
+      next: blob => {
+        this.cerrarModalPrevisualizacionTypst();
+        this.pdfPrevisualizacionObjectUrl = URL.createObjectURL(blob);
+        this.pdfUrlPrevisualizacion.set(this._sanitizer.bypassSecurityTrustResourceUrl(this.pdfPrevisualizacionObjectUrl));
+      },
+      error: () => {
+        alert('No se pudo descargar el archivo PDF para la visualización.');
+      }
+    });
+  }
+
+  public cerrarModalPrevisualizacionTypst(): void {
+    if (this.pdfPrevisualizacionObjectUrl) {
+      URL.revokeObjectURL(this.pdfPrevisualizacionObjectUrl);
+      this.pdfPrevisualizacionObjectUrl = null;
+    }
+    this.pdfUrlPrevisualizacion.set(null);
+  }
+
+  public ngOnDestroy(): void {
+    this.cerrarModalPrevisualizacionTypst();
   }
 }

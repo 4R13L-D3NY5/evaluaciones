@@ -13,14 +13,15 @@ public record DatosCartillaOmrDto(
         BigDecimal notaSobre60,
         BigDecimal notaSobre100,
         String letraVariante,
-        String cuadernilloPdfPath
+        String cuadernilloPdfPath,
+        Boolean esIndividual
 ) {
     public DatosCartillaOmrDto(Integer numeroOrden, String codigoMateria, String grupo, String codigoEstudiante, String nombreCompleto) {
-        this(numeroOrden, codigoMateria, grupo, codigoEstudiante, nombreCompleto, null, null, null, null, null, null);
+        this(numeroOrden, codigoMateria, grupo, codigoEstudiante, nombreCompleto, null, null, null, null, null, null, false);
     }
 
     public DatosCartillaOmrDto(Integer numeroOrden, String codigoMateria, String grupo, String codigoEstudiante, String nombreCompleto,
                                String estadoCalificacion, String observacion, BigDecimal notaSobre60, BigDecimal notaSobre100) {
-        this(numeroOrden, codigoMateria, grupo, codigoEstudiante, nombreCompleto, estadoCalificacion, observacion, notaSobre60, notaSobre100, null, null);
+        this(numeroOrden, codigoMateria, grupo, codigoEstudiante, nombreCompleto, estadoCalificacion, observacion, notaSobre60, notaSobre100, null, null, false);
     }
 }

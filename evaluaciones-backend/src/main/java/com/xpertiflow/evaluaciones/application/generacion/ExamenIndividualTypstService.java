@@ -9,6 +9,8 @@ import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.config.AppProperties;
+import com.xpertiflow.evaluaciones.security.BancoCifradoService;
+import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,7 @@ public class ExamenIndividualTypstService {
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final ExamenVarianteRepository varianteRepository;
     private final AuditoriaEvaluacionRepository auditoriaRepository;
+    private final BancoCifradoService cifradoService;
 
     private static final Pattern PATTERN_NOMBRE_FOOTER = Pattern.compile("#raw\\(\"([^\"]+)\",\\s*block:\\s*false\\)");
     private static final Pattern PATTERN_CODIGO_FOOTER = Pattern.compile("#text\\(size:\\s*15pt,\\s*weight:\\s*\"bold\"\\)\\[([^\\]]+)\\]");
@@ -156,6 +159,13 @@ public class ExamenIndividualTypstService {
         // Reemplazar hash de control CTL-
         chunkModificado = chunkModificado.replaceAll("CTL-[A-Za-z0-9_-]+-[A-Za-z]", "CTL-" + codigoEstudiante.trim() + "-" + letra);
 
+        // Reemplazar menciones explícitas de la variante si el estudiante de referencia tenía otra letra
+        if (refStudent != null && refStudent.getLetraVariante() != null && !refStudent.getLetraVariante().equalsIgnoreCase(letra)) {
+            String refL = refStudent.getLetraVariante().trim();
+            chunkModificado = chunkModificado.replaceAll("(?i)\\bVARIANTE\\s+" + Pattern.quote(refL) + "\\b", "VARIANTE " + letra);
+            chunkModificado = chunkModificado.replaceAll("(?i)\\bTIPO\\s+" + Pattern.quote(refL) + "\\b", "TIPO " + letra);
+        }
+
         // Ensamblar código Typst individual
         String individualTypst = preamble + "\n\n" + chunkModificado.trim() + "\n";
 
@@ -184,8 +194,64 @@ public class ExamenIndividualTypstService {
         // Compilar con Typst CLI
         compilarTypst(typOut, pdfOut);
 
+        // Asegurar que la variante exista en sea_examenes_variantes
+        String varianteId = String.format("VAR-%s-%s", rolExamenId, letra);
+        Optional<ExamenVariante> optVariante = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, letra);
+        if (optVariante.isEmpty()) {
+            ExamenVariante refVariante = null;
+            if (refStudent != null && refStudent.getLetraVariante() != null) {
+                refVariante = varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, refStudent.getLetraVariante()).orElse(null);
+            }
+            if (refVariante == null) {
+                refVariante = varianteRepository.findByRolExamenId(rolExamenId).stream().findFirst().orElse(null);
+            }
+
+            ExamenVariante nuevaVariante = new ExamenVariante();
+            nuevaVariante.setId(varianteId);
+            nuevaVariante.setRolExamenId(rolExamenId);
+            nuevaVariante.setLetraVariante(letra);
+            nuevaVariante.setNombreVariante("TIPO " + letra);
+            nuevaVariante.setSemillaPermutacion(refVariante != null && refVariante.getSemillaPermutacion() != null ? refVariante.getSemillaPermutacion() + 1 : 1);
+            nuevaVariante.setTotalPreguntas(refVariante != null && refVariante.getTotalPreguntas() != null ? refVariante.getTotalPreguntas() : 30);
+            nuevaVariante.setCuotaFaciles(refVariante != null && refVariante.getCuotaFaciles() != null ? refVariante.getCuotaFaciles() : 7);
+            nuevaVariante.setCuotaMedias(refVariante != null && refVariante.getCuotaMedias() != null ? refVariante.getCuotaMedias() : 16);
+            nuevaVariante.setCuotaDificiles(refVariante != null && refVariante.getCuotaDificiles() != null ? refVariante.getCuotaDificiles() : 7);
+
+            if (refVariante != null && refVariante.getContenidoSeguroCifrado() != null && !refVariante.getContenidoSeguroCifrado().isBlank() && cifradoService != null) {
+                try {
+                    BancoEncryptedPayload payloadRef = BancoEncryptedPayload.builder()
+                            .ciphertext(refVariante.getContenidoSeguroCifrado())
+                            .nonce(refVariante.getContenidoSeguroNonce())
+                            .wrappedDataKey(refVariante.getContenidoSeguroDekEnvuelta())
+                            .keyReference(refVariante.getContenidoSeguroKekReferencia())
+                            .keyVersion(refVariante.getContenidoSeguroKekVersion())
+                            .algorithm(refVariante.getContenidoSeguroAlgoritmo())
+                            .build();
+                    String jsonPlano = cifradoService.descifrarTexto(payloadRef, "variante:" + refVariante.getId() + ":rol:" + refVariante.getRolExamenId());
+                    BancoEncryptedPayload nuevoPayload = cifradoService.cifrarTexto(jsonPlano, "variante:" + varianteId + ":rol:" + rolExamenId);
+
+                    nuevaVariante.setContenidoSeguroCifrado(nuevoPayload.getCiphertext());
+                    nuevaVariante.setContenidoSeguroNonce(nuevoPayload.getNonce());
+                    nuevaVariante.setContenidoSeguroDekEnvuelta(nuevoPayload.getWrappedDataKey());
+                    nuevaVariante.setContenidoSeguroKekReferencia(nuevoPayload.getKeyReference());
+                    nuevaVariante.setContenidoSeguroKekVersion(nuevoPayload.getKeyVersion());
+                    nuevaVariante.setContenidoSeguroAlgoritmo(nuevoPayload.getAlgorithm());
+                } catch (Exception e) {
+                    log.warn("No se pudo descifrar/cifrar el contenido protegido de la nueva variante {}: {}", varianteId, e.getMessage());
+                }
+            }
+
+            nuevaVariante.setArchivoTypstPath(typOut.toString().replace("\\", "/"));
+            nuevaVariante.setArchivoPdfPath(pdfOut.toString().replace("\\", "/"));
+            varianteRepository.save(nuevaVariante);
+
+            rol.setVariantesGeneradasCount(varianteRepository.findByRolExamenId(rolExamenId).size());
+            rolExamenRepository.save(rol);
+        }
+
         // Actualizar mapeo del estudiante
         String pdfPathNormalizado = pdfOut.toString().replace("\\", "/");
+        mapeo.setVarianteId(varianteId);
         mapeo.setLetraVariante(letra);
         mapeo.setHashControlSeguridad("CTL-" + codigoEstudiante.trim() + "-" + letra);
         mapeo.setCuadernilloIndividualPdf(pdfPathNormalizado);

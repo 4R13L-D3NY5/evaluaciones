@@ -2,7 +2,7 @@ import { Component, OnDestroy, ViewChild, computed, inject, signal } from '@angu
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { VerificacionExamenService, VerificacionExamenLista, VerificacionExamenDetalle, VerificacionExamenFiltros, VerificacionPregunta } from '../../core/services/verificacion-examen.service';
+import { VerificacionExamenService, VerificacionExamenLista, VerificacionExamenDetalle, VerificacionExamenFiltros, VerificacionPregunta, VerificacionHistorialDevolucion } from '../../core/services/verificacion-examen.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
@@ -150,6 +150,39 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       </nav>
 
       <div class="grid grid-cols-1 gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs md:grid-cols-3 lg:grid-cols-4">
+        <!-- Buscador instantáneo por código, asignatura, docente o grupo -->
+        <div class="md:col-span-3 lg:col-span-4 border-b border-border/60 pb-3">
+          <label class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center justify-between mb-1">
+            <span class="flex items-center gap-1.5">
+              <i class="pi pi-search text-primary"></i>
+              Buscar por código de asignatura, materia, docente o grupo
+            </span>
+            @if (busqueda()) {
+              <span class="text-[10px] font-bold text-primary">
+                {{ vistaActual === 'revision' ? examenesValidados().length : vistaActual === 'observados' ? examenesDevueltos().length : examenesSinBancoFiltrados().length }} resultado(s) encontrado(s)
+              </span>
+            }
+          </label>
+          <div class="relative w-full">
+            <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
+            <input
+              type="text"
+              [ngModel]="busqueda()"
+              (ngModelChange)="busqueda.set($event)"
+              placeholder="Ej: SIS-114, ÁLGEBRA, Eliana Micordia, TA-01, Cochabamba..."
+              class="w-full rounded-xl border border-border bg-background pl-9 pr-8 py-2 text-xs font-semibold text-foreground outline-none focus:border-primary shadow-2xs" />
+            @if (busqueda()) {
+              <button
+                type="button"
+                (click)="busqueda.set('')"
+                title="Limpiar búsqueda"
+                class="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground text-xs cursor-pointer p-0.5">
+                <i class="pi pi-times"></i>
+              </button>
+            }
+          </div>
+        </div>
+
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Orden<select [(ngModel)]="orden" (ngModelChange)="cargar()" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs font-bold"><option value="FECHA_EXAMEN_ASC">Fecha examen ↑</option><option value="FECHA_EXAMEN_DESC">Fecha examen ↓</option><option value="FECHA_SUBIDA_ASC">Fecha subida ↑</option><option value="FECHA_SUBIDA_DESC">Fecha subida ↓</option></select></label>
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Sede · SEA<select [(ngModel)]="sedeCodigo" (ngModelChange)="cambiarSede($event)" [disabled]="cargandoSedes" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">{{ cargandoSedes ? 'Cargando sedes...' : 'Todas las sedes de mi alcance' }}</option>@for (sede of sedes; track sede.code) {<option [value]="sede.code">{{ sede.code }} · {{ sede.name }}</option>}</select></label>
         <label class="text-[10px] font-extrabold uppercase text-muted-foreground">Carrera · SEA<select [(ngModel)]="carreraCodigo" (ngModelChange)="cargar()" [disabled]="!sedeCodigo || cargandoCarreras" class="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-xs"><option value="">{{ !sedeCodigo ? 'Todas las carreras' : cargandoCarreras ? 'Cargando carreras...' : 'Todas las carreras de la sede' }}</option>@for (carrera of carreras; track carrera.careerCode) {<option [value]="carrera.careerCode">{{ carrera.careerCode }} · {{ carrera.careerName }}</option>}</select></label>
@@ -218,14 +251,22 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                         <i class="pi pi-shield mr-1"></i>VALIDADO
                       </span>
                       @if (examen.tieneHistorialDevoluciones) {
-                        <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[9px] font-bold border border-amber-300" title="Reingresado con correcciones tras devolución previa">
+                        <button type="button"
+                                (click)="abrirModalHistorial(examen, $event)"
+                                class="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[9px] font-bold border border-amber-300 hover:bg-amber-200 transition cursor-pointer"
+                                title="Ver bitácora de observaciones previas">
                           <i class="pi pi-history mr-1"></i>Corregido ({{ examen.cantidadDevoluciones || 1 }} {{ (examen.cantidadDevoluciones || 1) === 1 ? 'previa' : 'previas' }})
-                        </span>
+                        </button>
                       }
                     </div>
                   </td>
                   <td class="p-3 text-right">
                     <div class="inline-flex items-center gap-1.5">
+                      @if (examen.tieneHistorialDevoluciones) {
+                        <button type="button" class="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] font-bold text-amber-800 hover:bg-amber-100 transition shadow-2xs cursor-pointer" title="Ver bitácora de observaciones" (click)="abrirModalHistorial(examen, $event)">
+                          <i class="pi pi-history"></i>
+                        </button>
+                      }
                       <button type="button" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs cursor-pointer" title="Previsualizar examen completo" [disabled]="procesando()" (click)="previsualizarDirecto(examen)">
                         <i class="pi pi-file-pdf"></i>
                       </button>
@@ -275,14 +316,20 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                   <td class="p-3">{{ etiquetaModalidad(examen.modalidad) }}</td>
                   <td class="p-3">
                     <div class="flex flex-col gap-1 items-start">
-                      <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-800 px-2.5 py-1 text-[11px] font-black border border-rose-300 shadow-2xs">
+                      <button type="button"
+                              (click)="abrirModalHistorial(examen, $event)"
+                              class="inline-flex items-center rounded-full bg-rose-100 text-rose-800 px-2.5 py-1 text-[11px] font-black border border-rose-300 shadow-2xs hover:bg-rose-200 transition cursor-pointer"
+                              title="Ver bitácora completa de observaciones">
                         <i class="pi pi-history mr-1 text-rose-600"></i>
                         {{ examen.cantidadDevoluciones || 1 }} {{ (examen.cantidadDevoluciones || 1) === 1 ? 'vez devuelto' : 'veces devuelto' }}
-                      </span>
+                      </button>
                     </div>
                   </td>
                   <td class="p-3 text-right">
                     <div class="inline-flex items-center gap-1.5">
+                      <button type="button" class="rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-2 text-[11px] font-bold text-rose-800 hover:bg-rose-100 transition shadow-2xs cursor-pointer" title="Ver bitácora de observaciones" (click)="abrirModalHistorial(examen, $event)">
+                        <i class="pi pi-history"></i>
+                      </button>
                       <button type="button" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs cursor-pointer" title="Previsualizar examen completo" [disabled]="procesando()" (click)="previsualizarDirecto(examen)">
                         <i class="pi pi-file-pdf"></i>
                       </button>
@@ -656,10 +703,14 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
             <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
               <i class="pi pi-spin pi-spinner mr-2"></i>Cargando exámenes programados sin banco...
             </div>
-          } @else if (!examenesSinBanco().length) {
+          } @else if (!examenesSinBancoFiltrados().length) {
             <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
-              <i class="pi pi-check-circle text-emerald-600 mr-2 text-base"></i>
-              Todos los exámenes programados en el rango seleccionado ya cuentan con su banco de preguntas o no hay programaciones pendientes.
+              @if (busqueda()) {
+                No hay exámenes programados sin banco que coincidan con "{{ busqueda() }}".
+              } @else {
+                <i class="pi pi-check-circle text-emerald-600 mr-2 text-base"></i>
+                Todos los exámenes programados en el rango seleccionado ya cuentan con su banco de preguntas o no hay programaciones pendientes.
+              }
             </div>
           } @else {
             <div class="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
@@ -678,7 +729,7 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
-                  @for (examen of examenesSinBanco(); track examen.rolExamenId) {
+                  @for (examen of examenesSinBancoFiltrados(); track examen.rolExamenId) {
                     <tr class="hover:bg-muted/20" [class.bg-rose-50]="esHoy(examen.fechaExamen)">
                       <td class="p-3 font-bold">
                         <div class="flex items-center gap-1.5">
@@ -840,6 +891,166 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
           </div>
         }
       }
+
+      <!-- MODAL: HISTORIAL Y BITACORA DE OBSERVACIONES -->
+      @if (modalHistorialVisible() && examenHistorialSeleccionado(); as examenSel) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" (click)="cerrarModalHistorial()">
+          <section class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl border border-border" (click)="$event.stopPropagation()">
+            <header class="flex items-center justify-between border-b border-border px-5 py-4 bg-muted/40 shrink-0">
+              <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                  <i class="pi pi-history text-lg"></i>
+                </span>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h2 class="text-base font-black text-foreground">Bitácora de Devoluciones y Observaciones</h2>
+                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-300">
+                      {{ historialDevolucionesModal().length }} {{ historialDevolucionesModal().length === 1 ? 'devolución registrada' : 'devoluciones registradas' }}
+                    </span>
+                  </div>
+                  <p class="text-xs text-muted-foreground mt-0.5">
+                    <strong>{{ examenSel.materiaCodigo }}</strong> · {{ examenSel.materiaNombre }} · Grupo {{ examenSel.grupo }} · {{ examenSel.docenteNombre }}
+                  </p>
+                </div>
+              </div>
+              <button type="button" aria-label="Cerrar" class="icon-button" (click)="cerrarModalHistorial()">
+                <i class="pi pi-times"></i>
+              </button>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-5 space-y-6">
+              @if (cargandoHistorial()) {
+                <div class="py-12 text-center text-sm text-muted-foreground">
+                  <i class="pi pi-spinner pi-spin text-2xl text-primary block mb-2"></i>
+                  Cargando detalle de observaciones del examen...
+                </div>
+              } @else if (!historialDevolucionesModal().length) {
+                <div class="rounded-xl border border-border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
+                  <i class="pi pi-info-circle text-2xl text-muted-foreground block mb-2"></i>
+                  No se registran devoluciones ni observaciones para esta evaluación.
+                </div>
+              } @else {
+                <div class="space-y-6">
+                  @for (devolucion of historialDevolucionesModal(); track devolucion.id || $index; let idx = $index) {
+                    <article class="rounded-2xl border-2 border-amber-300/80 bg-amber-50/30 overflow-hidden shadow-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/80 bg-amber-100/60 px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <span class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-600 text-white text-xs font-black">
+                            {{ historialDevolucionesModal().length - idx }}
+                          </span>
+                          <span class="text-xs font-black text-amber-950 uppercase tracking-wide">
+                            Devolución #{{ historialDevolucionesModal().length - idx }}
+                          </span>
+                        </div>
+                        <div class="flex items-center gap-2 text-[11px] font-bold text-amber-900">
+                          <i class="pi pi-calendar"></i>
+                          <span>{{ devolucion.fechaDevolucion | date:'dd/MM/yyyy HH:mm' }}</span>
+                          <span class="text-amber-400">·</span>
+                          <i class="pi pi-user"></i>
+                          <span>Por: {{ devolucion.verificadoPor || 'Verificador oficial' }}</span>
+                        </div>
+                      </div>
+
+                      <div class="p-4 space-y-4">
+                        @if (devolucion.observacionesGenerales) {
+                          <div class="rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-950 shadow-2xs">
+                            <div class="flex items-center gap-1.5 font-black text-amber-900 mb-1">
+                              <i class="pi pi-comment"></i>
+                              <span>Observación General del Verificador:</span>
+                            </div>
+                            <p class="leading-relaxed whitespace-pre-wrap pl-5">{{ devolucion.observacionesGenerales }}</p>
+                          </div>
+                        }
+
+                        @if (devolucion.preguntasObservadas && devolucion.preguntasObservadas.length > 0) {
+                          <div>
+                            <p class="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                              <i class="pi pi-list"></i>
+                              <span>Preguntas observadas en esta revisión ({{ devolucion.preguntasObservadas.length }}):</span>
+                            </p>
+
+                            <div class="space-y-4">
+                              @for (item of devolucion.preguntasObservadas; track item.numeroPregunta) {
+                                <div class="rounded-xl border border-border bg-card p-4 shadow-2xs space-y-3">
+                                  <div class="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2.5">
+                                    <div class="flex items-center gap-2">
+                                      <span class="rounded-lg bg-purple-100 text-purple-800 px-2 py-0.5 text-xs font-black border border-purple-200">
+                                        Pregunta {{ item.numeroPregunta }}
+                                      </span>
+                                      @if (item.preguntaEnviada?.tipoReactivo) {
+                                        <span class="text-[10px] font-bold uppercase text-muted-foreground">
+                                          {{ item.preguntaEnviada?.tipoReactivo }}
+                                        </span>
+                                      }
+                                    </div>
+                                    @if (item.preguntaCorregida) {
+                                      <span class="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold border border-emerald-300">
+                                        <i class="pi pi-check mr-1"></i>Corregida en versión posterior
+                                      </span>
+                                    }
+                                  </div>
+
+                                  <div class="rounded-lg border border-rose-200 bg-rose-50/80 p-2.5 text-xs text-rose-900">
+                                    <strong class="text-rose-950 font-black flex items-center gap-1 mb-1">
+                                      <i class="pi pi-exclamation-triangle text-rose-600"></i> Observación del verificador:
+                                    </strong>
+                                    <p class="leading-relaxed whitespace-pre-wrap pl-4">{{ item.observacion }}</p>
+                                  </div>
+
+                                  @if (item.preguntaEnviada) {
+                                    <div class="rounded-lg bg-muted/40 p-3 border border-border/60 text-xs space-y-2">
+                                      <div class="font-extrabold uppercase text-[10px] text-muted-foreground">Enunciado de la pregunta:</div>
+                                      <div [seaMathContent]="item.preguntaEnviada.enunciado" class="whitespace-pre-wrap text-foreground font-medium"></div>
+
+                                      @if (imagenDataUrl(item.preguntaEnviada.imagenBase64); as img) {
+                                        <img [src]="img" alt="Imagen del reactivo" class="max-h-56 max-w-full rounded-lg border border-border object-contain my-2" />
+                                      }
+
+                                      @if (item.preguntaEnviada.opciones && item.preguntaEnviada.opciones.length > 0) {
+                                        <div class="mt-2.5 pt-2.5 border-t border-border/50 space-y-1.5">
+                                          <div class="font-bold text-[10px] uppercase text-muted-foreground">Opciones registradas:</div>
+                                          <div class="space-y-1">
+                                            @for (opc of item.preguntaEnviada.opciones; track opc.letra) {
+                                              <div class="flex items-start gap-1.5 text-xs" [class.font-black]="esOpcionCorrecta(item.preguntaEnviada, opc)" [class.text-emerald-700]="esOpcionCorrecta(item.preguntaEnviada, opc)">
+                                                <span class="w-5 shrink-0">{{ opc.letra }})</span>
+                                                <span [seaMathContent]="opc.texto" class="flex-1"></span>
+                                                @if (esOpcionCorrecta(item.preguntaEnviada, opc)) {
+                                                  <span class="rounded bg-emerald-100 text-emerald-800 text-[9px] px-1.5 py-0.2 font-black shrink-0 border border-emerald-300">CLAVE</span>
+                                                }
+                                              </div>
+                                            }
+                                          </div>
+                                        </div>
+                                      }
+                                      @if (item.preguntaEnviada.respuestaCorrecta) {
+                                        <div class="text-[11px] font-bold text-emerald-800 mt-1">
+                                          Clave correcta indicada: <strong>{{ item.preguntaEnviada.respuestaCorrecta }}</strong>
+                                        </div>
+                                      }
+                                    </div>
+                                  } @else {
+                                    <p class="text-xs text-muted-foreground italic">No se pudo recuperar el contenido completo de este reactivo.</p>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </article>
+                  }
+                </div>
+              }
+            </div>
+
+            <footer class="border-t border-border px-5 py-3 bg-muted/30 flex justify-end shrink-0">
+              <button type="button" class="rounded-xl border border-border bg-card hover:bg-muted px-4 py-2 text-xs font-bold text-foreground transition cursor-pointer" (click)="cerrarModalHistorial()">
+                Cerrar bitácora
+              </button>
+            </footer>
+          </section>
+        </div>
+      }
     </div>
   `
 })
@@ -852,12 +1063,27 @@ export class VerificarExamenesComponent implements OnDestroy {
   private pdfObjectUrl: string | null = null;
   private solicitudCarreras = 0;
   public readonly examenes = signal<VerificacionExamenLista[]>([]);
-  public readonly examenesValidados = computed(() =>
-    this.examenes().filter(e => e.estadoVerificacion !== 'DEVUELTO')
-  );
-  public readonly examenesDevueltos = computed(() =>
-    this.examenes().filter(e => e.estadoVerificacion === 'DEVUELTO')
-  );
+  public readonly busqueda = signal<string>('');
+  public readonly examenesValidados = computed(() => {
+    const texto = this.busqueda().trim().toLowerCase();
+    let lista = this.examenes().filter(e => e.estadoVerificacion !== 'DEVUELTO');
+    if (texto) {
+      lista = lista.filter(e =>
+        `${e.materiaCodigo} ${e.materiaNombre} ${e.docenteNombre} ${e.grupo} ${e.sedeNombre} ${e.carreraNombre}`.toLowerCase().includes(texto)
+      );
+    }
+    return lista;
+  });
+  public readonly examenesDevueltos = computed(() => {
+    const texto = this.busqueda().trim().toLowerCase();
+    let lista = this.examenes().filter(e => e.estadoVerificacion === 'DEVUELTO');
+    if (texto) {
+      lista = lista.filter(e =>
+        `${e.materiaCodigo} ${e.materiaNombre} ${e.docenteNombre} ${e.grupo} ${e.sedeNombre} ${e.carreraNombre}`.toLowerCase().includes(texto)
+      );
+    }
+    return lista;
+  });
   public readonly totalAprobados = signal<number>(0);
   public readonly totalCorregidosValidados = computed(() =>
     this.examenesValidados().filter(e => e.tieneHistorialDevoluciones).length
@@ -865,7 +1091,21 @@ export class VerificarExamenesComponent implements OnDestroy {
   public readonly totalDevueltosMasDeUnaVez = computed(() =>
     this.examenesDevueltos().filter(e => (e.cantidadDevoluciones || 0) > 1).length
   );
+  public readonly modalHistorialVisible = signal(false);
+  public readonly cargandoHistorial = signal(false);
+  public readonly examenHistorialSeleccionado = signal<VerificacionExamenLista | null>(null);
+  public readonly historialDevolucionesModal = signal<VerificacionHistorialDevolucion[]>([]);
   public readonly examenesSinBanco = signal<VerificacionExamenLista[]>([]);
+  public readonly examenesSinBancoFiltrados = computed(() => {
+    const texto = this.busqueda().trim().toLowerCase();
+    let lista = this.examenesSinBanco();
+    if (texto) {
+      lista = lista.filter(e =>
+        `${e.materiaCodigo} ${e.materiaNombre} ${e.docenteNombre} ${e.grupo} ${e.sedeNombre} ${e.carreraNombre}`.toLowerCase().includes(texto)
+      );
+    }
+    return lista;
+  });
   public readonly cargandoSinBanco = signal(false);
   public readonly detalleSinBanco = signal<VerificacionExamenLista | null>(null);
   public readonly detalle = signal<VerificacionExamenDetalle | null>(null);
@@ -971,7 +1211,7 @@ export class VerificarExamenesComponent implements OnDestroy {
   }
 
   public totalExamenesHoySinBanco(): number {
-    return this.examenesSinBanco().filter(e => this.esHoy(e.fechaExamen)).length;
+    return this.examenesSinBancoFiltrados().filter(e => this.esHoy(e.fechaExamen)).length;
   }
 
   public esHoy(fechaStr?: string): boolean {
@@ -1205,5 +1445,29 @@ export class VerificarExamenesComponent implements OnDestroy {
     return 'Con cartilla';
   }
   private mensajeError(error: any, fallback: string): string { return error?.error?.mensaje || error?.error?.message || fallback; }
+  public abrirModalHistorial(examen: VerificacionExamenLista, event?: Event): void {
+    if (event) event.stopPropagation();
+    this.examenHistorialSeleccionado.set(examen);
+    this.historialDevolucionesModal.set([]);
+    this.modalHistorialVisible.set(true);
+    this.cargandoHistorial.set(true);
+    this.service.obtenerHistorialDevoluciones(examen.rolExamenId).subscribe({
+      next: historial => {
+        this.historialDevolucionesModal.set(historial || []);
+        this.cargandoHistorial.set(false);
+      },
+      error: err => {
+        this.cargandoHistorial.set(false);
+        this.error.set(this.mensajeError(err, 'No se pudo cargar el historial de observaciones.'));
+      }
+    });
+  }
+
+  public cerrarModalHistorial(): void {
+    this.modalHistorialVisible.set(false);
+    this.examenHistorialSeleccionado.set(null);
+    this.historialDevolucionesModal.set([]);
+  }
+
   public ngOnDestroy(): void { this.cerrarPdf(); }
 }
