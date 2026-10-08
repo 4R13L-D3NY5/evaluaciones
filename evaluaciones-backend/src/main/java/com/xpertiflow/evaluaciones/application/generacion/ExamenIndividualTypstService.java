@@ -166,6 +166,14 @@ public class ExamenIndividualTypstService {
             chunkModificado = chunkModificado.replaceAll("(?i)\\bTIPO\\s+" + Pattern.quote(refL) + "\\b", "TIPO " + letra);
         }
 
+        // Asegurar que en el encabezado oficial del examen individual figure visiblemente el Tipo de Variante
+        if (!chunkModificado.contains("TIPO " + letra) && !chunkModificado.contains("VARIANTE " + letra)) {
+            chunkModificado = chunkModificado.replaceFirst(
+                    "(?i)(EVALUACION\\s+TEORICA\\s+[^\\\\\\]\\r\\n]+)",
+                    "$1 - TIPO " + letra
+            );
+        }
+
         // Ensamblar código Typst individual
         String individualTypst = preamble + "\n\n" + chunkModificado.trim() + "\n";
 
