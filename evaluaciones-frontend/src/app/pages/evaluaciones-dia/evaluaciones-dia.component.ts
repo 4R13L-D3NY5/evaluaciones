@@ -2034,14 +2034,23 @@ interface CampusDisponible extends Campus {
                       </div>
                     </div>
                     <div class="max-h-56 overflow-y-auto divide-y divide-border text-xs">
-                      <div class="grid grid-cols-[36px_110px_1fr_110px_120px] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
-                        <span>N°</span><span>Código</span><span>Estudiante</span><span class="text-center">Examen</span><span>Observaciones</span>
+                      <div class="grid grid-cols-[36px_100px_1fr_80px_110px_110px] gap-2 px-3 py-2 bg-background text-[10px] uppercase tracking-wide font-black text-muted-foreground sticky top-0">
+                        <span>N°</span><span>Código</span><span>Estudiante</span><span class="text-center">Variante</span><span class="text-center">Examen</span><span>Observaciones</span>
                       </div>
                     @for (estudiante of preparacion.estudiantes; track estudiante.codigoEstudiante) {
-                      <div class="grid grid-cols-[36px_110px_1fr_110px_120px] gap-2 px-3 py-2.5 items-center">
+                      <div class="grid grid-cols-[36px_100px_1fr_80px_110px_110px] gap-2 px-3 py-2.5 items-center">
                         <span class="font-mono text-muted-foreground">{{ estudiante.numeroOrden }}</span>
                         <span class="font-mono font-bold">{{ estudiante.codigoEstudiante }}</span>
                         <span class="truncate font-medium">{{ estudiante.nombreCompleto }}</span>
+                        <div class="text-center">
+                          @if (estudiante.letraVariante) {
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md font-mono font-black text-[10px] bg-purple-100 text-purple-800 border border-purple-200">
+                              Tipo {{ estudiante.letraVariante }}
+                            </span>
+                          } @else {
+                            <span class="text-[10px] text-muted-foreground">—</span>
+                          }
+                        </div>
                         <div class="text-center">
                           @if (estudiante.esIndividual) {
                             @if (estudiante.cuadernilloPdfPath) {
@@ -2159,6 +2168,19 @@ interface CampusDisponible extends Campus {
                     <span class="text-muted-foreground font-semibold">Materia / Grupo:</span>
                     <span class="text-foreground">{{ est.codigoMateria }} · Grupo {{ est.grupo }}</span>
                   </div>
+                  <div class="flex justify-between items-center text-xs pt-1.5 border-t border-border/50">
+                    <span class="text-muted-foreground font-semibold">Variante a asignar:</span>
+                    <span class="font-bold text-xs px-2 py-0.5 rounded-md"
+                      [class.bg-emerald-100]="esModoNuevaVariante()"
+                      [class.text-emerald-800]="esModoNuevaVariante()"
+                      [class.border]="esModoNuevaVariante()"
+                      [class.border-emerald-300]="esModoNuevaVariante()"
+                      [class.bg-purple-100]="!esModoNuevaVariante()"
+                      [class.text-purple-800]="!esModoNuevaVariante()"
+                      [class.border-purple-300]="!esModoNuevaVariante()">
+                      Tipo {{ esModoNuevaVariante() ? siguienteVarianteNueva() : varianteSeleccionada() }} {{ esModoNuevaVariante() ? '(Nueva variante)' : '(Existente en lote)' }}
+                    </span>
+                  </div>
                 </div>
 
                 <div class="space-y-3">
@@ -2255,10 +2277,10 @@ interface CampusDisponible extends Campus {
               </button>
               <button
                 (click)="confirmarGeneracionExamenIndividual()"
-                [disabled]="generandoExamenIndividual() || !varianteSeleccionada()"
+                [disabled]="generandoExamenIndividual() || (!esModoNuevaVariante() && !varianteSeleccionada())"
                 class="px-5 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer disabled:opacity-50 flex items-center gap-2 shadow-xs transition-colors">
                 <i class="pi" [class.pi-spin]="generandoExamenIndividual()" [class.pi-spinner]="generandoExamenIndividual()" [class.pi-file-pdf]="!generandoExamenIndividual()"></i>
-                <span>{{ generandoExamenIndividual() ? 'Generando examen...' : 'Generar Cuadernillo' }}</span>
+                <span>{{ generandoExamenIndividual() ? 'Generando examen...' : ('Generar Cuadernillo Tipo ' + (esModoNuevaVariante() ? siguienteVarianteNueva() : varianteSeleccionada())) }}</span>
               </button>
             </div>
           </div>
@@ -5172,8 +5194,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       next: vars => {
         if (vars && vars.length > 0) {
           this.variantesDisponibles.set(vars);
-          if (!this.varianteSeleccionada() || !vars.includes(this.varianteSeleccionada())) {
-            this.varianteSeleccionada.set(vars[0]);
+          if (!this.esModoNuevaVariante()) {
+            if (!this.varianteSeleccionada() || !vars.includes(this.varianteSeleccionada())) {
+              this.varianteSeleccionada.set(vars[0]);
+            }
           }
         }
       },
@@ -5204,7 +5228,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     if (!item || !estudiante || this.generandoExamenIndividual()) return;
 
     this.generandoExamenIndividual.set(true);
-    const variante = this.varianteSeleccionada();
+    const variante = this.esModoNuevaVariante() ? this.siguienteVarianteNueva() : (this.varianteSeleccionada() || 'A');
 
     this._cartillasOmr.generarExamenEstudiante(item.id, estudiante.codigoEstudiante, variante).subscribe({
       next: prep => {
@@ -5212,7 +5236,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.loteCartillasActual.set(prep);
         this.cerrarModalGenerarExamen();
         this._mostrarToast(
-          `Examen generado con éxito para ${estudiante.nombreCompleto} (Variante ${variante}).`,
+          `Examen generado con éxito para ${estudiante.nombreCompleto} (Variante Tipo ${variante}).`,
           'success'
         );
       },
