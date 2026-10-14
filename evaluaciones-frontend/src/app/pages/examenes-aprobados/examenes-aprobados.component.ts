@@ -56,8 +56,8 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       }
 
       @if (detalle()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" (click)="cerrar()">
-          <section class="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3">
+          <section class="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
             <header class="flex items-center justify-between border-b border-border px-5 py-4 bg-card z-10 sticky top-0 shrink-0">
               <div>
                 <div class="flex items-center gap-2">
@@ -300,8 +300,8 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       }
 
       @if (pdfUrl()) {
-        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-3" (click)="cerrarPdf()">
-          <div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-3">
+          <div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card">
             <div class="flex items-center justify-between border-b border-border px-4 py-3">
               <strong class="text-sm">Previsualización del examen aprobado</strong>
               <button type="button" class="icon-button" (click)="cerrarPdf()"><i class="pi pi-times"></i></button>

@@ -15,12 +15,18 @@ export const authGuard: CanActivateFn = () => {
   );
 };
 
+const resolverRutaPorDefecto = (rol: AppRole): string => {
+  if (rol === 'EVALUADOR_VOCACIONAL') return '/test-vocacional';
+  if (rol === 'VERIFICADOR') return '/verificar-examenes';
+  return '/dashboard';
+};
+
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   return auth.restaurarSesion().pipe(
-    map(usuario => usuario ? router.createUrlTree(['/dashboard']) : true),
+    map(usuario => usuario ? router.createUrlTree([resolverRutaPorDefecto(usuario.rol)]) : true),
     catchError(() => of(true))
   );
 };
@@ -33,7 +39,7 @@ export const roleGuard = (roles: AppRole[]): CanActivateFn => () => {
     map(usuario => {
       if (!usuario) return router.createUrlTree(['/login']);
       if (usuario.rol === 'ADMINISTRADOR_SISTEMA' || roles.includes(usuario.rol)) return true;
-      return router.createUrlTree(['/dashboard']);
+      return router.createUrlTree([resolverRutaPorDefecto(usuario.rol)]);
     }),
     catchError(() => of(router.createUrlTree(['/login'])))
   );
@@ -47,7 +53,7 @@ export const strictRoleGuard = (roles: AppRole[]): CanActivateFn => () => {
   return auth.restaurarSesion().pipe(
     map(usuario => {
       if (!usuario) return router.createUrlTree(['/login']);
-      return roles.includes(usuario.rol) ? true : router.createUrlTree(['/dashboard']);
+      return roles.includes(usuario.rol) ? true : router.createUrlTree([resolverRutaPorDefecto(usuario.rol)]);
     }),
     catchError(() => of(router.createUrlTree(['/login'])))
   );

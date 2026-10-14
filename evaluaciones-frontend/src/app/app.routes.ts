@@ -19,6 +19,7 @@ import { UsuariosSistemaComponent } from './pages/usuarios-sistema/usuarios-sist
 import { RespaldosComponent } from './pages/respaldos/respaldos.component';
 import { VerificarExamenesComponent } from './pages/verificar-examenes/verificar-examenes.component';
 import { SincronizacionSeaComponent } from './pages/sincronizacion-sea/sincronizacion-sea.component';
+import { TestVocacionalComponent } from './pages/test-vocacional/test-vocacional.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard], title: 'Acceso - Sistema de Evaluaciones' },
@@ -37,6 +38,7 @@ export const routes: Routes = [
       { path: 'evaluaciones-dia', component: EvaluacionesDiaComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR', 'DOCENTE'])], title: 'Lista de Evaluaciones por Día - Sistema de Evaluaciones' },
       { path: 'salas-virtuales', component: SalaVirtualComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE'])], title: 'Salas virtuales - Sistema de Evaluaciones' },
       { path: 'calificacion-omr', component: CalificacionOmrComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Calificación OMR - Sistema de Evaluaciones' },
+      { path: 'test-vocacional', component: TestVocacionalComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'EVALUADOR_VOCACIONAL'])], title: 'Test Vocacional - Sistema de Evaluaciones' },
       { path: 'banco-preguntas', component: BancoPreguntasComponent, canActivate: [roleGuard(['DOCENTE'])], title: 'Validador de Banco de Preguntas - Sistema de Evaluaciones' },
       { path: 'administracion-evaluaciones', component: AdministracionEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Administración - Sistema de Evaluaciones' },
       { path: 'reporte-evaluaciones', component: ReporteEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA', 'VERIFICADOR'])], title: 'Reporte Evaluaciones - Sistema de Evaluaciones' },

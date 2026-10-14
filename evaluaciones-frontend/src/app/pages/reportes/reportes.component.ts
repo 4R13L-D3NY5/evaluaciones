@@ -541,8 +541,8 @@ interface FilaRemark {
 
       <!-- MODAL DETALLADO DE OBSERVACIONES Y TIMELINE -->
       @if (itemCalidadSeleccionado(); as item) {
-        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" (click)="cerrarModalObservaciones()">
-          <div class="bg-card border border-border rounded-2xl max-w-4xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-4xl w-full max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
             <div class="p-5 border-b border-border bg-purple-50/60 dark:bg-purple-950/20 flex items-start justify-between gap-3 shrink-0">
               <div class="flex items-center gap-3">
                 <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 shrink-0">
@@ -1331,8 +1331,8 @@ interface FilaRemark {
       }
 
       @if (pdfUrlPrevisualizacion()) {
-        <div class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-3 animate-fade-in" (click)="cerrarModalPrevisualizacionTypst()">
-          <div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card shadow-2xl flex flex-col" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-3 animate-fade-in">
+          <div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card shadow-2xl flex flex-col">
             <div class="flex items-center justify-between border-b border-border px-5 py-3.5 bg-muted/40 shrink-0">
               <div class="flex items-center gap-2">
                 <i class="pi pi-file-pdf text-purple-700 text-lg"></i>

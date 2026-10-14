@@ -334,6 +334,13 @@ export class SidebarComponent implements OnInit {
       roles: ['RESPONSABLE_EVALUACIONES']
     },
     {
+      label: 'Test Vocacional',
+      route: '/test-vocacional',
+      icon: 'pi pi-compass',
+      description: 'Lectura OMR y OCR de cartillas del Test de Orientación Vocacional RIASEC',
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'EVALUADOR_VOCACIONAL']
+    },
+    {
       label: 'Sincronización SEA',
       route: '/sincronizacion-sea',
       icon: 'pi pi-cloud-upload',

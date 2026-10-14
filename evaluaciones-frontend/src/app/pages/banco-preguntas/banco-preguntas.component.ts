@@ -2865,8 +2865,8 @@ export interface DiaCalendario {
 
       <!-- MODAL: ELIMINAR EXAMEN SIN CARTILLA -->
       @if (dialogEliminarDocumentoSinCartilla()) {
-        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" (click)="cerrarEliminarDocumentoSinCartilla()">
-          <div class="bg-card border border-rose-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-rose-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
             <div class="p-5 border-b border-border flex items-start justify-between gap-4">
               <div class="flex items-start gap-3">
                 <div class="h-9 w-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
