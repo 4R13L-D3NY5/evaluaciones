@@ -490,7 +490,17 @@ export class LoginComponent {
   public iniciarSesion(): void {
     this.mensajeError.set(null);
     this.auth.iniciarSesion(this.usuario.trim(), this.contrasena).subscribe({
-      next: sesion => this._router.navigateByUrl(sesion.debeCambiarContrasena ? '/cambiar-contrasena' : '/dashboard'),
+      next: sesion => {
+        if (sesion.debeCambiarContrasena) {
+          this._router.navigateByUrl('/cambiar-contrasena');
+        } else if (sesion.rol === 'EVALUADOR_VOCACIONAL') {
+          this._router.navigateByUrl('/test-vocacional');
+        } else if (sesion.rol === 'VERIFICADOR') {
+          this._router.navigateByUrl('/verificar-examenes');
+        } else {
+          this._router.navigateByUrl('/dashboard');
+        }
+      },
       error: error => {
         this.mensajeError.set(error?.status === 401
           ? 'El usuario o la contraseña no son válidos.'

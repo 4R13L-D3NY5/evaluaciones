@@ -347,8 +347,8 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       }
 
       @if (detalle()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" (click)="cerrar()">
-          <div class="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3">
+          <div class="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
             <div class="flex items-center justify-between border-b border-border px-5 py-4 bg-card z-10 sticky top-0 shrink-0">
               <div>
                 <div class="flex items-center gap-2">
@@ -657,12 +657,12 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
             </div>
             <div class="border-t border-border bg-muted/20 p-5">
               <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Observación general <textarea [(ngModel)]="observacionGeneral" rows="2" class="mt-1 w-full rounded-lg border border-border bg-card p-2 text-xs" placeholder="Escribe una observación general..."></textarea></label>
-              <div class="mt-3 flex flex-wrap justify-end gap-2"><button type="button" class="rounded-xl border border-rose-300 bg-card px-4 py-2 text-xs font-black text-rose-700" [disabled]="guardando()" (click)="decidir('DEVOLVER')">Devolver con observaciones</button><button type="button" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white" [disabled]="guardando()" (click)="decidir('APROBAR')"><i class="pi pi-check mr-1"></i>Aprobar examen</button></div>
+              <div class="mt-3 flex flex-wrap justify-end gap-2"><button type="button" class="rounded-xl border border-border bg-card px-4 py-2 text-xs font-black text-muted-foreground hover:text-foreground cursor-pointer" [disabled]="guardando()" (click)="cerrar()">Cerrar</button><button type="button" class="rounded-xl border border-rose-300 bg-card px-4 py-2 text-xs font-black text-rose-700" [disabled]="guardando()" (click)="decidir('DEVOLVER')">Devolver con observaciones</button><button type="button" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white" [disabled]="guardando()" (click)="decidir('APROBAR')"><i class="pi pi-check mr-1"></i>Aprobar examen</button></div>
             </div>
           </div>
         </div>
       }
-      @if (pdfUrl()) { <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-3" (click)="cerrarPdf()"><div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card" (click)="$event.stopPropagation()"><div class="flex items-center justify-between border-b border-border px-4 py-3"><strong class="text-sm">Previsualización completa para verificación</strong><button type="button" class="icon-button" (click)="cerrarPdf()"><i class="pi pi-times"></i></button></div><iframe [src]="pdfUrl()" class="h-[calc(100%-3.5rem)] w-full" title="Previsualización del examen"></iframe></div></div> }
+      @if (pdfUrl()) { <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-3"><div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card"><div class="flex items-center justify-between border-b border-border px-4 py-3"><strong class="text-sm">Previsualización completa para verificación</strong><button type="button" class="icon-button" (click)="cerrarPdf()"><i class="pi pi-times"></i></button></div><iframe [src]="pdfUrl()" class="h-[calc(100%-3.5rem)] w-full" title="Previsualización del examen"></iframe></div></div> }
       @if (aprobadosInicializados) {
         <div [hidden]="vistaActual !== 'aprobados'"><sea-examenes-aprobados #panelAprobados [filtros]="filtrosCompartidos" [activo]="vistaActual === 'aprobados'" /></div>
       }
@@ -811,8 +811,8 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
         </div>
 
         @if (detalleSinBanco()) {
-          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" (click)="cerrarDetalleSinBanco()">
-            <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-2xl border border-amber-200" (click)="$event.stopPropagation()">
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3">
+            <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-2xl border border-amber-200">
               <div class="flex items-center justify-between border-b border-border px-5 py-4 bg-amber-50/50">
                 <div class="flex items-center gap-2.5">
                   <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
@@ -894,8 +894,8 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
 
       <!-- MODAL: HISTORIAL Y BITACORA DE OBSERVACIONES -->
       @if (modalHistorialVisible() && examenHistorialSeleccionado(); as examenSel) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" (click)="cerrarModalHistorial()">
-          <section class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl border border-border" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3">
+          <section class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl border border-border">
             <header class="flex items-center justify-between border-b border-border px-5 py-4 bg-muted/40 shrink-0">
               <div class="flex items-center gap-3">
                 <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
