@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ReprogramacionOmrRequest } from './omr-procesamiento.service';
 
 export interface DocumentoSinCartilla {
   id: string;
@@ -21,6 +22,18 @@ export interface NotaDocente {
   notaSobre100: number | null;
   guardadoEn?: string;
   guardadoPor?: string;
+  sincronizadoSea?: boolean;
+  fechaSincronizacionSea?: string;
+  sincronizadoSeaPor?: string;
+  esReprogramado?: boolean;
+  fechaExamenReprogramado?: string;
+  motivoReprogramacion?: string;
+  comprobanteReprogramacion?: string;
+  observacionReprogramacion?: string;
+  reprogramadoPor?: string;
+  fechaReprogramacion?: string;
+  notaOriginal60?: number | null;
+  notaOriginal100?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -56,6 +69,14 @@ export class ExamenSinCartillaService {
 
   public guardarNotas(rolExamenId: string, notas: { codigoEstudiante: string; notaSobre60: number }[]): Observable<NotaDocente[]> {
     return this._http.post<NotaDocente[]>(`${this._baseUrl}/${rolExamenId}/notas`, { notas });
+  }
+
+  public registrarReprogramacion(rolExamenId: string, codigoEstudiante: string, request: ReprogramacionOmrRequest): Observable<NotaDocente> {
+    return this._http.post<NotaDocente>(`${this._baseUrl}/${encodeURIComponent(rolExamenId)}/estudiantes/${encodeURIComponent(codigoEstudiante)}/reprogramar`, request);
+  }
+
+  public revertirReprogramacion(rolExamenId: string, codigoEstudiante: string): Observable<NotaDocente> {
+    return this._http.post<NotaDocente>(`${this._baseUrl}/${encodeURIComponent(rolExamenId)}/estudiantes/${encodeURIComponent(codigoEstudiante)}/revertir-reprogramacion`, {});
   }
 
   public urlReporteNotasPdf(rolExamenId: string): string {

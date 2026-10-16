@@ -76,35 +76,39 @@ interface InstanciaImportacionItem {
             <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
               <i class="pi pi-eye"></i> Consulta por sede
             </span>
-          } @else if (esAdministrador()) {
-            <!-- Acciones de gestión reservadas exclusivamente al Administrador del Sistema -->
-            <button
-              (click)="abrirModalReprogramarRango()"
-              class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-              <i class="pi pi-calendar-plus"></i>
-              <span>Reprogramar por Rango (Suspensión)</span>
-            </button>
+          } @else {
+            @if (esAdministrador()) {
+              <!-- Acciones de gestión reservadas exclusivamente al Administrador del Sistema -->
+              <button
+                (click)="abrirModalReprogramarRango()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+                <i class="pi pi-calendar-plus"></i>
+                <span>Reprogramar por Rango (Suspensión)</span>
+              </button>
 
-            <button
-              (click)="abrirModalSubirExcel()"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-              <i class="pi pi-file-excel"></i>
-              <span>Subir Excel</span>
-            </button>
+              <button
+                (click)="abrirModalSubirExcel()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+                <i class="pi pi-file-excel"></i>
+                <span>Subir Excel</span>
+              </button>
 
-            <button
-              (click)="abrirModalSubirInstancias()"
-              class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-              <i class="pi pi-calendar-plus"></i>
-              <span>Subir 2da Instancia</span>
-            </button>
+              <button
+                (click)="abrirModalSubirInstancias()"
+                class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+                <i class="pi pi-calendar-plus"></i>
+                <span>Subir 2da Instancia</span>
+              </button>
+            }
 
-            <button
-              (click)="abrirModalAnadirManual()"
-              class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-              <i class="pi pi-plus"></i>
-              <span>Añadir Examen al Rol de Examen</span>
-            </button>
+            @if (puedeVerBotonAnadirExamen()) {
+              <button
+                (click)="abrirModalAnadirManual()"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+                <i class="pi pi-plus"></i>
+                <span>Añadir Examen al Rol de Examen</span>
+              </button>
+            }
           }
         </div>
       </div>
@@ -290,7 +294,7 @@ interface InstanciaImportacionItem {
               </p>
             </div>
 
-            @if (esAdministrador()) {
+            @if (puedeVerBotonAnadirExamen()) {
               <div class="flex items-center justify-center gap-3 pt-2">
                 <button 
                   (click)="abrirModalAnadirManual()"
@@ -299,12 +303,14 @@ interface InstanciaImportacionItem {
                   <span>Añadir Examen al Rol de Examen</span>
                 </button>
 
-                <button 
-                  (click)="abrirModalSubirExcel()"
-                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
-                  <i class="pi pi-file-excel"></i>
-                  <span>Importar Excel</span>
-                </button>
+                @if (esAdministrador()) {
+                  <button 
+                    (click)="abrirModalSubirExcel()"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
+                    <i class="pi pi-file-excel"></i>
+                    <span>Importar Excel</span>
+                  </button>
+                }
               </div>
             }
           </div>
@@ -768,6 +774,16 @@ interface InstanciaImportacionItem {
                   </p>
                 </div>
               </div>
+            } @else if (!esAdministrador()) {
+              <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-900 flex items-start gap-2.5">
+                <i class="pi pi-lock text-purple-600 text-base mt-0.5 shrink-0"></i>
+                <div class="space-y-0.5">
+                  <p class="font-black text-purple-950">Candado de Seguridad Activo ({{ horasCandado72() }} Horas):</p>
+                  <p class="text-[11px] leading-relaxed text-purple-800">
+                    Por política institucional, los exámenes deben programarse con al menos {{ horasCandado72() }} horas de anticipación a la fecha y hora seleccionada.
+                  </p>
+                </div>
+              </div>
             }
 
             <!-- SECCIÓN 1: Selección de Materia y Grupo de SEA -->
@@ -1146,6 +1162,24 @@ export class RolExamenesComponent implements OnInit {
   public readonly todasCarrerasSeleccionadas = computed(() =>
     this.puedeListarTodasLasCarreras() && !this.carreraSeleccionada()
   );
+  public readonly esDirectorCarrera = computed(() => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA');
+
+  public readonly puedeVerBotonAnadirExamen = computed(() => {
+    if (this.esAdministrador() || this.esResponsable()) return true;
+    if (!this.esDirectorCarrera()) return false;
+
+    // Si el director filtró por una fecha 'desde', esa fecha debe respetar el candado de 72h
+    const fDesde = this.filtroFechaDesde();
+    if (fDesde && this.estaFechaBloqueadaPorCandado(fDesde)) {
+      return false;
+    }
+    // Si el director filtró por una fecha 'hasta' y no 'desde', y 'hasta' está bloqueada
+    const fHasta = this.filtroFechaHasta();
+    if (!fDesde && fHasta && this.estaFechaBloqueadaPorCandado(fHasta)) {
+      return false;
+    }
+    return true;
+  });
 
   // Estados de Datos Reales de SEA
   public sedes = signal<BranchOffice[]>([]);
@@ -2263,8 +2297,8 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public abrirModalAnadirManual(): void {
-    if (!this.esAdministrador()) {
-      this._mostrarToast('Solo el administrador del sistema puede registrar exámenes manualmente.');
+    if (!this.esAdministrador() && !this.esResponsable() && !this.esDirectorCarrera()) {
+      this._mostrarToast('No tienes permiso para registrar exámenes en el rol de examen.');
       return;
     }
     this.itemEditando.set(null);
@@ -2276,7 +2310,14 @@ export class RolExamenesComponent implements OnInit {
       this.formGrupoObj.set(null);
     }
     this.formTipo = '1er Parcial';
-    this.formFecha = '';
+    const fDesde = this.filtroFechaDesde();
+    if (fDesde && !this.estaFechaBloqueadaPorCandado(fDesde)) {
+      this.formFecha = fDesde;
+    } else if (!this.esAdministrador()) {
+      this.formFecha = this.fechaMinimaReprogramacion();
+    } else {
+      this.formFecha = '';
+    }
     this._establecerHorarioFormulario(this.formGrupoObj());
     this.formModalidad = 'PRESENCIAL_CARTILLA';
     this.dialogFormulario.set(true);
@@ -2320,13 +2361,12 @@ export class RolExamenesComponent implements OnInit {
   public guardarExamenModal(): void {
     const edit = this.itemEditando();
     if (!this.esAdministrador()) {
-      const hoy = new Date().toISOString().split('T')[0];
-      if (this.formFecha <= hoy) {
-        this._mostrarToast('La fecha de reprogramación debe ser posterior a la fecha actual.');
-        return;
-      }
       if (edit && this.estaBloqueadoPorCandado(edit)) {
         this._mostrarToast(`No se puede modificar un examen que está dentro del candado de ${this.horasCandado72()} horas.`);
+        return;
+      }
+      if (this.estaFechaBloqueadaPorCandado(this.formFecha, this.formHoraInicio)) {
+        this._mostrarToast(`No se puede programar el examen: la fecha y hora seleccionada se encuentra dentro del candado de seguridad de ${this.horasCandado72()} horas.`);
         return;
       }
     }
@@ -2448,23 +2488,27 @@ export class RolExamenesComponent implements OnInit {
     });
   }
 
-  public estaBloqueadoPorCandado(item: RolExamenItem): boolean {
-    if (!item.fecha) return false;
+  public estaFechaBloqueadaPorCandado(fecha: string, horario?: string): boolean {
+    if (!fecha) return false;
     const horasCandado = this.horasCandado72();
     let horaInicio = 8;
     let minutoInicio = 0;
-    if (item.horario) {
-      const match = item.horario.match(/(\d{1,2}):(\d{2})/);
+    if (horario) {
+      const match = horario.match(/(\d{1,2}):(\d{2})/);
       if (match) {
         horaInicio = parseInt(match[1], 10);
         minutoInicio = parseInt(match[2], 10);
       }
     }
-    const p = item.fecha.split('-').map(Number);
+    const p = fecha.split('-').map(Number);
     if (p.length !== 3) return false;
     const fechaInicio = new Date(p[0], p[1] - 1, p[2], horaInicio, minutoInicio);
     const limite = new Date(fechaInicio.getTime() - horasCandado * 3600 * 1000);
     return new Date() >= limite;
+  }
+
+  public estaBloqueadoPorCandado(item: RolExamenItem): boolean {
+    return this.estaFechaBloqueadaPorCandado(item.fecha, item.horario);
   }
 
   public puedeEditar(item: RolExamenItem): boolean {
@@ -2499,8 +2543,12 @@ export class RolExamenesComponent implements OnInit {
     if (this.esAdministrador()) {
       return '2020-01-01';
     }
-    const manana = new Date(Date.now() + 86400000);
-    return manana.toISOString().split('T')[0];
+    const horas = this.horasCandado72();
+    const d = new Date(Date.now() + horas * 3600 * 1000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   public abrirModalReprogramarRango(): void {

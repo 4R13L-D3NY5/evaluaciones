@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -29,4 +30,31 @@ public class NotaDocente {
 
     @Column(name = "sincronizado_sea_por", length = 100)
     private String sincronizadoSeaPor;
+
+    @Column(name = "es_reprogramado", nullable = false)
+    private Boolean esReprogramado = false;
+
+    @Column(name = "fecha_examen_reprogramado")
+    private LocalDate fechaExamenReprogramado;
+
+    @Column(name = "motivo_reprogramacion", length = 500)
+    private String motivoReprogramacion;
+
+    @Column(name = "comprobante_reprogramacion", length = 100)
+    private String comprobanteReprogramacion;
+
+    @Column(name = "observacion_reprogramacion", columnDefinition = "TEXT")
+    private String observacionReprogramacion;
+
+    @Column(name = "reprogramado_por", length = 100)
+    private String reprogramadoPor;
+
+    @Column(name = "fecha_reprogramacion")
+    private LocalDateTime fechaReprogramacion;
+
+    @Column(name = "nota_original_60", precision = 5, scale = 2)
+    private BigDecimal notaOriginal60;
+
+    @Column(name = "nota_original_100", precision = 5, scale = 2)
+    private BigDecimal notaOriginal100;
 }
