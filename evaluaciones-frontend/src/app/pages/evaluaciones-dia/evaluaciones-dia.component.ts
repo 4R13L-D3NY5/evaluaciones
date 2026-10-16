@@ -3379,9 +3379,9 @@ interface CampusDisponible extends Campus {
         </div>
       }
 
-      <!-- MODAL: REPROGRAMACIÓN ORAL DE CALIFICACIÓN OMR -->
+      <!-- MODAL: REPROGRAMACIÓN DE CALIFICACIÓN (OMR / SIN CARTILLA) -->
       @if (dialogReprogramarEstudiante()) {
-        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-[70] animate-fade-in">
           <div class="bg-card border border-amber-300 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div class="p-5 border-b border-border bg-amber-500/5 flex items-start justify-between gap-4 shrink-0">
               <div class="flex items-center gap-3">
@@ -3390,8 +3390,8 @@ interface CampusDisponible extends Campus {
                 </div>
                 <div>
                   <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">{{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Calificación Extemporánea' : 'Evaluación Extraordinaria' }}</p>
-                  <h3 class="text-base font-black text-foreground">{{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Asignar Calificación a Rezagado / Ausente' : (estudianteSeleccionadoReprogramar()?.esReprogramado ? 'Editar Calificación por Reprogramación' : 'Calificación por Reprogramación Oral') }}</h3>
-                  <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotas()?.codigo || evaluacionSeleccionadaOmr()?.codigo }} · {{ evaluacionSeleccionadaNotas()?.materia || evaluacionSeleccionadaOmr()?.materia }} · {{ evaluacionSeleccionadaNotas()?.grupo || evaluacionSeleccionadaOmr()?.grupo }}</p>
+                  <h3 class="text-base font-black text-foreground">{{ (estudianteSeleccionadoReprogramar()?.nota60 === null && !estudianteSeleccionadoReprogramar()?.esReprogramado) ? 'Asignar Calificación a Rezagado / Ausente' : (estudianteSeleccionadoReprogramar()?.esReprogramado ? 'Editar Calificación por Reprogramación' : 'Calificación por Reprogramación') }}</h3>
+                  <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotas()?.codigo || evaluacionSeleccionadaOmr()?.codigo || evaluacionSeleccionadaNotasDocente()?.codigo }} · {{ evaluacionSeleccionadaNotas()?.materia || evaluacionSeleccionadaOmr()?.materia || evaluacionSeleccionadaNotasDocente()?.materia }} · {{ evaluacionSeleccionadaNotas()?.grupo || evaluacionSeleccionadaOmr()?.grupo || evaluacionSeleccionadaNotasDocente()?.grupo }}</p>
                 </div>
               </div>
               <button type="button" (click)="cerrarModalReprogramar()" [disabled]="guardandoReprogramacion()" class="text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50">
@@ -3407,7 +3407,7 @@ interface CampusDisponible extends Campus {
                     <div>
                       <span class="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Estudiante a calificar</span>
                       <p class="font-bold text-sm text-foreground">{{ est.nombre || 'Estudiante nómina' }}</p>
-                      <p class="font-mono text-xs text-muted-foreground">{{ est.codigo }} · Variante {{ est.variante || 'A' }}</p>
+                      <p class="font-mono text-xs text-muted-foreground">{{ est.codigo }}{{ est.variante ? ' · Variante ' + est.variante : '' }}</p>
                     </div>
                     @if (est.esReprogramado) {
                       <span class="px-2 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold">
@@ -3426,7 +3426,7 @@ interface CampusDisponible extends Campus {
                       <option value="">-- Seleccionar estudiante --</option>
                       @for (est of nominaEstudiantesReprogramacion(); track est.codigoEstudiante) {
                         <option [value]="est.codigoEstudiante">
-                          {{ est.codigoEstudiante }} - {{ est.nombreCompleto }} (Var {{ est.letraVariante }}) {{ est.esReprogramado ? '[REPROGRAMADO]' : (est.yaCalificado ? '[CALIFICADO]' : '[SIN CARTILLA / AUSENTE]') }}
+                          {{ est.codigoEstudiante }} - {{ est.nombreCompleto }} {{ est.letraVariante ? '(Var ' + est.letraVariante + ') ' : '' }}{{ est.esReprogramado ? '[REPROGRAMADO]' : (est.yaCalificado ? '[CALIFICADO]' : '[SIN CARTILLA / AUSENTE]') }}
                         </option>
                       }
                     </select>
@@ -3436,9 +3436,9 @@ interface CampusDisponible extends Campus {
 
               <!-- Fecha del examen reprogramado -->
               <div>
-                <label class="block text-[11px] font-black uppercase text-foreground mb-1">Fecha en que se tomó el examen oral *</label>
+                <label class="block text-[11px] font-black uppercase text-foreground mb-1">Fecha en que se tomó el examen reprogramado *</label>
                 <input type="date" [value]="reprogramacionFechaExamen()" (input)="reprogramacionFechaExamen.set($any($event.target).value)" class="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500" />
-                <p class="text-[10px] text-muted-foreground mt-0.5">Fecha del examen oral remitido por el docente a Evaluaciones.</p>
+                <p class="text-[10px] text-muted-foreground mt-0.5">Fecha del examen reprogramado remitido por el docente a Evaluaciones.</p>
               </div>
 
               <!-- Calificaciones /100 y /60 -->
@@ -3485,8 +3485,8 @@ interface CampusDisponible extends Campus {
 
               <!-- Observaciones -->
               <div>
-                <label class="block text-[11px] font-black uppercase text-foreground mb-1">Observaciones del examen oral (Opcional)</label>
-                <textarea [value]="reprogramacionObservaciones()" (input)="reprogramacionObservaciones.set($any($event.target).value)" rows="2" placeholder="Detalles de los reactivos evaluados oralmente, modalidad de preguntas, etc." class="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500 resize-none"></textarea>
+                <label class="block text-[11px] font-black uppercase text-foreground mb-1">Observaciones del examen reprogramado (Opcional)</label>
+                <textarea [value]="reprogramacionObservaciones()" (input)="reprogramacionObservaciones.set($any($event.target).value)" rows="2" placeholder="Detalles de los reactivos evaluados, modalidad de examen, etc." class="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500 resize-none"></textarea>
               </div>
             </div>
 
@@ -3870,12 +3870,29 @@ interface CampusDisponible extends Campus {
                 <h3 class="text-lg font-black text-foreground">{{ puedeEditarNotasDocente(evaluacionSeleccionadaNotasDocente()) ? 'Carga de notas por estudiante' : 'Reporte de notas registradas' }}</h3>
                 <p class="text-xs text-muted-foreground">{{ evaluacionSeleccionadaNotasDocente()?.codigo }} · {{ evaluacionSeleccionadaNotasDocente()?.materia }} · {{ evaluacionSeleccionadaNotasDocente()?.grupo }}</p>
               </div>
-              <button (click)="cerrarNotasDocente()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+              <div class="flex items-center gap-2">
+                @if (puedeRegistrarReprogramacion()) {
+                  <button type="button"
+                          (click)="abrirModalReprogramarNuevaDocente()"
+                          class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
+                    <i class="pi pi-calendar-plus text-xs"></i>
+                    <span>+ Registrar examen reprogramado</span>
+                  </button>
+                }
+                <button (click)="cerrarNotasDocente()" class="text-muted-foreground hover:text-foreground cursor-pointer"><i class="pi pi-times"></i></button>
+              </div>
             </div>
             <div class="p-5 overflow-y-auto space-y-4">
-              <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-950">
-                <i class="pi pi-info-circle mr-1.5"></i>
-                {{ puedeEditarNotasDocente(evaluacionSeleccionadaNotasDocente()) ? 'Registre la nota sobre 60 de cada estudiante de la nómina oficial. Al guardar todas las notas, la evaluación pasará a Calificado.' : 'Las notas se calcularon y guardaron tomando como fuente la nómina oficial de los servicios institucionales.' }}
+              <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <i class="pi pi-info-circle mr-1.5"></i>
+                  {{ puedeEditarNotasDocente(evaluacionSeleccionadaNotasDocente()) ? 'Registre la nota sobre 60 de cada estudiante de la nómina oficial. Al guardar todas las notas, la evaluación pasará a Calificado.' : 'Las notas se calcularon y guardaron tomando como fuente la nómina oficial de los servicios institucionales.' }}
+                </div>
+                @if (totalReprogramadosDocente() > 0) {
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-amber-200 text-amber-950 border border-amber-300">
+                    <i class="pi pi-calendar-clock text-xs"></i> {{ totalReprogramadosDocente() }} reprogramado(s)
+                  </span>
+                }
               </div>
               @if (cargandoNotasDocente()) {
                 <div class="py-12 text-center text-xs font-bold text-muted-foreground"><i class="pi pi-spin pi-spinner text-xl text-amber-700"></i><p class="mt-2">Consultando nómina oficial y notas...</p></div>
@@ -3883,14 +3900,45 @@ interface CampusDisponible extends Campus {
                 <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-xs text-amber-900">No se pudo obtener la nómina oficial del grupo.</div>
               } @else {
                 <div class="border border-border rounded-xl overflow-hidden">
-                  <div class="grid grid-cols-[55px_1fr_150px_150px] gap-3 bg-muted/60 px-4 py-3 text-[10px] font-black uppercase text-muted-foreground"><span>N°</span><span>Estudiante</span><span>Nota /60</span><span>Nota /100</span></div>
+                  <div class="grid gap-3 bg-muted/60 px-4 py-3 text-[10px] font-black uppercase text-muted-foreground items-center"
+                       [class.grid-cols-[45px_1fr_120px_120px_110px]]="puedeRegistrarReprogramacion()"
+                       [class.grid-cols-[55px_1fr_150px_150px]]="!puedeRegistrarReprogramacion()">
+                    <span>N°</span>
+                    <span>Estudiante</span>
+                    <span>Nota /60</span>
+                    <span>Nota /100</span>
+                    @if (puedeRegistrarReprogramacion()) {
+                      <span class="text-right">Acción</span>
+                    }
+                  </div>
                   <div class="divide-y divide-border">
                     @for (nota of notasDocente(); track nota.codigoEstudiante; let idx = $index) {
-                      <div class="grid grid-cols-[55px_1fr_150px_150px] gap-3 px-4 py-3 items-center text-xs">
+                      <div class="grid gap-3 px-4 py-3 items-center text-xs"
+                           [class.grid-cols-[45px_1fr_120px_120px_110px]]="puedeRegistrarReprogramacion()"
+                           [class.grid-cols-[55px_1fr_150px_150px]]="!puedeRegistrarReprogramacion()">
                         <span class="font-mono text-muted-foreground">{{ idx + 1 }}</span>
-                        <span><strong class="block">{{ nota.codigoEstudiante }}</strong><span class="text-[10px] text-muted-foreground uppercase">{{ nota.estudianteNombreCompleto }}</span></span>
+                        <span>
+                          <strong class="block">{{ nota.codigoEstudiante }}</strong>
+                          <span class="text-[10px] text-muted-foreground uppercase block">{{ nota.estudianteNombreCompleto }}</span>
+                          @if (nota.esReprogramado) {
+                            <span class="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200" [title]="'Examen reprogramado: ' + (nota.fechaExamenReprogramado || '') + '\nMotivo: ' + (nota.motivoReprogramacion || '') + (nota.comprobanteReprogramacion ? '\nComprobante: ' + nota.comprobanteReprogramacion : '')">
+                              <i class="pi pi-comments text-[8px]"></i> Reprogramado: {{ nota.fechaExamenReprogramado }}
+                            </span>
+                          }
+                        </span>
                         <input type="number" min="0" max="60" step="0.01" [value]="nota.notaSobre60 ?? ''" (input)="editarNotaDocente(nota.codigoEstudiante, $any($event.target).value)" [disabled]="!puedeEditarNotasDocente(evaluacionSeleccionadaNotasDocente()) || guardandoNotasDocente()" class="rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs font-black text-foreground outline-none focus:border-amber-500 disabled:bg-muted disabled:cursor-not-allowed" placeholder="0–60" />
                         <span class="rounded-lg bg-emerald-50 px-3 py-2 font-mono text-xs font-black text-emerald-800">{{ nota.notaSobre100 ?? '—' }}</span>
+                        @if (puedeRegistrarReprogramacion()) {
+                          <div class="flex items-center justify-end">
+                            <button type="button"
+                                    (click)="abrirModalReprogramarDocente(nota)"
+                                    class="px-2 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[11px] font-bold cursor-pointer transition-colors shadow-2xs flex items-center gap-1"
+                                    [title]="nota.esReprogramado ? 'Editar calificación por reprogramación' : 'Registrar nota por examen reprogramado'">
+                              <i class="pi pi-file-edit text-xs"></i>
+                              <span>{{ nota.esReprogramado ? 'Editar' : 'Reprog.' }}</span>
+                            </button>
+                          </div>
+                        }
                       </div>
                     }
                   </div>
@@ -4258,6 +4306,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public notasDocente = signal<NotaDocenteSinCartilla[]>([]);
   public cargandoNotasDocente = signal<boolean>(false);
   public guardandoNotasDocente = signal<boolean>(false);
+  public totalReprogramadosDocente = computed(() => this.notasDocente().filter(n => n.esReprogramado).length);
 
   // Operación y resultados del examen virtual.
   public dialogSalaVirtual = signal<boolean>(false);
@@ -7056,6 +7105,89 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.dialogReprogramarEstudiante.set(true);
   }
 
+  public abrirModalReprogramarDocente(nota: NotaDocenteSinCartilla): void {
+    if (!this.puedeRegistrarReprogramacion()) return;
+    const fechaDefecto = nota.fechaExamenReprogramado || new Date().toISOString().substring(0, 10);
+    this.estudianteSeleccionadoReprogramar.set({
+      codigo: nota.codigoEstudiante,
+      nombre: nota.estudianteNombreCompleto,
+      variante: '',
+      nota60: nota.notaSobre60 ?? undefined,
+      nota100: nota.notaSobre100 ?? undefined,
+      esReprogramado: !!nota.esReprogramado,
+      fechaExamenReprogramado: nota.fechaExamenReprogramado,
+      motivo: nota.motivoReprogramacion,
+      comprobante: nota.comprobanteReprogramacion,
+      observaciones: nota.observacionReprogramacion
+    });
+    this.reprogramacionCodigoEstudiante.set(nota.codigoEstudiante);
+    this.reprogramacionFechaExamen.set(fechaDefecto);
+    this.reprogramacionNota100.set(nota.esReprogramado ? (nota.notaSobre100 ?? null) : null);
+    this.reprogramacionNota60.set(nota.esReprogramado ? (nota.notaSobre60 ?? null) : null);
+    const motivoDefecto = nota.motivoReprogramacion || 'Examen reprogramado tomado por docente tras cancelación de arancel / autorización académica';
+    this.reprogramacionMotivo.set(motivoDefecto);
+    this.reprogramacionComprobante.set(nota.comprobanteReprogramacion || '');
+    this.reprogramacionObservaciones.set(nota.observacionReprogramacion || '');
+    this.dialogReprogramarEstudiante.set(true);
+  }
+
+  public abrirModalReprogramarNuevaDocente(): void {
+    if (!this.puedeRegistrarReprogramacion()) return;
+    const item = this.evaluacionSeleccionadaNotasDocente();
+    if (!item) return;
+
+    this.estudianteSeleccionadoReprogramar.set(null);
+    this.reprogramacionCodigoEstudiante.set('');
+    this.reprogramacionFechaExamen.set(new Date().toISOString().substring(0, 10));
+    this.reprogramacionNota100.set(null);
+    this.reprogramacionNota60.set(null);
+    this.reprogramacionMotivo.set('Examen reprogramado tomado por docente tras cancelación de arancel / autorización académica');
+    this.reprogramacionComprobante.set('');
+    this.reprogramacionObservaciones.set('');
+    this.cargandoNominaReprogramacion.set(true);
+    this.dialogReprogramarEstudiante.set(true);
+
+    if (this.notasDocente().length > 0) {
+      const nomina: EstudianteNominaOmr[] = this.notasDocente().map(n => ({
+        codigoEstudiante: n.codigoEstudiante,
+        nombreCompleto: n.estudianteNombreCompleto,
+        letraVariante: '',
+        yaCalificado: n.notaSobre60 !== null && n.notaSobre60 !== undefined,
+        esReprogramado: !!n.esReprogramado,
+        notaSobre60: n.notaSobre60 ?? undefined,
+        notaSobre100: n.notaSobre100 ?? undefined,
+        estadoCalificacion: (n.notaSobre100 ?? 0) >= 51 ? 'APROBADO' : ((n.notaSobre60 !== null && n.notaSobre60 !== undefined) ? 'REPROBADO' : 'SIN_CALIFICACION'),
+        fechaExamenReprogramado: n.fechaExamenReprogramado,
+        sincronizadoSea: n.sincronizadoSea
+      }));
+      this.nominaEstudiantesReprogramacion.set(nomina);
+      this.cargandoNominaReprogramacion.set(false);
+    } else {
+      this._sinCartillaService.listarNotas(item.id).subscribe({
+        next: notas => {
+          this.notasDocente.set(notas);
+          const nomina: EstudianteNominaOmr[] = notas.map(n => ({
+            codigoEstudiante: n.codigoEstudiante,
+            nombreCompleto: n.estudianteNombreCompleto,
+            letraVariante: '',
+            yaCalificado: n.notaSobre60 !== null && n.notaSobre60 !== undefined,
+            esReprogramado: !!n.esReprogramado,
+            notaSobre60: n.notaSobre60 ?? undefined,
+            notaSobre100: n.notaSobre100 ?? undefined,
+            estadoCalificacion: (n.notaSobre100 ?? 0) >= 51 ? 'APROBADO' : ((n.notaSobre60 !== null && n.notaSobre60 !== undefined) ? 'REPROBADO' : 'SIN_CALIFICACION'),
+            fechaExamenReprogramado: n.fechaExamenReprogramado,
+            sincronizadoSea: n.sincronizadoSea
+          }));
+          this.nominaEstudiantesReprogramacion.set(nomina);
+          this.cargandoNominaReprogramacion.set(false);
+        },
+        error: () => {
+          this.cargandoNominaReprogramacion.set(false);
+        }
+      });
+    }
+  }
+
   public abrirModalReprogramarNueva(): void {
     if (!this.puedeRegistrarReprogramacion()) return;
     const item = this.evaluacionSeleccionadaNotas() || this.evaluacionSeleccionadaOmr();
@@ -7118,7 +7250,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public guardarReprogramacion(): void {
-    const item = this.evaluacionSeleccionadaNotas() || this.evaluacionSeleccionadaOmr();
+    const item = this.evaluacionSeleccionadaNotas()
+      || this.evaluacionSeleccionadaOmr()
+      || this.evaluacionSeleccionadaNotasDocente();
     const codigo = this.reprogramacionCodigoEstudiante().trim();
     const fecha = this.reprogramacionFechaExamen().trim();
     const nota100 = this.reprogramacionNota100();
@@ -7153,6 +7287,32 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     };
 
     this.guardandoReprogramacion.set(true);
+
+    if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+      this._sinCartillaService.registrarReprogramacion(item.id, codigo, payload).subscribe({
+        next: calificacion => {
+          this.guardandoReprogramacion.set(false);
+          this.cerrarModalReprogramar();
+          this._mostrarToast(`Calificación por reprogramación registrada correctamente para ${codigo} (${calificacion.notaSobre100}/100 - ${calificacion.notaSobre60}/60).`);
+
+          // Actualizar notasDocente
+          this.notasDocente.update(notas => {
+            const index = notas.findIndex(n => n.codigoEstudiante === codigo);
+            if (index >= 0) {
+              return notas.map((n, i) => i === index ? calificacion : n);
+            } else {
+              return [...notas, calificacion].sort((a, b) => a.codigoEstudiante.localeCompare(b.codigoEstudiante));
+            }
+          });
+        },
+        error: err => {
+          this.guardandoReprogramacion.set(false);
+          this._mostrarToast(err?.error?.message || err?.error?.error || 'Error al registrar la calificación por reprogramación.', 'error');
+        }
+      });
+      return;
+    }
+
     this._omrService.registrarReprogramacion(item.id, codigo, payload).subscribe({
       next: calificacion => {
         this.guardandoReprogramacion.set(false);
@@ -7178,11 +7338,33 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   public revertirReprogramacion(): void {
-    const item = this.evaluacionSeleccionadaNotas() || this.evaluacionSeleccionadaOmr();
+    const item = this.evaluacionSeleccionadaNotas()
+      || this.evaluacionSeleccionadaOmr()
+      || this.evaluacionSeleccionadaNotasDocente();
     const codigo = this.reprogramacionCodigoEstudiante().trim();
     if (!item || !codigo || this.guardandoReprogramacion()) return;
 
     this.guardandoReprogramacion.set(true);
+
+    if (item.modalidad === 'PRESENCIAL_SIN_CARTILLA') {
+      this._sinCartillaService.revertirReprogramacion(item.id, codigo).subscribe({
+        next: notaActualizada => {
+          this.guardandoReprogramacion.set(false);
+          this.cerrarModalReprogramar();
+          this._mostrarToast(`Reprogramación revertida para el estudiante ${codigo}.`);
+
+          this.notasDocente.update(notas =>
+            notas.map(n => n.codigoEstudiante === codigo ? notaActualizada : n)
+          );
+        },
+        error: err => {
+          this.guardandoReprogramacion.set(false);
+          this._mostrarToast(err?.error?.message || err?.error?.error || 'Error al revertir la reprogramación.', 'error');
+        }
+      });
+      return;
+    }
+
     this._omrService.revertirReprogramacion(item.id, codigo).subscribe({
       next: calificacion => {
         this.guardandoReprogramacion.set(false);

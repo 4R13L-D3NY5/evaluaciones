@@ -160,6 +160,10 @@ public class PoliticaTiempoEvaluacionesService {
     }
 
     public void exigirEdicionPermitida(RolExamen rol, java.time.LocalDate nuevaFecha, Authentication authentication) {
+        exigirEdicionPermitida(rol, nuevaFecha, null, authentication);
+    }
+
+    public void exigirEdicionPermitida(RolExamen rol, java.time.LocalDate nuevaFecha, String nuevoHorario, Authentication authentication) {
         if (esAdministrador(authentication)) {
             return;
         }
@@ -176,9 +180,40 @@ public class PoliticaTiempoEvaluacionesService {
             }
         });
 
-        if (nuevaFecha == null || !nuevaFecha.isAfter(java.time.LocalDate.now())) {
-            throw new RuntimeException("La fecha a la que se reprograma el examen debe ser posterior a la fecha actual ("
-                    + java.time.LocalDate.now() + ").");
+        if (nuevaFecha != null) {
+            exigirFechaHoraPermitidaPorCandado(nuevaFecha, nuevoHorario != null ? nuevoHorario : rol.getHorario(), authentication);
+        }
+    }
+
+    public void exigirFechaHoraPermitidaPorCandado(java.time.LocalDate fecha, String horario, Authentication authentication) {
+        if (esAdministrador(authentication)) {
+            return;
+        }
+
+        if (fecha == null) {
+            throw new RuntimeException("La fecha del examen es obligatoria.");
+        }
+
+        int horasCandado = configuracion().getHorasCandado72() != null
+                ? configuracion().getHorasCandado72()
+                : 72;
+
+        int horaInicio = 8;
+        int minutoInicio = 0;
+        if (horario != null) {
+            Matcher matcher = HORA.matcher(horario);
+            if (matcher.find()) {
+                horaInicio = Integer.parseInt(matcher.group(1));
+                minutoInicio = Integer.parseInt(matcher.group(2));
+            }
+        }
+
+        LocalDateTime inicioExamen = fecha.atTime(horaInicio, minutoInicio);
+        LocalDateTime limiteMinimo = LocalDateTime.now().plusHours(horasCandado);
+
+        if (inicioExamen.isBefore(limiteMinimo)) {
+            throw new RuntimeException("No es posible programar el examen: la fecha y hora seleccionada se encuentra dentro del candado de seguridad de "
+                    + horasCandado + " horas previas.");
         }
     }
 

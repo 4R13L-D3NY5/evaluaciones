@@ -100,4 +100,29 @@ public class ExamenSinCartillaController {
                         ContentDisposition.inline().filename("planilla-notas-" + rolExamenId + ".pdf").build().toString())
                 .body(pdf);
     }
+
+    @PostMapping("/{rolExamenId}/estudiantes/{codigoEstudiante}/reprogramar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    public ResponseEntity<NotaDocenteResponseDto> registrarReprogramacion(
+            @PathVariable String rolExamenId,
+            @PathVariable String codigoEstudiante,
+            @Valid @RequestBody com.xpertiflow.evaluaciones.api.dto.ReprogramacionOmrRequestDto request,
+            Authentication authentication,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(service.registrarReprogramacion(
+                rolExamenId, codigoEstudiante, request, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
+    }
+
+    @PostMapping("/{rolExamenId}/estudiantes/{codigoEstudiante}/revertir-reprogramacion")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    public ResponseEntity<NotaDocenteResponseDto> revertirReprogramacion(
+            @PathVariable String rolExamenId,
+            @PathVariable String codigoEstudiante,
+            Authentication authentication,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(service.revertirReprogramacion(
+                rolExamenId, codigoEstudiante, authentication,
+                httpRequest == null ? null : httpRequest.getRemoteAddr()));
+    }
 }

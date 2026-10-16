@@ -161,6 +161,13 @@ public class RolExamenService {
 
     @Transactional
     public RolExamenResponseDto crear(RolExamenRequestDto dto, Authentication authentication) {
+        if (authentication != null && !politicaTiempoEvaluacionesService.esAdministrador(authentication)) {
+            if (!accesoAcademicoService.puedeConsultarCarrera(dto.getSedeCodigo(), dto.getCarreraCodigo(), authentication)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "No tienes permiso para programar exámenes en la sede o carrera seleccionada");
+            }
+            politicaTiempoEvaluacionesService.exigirFechaHoraPermitidaPorCandado(dto.getFecha(), dto.getHorario(), authentication);
+        }
         normalizarModalidadVigente(dto);
         RolExamen previsualizacion = mapper.toEntity(dto);
         GroupItemDto grupoOficial = resolverGrupoOficialDesdeSea(previsualizacion);
@@ -223,7 +230,7 @@ public class RolExamenService {
             throw new RuntimeException("Solo se puede editar un rol de examen en estado PROGRAMADO o VALIDADO");
         }
 
-        politicaTiempoEvaluacionesService.exigirEdicionPermitida(rol, dto.getFecha(), authentication);
+        politicaTiempoEvaluacionesService.exigirEdicionPermitida(rol, dto.getFecha(), dto.getHorario(), authentication);
 
         LocalDate fechaAnterior = rol.getFecha();
         boolean fechaCambiada = fechaAnterior != null && !fechaAnterior.equals(dto.getFecha());

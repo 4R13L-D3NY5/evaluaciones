@@ -18,7 +18,12 @@ import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import com.xpertiflow.evaluaciones.security.BancoCifradoService;
 import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertiflow.evaluaciones.api.dto.ReprogramacionOmrRequestDto;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +39,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -43,6 +49,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExamenSinCartillaService {
@@ -58,6 +65,8 @@ public class ExamenSinCartillaService {
     private final AppProperties appProperties;
     private final BancoCifradoService cifradoService;
     private final ReporteNotasSinCartillaPdfService reporteNotasPdfService;
+    private final AuditoriaEvaluacionRepository auditoriaRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public DocumentoSinCartillaResponseDto obtenerDocumento(String rolExamenId, Authentication authentication) {
@@ -131,23 +140,45 @@ public class ExamenSinCartillaService {
         RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
         Map<String, NotaDocente> notas = notaRepository.findByRolExamenId(rolExamenId).stream()
                 .collect(Collectors.toMap(NotaDocente::getCodigoEstudiante, Function.identity()));
-        return obtenerEstudiantesOficiales(rol).stream()
-                .map(estudiante -> {
-                    NotaDocente nota = notas.get(estudiante.getStudentCode());
-                    return NotaDocenteResponseDto.builder()
-                            .id(nota == null ? null : nota.getId())
-                            .codigoEstudiante(estudiante.getStudentCode())
-                            .estudianteNombreCompleto(estudiante.getFullName())
-                            .notaSobre60(nota == null ? null : nota.getNotaSobre60())
-                            .notaSobre100(nota == null ? null : nota.getNotaSobre100())
-                            .guardadoEn(nota == null ? null : nota.getGuardadoEn())
-                            .guardadoPor(nota == null ? null : nota.getGuardadoPor())
-                            .build();
-                })
+        Map<String, NotaDocenteResponseDto> mapa = new LinkedHashMap<>();
+        for (StudentItemDto estudiante : obtenerEstudiantesOficiales(rol)) {
+            NotaDocente nota = notas.get(estudiante.getStudentCode());
+            mapa.put(estudiante.getStudentCode(), mapearNotaResponse(estudiante.getStudentCode(), estudiante.getFullName(), nota));
+        }
+        for (NotaDocente nd : notas.values()) {
+            if (!mapa.containsKey(nd.getCodigoEstudiante())) {
+                mapa.put(nd.getCodigoEstudiante(), mapearNotaResponse(nd.getCodigoEstudiante(), nd.getEstudianteNombreCompleto(), nd));
+            }
+        }
+        return mapa.values().stream()
                 .sorted(Comparator.comparing(
                         NotaDocenteResponseDto::getCodigoEstudiante,
                         OrdenEstudiantes.comparadorCodigo()))
                 .toList();
+    }
+
+    private NotaDocenteResponseDto mapearNotaResponse(String codigo, String nombreCompleto, NotaDocente nota) {
+        return NotaDocenteResponseDto.builder()
+                .id(nota == null ? null : nota.getId())
+                .codigoEstudiante(codigo)
+                .estudianteNombreCompleto(nombreCompleto)
+                .notaSobre60(nota == null ? null : nota.getNotaSobre60())
+                .notaSobre100(nota == null ? null : nota.getNotaSobre100())
+                .guardadoEn(nota == null ? null : nota.getGuardadoEn())
+                .guardadoPor(nota == null ? null : nota.getGuardadoPor())
+                .sincronizadoSea(nota != null && Boolean.TRUE.equals(nota.getSincronizadoSea()))
+                .fechaSincronizacionSea(nota == null ? null : nota.getFechaSincronizacionSea())
+                .sincronizadoSeaPor(nota == null ? null : nota.getSincronizadoSeaPor())
+                .esReprogramado(nota != null && Boolean.TRUE.equals(nota.getEsReprogramado()))
+                .fechaExamenReprogramado(nota == null ? null : nota.getFechaExamenReprogramado())
+                .motivoReprogramacion(nota == null ? null : nota.getMotivoReprogramacion())
+                .comprobanteReprogramacion(nota == null ? null : nota.getComprobanteReprogramacion())
+                .observacionReprogramacion(nota == null ? null : nota.getObservacionReprogramacion())
+                .reprogramadoPor(nota == null ? null : nota.getReprogramadoPor())
+                .fechaReprogramacion(nota == null ? null : nota.getFechaReprogramacion())
+                .notaOriginal60(nota == null ? null : nota.getNotaOriginal60())
+                .notaOriginal100(nota == null ? null : nota.getNotaOriginal100())
+                .build();
     }
 
     @Transactional
@@ -219,6 +250,197 @@ public class ExamenSinCartillaService {
                 .ipOrigen("127.0.0.1")
                 .build());
         return listarNotas(rolExamenId, authentication);
+    }
+
+    @Transactional
+    public NotaDocenteResponseDto registrarReprogramacion(String rolExamenId,
+                                                          String codigoEstudiante,
+                                                          ReprogramacionOmrRequestDto request,
+                                                          Authentication authentication,
+                                                          String ipOrigen) {
+        RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
+
+        if (rol.getEstadoFlujo() == null || !Set.of("PENDIENTE_NOTAS", "CALIFICADO", "CONFIRMADO", "DEVUELTO").contains(rol.getEstadoFlujo().name())) {
+            throw new IllegalStateException("Solo se puede registrar reprogramación para exámenes en calificación o confirmación (estado actual: " + rol.getEstadoFlujo() + ").");
+        }
+
+        if (codigoEstudiante == null || codigoEstudiante.isBlank()) {
+            throw new IllegalArgumentException("El código del estudiante es obligatorio.");
+        }
+        String codigo = codigoEstudiante.trim();
+
+        if (request.getFechaExamenReprogramado() == null) {
+            throw new IllegalArgumentException("La fecha del examen reprogramado es obligatoria.");
+        }
+        if (request.getMotivo() == null || request.getMotivo().trim().length() < 5) {
+            throw new IllegalArgumentException("El motivo o justificación de la reprogramación es obligatorio (mínimo 5 caracteres).");
+        }
+
+        BigDecimal nota100 = request.getNotaSobre100();
+        BigDecimal nota60 = request.getNotaSobre60();
+
+        if (nota100 == null && nota60 == null) {
+            throw new IllegalArgumentException("Debe proporcionar al menos una nota (sobre 100 o sobre 60).");
+        }
+
+        if (nota100 != null) {
+            if (nota100.compareTo(BigDecimal.ZERO) < 0 || nota100.compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new IllegalArgumentException("La nota sobre 100 debe estar entre 0 y 100.");
+            }
+            if (nota60 == null) {
+                nota60 = nota100.multiply(BigDecimal.valueOf(60)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            }
+        } else {
+            if (nota60.compareTo(BigDecimal.ZERO) < 0 || nota60.compareTo(BigDecimal.valueOf(60)) > 0) {
+                throw new IllegalArgumentException("La nota sobre 60 debe estar entre 0 y 60.");
+            }
+            nota100 = nota60.multiply(BigDecimal.valueOf(100)).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        }
+
+        List<StudentItemDto> estudiantes = obtenerEstudiantesOficiales(rol);
+        StudentItemDto estudianteOficial = estudiantes.stream()
+                .filter(e -> codigo.equalsIgnoreCase(e.getStudentCode().trim()))
+                .findFirst()
+                .orElse(null);
+
+        String nombreEstudiante = estudianteOficial != null ? estudianteOficial.getFullName() : null;
+
+        NotaDocente nota = notaRepository.findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigo)
+                .orElseGet(() -> {
+                    NotaDocente nueva = new NotaDocente();
+                    nueva.setRolExamenId(rolExamenId);
+                    nueva.setCodigoEstudiante(codigo);
+                    return nueva;
+                });
+
+        if (nombreEstudiante != null) {
+            nota.setEstudianteNombreCompleto(nombreEstudiante);
+        } else if (nota.getEstudianteNombreCompleto() == null || nota.getEstudianteNombreCompleto().isBlank()) {
+            throw new IllegalArgumentException("El estudiante con código " + codigo + " no pertenece a la nómina oficial de esta evaluación.");
+        }
+
+        if (!Boolean.TRUE.equals(nota.getEsReprogramado())) {
+            nota.setNotaOriginal60(nota.getNotaSobre60());
+            nota.setNotaOriginal100(nota.getNotaSobre100());
+        }
+
+        String usuario = usuarioAutenticado(authentication);
+        nota.setNotaSobre60(nota60.setScale(2, RoundingMode.HALF_UP));
+        nota.setNotaSobre100(nota100.setScale(2, RoundingMode.HALF_UP));
+        nota.setEsReprogramado(true);
+        nota.setFechaExamenReprogramado(request.getFechaExamenReprogramado());
+        nota.setMotivoReprogramacion(request.getMotivo().trim());
+        nota.setComprobanteReprogramacion(request.getComprobantePago() == null || request.getComprobantePago().isBlank() ? null : request.getComprobantePago().trim());
+        nota.setObservacionReprogramacion(request.getObservaciones() == null || request.getObservaciones().isBlank() ? null : request.getObservaciones().trim());
+        nota.setReprogramadoPor(usuario);
+        nota.setFechaReprogramacion(LocalDateTime.now());
+        if (nota.getGuardadoPor() == null) {
+            nota.setGuardadoPor(usuario);
+            nota.setGuardadoEn(LocalDateTime.now());
+        }
+
+        nota.setSincronizadoSea(false);
+        nota.setFechaSincronizacionSea(null);
+        nota.setSincronizadoSeaPor(null);
+
+        NotaDocente guardada = notaRepository.save(nota);
+
+        try {
+            Map<String, Object> auditoriaData = new LinkedHashMap<>();
+            auditoriaData.put("accion", "REPROGRAMACION_EXAMEN_SIN_CARTILLA");
+            auditoriaData.put("rolExamenId", rolExamenId);
+            auditoriaData.put("codigoEstudiante", codigo);
+            auditoriaData.put("notaSobre60", nota60);
+            auditoriaData.put("notaSobre100", nota100);
+            auditoriaData.put("fechaExamenReprogramado", request.getFechaExamenReprogramado().toString());
+            auditoriaData.put("comprobantePago", request.getComprobantePago());
+            auditoriaData.put("motivo", request.getMotivo());
+            auditoriaData.put("observaciones", request.getObservaciones());
+            auditoriaData.put("usuario", usuario);
+            auditoriaData.put("fechaRegistro", LocalDateTime.now().toString());
+
+            auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen(rol.getEstadoFlujo().getValor())
+                    .etapaDestino(rol.getEstadoFlujo().getValor())
+                    .accion("REPROGRAMACION_EXAMEN_SIN_CARTILLA")
+                    .usuario(usuario)
+                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                    .detallesJson(objectMapper.writeValueAsString(auditoriaData))
+                    .build());
+        } catch (IOException e) {
+            log.error("Error al registrar auditoría de reprogramación sin cartilla", e);
+        }
+
+        return mapearNotaResponse(guardada.getCodigoEstudiante(), guardada.getEstudianteNombreCompleto(), guardada);
+    }
+
+    @Transactional
+    public NotaDocenteResponseDto revertirReprogramacion(String rolExamenId,
+                                                         String codigoEstudiante,
+                                                         Authentication authentication,
+                                                         String ipOrigen) {
+        RolExamen rol = obtenerRolSinCartilla(rolExamenId, authentication);
+
+        if (codigoEstudiante == null || codigoEstudiante.isBlank()) {
+            throw new IllegalArgumentException("El código del estudiante es obligatorio.");
+        }
+        String codigo = codigoEstudiante.trim();
+
+        NotaDocente nota = notaRepository.findByRolExamenIdAndCodigoEstudiante(rolExamenId, codigo)
+                .orElseThrow(() -> new IllegalArgumentException("No se encontró la calificación para el estudiante " + codigo));
+
+        if (!Boolean.TRUE.equals(nota.getEsReprogramado())) {
+            throw new IllegalStateException("El estudiante no tiene una calificación por reprogramación.");
+        }
+
+        nota.setEsReprogramado(false);
+        nota.setFechaExamenReprogramado(null);
+        nota.setMotivoReprogramacion(null);
+        nota.setComprobanteReprogramacion(null);
+        nota.setObservacionReprogramacion(null);
+        nota.setReprogramadoPor(null);
+        nota.setFechaReprogramacion(null);
+
+        if (nota.getNotaOriginal60() != null) {
+            nota.setNotaSobre60(nota.getNotaOriginal60());
+            nota.setNotaSobre100(nota.getNotaOriginal100());
+        } else {
+            nota.setNotaSobre60(BigDecimal.ZERO);
+            nota.setNotaSobre100(BigDecimal.ZERO);
+        }
+
+        nota.setSincronizadoSea(false);
+        nota.setFechaSincronizacionSea(null);
+        nota.setSincronizadoSeaPor(null);
+
+        NotaDocente guardada = notaRepository.save(nota);
+
+        String usuario = usuarioAutenticado(authentication);
+        try {
+            Map<String, Object> auditoriaData = new LinkedHashMap<>();
+            auditoriaData.put("accion", "REVERSION_REPROGRAMACION_SIN_CARTILLA");
+            auditoriaData.put("rolExamenId", rolExamenId);
+            auditoriaData.put("codigoEstudiante", codigo);
+            auditoriaData.put("notaSobre60Restaurada", guardada.getNotaSobre60());
+            auditoriaData.put("notaSobre100Restaurada", guardada.getNotaSobre100());
+            auditoriaData.put("revertidoPor", usuario);
+            auditoriaData.put("fechaRegistro", LocalDateTime.now().toString());
+
+            auditoriaRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen(rol.getEstadoFlujo().getValor())
+                    .etapaDestino(rol.getEstadoFlujo().getValor())
+                    .accion("REVERSION_REPROGRAMACION_SIN_CARTILLA")
+                    .usuario(usuario)
+                    .ipOrigen(ipOrigen == null || ipOrigen.isBlank() ? "127.0.0.1" : ipOrigen)
+                    .detallesJson(objectMapper.writeValueAsString(auditoriaData))
+                    .build());
+        } catch (IOException e) {
+            log.error("Error al registrar auditoría de reversión de reprogramación sin cartilla", e);
+        }
+
+        return mapearNotaResponse(guardada.getCodigoEstudiante(), guardada.getEstudianteNombreCompleto(), guardada);
     }
 
     @Transactional(readOnly = true)

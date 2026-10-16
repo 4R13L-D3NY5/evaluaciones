@@ -423,14 +423,17 @@ public class SincronizacionNotasSeaService {
                 nombre = nominaGatewayMap.get(codigo).getFullName();
             }
 
-            String obs = "Planilla docente sin cartilla (Calificado)";
+            boolean reprogramado = Boolean.TRUE.equals(n.getEsReprogramado());
+            String obs = reprogramado
+                    ? "Examen reprogramado (" + n.getFechaExamenReprogramado() + ")"
+                    : "Planilla docente sin cartilla (Calificado)";
 
             calculados.put(codigo, new EstudianteCalculado(
                     codigo,
                     oldCode,
                     nombre != null ? nombre : "ESTUDIANTE",
                     score,
-                    false,
+                    reprogramado,
                     obs,
                     Boolean.TRUE.equals(n.getSincronizadoSea()),
                     n.getFechaSincronizacionSea(),

@@ -46,8 +46,8 @@ public class RolExamenController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
-    @Operation(summary = "Crear un nuevo rol de examen (solo administrador)")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
+    @Operation(summary = "Crear un nuevo rol de examen")
     public ResponseEntity<RolExamenResponseDto> crear(@Valid @RequestBody RolExamenRequestDto dto,
                                                        Authentication authentication) {
         return ResponseEntity.status(HttpStatus.CREATED).body(rolExamenService.crear(dto, authentication));

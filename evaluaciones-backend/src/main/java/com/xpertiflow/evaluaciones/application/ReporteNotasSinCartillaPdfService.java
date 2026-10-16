@@ -267,8 +267,11 @@ public class ReporteNotasSinCartillaPdfService {
             int numOrden = offsetIndice + i + 1;
 
             textoDesdeArriba(contenido, String.valueOf(numOrden), x + 10f, y, fuentes.regular(), 7.5f, Color.DARK_GRAY);
-            textoDesdeArriba(contenido, normalizar(item.getCodigoEstudiante()), colCodigo + 8f, y, fuentes.bold(), 7.5f, Color.BLACK);
-            textoAjustado(contenido, normalizar(item.getEstudianteNombreCompleto()), colNombre + 8f, y, fuentes.regular(), 7.5f, colNota60 - colNombre - 14f);
+            String nombreEst = normalizar(item.getEstudianteNombreCompleto());
+            if (Boolean.TRUE.equals(item.getEsReprogramado())) {
+                nombreEst += " (REPROGRAMADO)";
+            }
+            textoAjustado(contenido, nombreEst, colNombre + 8f, y, fuentes.regular(), 7.5f, colNota60 - colNombre - 14f);
 
             String nota60Str = item.getNotaSobre60() != null ? item.getNotaSobre60().stripTrailingZeros().toPlainString() : "—";
             String nota100Str = item.getNotaSobre100() != null ? item.getNotaSobre100().stripTrailingZeros().toPlainString() : "—";
