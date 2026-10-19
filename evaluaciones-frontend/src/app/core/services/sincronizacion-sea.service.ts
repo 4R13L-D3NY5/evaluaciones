@@ -5,7 +5,11 @@ import {
   GrupoSincronizacionResumen,
   SincronizacionMasivaReporte,
   SincronizacionMasivaRequest,
-  SincronizacionNotasSeaReporte
+  SincronizacionNotasSeaReporte,
+  DiscrepanciaGrupoReporte,
+  DetectarDiscrepanciasRequest,
+  TrasladoCalificacionesRequest,
+  TrasladoCalificacionesResultado
 } from '../models/sincronizacion-sea.models';
 
 export type {
@@ -13,7 +17,14 @@ export type {
   SincronizacionNotasSeaReporte,
   GrupoSincronizacionResumen,
   SincronizacionMasivaRequest,
-  SincronizacionMasivaReporte
+  SincronizacionMasivaReporte,
+  DiscrepanciaGrupoItem,
+  DiscrepanciaGrupoReporte,
+  DetectarDiscrepanciasRequest,
+  TrasladoCalificacionItemRequest,
+  TrasladoCalificacionesRequest,
+  TrasladoCalificacionItemResultado,
+  TrasladoCalificacionesResultado
 } from '../models/sincronizacion-sea.models';
 
 @Injectable({
@@ -23,6 +34,7 @@ export class SincronizacionSeaService {
   private readonly _http = inject(HttpClient);
   private readonly _baseUrl = '/api/integracion/sincronizacion-sea';
   private readonly _individualUrl = '/api/integracion/roles';
+  private readonly _discrepanciasUrl = '/api/integracion/sincronizacion-sea/discrepancias';
 
   public obtenerGrupos(
     sedeCodigo: string,
@@ -58,5 +70,26 @@ export class SincronizacionSeaService {
 
   public sincronizarMasivo(request: SincronizacionMasivaRequest): Observable<SincronizacionMasivaReporte> {
     return this._http.post<SincronizacionMasivaReporte>(`${this._baseUrl}/masiva`, request);
+  }
+
+  /**
+   * Detecta discrepancias de nómina institucional para un conjunto de grupos (uno o más)
+   */
+  public detectarDiscrepancias(request: DetectarDiscrepanciasRequest): Observable<DiscrepanciaGrupoReporte> {
+    return this._http.post<DiscrepanciaGrupoReporte>(`${this._discrepanciasUrl}/detectar`, request);
+  }
+
+  /**
+   * Detecta discrepancias para un grupo específico frente a sus paralelos
+   */
+  public detectarDiscrepanciasIndividual(rolExamenId: string): Observable<DiscrepanciaGrupoReporte> {
+    return this._http.get<DiscrepanciaGrupoReporte>(`${this._discrepanciasUrl}/rol/${rolExamenId}`);
+  }
+
+  /**
+   * Traslada calificaciones de estudiantes a su grupo destino oficial en SEA
+   */
+  public trasladarCalificaciones(request: TrasladoCalificacionesRequest): Observable<TrasladoCalificacionesResultado> {
+    return this._http.post<TrasladoCalificacionesResultado>(`${this._discrepanciasUrl}/trasladar`, request);
   }
 }

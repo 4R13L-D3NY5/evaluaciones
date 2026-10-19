@@ -3,6 +3,8 @@ package com.xpertiflow.evaluaciones.api.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertiflow.evaluaciones.api.dto.gateway.*;
 import com.xpertiflow.evaluaciones.domain.entity.MockGatewayCalificacion;
+import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
+import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.repository.MockGatewayCalificacionRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +25,8 @@ public class MockUnitepcGatewayController {
 
     private final MockGatewayCalificacionRepository mockRepository;
     private final ObjectMapper objectMapper;
+    private final com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository rolExamenRepository;
+    private final com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository mapeoRepository;
 
     /**
      * Endpoint simulado para generación de tokens Bearer OAuth2.
@@ -164,7 +168,6 @@ public class MockUnitepcGatewayController {
             "/mock-gateway/calificaciones/limpiar",
             "/api/mock-gateway/calificaciones/limpiar"
     })
-    @Operation(summary = "Limpiar todos los registros de prueba del sandbox")
     public ResponseEntity<Map<String, Object>> limpiarSandbox() {
         long count = mockRepository.count();
         mockRepository.deleteAll();
@@ -173,4 +176,55 @@ public class MockUnitepcGatewayController {
                 "registrosEliminados", count
         ));
     }
+
+    /**
+     * Endpoint simulado para consultar nómina de estudiantes por groupId.
+     * Retorna los estudiantes mapeados al grupo en la base de datos de Sandbox.
+     */
+    @GetMapping({
+            "/mock-gateway/api/v1/student/externals/research/students/byGroup",
+            "/api/mock-gateway/api/v1/student/externals/research/students/byGroup"
+    })
+    @Operation(summary = "Consultar nómina de estudiantes por grupo (simulador)")
+    public ResponseEntity<List<StudentItemDto>> getStudentsByGroupMock(@RequestParam String groupId) {
+        log.info("[MOCK-GATEWAY] Consultando estudiantes para groupId={}", groupId);
+        if (groupId == null || groupId.isBlank()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<RolExamen> roles = rolExamenRepository.findAll().stream()
+                .filter(r -> groupId.equalsIgnoreCase(r.getSeaGroupId()))
+                .toList();
+
+        if (roles.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<MapeoEstudianteVariante> mapeos = List.of();
+        RolExamen rolElegido = roles.get(0);
+        for (RolExamen r : roles) {
+            List<MapeoEstudianteVariante> mList = mapeoRepository.findByRolExamenId(r.getId());
+            if (!mList.isEmpty()) {
+                mapeos = mList;
+                rolElegido = r;
+                break;
+            }
+        }
+
+        List<StudentItemDto> result = new ArrayList<>();
+        for (MapeoEstudianteVariante m : mapeos) {
+            StudentItemDto dto = new StudentItemDto();
+            dto.setStudentCode(m.getCodigoEstudiante());
+            String nombreCompleto = (m.getNombres() != null ? m.getNombres().trim() : "") + " "
+                    + (m.getApellidoPaterno() != null ? m.getApellidoPaterno().trim() : "") + " "
+                    + (m.getApellidoMaterno() != null ? m.getApellidoMaterno().trim() : "");
+            dto.setFullName(nombreCompleto.trim().replaceAll(" +", " "));
+            dto.setGroupId(groupId);
+            dto.setSyllabusCourseId(rolElegido.getSeaSyllabusCourseId());
+            dto.setCourseState("CURSANDO");
+            result.add(dto);
+        }
+        return ResponseEntity.ok(result);
+    }
 }
+

@@ -7,7 +7,10 @@ import { SincronizacionSeaService } from '../../core/services/sincronizacion-sea
 import {
   GrupoSincronizacionResumen,
   SincronizacionMasivaReporte,
-  SincronizacionNotasSeaReporte
+  SincronizacionNotasSeaReporte,
+  DiscrepanciaGrupoItem,
+  DiscrepanciaGrupoReporte,
+  TrasladoCalificacionesResultado
 } from '../../core/models/sincronizacion-sea.models';
 import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
 
@@ -41,6 +44,25 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
             class="px-3.5 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors">
             <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoGrupos()"></i>
             <span>Actualizar</span>
+          </button>
+
+          <button
+            type="button"
+            (click)="abrirModalDeteccionDiscrepancias()"
+            [disabled]="cargandoGrupos() || detectandoDiscrepancias() || gruposFiltrados().length === 0"
+            class="px-3.5 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold text-amber-800 dark:text-amber-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
+            title="Identificar estudiantes con notas en grupos distintos a su nómina oficial en SEA">
+            @if (detectandoDiscrepancias()) {
+              <i class="pi pi-spin pi-spinner text-xs"></i>
+              <span>Auditando SEA...</span>
+            } @else {
+              <i class="pi pi-search-plus text-xs"></i>
+              @if (seleccionadosCount() > 0) {
+                <span>Auditar seleccionados ({{ seleccionadosCount() }})</span>
+              } @else {
+                <span>Auditar Cambios SEA</span>
+              }
+            }
           </button>
 
           <button
@@ -401,6 +423,15 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
                       <div class="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
+                          (click)="auditarDiscrepanciasGrupo(item)"
+                          [disabled]="detectandoDiscrepancias()"
+                          class="h-7 w-7 rounded-lg border border-border text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 flex items-center justify-center text-xs font-bold cursor-pointer transition-colors"
+                          title="Auditar si algún estudiante rindió en este grupo pero pertenece a otro en SEA">
+                          <i class="pi pi-user-edit text-[11px]"></i>
+                        </button>
+
+                        <button
+                          type="button"
                           (click)="abrirModalPrevia(item)"
                           class="h-7 px-2.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors"
                           title="Ver nómina de calificaciones sobre 100 puntos consolidadas">
@@ -714,6 +745,340 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
           </div>
         </div>
       }
+
+      <!-- MODAL 4: AUDITORÍA Y CORRECCIÓN DE DISCREPANCIAS DE GRUPOS SEA -->
+      @if (dialogDiscrepancias()) {
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-scale-in">
+            <!-- CABECERA MODAL -->
+            <div class="p-5 border-b border-border flex items-start justify-between">
+              <div class="flex items-start gap-3">
+                <div class="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <i class="pi pi-user-edit text-lg"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-black text-foreground">Discrepancias de Grupos SEA</h3>
+                  <p class="text-xs text-muted-foreground mt-0.5">
+                    Estudiantes con calificaciones en un grupo pero inscritos oficialmente en otro en el Gateway SEA.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                (click)="cerrarModalDiscrepancias()"
+                class="h-8 w-8 rounded-lg border border-border text-muted-foreground hover:bg-muted flex items-center justify-center cursor-pointer">
+                <i class="pi pi-times text-xs"></i>
+              </button>
+            </div>
+
+            <!-- CUERPO MODAL -->
+            <div class="p-5 overflow-y-auto flex-1 space-y-4">
+              <!-- KPIS DISCREPANCIAS -->
+              <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3.5 bg-muted/40 rounded-xl text-center text-xs">
+                <div>
+                  <span class="text-muted-foreground block text-[10px] uppercase font-bold">Grupos Auditados</span>
+                  <span class="font-black text-foreground text-sm">{{ reporteDiscrepancias()?.totalGruposAnalizados }}</span>
+                </div>
+                <div>
+                  <span class="text-foreground block text-[10px] uppercase font-bold">Total Discrepancias</span>
+                  <span class="font-black text-amber-600 dark:text-amber-400 text-sm">{{ reporteDiscrepancias()?.totalConDiscrepancia }}</span>
+                </div>
+                <div>
+                  <span class="text-emerald-600 block text-[10px] uppercase font-bold">Listos p/ Trasladar</span>
+                  <span class="font-black text-emerald-600 text-sm">{{ reporteDiscrepancias()?.totalListosParaTrasladar }}</span>
+                </div>
+                <div>
+                  <span class="text-orange-600 block text-[10px] uppercase font-bold">Conflictos Nota</span>
+                  <span class="font-black text-orange-600 text-sm">{{ reporteDiscrepancias()?.totalConflictos }}</span>
+                </div>
+                <div>
+                  <span class="text-rose-600 block text-[10px] uppercase font-bold">No Hallados SEA</span>
+                  <span class="font-black text-rose-600 text-sm">{{ reporteDiscrepancias()?.totalNoEncontradosEnSea }}</span>
+                </div>
+              </div>
+
+              @if ((reporteDiscrepancias()?.discrepancias?.length ?? 0) === 0) {
+                <div class="p-10 text-center space-y-3">
+                  <div class="h-12 w-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                    <i class="pi pi-check text-xl"></i>
+                  </div>
+                  <h4 class="text-sm font-bold text-foreground">¡Todo en Orden!</h4>
+                  <p class="text-xs text-muted-foreground max-w-md mx-auto">
+                    No se detectaron discrepancias entre las notas registradas y las nóminas vigentes del Gateway SEA en los grupos analizados.
+                  </p>
+                </div>
+              } @else {
+                <!-- FILTROS Y CONTROLES TABLA -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs pt-1">
+                  <!-- Píldoras de filtro -->
+                  <div class="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl">
+                    <button
+                      type="button"
+                      (click)="alCambiarFiltroDiscrepancia('TODOS')"
+                      [class.bg-card]="filtroEstadoDiscrepancia() === 'TODOS'"
+                      [class.text-primary]="filtroEstadoDiscrepancia() === 'TODOS'"
+                      [class.shadow-2xs]="filtroEstadoDiscrepancia() === 'TODOS'"
+                      class="px-2.5 py-1 rounded-lg font-bold text-muted-foreground hover:text-foreground cursor-pointer transition-all">
+                      Todos ({{ reporteDiscrepancias()?.totalConDiscrepancia }})
+                    </button>
+                    <button
+                      type="button"
+                      (click)="alCambiarFiltroDiscrepancia('LISTO')"
+                      [class.bg-card]="filtroEstadoDiscrepancia() === 'LISTO'"
+                      [class.text-emerald-600]="filtroEstadoDiscrepancia() === 'LISTO'"
+                      [class.shadow-2xs]="filtroEstadoDiscrepancia() === 'LISTO'"
+                      class="px-2.5 py-1 rounded-lg font-bold text-muted-foreground hover:text-foreground cursor-pointer transition-all">
+                      Listos ({{ reporteDiscrepancias()?.totalListosParaTrasladar }})
+                    </button>
+                    <button
+                      type="button"
+                      (click)="alCambiarFiltroDiscrepancia('CONFLICTO')"
+                      [class.bg-card]="filtroEstadoDiscrepancia() === 'CONFLICTO'"
+                      [class.text-orange-600]="filtroEstadoDiscrepancia() === 'CONFLICTO'"
+                      [class.shadow-2xs]="filtroEstadoDiscrepancia() === 'CONFLICTO'"
+                      class="px-2.5 py-1 rounded-lg font-bold text-muted-foreground hover:text-foreground cursor-pointer transition-all">
+                      Conflictos ({{ reporteDiscrepancias()?.totalConflictos }})
+                    </button>
+                    <button
+                      type="button"
+                      (click)="alCambiarFiltroDiscrepancia('NO_ENCONTRADO')"
+                      [class.bg-card]="filtroEstadoDiscrepancia() === 'NO_ENCONTRADO'"
+                      [class.text-rose-600]="filtroEstadoDiscrepancia() === 'NO_ENCONTRADO'"
+                      [class.shadow-2xs]="filtroEstadoDiscrepancia() === 'NO_ENCONTRADO'"
+                      class="px-2.5 py-1 rounded-lg font-bold text-muted-foreground hover:text-foreground cursor-pointer transition-all">
+                      No en SEA ({{ reporteDiscrepancias()?.totalNoEncontradosEnSea }})
+                    </button>
+                  </div>
+
+                  <!-- Botones de selección rápida -->
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      (click)="seleccionarTodasDiscrepanciasListas()"
+                      class="px-2.5 py-1 rounded-lg border border-border bg-card hover:bg-muted text-[11px] font-bold text-foreground cursor-pointer">
+                      Seleccionar listos
+                    </button>
+                    <button
+                      type="button"
+                      (click)="deseleccionarTodasDiscrepancias()"
+                      class="px-2.5 py-1 rounded-lg border border-border bg-card hover:bg-muted text-[11px] font-bold text-muted-foreground cursor-pointer">
+                      Limpiar selección
+                    </button>
+                  </div>
+                </div>
+
+                <!-- TABLA DE DISCREPANCIAS -->
+                <div class="border border-border rounded-xl overflow-hidden">
+                  <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr class="bg-muted/60 text-[10px] font-extrabold text-muted-foreground uppercase border-b border-border">
+                        <th class="py-2.5 px-3 text-center w-10">
+                          <input
+                            type="checkbox"
+                            [checked]="todasDiscrepanciasSeleccionadas()"
+                            (change)="toggleSeleccionarTodasDiscrepancias()"
+                            class="rounded border-border text-primary focus:ring-primary cursor-pointer" />
+                        </th>
+                        <th class="py-2.5 px-3">Estudiante</th>
+                        <th class="py-2.5 px-3">Materia</th>
+                        <th class="py-2.5 px-3 text-center">Rindió en</th>
+                        <th class="py-2.5 px-3 text-center">Pertenece en SEA</th>
+                        <th class="py-2.5 px-3 text-center">Nota</th>
+                        <th class="py-2.5 px-3 text-center">Diagnóstico</th>
+                        <th class="py-2.5 px-3">Detalle</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                      @for (item of discrepanciasFiltradas(); track claveDiscrepancia(item)) {
+                        <tr class="hover:bg-muted/20">
+                          <td class="py-2.5 px-3 text-center">
+                            @if (item.rolExamenDestinoId) {
+                              <input
+                                type="checkbox"
+                                [checked]="estaDiscrepanciaSeleccionada(item)"
+                                (change)="toggleSeleccionDiscrepancia(item)"
+                                class="rounded border-border text-primary focus:ring-primary cursor-pointer" />
+                            } @else {
+                              <span class="text-muted-foreground text-[10px]">-</span>
+                            }
+                          </td>
+                          <td class="py-2.5 px-3">
+                            <div class="font-bold text-foreground">{{ item.nombreEstudiante }}</div>
+                            <div class="text-[10px] font-mono text-muted-foreground">Cód: {{ item.codigoEstudiante }}</div>
+                          </td>
+                          <td class="py-2.5 px-3">
+                            <span class="font-mono font-bold text-primary">{{ item.materiaCodigo }}</span>
+                            <div class="text-[10px] text-muted-foreground line-clamp-1">{{ item.materiaNombre }}</div>
+                          </td>
+                          <td class="py-2.5 px-3 text-center">
+                            <span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold font-mono text-[11px]">
+                              {{ item.grupoOrigen }}
+                            </span>
+                          </td>
+                          <td class="py-2.5 px-3 text-center">
+                            @if (item.grupoDestino) {
+                              <span class="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-black font-mono text-[11px] inline-flex items-center gap-1">
+                                <i class="pi pi-arrow-right text-[9px]"></i> {{ item.grupoDestino }}
+                              </span>
+                            } @else {
+                              <span class="px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 font-bold text-[10px]">
+                                No asignado
+                              </span>
+                            }
+                          </td>
+                          <td class="py-2.5 px-3 text-center">
+                            <span class="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-black text-xs">
+                              {{ item.notaSobre100 ?? 0 }} pts
+                            </span>
+                            @if (item.esReprogramado) {
+                              <div class="text-[9px] text-blue-600 font-bold mt-0.5">Oral Reprog.</div>
+                            }
+                          </td>
+                          <td class="py-2.5 px-3 text-center">
+                            @if (item.estadoDiscrepancia === 'LISTO_PARA_TRASLADAR') {
+                              <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] inline-flex items-center gap-1">
+                                <i class="pi pi-check text-[8px]"></i> Listo
+                              </span>
+                            } @else if (item.estadoDiscrepancia === 'CONFLICTO_TIENE_NOTA_EN_DESTINO') {
+                              <span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 font-bold text-[10px] inline-flex items-center gap-1">
+                                <i class="pi pi-exclamation-triangle text-[8px]"></i> Ya tiene nota
+                              </span>
+                            } @else {
+                              <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px] inline-flex items-center gap-1">
+                                <i class="pi pi-times text-[8px]"></i> No en SEA
+                              </span>
+                            }
+                          </td>
+                          <td class="py-2.5 px-3 text-[11px] text-muted-foreground">
+                            {{ item.detalle }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- OPCIÓN SOBREESCRIBIR CONFLICTOS -->
+                @if ((reporteDiscrepancias()?.totalConflictos ?? 0) > 0) {
+                  <div class="p-3 rounded-xl border border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 text-xs flex items-center justify-between">
+                    <label class="flex items-center gap-2 cursor-pointer font-bold text-orange-900 dark:text-orange-200">
+                      <input
+                        type="checkbox"
+                        [ngModel]="sobrescribirConflictos()"
+                        (ngModelChange)="sobrescribirConflictos.set($event)"
+                        class="rounded border-border text-orange-600 focus:ring-orange-500 cursor-pointer" />
+                      <span>Permitir sobrescribir la calificación si el estudiante ya cuenta con nota en el grupo destino</span>
+                    </label>
+                  </div>
+                }
+              }
+            </div>
+
+            <!-- PIE MODAL DISCREPANCIAS -->
+            <div class="p-4 border-t border-border flex items-center justify-between bg-muted/10">
+              <span class="text-xs font-semibold text-muted-foreground">
+                @if (discrepanciasSeleccionadasCount() > 0) {
+                  <strong class="text-foreground">{{ discrepanciasSeleccionadasCount() }}</strong> estudiante(s) seleccionado(s) para traslado
+                } @else {
+                  Selecciona los estudiantes que deseas transferir al grupo correcto
+                }
+              </span>
+
+              <div class="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  (click)="cerrarModalDiscrepancias()"
+                  [disabled]="trasladandoCalificaciones()"
+                  class="px-4 py-2 rounded-xl bg-card border border-border text-xs font-bold text-foreground hover:bg-muted cursor-pointer disabled:opacity-50">
+                  Cerrar
+                </button>
+
+                <button
+                  type="button"
+                  (click)="ejecutarTrasladoCalificaciones()"
+                  [disabled]="discrepanciasSeleccionadasCount() === 0 || trasladandoCalificaciones()"
+                  class="px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-black flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                  @if (trasladandoCalificaciones()) {
+                    <i class="pi pi-spin pi-spinner text-xs"></i>
+                    <span>Trasladando...</span>
+                  } @else {
+                    <i class="pi pi-arrow-right-arrow-left text-xs"></i>
+                    <span>Trasladar seleccionados ({{ discrepanciasSeleccionadasCount() }})</span>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL 5: RESULTADOS DEL TRASLADO -->
+      @if (dialogResultadoTraslado()) {
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-scale-in">
+            <div class="flex items-center gap-3">
+              <div class="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <i class="pi pi-check-circle text-lg"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-black text-foreground">Traslado de Calificaciones Concluido</h3>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                  Las notas fueron reasignadas y dejadas listas para sincronización al SEA.
+                </p>
+              </div>
+            </div>
+
+            <!-- KPIS TRASLADO -->
+            <div class="grid grid-cols-3 gap-3 p-4 rounded-xl bg-muted/40 text-center text-xs">
+              <div>
+                <span class="text-muted-foreground block text-[10px] uppercase font-bold">Solicitados</span>
+                <span class="font-black text-foreground text-sm">{{ resultadoTraslado()?.totalSolicitados }}</span>
+              </div>
+              <div>
+                <span class="text-emerald-600 block text-[10px] uppercase font-bold">Trasladados con Éxito</span>
+                <span class="font-black text-emerald-600 text-sm">{{ resultadoTraslado()?.totalExitosos }}</span>
+              </div>
+              <div>
+                <span class="text-rose-600 block text-[10px] uppercase font-bold">Fallidos</span>
+                <span class="font-black text-rose-600 text-sm">{{ resultadoTraslado()?.totalFallidos }}</span>
+              </div>
+            </div>
+
+            <!-- DETALLE POR ESTUDIANTE -->
+            <div class="border border-border rounded-xl max-h-60 overflow-y-auto divide-y divide-border text-xs">
+              @for (res of resultadoTraslado()?.resultados; track res.codigoEstudiante) {
+                <div class="p-3 flex items-center justify-between">
+                  <div>
+                    <div class="font-bold text-foreground">{{ res.nombreEstudiante }} ({{ res.codigoEstudiante }})</div>
+                    <div class="text-[11px] text-muted-foreground">
+                      {{ res.grupoOrigen }} → {{ res.grupoDestino }}
+                    </div>
+                  </div>
+                  @if (res.exitoso) {
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] flex items-center gap-1">
+                      <i class="pi pi-check text-[8px]"></i> Éxito
+                    </span>
+                  } @else {
+                    <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px] flex items-center gap-1" [title]="res.mensaje">
+                      <i class="pi pi-times text-[8px]"></i> Fallido
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-border">
+              <button
+                type="button"
+                (click)="cerrarModalResultadoTraslado()"
+                class="px-5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 cursor-pointer">
+                Aceptar y Actualizar Nóminas
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `
 })
@@ -752,6 +1117,17 @@ export class SincronizacionSeaComponent implements OnInit {
   public readonly dialogConfirmacionMasiva = signal(false);
   public readonly dialogReporteMasivo = signal(false);
   public readonly reporteMasivo = signal<SincronizacionMasivaReporte | null>(null);
+
+  // Modales de Discrepancias y Traslado
+  public readonly dialogDiscrepancias = signal(false);
+  public readonly detectandoDiscrepancias = signal(false);
+  public readonly reporteDiscrepancias = signal<DiscrepanciaGrupoReporte | null>(null);
+  public readonly filtroEstadoDiscrepancia = signal<'TODOS' | 'LISTO' | 'CONFLICTO' | 'NO_ENCONTRADO'>('TODOS');
+  public readonly discrepanciasSeleccionadas = signal<Set<string>>(new Set());
+  public readonly sobrescribirConflictos = signal(false);
+  public readonly trasladandoCalificaciones = signal(false);
+  public readonly dialogResultadoTraslado = signal(false);
+  public readonly resultadoTraslado = signal<TrasladoCalificacionesResultado | null>(null);
 
   // Computed: Grupos filtrados por búsqueda de texto
   public readonly gruposFiltrados = computed(() => {
@@ -796,6 +1172,26 @@ export class SincronizacionSeaComponent implements OnInit {
     if (elegibles.length === 0) return false;
     const count = elegibles.filter(g => this.seleccionados().has(g.rolExamenId)).length;
     return count > 0 && count < elegibles.length;
+  });
+
+  // Computed: Discrepancias filtradas por estado
+  public readonly discrepanciasFiltradas = computed(() => {
+    const r = this.reporteDiscrepancias();
+    if (!r || !r.discrepancias) return [];
+    const filtro = this.filtroEstadoDiscrepancia();
+    if (filtro === 'TODOS') return r.discrepancias;
+    if (filtro === 'LISTO') return r.discrepancias.filter(d => d.estadoDiscrepancia === 'LISTO_PARA_TRASLADAR');
+    if (filtro === 'CONFLICTO') return r.discrepancias.filter(d => d.estadoDiscrepancia === 'CONFLICTO_TIENE_NOTA_EN_DESTINO');
+    if (filtro === 'NO_ENCONTRADO') return r.discrepancias.filter(d => d.estadoDiscrepancia === 'NO_ENCONTRADO_EN_SEA');
+    return r.discrepancias;
+  });
+
+  public readonly discrepanciasSeleccionadasCount = computed(() => this.discrepanciasSeleccionadas().size);
+
+  public readonly todasDiscrepanciasSeleccionadas = computed(() => {
+    const lista = this.discrepanciasFiltradas().filter(d => !!d.rolExamenDestinoId);
+    if (lista.length === 0) return false;
+    return lista.every(d => this.discrepanciasSeleccionadas().has(this.claveDiscrepancia(d)));
   });
 
   public readonly nombreSedeActual = computed(() => {
@@ -1102,5 +1498,198 @@ export class SincronizacionSeaComponent implements OnInit {
     if (total > 0 && calificados >= total) return 'bg-emerald-500';
     if (calificados > 0) return 'bg-amber-500';
     return 'bg-rose-400';
+  }
+
+  // =========================================================================
+  // Métodos de Auditoría y Traslado de Calificaciones por Discrepancias SEA
+  // =========================================================================
+
+  public claveDiscrepancia(item: DiscrepanciaGrupoItem): string {
+    return `${item.codigoEstudiante}_${item.rolExamenOrigenId}`;
+  }
+
+  public abrirModalDeteccionDiscrepancias(): void {
+    const seleccionados = Array.from(this.seleccionados());
+    let idsParaAuditar: string[] = [];
+
+    if (seleccionados.length > 0) {
+      idsParaAuditar = seleccionados;
+    } else {
+      idsParaAuditar = this.gruposFiltrados().map(g => g.rolExamenId);
+    }
+
+    if (idsParaAuditar.length === 0) return;
+
+    this.detectandoDiscrepancias.set(true);
+    this.syncService.detectarDiscrepancias({
+      rolExamenIds: idsParaAuditar,
+      sedeCodigo: this.filtroSedeCodigo(),
+      carreraCodigo: this.filtroCarreraCodigo()
+    }).subscribe({
+      next: reporte => {
+        this.detectandoDiscrepancias.set(false);
+        this.reporteDiscrepancias.set(reporte);
+        this.filtroEstadoDiscrepancia.set('TODOS');
+        this.sobrescribirConflictos.set(false);
+
+        // Pre-seleccionar automáticamente todos los que están listos para trasladar
+        const listos = new Set<string>();
+        if (reporte && reporte.discrepancias) {
+          reporte.discrepancias.forEach(d => {
+            if (d.estadoDiscrepancia === 'LISTO_PARA_TRASLADAR' && d.rolExamenDestinoId) {
+              listos.add(this.claveDiscrepancia(d));
+            }
+          });
+        }
+        this.discrepanciasSeleccionadas.set(listos);
+        this.dialogDiscrepancias.set(true);
+      },
+      error: err => {
+        this.detectandoDiscrepancias.set(false);
+        console.error('Error al auditar discrepancias:', err);
+        alert('Error al auditar discrepancias con el Gateway SEA: ' + (err?.error?.message || err?.message || 'Error desconocido'));
+      }
+    });
+  }
+
+  public auditarDiscrepanciasGrupo(item: GrupoSincronizacionResumen): void {
+    this.detectandoDiscrepancias.set(true);
+    this.syncService.detectarDiscrepanciasIndividual(item.rolExamenId).subscribe({
+      next: reporte => {
+        this.detectandoDiscrepancias.set(false);
+        this.reporteDiscrepancias.set(reporte);
+        this.filtroEstadoDiscrepancia.set('TODOS');
+        this.sobrescribirConflictos.set(false);
+
+        // Pre-seleccionar los que están listos
+        const listos = new Set<string>();
+        if (reporte && reporte.discrepancias) {
+          reporte.discrepancias.forEach(d => {
+            if (d.estadoDiscrepancia === 'LISTO_PARA_TRASLADAR' && d.rolExamenDestinoId) {
+              listos.add(this.claveDiscrepancia(d));
+            }
+          });
+        }
+        this.discrepanciasSeleccionadas.set(listos);
+        this.dialogDiscrepancias.set(true);
+      },
+      error: err => {
+        this.detectandoDiscrepancias.set(false);
+        console.error('Error al auditar grupo individual:', err);
+        alert('Error al auditar discrepancias para este grupo: ' + (err?.error?.message || err?.message || 'Error desconocido'));
+      }
+    });
+  }
+
+  public cerrarModalDiscrepancias(): void {
+    this.dialogDiscrepancias.set(false);
+    this.reporteDiscrepancias.set(null);
+    this.discrepanciasSeleccionadas.set(new Set());
+    this.sobrescribirConflictos.set(false);
+  }
+
+  public alCambiarFiltroDiscrepancia(estado: 'TODOS' | 'LISTO' | 'CONFLICTO' | 'NO_ENCONTRADO'): void {
+    this.filtroEstadoDiscrepancia.set(estado);
+  }
+
+  public estaDiscrepanciaSeleccionada(item: DiscrepanciaGrupoItem): boolean {
+    return this.discrepanciasSeleccionadas().has(this.claveDiscrepancia(item));
+  }
+
+  public toggleSeleccionDiscrepancia(item: DiscrepanciaGrupoItem): void {
+    if (!item.rolExamenDestinoId) return;
+    const clave = this.claveDiscrepancia(item);
+    this.discrepanciasSeleccionadas.update(prev => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(clave)) {
+        nuevo.delete(clave);
+      } else {
+        nuevo.add(clave);
+      }
+      return nuevo;
+    });
+  }
+
+  public toggleSeleccionarTodasDiscrepancias(): void {
+    const lista = this.discrepanciasFiltradas().filter(d => !!d.rolExamenDestinoId);
+    if (this.todasDiscrepanciasSeleccionadas()) {
+      this.discrepanciasSeleccionadas.update(prev => {
+        const nuevo = new Set(prev);
+        lista.forEach(d => nuevo.delete(this.claveDiscrepancia(d)));
+        return nuevo;
+      });
+    } else {
+      this.discrepanciasSeleccionadas.update(prev => {
+        const nuevo = new Set(prev);
+        lista.forEach(d => nuevo.add(this.claveDiscrepancia(d)));
+        return nuevo;
+      });
+    }
+  }
+
+  public seleccionarTodasDiscrepanciasListas(): void {
+    const r = this.reporteDiscrepancias();
+    if (!r || !r.discrepancias) return;
+
+    this.discrepanciasSeleccionadas.update(prev => {
+      const nuevo = new Set(prev);
+      r.discrepancias.forEach(d => {
+        if (d.estadoDiscrepancia === 'LISTO_PARA_TRASLADAR' && d.rolExamenDestinoId) {
+          nuevo.add(this.claveDiscrepancia(d));
+        }
+      });
+      return nuevo;
+    });
+  }
+
+  public deseleccionarTodasDiscrepancias(): void {
+    this.discrepanciasSeleccionadas.set(new Set());
+  }
+
+  public ejecutarTrasladoCalificaciones(): void {
+    const sel = this.discrepanciasSeleccionadas();
+    if (sel.size === 0) return;
+
+    const reporte = this.reporteDiscrepancias();
+    if (!reporte || !reporte.discrepancias) return;
+
+    const seleccionados = reporte.discrepancias.filter(d =>
+      sel.has(this.claveDiscrepancia(d)) && !!d.rolExamenDestinoId
+    );
+
+    if (seleccionados.length === 0) return;
+
+    this.trasladandoCalificaciones.set(true);
+
+    const request = {
+      traslados: seleccionados.map(d => ({
+        codigoEstudiante: d.codigoEstudiante,
+        rolExamenOrigenId: d.rolExamenOrigenId,
+        rolExamenDestinoId: d.rolExamenDestinoId!,
+        sobrescribirSiExiste: this.sobrescribirConflictos()
+      }))
+    };
+
+    this.syncService.trasladarCalificaciones(request).subscribe({
+      next: res => {
+        this.trasladandoCalificaciones.set(false);
+        this.dialogDiscrepancias.set(false);
+        this.resultadoTraslado.set(res);
+        this.dialogResultadoTraslado.set(true);
+        this.discrepanciasSeleccionadas.set(new Set());
+        this.cargarGrupos();
+      },
+      error: err => {
+        this.trasladandoCalificaciones.set(false);
+        console.error('Error al trasladar calificaciones:', err);
+        alert('Error durante el traslado de calificaciones: ' + (err?.error?.message || err?.message || 'Error desconocido'));
+      }
+    });
+  }
+
+  public cerrarModalResultadoTraslado(): void {
+    this.dialogResultadoTraslado.set(false);
+    this.resultadoTraslado.set(null);
+    this.cargarGrupos();
   }
 }
