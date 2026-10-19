@@ -21,6 +21,10 @@ public interface RolExamenRepository extends JpaRepository<RolExamen, String> {
 
     List<RolExamen> findByMateriaCodigoAndGrupo(String materiaCodigo, String grupo);
 
+    List<RolExamen> findBySedeCodigoAndMateriaCodigoAndTipoParcialAndEstadoFlujoNot(
+            String sedeCodigo, String materiaCodigo, com.xpertiflow.evaluaciones.domain.enums.TipoParcial tipoParcial,
+            EstadoFlujo estadoExcluido);
+
     List<RolExamen> findByDocenteCi(String docenteCi);
 
     /**

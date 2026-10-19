@@ -66,3 +66,77 @@ export interface SincronizacionMasivaReporte {
   ejecutadoPor: string;
   resultadosPorGrupo: SincronizacionNotasSeaReporte[];
 }
+
+export interface DiscrepanciaGrupoItem {
+  codigoEstudiante: string;
+  studentOldCode?: number;
+  nombreEstudiante: string;
+  materiaCodigo: string;
+  materiaNombre: string;
+  sedeCodigo: string;
+  carreraCodigo: string;
+  tipoParcial: string;
+  rolExamenOrigenId: string;
+  grupoOrigen: string;
+  seaGroupIdOrigen?: string;
+  rolExamenDestinoId?: string;
+  grupoDestino?: string;
+  seaGroupIdDestino?: string;
+  notaSobre60?: number;
+  notaSobre100?: number;
+  esReprogramado?: boolean;
+  modalidad?: string;
+  estadoDiscrepancia: 'LISTO_PARA_TRASLADAR' | 'CONFLICTO_TIENE_NOTA_EN_DESTINO' | 'NO_ENCONTRADO_EN_SEA' | string;
+  detalle?: string;
+  notaExistenteDestino100?: number;
+}
+
+export interface DiscrepanciaGrupoReporte {
+  totalGruposAnalizados: number;
+  totalEstudiantesAnalizados: number;
+  totalConDiscrepancia: number;
+  totalListosParaTrasladar: number;
+  totalConflictos: number;
+  totalNoEncontradosEnSea: number;
+  fechaAnalisis: string;
+  analizadoPor: string;
+  discrepancias: DiscrepanciaGrupoItem[];
+}
+
+export interface DetectarDiscrepanciasRequest {
+  rolExamenIds: string[];
+  sedeCodigo?: string;
+  carreraCodigo?: string;
+}
+
+export interface TrasladoCalificacionItemRequest {
+  codigoEstudiante: string;
+  rolExamenOrigenId: string;
+  rolExamenDestinoId: string;
+  sobrescribirSiExiste?: boolean;
+}
+
+export interface TrasladoCalificacionesRequest {
+  traslados: TrasladoCalificacionItemRequest[];
+}
+
+export interface TrasladoCalificacionItemResultado {
+  codigoEstudiante: string;
+  nombreEstudiante?: string;
+  rolExamenOrigenId: string;
+  grupoOrigen?: string;
+  rolExamenDestinoId: string;
+  grupoDestino?: string;
+  exitoso: boolean;
+  mensaje: string;
+}
+
+export interface TrasladoCalificacionesResultado {
+  totalSolicitados: number;
+  totalExitosos: number;
+  totalFallidos: number;
+  fechaEjecucion: string;
+  ejecutadoPor: string;
+  resultados: TrasladoCalificacionItemResultado[];
+}
+

@@ -44,6 +44,10 @@ public class UnitepcGatewayClient {
     }
 
     private synchronized String getToken() {
+        if (mockEvaluationsEnabled) {
+            return "mock-sea-bearer-token";
+        }
+
         if (accessToken != null && tokenExpiration != null && Instant.now().isBefore(tokenExpiration.minusSeconds(60))) {
             return accessToken;
         }
@@ -149,6 +153,21 @@ public class UnitepcGatewayClient {
     }
 
     public List<StudentItemDto> getStudentsByGroup(String groupId) {
+        if (mockEvaluationsEnabled) {
+            RestClient localClient = RestClient.builder().baseUrl("http://127.0.0.1:" + serverPort).build();
+            return localClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/api/mock-gateway/api/v1/student/externals/research/students/byGroup")
+                            .queryParam("groupId", groupId)
+                            .build())
+                    .headers(h -> {
+                        h.setBearerAuth(getToken());
+                        h.set("clientId", systemClientId);
+                    })
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+        }
+
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/student/externals/research/students/byGroup")
