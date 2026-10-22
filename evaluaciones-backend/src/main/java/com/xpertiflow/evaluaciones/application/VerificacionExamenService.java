@@ -256,9 +256,37 @@ public class VerificacionExamenService {
 
     @Transactional
     public GeneracionTypstResultadoDto solicitarPrevisualizacion(String rolExamenId, Authentication authentication) {
-        RolExamen rol = obtenerRolAccesible(rolExamenId, authentication);
-        BancoPreguntas banco = obtenerBancoValidado(rol);
-        asegurarPendiente(rol, banco);
+        RolExamen rol = rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+
+        VerificacionExamen verificacion = verificacionRepository.findByRolExamenId(rolExamenId).orElse(null);
+        boolean estaAprobado = verificacion != null && "VERIFICADO".equalsIgnoreCase(verificacion.getEstado());
+
+        BancoPreguntas banco;
+        if (estaAprobado) {
+            if (!politicaService.aplica(rol) || !accesoAcademicoService.puedeAcceder(rol, authentication)) {
+                throw new AccessDeniedException("El examen aprobado no está dentro del alcance de esta cuenta");
+            }
+            if (verificacion.getBancoPreguntasId() != null) {
+                banco = bancoRepository.findById(verificacion.getBancoPreguntasId()).orElse(null);
+            } else {
+                banco = null;
+            }
+            if (banco == null) {
+                banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId).orElse(null);
+            }
+            if (banco == null) {
+                throw new IllegalArgumentException("No se encontró el banco aprobado del examen");
+            }
+        } else {
+            if (rol.getEstadoFlujo() != EstadoFlujo.VALIDADO || !politicaService.aplica(rol)
+                    || !accesoAcademicoService.puedeAcceder(rol, authentication)) {
+                throw new AccessDeniedException("El examen no está disponible para verificación");
+            }
+            banco = obtenerBancoValidado(rol);
+            asegurarPendiente(rol, banco);
+        }
+
         List<Map<String, Object>> preguntas = descifrarReactivos(banco).stream()
                 .sorted(Comparator.comparingInt(this::ordenTipo).thenComparing(Reactivo::getNumeroOrden,
                         Comparator.nullsLast(Comparator.naturalOrder())))
@@ -269,8 +297,9 @@ public class VerificacionExamenService {
         request.setPreguntas(preguntas);
         request.setModoVerificacion(true);
         request.setIncluirClave(true);
-        registrarAuditoria(rolExamenId, "PREVISUALIZACION_VERIFICACION", authentication.getName(),
-                "Se generó la vista completa del banco validado");
+        registrarAuditoria(rolExamenId, estaAprobado ? "PREVISUALIZACION_APROBADO" : "PREVISUALIZACION_VERIFICACION",
+                authentication.getName(),
+                estaAprobado ? "Se generó la vista de patrones del examen aprobado" : "Se generó la vista completa del banco validado");
         return generacionTypstService.solicitarPrevisualizacion(request);
     }
 
@@ -288,6 +317,10 @@ public class VerificacionExamenService {
         Map<String, String> notas = limpiarObservaciones(request.getObservacionesPreguntas());
         if (devolver && general.isBlank() && notas.isEmpty()) {
             throw new IllegalArgumentException("Para devolver el examen debe registrar observaciones");
+        }
+        if (aprobar && "DEVUELTO".equalsIgnoreCase(verificacion.getEstado())) {
+            BancoPreguntas bancoAnterior = bancoRepository.findById(verificacion.getBancoPreguntasId()).orElse(null);
+            historialVerificacionService.archivarDevolucion(verificacion, bancoAnterior);
         }
         verificacion.setEstado(aprobar ? "VERIFICADO" : "DEVUELTO");
         verificacion.setObservacionesGenerales(general.isBlank() ? null : general);
@@ -492,11 +525,16 @@ public class VerificacionExamenService {
         VerificacionExamen verificacion = verificacionRepository.findByRolExamenId(rolExamenId)
                 .filter(registro -> "VERIFICADO".equalsIgnoreCase(registro.getEstado()))
                 .orElseThrow(() -> new IllegalArgumentException("El examen todavía no está aprobado"));
-        BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId)
-                .filter(registro -> registro.getId().equals(verificacion.getBancoPreguntasId())
-                        && rolExamenId.equals(registro.getRolExamenId())
-                        && "VALIDADO".equalsIgnoreCase(registro.getEstado()))
-                .orElseThrow(() -> new IllegalArgumentException("No se encontró el banco aprobado del examen"));
+        BancoPreguntas banco = null;
+        if (verificacion.getBancoPreguntasId() != null) {
+            banco = bancoRepository.findById(verificacion.getBancoPreguntasId()).orElse(null);
+        }
+        if (banco == null) {
+            banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId).orElse(null);
+        }
+        if (banco == null) {
+            throw new IllegalArgumentException("No se encontró el banco aprobado del examen");
+        }
         List<Reactivo> reactivos = descifrarReactivos(banco);
         VerificacionExamenDetalleDto dto = mapearDetalle(rol, banco, verificacion);
         Map<String, String> notas = observaciones(verificacion);
@@ -513,9 +551,15 @@ public class VerificacionExamenService {
         if (!accesoAcademicoService.puedeAcceder(rol, authentication)) {
             throw new AccessDeniedException("No tiene permisos para acceder a esta evaluación");
         }
-        BancoPreguntas banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId).orElse(null);
-        List<Reactivo> reactivosActuales = banco != null ? descifrarReactivos(banco) : List.of();
         VerificacionExamen verificacion = verificacionRepository.findByRolExamenId(rolExamenId).orElse(null);
+        BancoPreguntas banco = null;
+        if (verificacion != null && verificacion.getBancoPreguntasId() != null) {
+            banco = bancoRepository.findById(verificacion.getBancoPreguntasId()).orElse(null);
+        }
+        if (banco == null) {
+            banco = bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rolExamenId).orElse(null);
+        }
+        List<Reactivo> reactivosActuales = banco != null ? descifrarReactivos(banco) : List.of();
         return mapearHistorialDevoluciones(rolExamenId, reactivosActuales, verificacion);
     }
 
