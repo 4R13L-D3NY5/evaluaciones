@@ -338,7 +338,7 @@ export class SidebarComponent implements OnInit {
       route: '/test-vocacional',
       icon: 'pi pi-compass',
       description: 'Lectura OMR y OCR de cartillas del Test de Orientación Vocacional RIASEC',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'EVALUADOR_VOCACIONAL']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'EVALUADOR_VOCACIONAL']
     },
     {
       label: 'Sincronización SEA',
@@ -359,7 +359,7 @@ export class SidebarComponent implements OnInit {
       route: '/auditoria',
       icon: 'pi pi-shield-check',
       description: 'Peritaje forense de toma de grupos, nóminas, bitácora de IPs y accesos',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA']
     },
     {
       label: 'Respaldos y contingencia',

@@ -84,8 +84,8 @@ public class UsuariosSistemaService {
     @Transactional(readOnly = true)
     public List<UsuarioSistemaResponseDto> listar(String contexto) {
         Set<String> rolesVisibles = "EVALUACIONES".equalsIgnoreCase(contexto)
-                ? Set.of("RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "VERIFICADOR")
-                : Set.of("ADMINISTRADOR_SISTEMA", "RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "DOCENTE", "VICERRECTOR", "VERIFICADOR");
+                ? Set.of("RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "VERIFICADOR", "EVALUADOR_VOCACIONAL")
+                : Set.of("ADMINISTRADOR_SISTEMA", "RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "DOCENTE", "VICERRECTOR", "VERIFICADOR", "EVALUADOR_VOCACIONAL");
         Map<String, AlcanceSea> alcancesSea = "EVALUACIONES".equalsIgnoreCase(contexto)
                 ? Map.of() : construirAlcancesSea();
         return usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
@@ -644,7 +644,7 @@ public class UsuariosSistemaService {
             String[] textos = {
                     "CI: obligatorio; será el usuario y la contraseña temporal.",
                     "NOMBRE_COMPLETO: conservar exactamente el orden recibido desde SEA.",
-                    "ROL: usar ADMINISTRADOR_SISTEMA, RESPONSABLE_EVALUACIONES, PERSONAL_EVALUACIONES, VERIFICADOR, DIRECTOR_CARRERA, DOCENTE o VICERRECTOR.",
+                    "ROL: usar ADMINISTRADOR_SISTEMA, RESPONSABLE_EVALUACIONES, PERSONAL_EVALUACIONES, VERIFICADOR, EVALUADOR_VOCACIONAL, DIRECTOR_CARRERA, DOCENTE o VICERRECTOR.",
                     "Marcar con X las columnas SEDE [...] y CARRERA [...] que correspondan. Se pueden marcar varias.",
                     "Los códigos entre corchetes deben ser los códigos oficiales entregados por SEA.",
                     "Para PERSONAL_EVALUACIONES, CAMPUS acepta varios registros separados por punto y coma: SEDE_CODIGO|CAMPUS_ID|CAMPUS_CODIGO|CAMPUS_NOMBRE|SI o NO.",

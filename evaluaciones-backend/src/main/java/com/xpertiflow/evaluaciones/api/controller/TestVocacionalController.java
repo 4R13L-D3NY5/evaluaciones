@@ -37,7 +37,7 @@ public class TestVocacionalController {
     private final TestVocacionalService testVocacionalService;
 
     @PostMapping(value = "/procesar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Subir y encolar escaneado del Test Vocacional para procesamiento OMR y OCR")
     public ResponseEntity<TestVocacionalProcesarResponseDto> procesar(
             @RequestParam("archivo") MultipartFile archivo,
@@ -61,14 +61,14 @@ public class TestVocacionalController {
     }
 
     @GetMapping("/jobs/{jobId}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Consultar el estado y resultados de un trabajo de procesamiento de Test Vocacional")
     public ResponseEntity<TestVocacionalProcesarResponseDto> consultarJob(@PathVariable String jobId) {
         return ResponseEntity.ok(testVocacionalService.consultarJob(jobId));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Listar registros evaluados del Test Vocacional con filtros")
     public ResponseEntity<List<TestVocacionalItemDto>> listar(
             @RequestParam(value = "colegio", required = false) String colegio,
@@ -80,28 +80,28 @@ public class TestVocacionalController {
     }
 
     @GetMapping("/filtros")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Obtener opciones únicas de colegios y cursos para filtros")
     public ResponseEntity<Map<String, List<String>>> obtenerFiltros() {
         return ResponseEntity.ok(testVocacionalService.obtenerFiltrosDisponibles());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Obtener el detalle de una evaluación de Test Vocacional")
     public ResponseEntity<TestVocacionalItemDto> obtenerPorId(@PathVariable Long id) {
         return ResponseEntity.ok(testVocacionalService.obtenerPorId(id));
     }
 
     @GetMapping("/{id}/interpretacion")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Obtener el informe vocacional detallado RIASEC del estudiante")
     public ResponseEntity<com.xpertiflow.evaluaciones.api.dto.testvocacional.InterpretacionVocacionalDto> obtenerInterpretacion(@PathVariable Long id) {
         return ResponseEntity.ok(testVocacionalService.obtenerInterpretacion(id));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Actualizar campos editables de una evaluación (nombre, celular, correo, números marcados, etc.)")
     public ResponseEntity<TestVocacionalItemDto> actualizar(
             @PathVariable Long id,
@@ -113,7 +113,7 @@ public class TestVocacionalController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Eliminar un registro de evaluación")
     public ResponseEntity<Void> eliminar(@PathVariable Long id, Authentication authentication) {
         String usuario = authentication != null ? authentication.getName() : "SISTEMA";
@@ -122,7 +122,7 @@ public class TestVocacionalController {
     }
 
     @DeleteMapping("/paquete")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Eliminar todas las evaluaciones de un colegio y paralelo específico")
     public ResponseEntity<Map<String, Object>> eliminarPaquete(
             @RequestParam("colegio") String colegio,
@@ -137,7 +137,7 @@ public class TestVocacionalController {
     }
 
     @GetMapping("/exportar")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Exportar las evaluaciones filtradas a formato Excel (.xlsx)")
     public ResponseEntity<byte[]> exportar(
             @RequestParam(value = "colegio", required = false) String colegio,
@@ -153,7 +153,7 @@ public class TestVocacionalController {
     }
 
     @GetMapping("/{id}/preview")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','EVALUADOR_VOCACIONAL')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','EVALUADOR_VOCACIONAL')")
     @Operation(summary = "Obtener la imagen escaneada anotada de la hoja de Test Vocacional")
     public ResponseEntity<Resource> preview(@PathVariable Long id) {
         Path path = testVocacionalService.resolverRutaPreview(id);
