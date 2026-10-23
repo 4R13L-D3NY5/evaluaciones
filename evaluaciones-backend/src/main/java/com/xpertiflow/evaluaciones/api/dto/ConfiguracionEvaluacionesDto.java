@@ -62,6 +62,8 @@ public class ConfiguracionEvaluacionesDto {
     @Max(1440)
     private Integer minutosMinimosDevolucion;
 
+    private String examenEnCurso;
+
     private LocalDateTime actualizadoEn;
 
     private String actualizadoPor;

@@ -57,6 +57,21 @@ public class BancoPreguntasService {
     private static final int CUOTA_FACILES = 15;
     private static final int CUOTA_MEDIAS = 30;
     private static final int CUOTA_DIFICILES = 15;
+    private static final int CUOTA_GRUPO_1 = 20;
+    private static final int CUOTA_GRUPO_2 = 20;
+    private static final int CUOTA_GRUPO_3 = 20;
+    private static final Set<String> TIPOS_GRUPO_1 = Set.of(
+            "VERDADERO_O_FALSO_SIMPLE",
+            "VERDADERO_O_FALSO_COMPLEJAS",
+            "RESPUESTA_PREMISAS_ABCD"
+    );
+    private static final Set<String> TIPOS_GRUPO_2 = Set.of(
+            "SELECCION_MEJOR_RESPUESTA"
+    );
+    private static final Set<String> TIPOS_GRUPO_3 = Set.of(
+            "SUBITEM_CASO",
+            "OPCION_EMPAREJAMIENTO"
+    );
     private static final int MIN_HIJOS_AGRUPADOS = 2;
     private static final int MAX_HIJOS_AGRUPADOS = 10;
     private static final long MAX_ARCHIVO_BYTES = 10L * 1024L * 1024L;
@@ -179,6 +194,7 @@ public class BancoPreguntasService {
             if (!errores.isEmpty()) return respuestaFallida(rol, errores);
 
             int faciles = 0, medias = 0, dificiles = 0;
+            int g1 = 0, g2 = 0, g3 = 0;
             Set<String> huellasPreguntas = new HashSet<>();
             List<FilaEstructura> estructura = new ArrayList<>();
 
@@ -211,6 +227,13 @@ public class BancoPreguntasService {
                             case 2 -> medias++;
                             case 3 -> dificiles++;
                         }
+                        if (TIPOS_GRUPO_1.contains(r.getTipoReactivo())) {
+                            g1++;
+                        } else if (TIPOS_GRUPO_2.contains(r.getTipoReactivo())) {
+                            g2++;
+                        } else if (TIPOS_GRUPO_3.contains(r.getTipoReactivo())) {
+                            g3++;
+                        }
                     }
                 }
                 rowNum++;
@@ -219,7 +242,7 @@ public class BancoPreguntasService {
             validarEstructuraAgrupada(estructura, errores);
 
             int totalPreguntas = contarPreguntasContables(reactivos);
-            validarCuotas(faciles, medias, dificiles, totalPreguntas, errores);
+            validarCuotas(faciles, medias, dificiles, g1, g2, g3, totalPreguntas, errores);
 
             if (!errores.isEmpty()) {
                 return CargaBancoResponseDto.builder()
@@ -951,7 +974,7 @@ public class BancoPreguntasService {
                 .trim().toLowerCase(Locale.ROOT);
     }
 
-    private void validarCuotas(int faciles, int medias, int dificiles, int total, List<String> errores) {
+    private void validarCuotas(int faciles, int medias, int dificiles, int g1, int g2, int g3, int total, List<String> errores) {
         if (total < TOTAL_REQUERIDO) {
             errores.add("El banco debe tener como mínimo " + TOTAL_REQUERIDO + " preguntas; se encontraron " + total);
         }
@@ -963,6 +986,15 @@ public class BancoPreguntasService {
         }
         if (dificiles < CUOTA_DIFICILES) {
             errores.add("Debe haber como mínimo " + CUOTA_DIFICILES + " preguntas difíciles; se encontraron " + dificiles);
+        }
+        if (g1 < CUOTA_GRUPO_1) {
+            errores.add("Debe haber como mínimo " + CUOTA_GRUPO_1 + " preguntas del Grupo 1 (Fáciles y Verdaderos / Premisas); se encontraron " + g1);
+        }
+        if (g2 < CUOTA_GRUPO_2) {
+            errores.add("Debe haber como mínimo " + CUOTA_GRUPO_2 + " preguntas del Grupo 2 (Selección de la mejor respuesta); se encontraron " + g2);
+        }
+        if (g3 < CUOTA_GRUPO_3) {
+            errores.add("Debe haber como mínimo " + CUOTA_GRUPO_3 + " preguntas del Grupo 3 (Emparejamiento y Casos o Problemas); se encontraron " + g3);
         }
     }
 

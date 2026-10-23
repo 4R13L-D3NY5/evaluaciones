@@ -527,6 +527,47 @@ export interface ParcialConfig {
                 </div>
               </div>
 
+              <!-- Examen en Curso Institucional (Periodo Activo) -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
+                <div class="flex items-center justify-between border-b border-border pb-3">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-calendar-check text-purple-700"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Examen en Curso Institucional</h4>
+                      <p class="text-[10px] text-muted-foreground">Define el periodo evaluativo oficial activo para todo el sistema institucional.</p>
+                    </div>
+                  </div>
+                  <span class="bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700 rounded-full px-3 py-1 text-[10px] font-mono font-black uppercase">
+                    {{ examenEnCurso }}
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-muted-foreground mb-1">
+                      Periodo Evaluativo Activo
+                    </label>
+                    <select 
+                      [(ngModel)]="examenEnCurso" 
+                      class="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:ring-2 focus:ring-purple-500">
+                      @for (op of opcionesExamenEnCurso; track op.valor) {
+                        <option [value]="op.valor">{{ op.etiqueta }}</option>
+                      }
+                    </select>
+                    <p class="text-[10px] text-muted-foreground mt-1">
+                      Configura el examen que se encuentra activo en curso para los módulos de roles, bancos de preguntas y entrega de notas.
+                    </p>
+                  </div>
+
+                  <div class="p-3 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl space-y-1">
+                    <span class="text-[10px] font-bold text-purple-700 dark:text-purple-300 block uppercase">Periodo Vigente:</span>
+                    <p class="text-[11px] text-muted-foreground leading-snug">
+                      Al cambiar entre <strong>1er Parcial</strong>, <strong>2do Parcial</strong>, <strong>Final</strong> o <strong>2da Instancia</strong>, se orientan las acciones prioritarias de calendarización y carga para todo el personal docente.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Grilla de Configuración: Estructura por Parcial -->
               <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
                 <div class="flex items-center gap-2 border-b border-border pb-3">
@@ -1026,6 +1067,13 @@ export class AdministracionEvaluacionesComponent {
   public readonly Math = Math;
 
   public ratioEstudiantesPorVariante: number = 5;
+  public examenEnCurso: string = '1ER_PARCIAL';
+  public readonly opcionesExamenEnCurso = [
+    { valor: '1ER_PARCIAL', etiqueta: 'Primer Parcial (1er Parcial)' },
+    { valor: '2DO_PARCIAL', etiqueta: 'Segundo Parcial (2do Parcial)' },
+    { valor: 'FINAL', etiqueta: 'Examen Final' },
+    { valor: '2DA_INSTANCIA', etiqueta: 'Segunda Instancia (2da Instancia)' }
+  ];
   public guardandoConfiguracion = signal<boolean>(false);
   public guardandoAsignacionCarrera = signal<boolean>(false);
 
@@ -1274,6 +1322,7 @@ export class AdministracionEvaluacionesComponent {
 
   private aplicarConfiguracion(configuracion: ConfiguracionEvaluaciones): void {
     this.ratioEstudiantesPorVariante = configuracion.ratioEstudiantesPorVariante;
+    this.examenEnCurso = configuracion.examenEnCurso || '1ER_PARCIAL';
     this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
     this.cuentaRegresivaInicioVirtualSegundos = configuracion.cuentaRegresivaInicioVirtualSegundos ?? 15;
     this.typstFormatoHoja = configuracion.formatoHoja;
@@ -1803,6 +1852,7 @@ export class AdministracionEvaluacionesComponent {
     this.guardandoConfiguracion.set(true);
     this._configuracionService.guardar({
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
+      examenEnCurso: this.examenEnCurso,
       duracionExamenVirtualMinutos: this.normalizarDuracionVirtual(),
       cuentaRegresivaInicioVirtualSegundos: this.normalizarCuentaRegresivaVirtual(),
       formatoHoja: this.typstFormatoHoja,
@@ -1841,6 +1891,7 @@ export class AdministracionEvaluacionesComponent {
     this.cuentaRegresivaInicioVirtualSegundos = this.normalizarCuentaRegresivaVirtual();
     this._configuracionService.guardar({
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
+      examenEnCurso: this.examenEnCurso,
       duracionExamenVirtualMinutos: this.duracionExamenVirtualMinutos,
       cuentaRegresivaInicioVirtualSegundos: this.cuentaRegresivaInicioVirtualSegundos,
       formatoHoja: this.typstFormatoHoja,

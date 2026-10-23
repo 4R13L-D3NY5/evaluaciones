@@ -18,6 +18,7 @@ export interface ConfiguracionEvaluaciones {
   horasAntesLista: number;
   horasCandado72: number;
   minutosMinimosDevolucion?: number;
+  examenEnCurso?: string;
   actualizadoEn?: string;
   actualizadoPor?: string;
 }

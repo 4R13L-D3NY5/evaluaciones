@@ -74,10 +74,10 @@ interface InstanciaImportacionItem {
         <div class="flex items-center justify-end gap-2.5 flex-wrap">
           @if (esVicerrector()) {
             <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
-              <i class="pi pi-eye"></i> Consulta por sede
+              <i class="pi pi-shield"></i> Gestión Vicerrectorado
             </span>
-          } @else {
-            @if (esAdministrador()) {
+          }
+          @if (esAdministrador()) {
               <!-- Acciones de gestión reservadas exclusivamente al Administrador del Sistema -->
               <button
                 (click)="abrirModalReprogramarRango()"
@@ -101,14 +101,13 @@ interface InstanciaImportacionItem {
               </button>
             }
 
-            @if (puedeVerBotonAnadirExamen()) {
-              <button
-                (click)="abrirModalAnadirManual()"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-                <i class="pi pi-plus"></i>
-                <span>Añadir Examen al Rol de Examen</span>
-              </button>
-            }
+          @if (puedeVerBotonAnadirExamen()) {
+            <button
+              (click)="abrirModalAnadirManual()"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+              <i class="pi pi-plus"></i>
+              <span>Añadir Examen al Rol de Examen</span>
+            </button>
           }
         </div>
       </div>
@@ -1165,7 +1164,7 @@ export class RolExamenesComponent implements OnInit {
   public readonly esDirectorCarrera = computed(() => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA');
 
   public readonly puedeVerBotonAnadirExamen = computed(() => {
-    if (this.esAdministrador() || this.esResponsable()) return true;
+    if (this.esAdministrador() || this.esResponsable() || this.esVicerrector()) return true;
     if (!this.esDirectorCarrera()) return false;
 
     // Si el director filtró por una fecha 'desde', esa fecha debe respetar el candado de 72h
@@ -2512,17 +2511,21 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public puedeEditar(item: RolExamenItem): boolean {
-    if (this.esVicerrector()) return false;
     if (this.esAdministrador()) {
       return true;
+    }
+    if (this.esVicerrector()) {
+      return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
       && !this.estaBloqueadoPorCandado(item);
   }
 
   public puedeEliminar(item: RolExamenItem): boolean {
-    if (this.esVicerrector()) return false;
     if (this.esAdministrador()) {
+      return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
+    }
+    if (this.esVicerrector()) {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')

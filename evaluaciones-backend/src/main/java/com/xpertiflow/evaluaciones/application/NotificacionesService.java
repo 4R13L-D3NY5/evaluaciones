@@ -9,6 +9,10 @@ import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.UsuarioSistemaRepository;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -34,6 +38,8 @@ public class NotificacionesService {
     private final VerificacionExamenRepository verificacionExamenRepository;
     private final UsuarioSistemaRepository usuarioRepository;
     private final AccesoAcademicoService accesoAcademicoService;
+    private final AuditoriaEvaluacionRepository auditoriaEvaluacionRepository;
+    private final ObjectMapper objectMapper;
 
     public List<NotificacionItemDto> obtenerResumen(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -51,6 +57,10 @@ public class NotificacionesService {
 
         if (tieneRol(authentication, "DIRECTOR_CARRERA")) {
             return obtenerNotificacionesDirector(authentication);
+        }
+
+        if (tieneRol(authentication, "PERSONAL_EVALUACIONES") || tieneRol(authentication, "RESPONSABLE_EVALUACIONES")) {
+            return obtenerNotificacionesPersonalEvaluaciones(authentication);
         }
 
         return List.of();
@@ -279,6 +289,68 @@ public class NotificacionesService {
             }
         }
         return LocalDateTime.of(fecha, LocalTime.of(hora, min));
+    }
+
+    private List<NotificacionItemDto> obtenerNotificacionesPersonalEvaluaciones(Authentication authentication) {
+        LocalDateTime sieteDiasAtras = LocalDateTime.now().minusDays(7);
+        List<AuditoriaEvaluacion> eventos = auditoriaEvaluacionRepository.findReprogramacionesRecientes(
+                List.of("REPROGRAMACION_FECHA_ROL", "REPROGRAMACION_FECHA_ADMINISTRADOR"),
+                sieteDiasAtras
+        );
+
+        if (eventos.isEmpty()) {
+            return List.of();
+        }
+
+        List<NotificacionItemDto> lista = new ArrayList<>();
+        Set<String> rolesProcesados = new HashSet<>();
+
+        for (AuditoriaEvaluacion audit : eventos) {
+            RolExamen rol = audit.getRolExamen();
+            if (rol == null) continue;
+            if (!accesoAcademicoService.puedeAcceder(rol, authentication)) continue;
+
+            if (!rolesProcesados.add(rol.getId())) continue;
+
+            String motivo = "Fecha de examen reprogramada";
+            if (audit.getDetallesJson() != null && !audit.getDetallesJson().isBlank()) {
+                try {
+                    JsonNode node = objectMapper.readTree(audit.getDetallesJson());
+                    if (node.has("motivo") && !node.get("motivo").asText().isBlank()) {
+                        motivo = node.get("motivo").asText();
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            String usuarioActor = audit.getUsuario() != null && !audit.getUsuario().isBlank()
+                    ? audit.getUsuario().trim()
+                    : "Dirección Académica / Vicerrectorado";
+
+            String fechaStr = audit.getFechaEvento() != null
+                    ? audit.getFechaEvento().format(DateTimeFormatter.ISO_DATE_TIME)
+                    : null;
+
+            lista.add(NotificacionItemDto.builder()
+                    .id("reprog-" + audit.getId())
+                    .tipo("REPROGRAMACION_FECHA_ROL")
+                    .titulo("Examen reprogramado")
+                    .materiaCodigo(rol.getMateriaCodigo())
+                    .materiaNombre(rol.getMateriaNombre())
+                    .grupo(rol.getGrupo())
+                    .parcial(rol.getTipoParcial() != null ? rol.getTipoParcial().name() : null)
+                    .docenteNombre(rol.getDocenteNombre())
+                    .mensaje(String.format("El examen de %s (%s) fue reprogramado por %s. %s.",
+                            rol.getMateriaNombre(), rol.getGrupo(), usuarioActor, motivo))
+                    .fecha(fechaStr)
+                    .ruta("/rol-examenes")
+                    .queryParams(Map.of("busqueda", rol.getMateriaCodigo() != null ? rol.getMateriaCodigo() : rol.getMateriaNombre()))
+                    .textoAccion("Ver en cronograma")
+                    .nivel("warning")
+                    .build());
+        }
+
+        return lista;
     }
 
     private boolean tieneRol(Authentication authentication, String rol) {

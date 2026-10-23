@@ -35,6 +35,7 @@ public class ConfiguracionEvaluacionesService {
     private static final int HORAS_LISTA_POR_DEFECTO = 24;
     private static final int HORAS_CANDADO_POR_DEFECTO = 72;
     private static final int MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO = 45;
+    private static final String EXAMEN_EN_CURSO_POR_DEFECTO = "1ER_PARCIAL";
 
     private final ConfiguracionEvaluacionesRepository repository;
     private final ObjectMapper objectMapper;
@@ -71,6 +72,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setHorasAntesLista(valorORango(request.getHorasAntesLista(), HORAS_LISTA_POR_DEFECTO, 0, 720));
         configuracion.setHorasCandado72(valorORango(request.getHorasCandado72(), HORAS_CANDADO_POR_DEFECTO, 0, 720));
         configuracion.setMinutosMinimosDevolucion(valorORango(request.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
+        configuracion.setExamenEnCurso(valorODefecto(request.getExamenEnCurso(), EXAMEN_EN_CURSO_POR_DEFECTO));
         configuracion.setActualizadoEn(LocalDateTime.now());
         String actorReal = (actor != null && !actor.isBlank()) ? actor : usuarioValido(request.getActualizadoPor());
         configuracion.setActualizadoPor(actorReal);
@@ -82,8 +84,8 @@ public class ConfiguracionEvaluacionesService {
                     .collect(java.util.stream.Collectors.joining(", "))
                 : "estándar";
 
-        String resumen = String.format("Formato hoja: %s, Tipo letra: %s (%dpt), Preguntas por parcial: [%s]",
-                guardado.getFormatoHoja(), guardado.getTipoLetra(), guardado.getTamanoLetraPt(), parcialesInfo);
+        String resumen = String.format("Formato hoja: %s, Tipo letra: %s (%dpt), Examen activo: %s, Preguntas por parcial: [%s]",
+                guardado.getFormatoHoja(), guardado.getTipoLetra(), guardado.getTamanoLetraPt(), guardado.getExamenEnCurso(), parcialesInfo);
 
         AuditoriaUsuario auditoria = new AuditoriaUsuario();
         auditoria.setAccion("CONFIGURACION_EXAMENES_ACTUALIZADA");
@@ -113,6 +115,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setHorasAntesLista(HORAS_LISTA_POR_DEFECTO);
         configuracion.setHorasCandado72(HORAS_CANDADO_POR_DEFECTO);
         configuracion.setMinutosMinimosDevolucion(MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO);
+        configuracion.setExamenEnCurso(EXAMEN_EN_CURSO_POR_DEFECTO);
         configuracion.setActualizadoPor("ADMIN_EVALUACIONES");
         configuracion.setActualizadoEn(LocalDateTime.now());
         return configuracion;
@@ -137,6 +140,7 @@ public class ConfiguracionEvaluacionesService {
         dto.setHorasAntesLista(valorORango(configuracion.getHorasAntesLista(), HORAS_LISTA_POR_DEFECTO, 0, 720));
         dto.setHorasCandado72(valorORango(configuracion.getHorasCandado72(), HORAS_CANDADO_POR_DEFECTO, 0, 720));
         dto.setMinutosMinimosDevolucion(valorORango(configuracion.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
+        dto.setExamenEnCurso(valorODefecto(configuracion.getExamenEnCurso(), EXAMEN_EN_CURSO_POR_DEFECTO));
         dto.setActualizadoEn(configuracion.getActualizadoEn());
         dto.setActualizadoPor(configuracion.getActualizadoPor());
         return dto;

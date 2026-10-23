@@ -378,7 +378,9 @@ def _typst_content(texto: str) -> str:
     return "".join(partes)
 
 
-_OPCION_PREFIX_RE = re.compile(r"^\s*(?:[A-Ea-e]|[1-5])\s*[\.\):\-]\s*")
+_OPCION_PREFIX_RE = re.compile(
+    r"^\s*(?:[A-Ea-e]\s*[\.\):\-]\s*|[1-5]\s*[\):\-]\s*|[1-5]\.\s+(?!\d))"
+)
 
 
 def _limpiar_prefijo_opcion(texto: Any) -> str:
