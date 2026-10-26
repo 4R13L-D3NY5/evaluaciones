@@ -2296,7 +2296,7 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public abrirModalAnadirManual(): void {
-    if (!this.esAdministrador() && !this.esResponsable() && !this.esDirectorCarrera()) {
+    if (!this.esAdministrador() && !this.esResponsable() && !this.esDirectorCarrera() && !this.esVicerrector()) {
       this._mostrarToast('No tienes permiso para registrar exámenes en el rol de examen.');
       return;
     }
@@ -2312,7 +2312,7 @@ export class RolExamenesComponent implements OnInit {
     const fDesde = this.filtroFechaDesde();
     if (fDesde && !this.estaFechaBloqueadaPorCandado(fDesde)) {
       this.formFecha = fDesde;
-    } else if (!this.esAdministrador()) {
+    } else if (!this.esAdministrador() && !this.esVicerrector() && !this.esDirectorCarrera()) {
       this.formFecha = this.fechaMinimaReprogramacion();
     } else {
       this.formFecha = '';
@@ -2359,7 +2359,7 @@ export class RolExamenesComponent implements OnInit {
 
   public guardarExamenModal(): void {
     const edit = this.itemEditando();
-    if (!this.esAdministrador()) {
+    if (!this.esAdministrador() && !this.esVicerrector() && !this.esDirectorCarrera()) {
       if (edit && this.estaBloqueadoPorCandado(edit)) {
         this._mostrarToast(`No se puede modificar un examen que está dentro del candado de ${this.horasCandado72()} horas.`);
         return;
@@ -2514,7 +2514,7 @@ export class RolExamenesComponent implements OnInit {
     if (this.esAdministrador()) {
       return true;
     }
-    if (this.esVicerrector()) {
+    if (this.esVicerrector() || this.esDirectorCarrera()) {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
@@ -2525,7 +2525,7 @@ export class RolExamenesComponent implements OnInit {
     if (this.esAdministrador()) {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
-    if (this.esVicerrector()) {
+    if (this.esVicerrector() || this.esDirectorCarrera()) {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
@@ -2533,7 +2533,7 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public getTooltipEditar(item: RolExamenItem): string {
-    if (!this.esAdministrador() && this.estaBloqueadoPorCandado(item)) {
+    if (!this.esAdministrador() && !this.esVicerrector() && !this.esDirectorCarrera() && this.estaBloqueadoPorCandado(item)) {
       return `Bloqueado por candado de seguridad: faltan menos de ${this.horasCandado72()}h para el examen.`;
     }
     if (this.esAdministrador() && item.estado !== 'PROGRAMADO' && item.estado !== 'VALIDADO') {
@@ -2543,7 +2543,7 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public fechaMinimaReprogramacion(): string {
-    if (this.esAdministrador()) {
+    if (this.esAdministrador() || this.esVicerrector() || this.esDirectorCarrera()) {
       return '2020-01-01';
     }
     const horas = this.horasCandado72();

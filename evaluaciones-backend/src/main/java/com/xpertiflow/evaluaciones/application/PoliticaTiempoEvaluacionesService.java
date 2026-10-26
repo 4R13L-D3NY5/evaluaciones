@@ -159,12 +159,28 @@ public class PoliticaTiempoEvaluacionesService {
                 .anyMatch(authority -> "ROLE_ADMINISTRADOR_SISTEMA".equals(authority.getAuthority()));
     }
 
+    public boolean esVicerrector(Authentication authentication) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_VICERRECTOR".equals(authority.getAuthority()));
+    }
+
+    public boolean esDirectorCarrera(Authentication authentication) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_DIRECTOR_CARRERA".equals(authority.getAuthority()));
+    }
+
+    public boolean esAutoridadAcademica(Authentication authentication) {
+        return esVicerrector(authentication) || esDirectorCarrera(authentication);
+    }
+
     public void exigirEdicionPermitida(RolExamen rol, java.time.LocalDate nuevaFecha, Authentication authentication) {
         exigirEdicionPermitida(rol, nuevaFecha, null, authentication);
     }
 
     public void exigirEdicionPermitida(RolExamen rol, java.time.LocalDate nuevaFecha, String nuevoHorario, Authentication authentication) {
-        if (esAdministrador(authentication)) {
+        if (esAdministrador(authentication) || esAutoridadAcademica(authentication)) {
             return;
         }
 
@@ -186,7 +202,7 @@ public class PoliticaTiempoEvaluacionesService {
     }
 
     public void exigirFechaHoraPermitidaPorCandado(java.time.LocalDate fecha, String horario, Authentication authentication) {
-        if (esAdministrador(authentication)) {
+        if (esAdministrador(authentication) || esAutoridadAcademica(authentication)) {
             return;
         }
 
@@ -218,7 +234,7 @@ public class PoliticaTiempoEvaluacionesService {
     }
 
     public void exigirEliminacionPermitida(RolExamen rol, Authentication authentication) {
-        if (esAdministrador(authentication)) {
+        if (esAdministrador(authentication) || esAutoridadAcademica(authentication)) {
             return;
         }
 
