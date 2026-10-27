@@ -41,6 +41,15 @@ export class ConfiguracionEvaluacionesService {
   private readonly _http = inject(HttpClient);
   private readonly _baseUrl = '/api/configuracion-evaluaciones';
 
+  private static obtenerExamenEnCursoCache(): string {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        return localStorage.getItem('sea_config_examen_en_curso') || '1ER_PARCIAL';
+      }
+    } catch (_) {}
+    return '1ER_PARCIAL';
+  }
+
   public readonly configuracion = signal<ConfiguracionEvaluaciones>({
     ratioEstudiantesPorVariante: 5,
     duracionExamenVirtualMinutos: 45,
@@ -60,12 +69,46 @@ export class ConfiguracionEvaluacionesService {
     horasPostPatron: 8,
     horasAntesLista: 24,
     horasCandado72: 72,
-    minutosMinimosDevolucion: 45
+    minutosMinimosDevolucion: 45,
+    examenEnCurso: ConfiguracionEvaluacionesService.obtenerExamenEnCursoCache()
   });
+
+  public resolverParcialDisplay(valor?: string): '1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia' {
+    const v = (valor || this.configuracion().examenEnCurso || '1ER_PARCIAL').toUpperCase();
+    if (v.includes('2DO') || v.includes('2P') || v.includes('SEGUNDO')) return '2do Parcial';
+    if (v.includes('FINAL')) return 'Examen Final';
+    if (v.includes('2DA') || v.includes('INSTANCIA')) return '2da Instancia';
+    return '1er Parcial';
+  }
+
+  public resolverParcialDisplayCorto(valor?: string): '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' {
+    const v = (valor || this.configuracion().examenEnCurso || '1ER_PARCIAL').toUpperCase();
+    if (v.includes('2DO') || v.includes('2P') || v.includes('SEGUNDO')) return '2do Parcial';
+    if (v.includes('FINAL')) return 'Final';
+    if (v.includes('2DA') || v.includes('INSTANCIA')) return '2da Instancia';
+    return '1er Parcial';
+  }
+
+  public resolverParcialClavePlan(valor?: string): '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA' {
+    const v = (valor || this.configuracion().examenEnCurso || '1ER_PARCIAL').toUpperCase();
+    if (v.includes('2DO') || v.includes('2P') || v.includes('SEGUNDO')) return '2P';
+    if (v.includes('FINAL')) return 'FINAL';
+    if (v.includes('2DA') || v.includes('INSTANCIA')) return '2DA_INSTANCIA';
+    return '1P';
+  }
 
   public cargar(): Observable<ConfiguracionEvaluaciones> {
     return this._http.get<ConfiguracionEvaluaciones>(this._baseUrl).pipe(
-      tap(configuracion => this.configuracion.set(configuracion)),
+      tap(configuracion => {
+        if (configuracion?.examenEnCurso) {
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('sea_config_examen_en_curso', configuracion.examenEnCurso);
+            }
+          } catch (_) {}
+        }
+        this.configuracion.set(configuracion);
+      }),
       catchError(error => {
         console.error('[ConfiguracionEvaluacionesService] Error al cargar configuración:', error);
         return throwError(() => error);
@@ -75,7 +118,16 @@ export class ConfiguracionEvaluacionesService {
 
   public guardar(configuracion: Partial<ConfiguracionEvaluaciones> & { ratioEstudiantesPorVariante: number }): Observable<ConfiguracionEvaluaciones> {
     return this._http.put<ConfiguracionEvaluaciones>(this._baseUrl, configuracion).pipe(
-      tap(configuracion => this.configuracion.set(configuracion)),
+      tap(configuracion => {
+        if (configuracion?.examenEnCurso) {
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('sea_config_examen_en_curso', configuracion.examenEnCurso);
+            }
+          } catch (_) {}
+        }
+        this.configuracion.set(configuracion);
+      }),
       catchError(error => {
         console.error('[ConfiguracionEvaluacionesService] Error al guardar configuración:', error);
         return throwError(() => error);

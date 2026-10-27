@@ -4029,7 +4029,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   );
 
   // Filtros Parametrizados
-  public filtroParcial: string = '1er Parcial';
+  public filtroParcial: string = this._configuracionEvaluaciones.resolverParcialDisplayCorto();
   public filtroModalidad: 'Todos' | 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' = 'Todos';
   
   // La lista debe abrir mostrando la programación disponible. El usuario
@@ -4508,6 +4508,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       next: configuracion => {
         this.ratioEstudiantesPorVariante.set(configuracion.ratioEstudiantesPorVariante);
         this.duracionExamenVirtualMinutos.set(configuracion.duracionExamenVirtualMinutos || 45);
+        if (configuracion?.examenEnCurso) {
+          this.filtroParcial = this._configuracionEvaluaciones.resolverParcialDisplayCorto(configuracion.examenEnCurso);
+          this.actualizarFiltros();
+        }
       },
       error: () => {
         this.ratioEstudiantesPorVariante.set(5);
@@ -9014,7 +9018,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const hoy = this.fechaActualLocal();
     this.filtroFechaInicio = hoy;
     this.filtroFechaFin = hoy;
-    this.filtroParcial = '1er Parcial';
+    this.filtroParcial = this._configuracionEvaluaciones.resolverParcialDisplayCorto();
     this.filtroModalidad = 'Todos';
     this.estadosSeleccionados.set([]);
     this.busquedaTexto = '';

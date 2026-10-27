@@ -2267,10 +2267,10 @@ export interface DiaCalendario {
               <div class="p-3.5 bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-xl space-y-2">
                 <h4 class="font-black text-purple-950 dark:text-purple-200 uppercase tracking-tight flex items-center gap-2">
                   <i class="pi pi-info-circle text-purple-700 dark:text-purple-400"></i>
-                  Responsabilidad Institucional de la Evaluación
+                  Responsabilidad y Conformidad Institucional de la Evaluación
                 </h4>
                 <p class="text-purple-900/90 dark:text-purple-300/90">
-                  Estimado(a) docente: La oficialización de este banco de preguntas compromete la validez académica y la confiabilidad del proceso de evaluación institucional de la Universidad.
+                  Estimado(a) docente: La oficialización de este banco de preguntas compromete la validez académica y la confiabilidad del proceso evaluativo de la Universidad.
                 </p>
               </div>
 
@@ -2278,24 +2278,24 @@ export interface DiaCalendario {
                 <div class="flex items-start gap-2.5">
                   <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
                   <div>
-                    <strong class="text-foreground">Exactitud de Enunciados y Respuestas:</strong>
-                    Certifico que he revisado las {{ totalPreguntasValidas() }} preguntas y confirmo que cada clave de respuesta correcta registrada es académicamente precisa, sin ambigüedades.
+                    <strong class="text-foreground">Conformidad con la Previsualización y el Algoritmo de Selección:</strong>
+                    Habiendo previsualizado íntegramente el examen generado, declaro mi total conformidad con la forma en que se presentarán, diagramarán y ordenarán las preguntas en caso de ser seleccionadas por el algoritmo oficial de elaboración de pruebas.
                   </div>
                 </div>
 
                 <div class="flex items-start gap-2.5">
                   <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
                   <div>
-                    <strong class="text-foreground">Fórmulas y Diagramación Oficial:</strong>
-                    Certifico haber verificado el cuadernillo PDF previsualizado y que todas las fórmulas, figuras y textos se visualizan fielmente conforme al estándar UNITEPC.
+                    <strong class="text-foreground">Validación de Redacción y Estructura Técnica:</strong>
+                    Certifico haber revisado minuciosamente la redacción, formulación técnica y estructuración de cada enunciado, opciones e imágenes de las {{ totalPreguntasValidas() }} preguntas, garantizando claridad conceptual y ausencia de ambigüedades.
                   </div>
                 </div>
 
                 <div class="flex items-start gap-2.5">
                   <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
                   <div>
-                    <strong class="text-foreground">Conformidad con Calificación Automatizada:</strong>
-                    Acepto que estas claves constituirán el patrón oficial inalterable para la generación de variantes y la lectura automatizada por cartillas OMR.
+                    <strong class="text-foreground">Exactitud de Respuestas y Calificación Automatizada:</strong>
+                    Confirmo que las respuestas marcadas son académicamente precisas y constituirán el patrón oficial inalterable para la generación de variantes y la lectura automatizada por cartillas ópticas OMR.
                   </div>
                 </div>
               </div>
@@ -2309,7 +2309,7 @@ export interface DiaCalendario {
                     (change)="declaracionAceptada.set(!declaracionAceptada())" 
                     class="mt-0.5 h-4 w-4 rounded border-border text-purple-700 focus:ring-purple-500 cursor-pointer">
                   <span class="text-xs font-semibold text-foreground select-none">
-                    He revisado minuciosamente el examen, confirmo la exactitud de las preguntas y respuestas, y asumo la plena responsabilidad académica de este banco oficial.
+                    He previsualizado el examen en su totalidad, estoy de acuerdo con la presentación de las preguntas que seleccione el algoritmo, apruebo su redacción y estructura, y asumo la plena responsabilidad académica del banco cargado.
                   </span>
                 </label>
               </div>
@@ -3224,6 +3224,16 @@ export class BancoPreguntasComponent implements OnInit {
       next: usuario => {
         if (!usuario) return;
         this._configuracionService.cargar().subscribe({
+          next: config => {
+            const params = this._route.snapshot.queryParamMap;
+            if (!params.get('rolId') && config?.examenEnCurso) {
+              const display = this._configuracionService.resolverParcialDisplay(config.examenEnCurso);
+              this.parcialActivo.set(display);
+              if (this.rolesOficiales().length > 0) {
+                this._sincronizarRolSeleccionadoConContexto();
+              }
+            }
+          },
           error: () => {
             // Se conservan los valores oficiales predeterminados del servicio.
           }
@@ -3509,7 +3519,7 @@ export class BancoPreguntasComponent implements OnInit {
 
   public examenSeleccionadoModal = signal<ExamenDocenteCronograma | null>(null);
 
-  public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>('1er Parcial');
+  public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>(this._configuracionService.resolverParcialDisplay());
   public nombreArchivoCargado = signal<string | null>(null);
   public imagenBase64Generada = signal<string | null>(null);
   public imagenNombre = signal<string | null>(null);

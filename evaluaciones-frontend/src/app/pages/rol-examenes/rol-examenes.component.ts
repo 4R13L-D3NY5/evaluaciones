@@ -1237,7 +1237,7 @@ export class RolExamenesComponent implements OnInit {
   public formMateriaObj = signal<Course | null>(null);
   public formGrupoObj = signal<GroupItem | null>(null);
 
-  public formTipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' = '1er Parcial';
+  public formTipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' = this._configuracionService.resolverParcialDisplayCorto();
   public formFecha = '';
   public formHoraInicio = '08:15';
   public formHoraFin = '09:45';
@@ -1329,7 +1329,13 @@ export class RolExamenesComponent implements OnInit {
   public ngOnInit(): void {
     this._cargarSedes();
     this._configuracionService.cargar().subscribe({
-      next: config => this.horasCandado72.set(config.horasCandado72 ?? 72)
+      next: config => {
+        this.horasCandado72.set(config.horasCandado72 ?? 72);
+        if (config?.examenEnCurso) {
+          const parcialDefecto = this._configuracionService.resolverParcialDisplayCorto(config.examenEnCurso);
+          this.formTipo = parcialDefecto;
+        }
+      }
     });
     this._route.queryParams.subscribe(params => {
       const busqueda = params['busqueda'];
@@ -2308,7 +2314,7 @@ export class RolExamenesComponent implements OnInit {
       this.formMateriaObj.set(null);
       this.formGrupoObj.set(null);
     }
-    this.formTipo = '1er Parcial';
+    this.formTipo = this._configuracionService.resolverParcialDisplayCorto();
     const fDesde = this.filtroFechaDesde();
     if (fDesde && !this.estaFechaBloqueadaPorCandado(fDesde)) {
       this.formFecha = fDesde;

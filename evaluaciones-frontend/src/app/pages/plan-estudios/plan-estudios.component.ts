@@ -6,6 +6,7 @@ import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.servi
 import { BancoPreguntasResponse, BancoPreguntasService } from '../../core/services/banco-preguntas.service';
 import { RolExamenResponse, RolExamenService } from '../../core/services/rol-examen.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import { forkJoin, Observable, of } from 'rxjs';
@@ -599,7 +600,8 @@ export class PlanEstudiosComponent implements OnInit {
   public filtroTipoGrupo = signal<PlanTipoGrupo>('teorico');
   public readonly esVicerrector = computed(() => this.auth.usuario()?.rol === 'VICERRECTOR');
 
-    public parcialActivo = signal<'1P' | '2P' | 'FINAL' | '2DA_INSTANCIA'>('1P');
+    private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
+  public parcialActivo = signal<'1P' | '2P' | 'FINAL' | '2DA_INSTANCIA'>(this._configuracionService.resolverParcialClavePlan());
     public toastMessage = signal<string | null>(null);
     public itemSeleccionadoParaCambio = signal<PlanEstudioItem | null>(null);
     public modalidadParaCambio = signal<'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' | null>(null);
@@ -627,6 +629,13 @@ export class PlanEstudiosComponent implements OnInit {
 
   public ngOnInit(): void {
     if (this.auth.usuario()?.rol === 'DOCENTE') this.ocultarSinAsignar.set(true);
+    this._configuracionService.cargar().subscribe({
+      next: config => {
+        if (config?.examenEnCurso) {
+          this.parcialActivo.set(this._configuracionService.resolverParcialClavePlan(config.examenEnCurso));
+        }
+      }
+    });
     this.cargarSedes();
   }
 
