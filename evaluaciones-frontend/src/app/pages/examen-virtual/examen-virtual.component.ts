@@ -1051,7 +1051,7 @@ export class ExamenVirtualComponent implements OnInit, OnDestroy {
       },
       VERDADERO_O_FALSO_SIMPLE: {
         titulo: 'Verdadero o falso simple',
-        instrucciones: ['INSTRUCCIONES: Marque la respuesta correcta.']
+        instrucciones: ['INSTRUCCIONES: Marque A si la proposición es Verdadera o B si es Falsa en su cartilla de respuestas.']
       },
       RESPUESTA_PREMISAS_ABCD: {
         titulo: 'Respuesta A / B / Ambas / Ninguna',

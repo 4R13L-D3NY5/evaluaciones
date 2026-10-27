@@ -5878,7 +5878,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     const instruccionTipo = (tipo: string): string => {
       const instrucciones: Record<string, string> = {
         SELECCION_MEJOR_RESPUESTA: 'INSTRUCCIONES: Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.',
-        VERDADERO_O_FALSO_SIMPLE: 'INSTRUCCIONES: Marque la respuesta correcta.',
+        VERDADERO_O_FALSO_SIMPLE: 'INSTRUCCIONES: Marque A si la proposición es Verdadera o B si es Falsa en su cartilla de respuestas.',
         RESPUESTA_PREMISAS_ABCD: 'INSTRUCCIONES: Las siguientes preguntas están compuestas por dos premisas.\nResponda con:\nA: Si solo la primera premisa es verdadera.\nB: Si solo la segunda premisa es verdadera.\nC: Si ambas premisas son verdaderas.\nD: Si ninguna premisa es verdadera.',
         VERDADERO_O_FALSO_COMPLEJAS: 'INSTRUCCIONES: Seleccione la opción correcta de acuerdo con la siguiente clave:\nA: 1, 2 y 3 son verdaderas.\nB: 1 y 3 son verdaderas.\nC: 2 y 4 son verdaderas.\nD: Solo 4 es verdadera.\nE: Todas son verdaderas.',
         CASO_CLINICO_TRONCO: 'INSTRUCCIONES: El siguiente caso clínico o problema tendrá varias preguntas.\nSeleccione la respuesta correcta en cada una.',

@@ -36,7 +36,7 @@ INSTRUCCIONES_POR_TIPO = {
     ),
     "VERDADERO_O_FALSO_SIMPLE": (
         "VERDADERO O FALSO SIMPLE",
-        "INSTRUCCIONES: Marque la respuesta correcta.",
+        "INSTRUCCIONES: Marque A si la proposición es Verdadera o B si es Falsa en su cartilla de respuestas.",
     ),
     "RESPUESTA_PREMISAS_ABCD": (
         "RESPUESTA A/B/AMBAS/NINGUNA",
