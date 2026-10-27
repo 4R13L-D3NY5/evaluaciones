@@ -2279,7 +2279,7 @@ export interface DiaCalendario {
                   <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
                   <div>
                     <strong class="text-foreground">Conformidad con la Previsualización y el Algoritmo de Selección:</strong>
-                    Habiendo previsualizado íntegramente el examen generado, declaro mi total conformidad con la forma en que se presentarán, diagramarán y ordenarán las preguntas en caso de ser seleccionadas por el algoritmo oficial de elaboración de pruebas.
+                    Habiendo previsualizado íntegramente el examen generado, declaro mi total conformidad con la forma en que se presentarán y diagramarán las preguntas en caso de ser seleccionadas por el algoritmo oficial de elaboración de pruebas.
                   </div>
                 </div>
 
