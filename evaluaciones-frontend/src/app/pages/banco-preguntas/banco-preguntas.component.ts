@@ -2303,8 +2303,8 @@ export interface DiaCalendario {
                 <div class="flex items-start gap-2.5">
                   <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
                   <div>
-                    <strong class="text-foreground">Exactitud de Respuestas y Calificación Automatizada:</strong>
-                    Confirmo que las respuestas marcadas son académicamente precisas y constituirán el patrón oficial inalterable para la generación de variantes y la lectura automatizada por cartillas ópticas OMR.
+                    <strong class="text-foreground">Exactitud del Patrón de Respuestas del Archivo:</strong>
+                    Declaro bajo mi responsabilidad que las respuestas correctas asignadas a cada pregunta en el archivo Excel cargado son rigurosamente precisas y constituirán el patrón oficial inalterable para la calificación automatizada OMR.
                   </div>
                 </div>
               </div>
