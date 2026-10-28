@@ -568,6 +568,48 @@ export interface ParcialConfig {
                 </div>
               </div>
 
+              <!-- Validación de Cuotas por Grupos Tipológicos (15/30/15) -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
+                <div class="flex items-center justify-between border-b border-border pb-3">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-list-check text-indigo-600"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Validación de Cuotas por Grupos Tipológicos</h4>
+                      <p class="text-[10px] text-muted-foreground">Exige la cuota mínima de 15 V/F (G1), 30 Selección Múltiple (G2) y 15 Casos/Emparejamientos (G3) al registrar bancos de preguntas.</p>
+                    </div>
+                  </div>
+                  <span [class]="validarCuotasGrupos ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : 'bg-muted text-muted-foreground border-border'" class="border rounded-full px-3 py-1 text-[10px] font-mono font-black uppercase">
+                    {{ validarCuotasGrupos ? 'ACTIVA (15/30/15)' : 'DESACTIVADA' }}
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div class="flex flex-col justify-center space-y-2">
+                    <label class="flex items-center gap-3 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        [(ngModel)]="validarCuotasGrupos"
+                        class="w-4 h-4 text-purple-600 rounded border-border focus:ring-purple-500 cursor-pointer">
+                      <span class="text-xs font-bold text-foreground">
+                        Activar validación obligatoria de cuotas por grupo tipológico (15 / 30 / 15)
+                      </span>
+                    </label>
+                    <p class="text-[10px] text-muted-foreground">
+                      Cuando está activado, ningún docente puede aprobar o registrar un banco sin cumplir estrictamente con los 3 grupos tipológicos requeridos.
+                    </p>
+                  </div>
+
+                  <div class="p-3 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-xl space-y-1">
+                    <span class="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 block uppercase">Regla de Distribución:</span>
+                    <p class="text-[11px] text-muted-foreground leading-snug">
+                      • <strong>Grupo 1:</strong> mín. 15 preguntas (V/F Simple, V/F Complejas, Premisas ABCD)<br>
+                      • <strong>Grupo 2:</strong> mín. 30 preguntas (Selección de la mejor respuesta)<br>
+                      • <strong>Grupo 3:</strong> mín. 15 subítems (Casos clínicos, problemas o emparejamiento)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Grilla de Configuración: Estructura por Parcial -->
               <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
                 <div class="flex items-center gap-2 border-b border-border pb-3">
@@ -1068,6 +1110,7 @@ export class AdministracionEvaluacionesComponent {
 
   public ratioEstudiantesPorVariante: number = 5;
   public examenEnCurso: string = '1ER_PARCIAL';
+  public validarCuotasGrupos: boolean = true;
   public readonly opcionesExamenEnCurso = [
     { valor: '1ER_PARCIAL', etiqueta: 'Primer Parcial (1er Parcial)' },
     { valor: '2DO_PARCIAL', etiqueta: 'Segundo Parcial (2do Parcial)' },
@@ -1323,6 +1366,7 @@ export class AdministracionEvaluacionesComponent {
   private aplicarConfiguracion(configuracion: ConfiguracionEvaluaciones): void {
     this.ratioEstudiantesPorVariante = configuracion.ratioEstudiantesPorVariante;
     this.examenEnCurso = configuracion.examenEnCurso || '1ER_PARCIAL';
+    this.validarCuotasGrupos = configuracion.validarCuotasGrupos ?? true;
     this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
     this.cuentaRegresivaInicioVirtualSegundos = configuracion.cuentaRegresivaInicioVirtualSegundos ?? 15;
     this.typstFormatoHoja = configuracion.formatoHoja;
@@ -1853,6 +1897,7 @@ export class AdministracionEvaluacionesComponent {
     this._configuracionService.guardar({
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
       examenEnCurso: this.examenEnCurso,
+      validarCuotasGrupos: this.validarCuotasGrupos,
       duracionExamenVirtualMinutos: this.normalizarDuracionVirtual(),
       cuentaRegresivaInicioVirtualSegundos: this.normalizarCuentaRegresivaVirtual(),
       formatoHoja: this.typstFormatoHoja,
@@ -1892,6 +1937,7 @@ export class AdministracionEvaluacionesComponent {
     this._configuracionService.guardar({
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
       examenEnCurso: this.examenEnCurso,
+      validarCuotasGrupos: this.validarCuotasGrupos,
       duracionExamenVirtualMinutos: this.duracionExamenVirtualMinutos,
       cuentaRegresivaInicioVirtualSegundos: this.cuentaRegresivaInicioVirtualSegundos,
       formatoHoja: this.typstFormatoHoja,

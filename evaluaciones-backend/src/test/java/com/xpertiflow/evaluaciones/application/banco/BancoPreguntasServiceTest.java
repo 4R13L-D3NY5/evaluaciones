@@ -2,6 +2,8 @@ package com.xpertiflow.evaluaciones.application.banco;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertiflow.evaluaciones.api.dto.banco.CargaBancoResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
+import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.application.HistorialVerificacionService;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
@@ -60,6 +62,8 @@ class BancoPreguntasServiceTest {
     private AuditoriaVerificacionRepository auditoriaVerificacionRepository;
     @Mock
     private HistorialVerificacionService historialVerificacionService;
+    @Mock
+    private ConfiguracionEvaluacionesService configuracionEvaluacionesService;
 
     private BancoPreguntasService service;
     private RolExamen rol;
@@ -75,7 +79,11 @@ class BancoPreguntasServiceTest {
                 cifradoService,
                 verificacionRepository,
                 auditoriaVerificacionRepository,
-                historialVerificacionService);
+                historialVerificacionService,
+                configuracionEvaluacionesService);
+        ConfiguracionEvaluacionesDto configDto = new ConfiguracionEvaluacionesDto();
+        configDto.setValidarCuotasGrupos(false);
+        lenient().when(configuracionEvaluacionesService.obtener()).thenReturn(configDto);
         lenient().when(cifradoService.cifrarJson(any(), anyString())).thenReturn(BancoEncryptedPayload.builder()
                 .ciphertext("ciphertext")
                 .nonce("nonce")
@@ -491,6 +499,66 @@ class BancoPreguntasServiceTest {
         String[] valores = {tipo, grupo, enunciado, opcionA, opcionB, opcionC, opcionD, opcionE, respuesta, dificultad};
         for (int columna = 0; columna < valores.length; columna++) {
             row.createCell(columna).setCellValue(valores[columna]);
+        }
+    }
+    @Test
+    void cargaConValidacionGruposActivaFallaSiFaltanGrupos() throws Exception {
+        ConfiguracionEvaluacionesDto configDto = new ConfiguracionEvaluacionesDto();
+        configDto.setValidarCuotasGrupos(true);
+        when(configuracionEvaluacionesService.obtener()).thenReturn(configDto);
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        // Excel con 60 preguntas de SELECCION_SIMPLE (G2=60, G1=0, G3=0)
+        MockMultipartFile archivo = crearExcel(60);
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(rol.getId(), archivo, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isFalse();
+        assertThat(respuesta.getErroresValidacion()).anyMatch(e -> e.contains("Grupo 1"));
+        assertThat(respuesta.getErroresValidacion()).anyMatch(e -> e.contains("Grupo 3"));
+    }
+
+    @Test
+    void cargaConValidacionGruposActivaPasaCon15G1_30G2_15G3() throws Exception {
+        ConfiguracionEvaluacionesDto configDto = new ConfiguracionEvaluacionesDto();
+        configDto.setValidarCuotasGrupos(true);
+        when(configuracionEvaluacionesService.obtener()).thenReturn(configDto);
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Banco");
+            String[] columnas = {"tipo", "grupo", "enunciado", "A", "B", "C", "D", "E", "respuesta", "dificultad"};
+            Row header = sheet.createRow(0);
+            for (int cIdx = 0; cIdx < columnas.length; cIdx++) {
+                header.createCell(cIdx).setCellValue(columnas[cIdx]);
+            }
+
+            // G1: 15 preguntas de Verdadero o Falso Simple (dificultad 1)
+            for (int i = 1; i <= 15; i++) {
+                crearFila(sheet, i, "Verdadero o Falso Simple", "G1", "Pregunta VF " + i, "Verdadero", "Falso", "", "", "", "A", "1");
+            }
+
+            // G2: 30 preguntas de Selecci?n de la mejor respuesta (dificultad 2)
+            for (int i = 16; i <= 45; i++) {
+                crearFila(sheet, i, "Selecci?n de la mejor respuesta", "G2", "Pregunta SM " + i, "A", "B", "C", "D", "E", "A", "2");
+            }
+
+            // G3: 15 preguntas de Casos o Problemas (1 tronco + 15 sub?tems dificultad 3, en grupos de 5)
+            for (int caso = 1; caso <= 3; caso++) {
+                int base = 46 + (caso - 1) * 6;
+                crearFila(sheet, base, "Caso Cl?nico", "CASO-" + caso, "Descripci?n de caso " + caso, "", "", "", "", "", "", "");
+                for (int sub = 1; sub <= 5; sub++) {
+                    crearFila(sheet, base + sub, "Sub?tem de Caso", "CASO-" + caso, "Subpregunta " + sub, "A", "B", "C", "D", "E", "A", "3");
+                }
+            }
+
+            workbook.write(output);
+            MockMultipartFile archivo = new MockMultipartFile("file", "banco-balanceado.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", output.toByteArray());
+
+            CargaBancoResponseDto respuesta = service.cargarDesdeExcel(rol.getId(), archivo, "Docente Oficial");
+            assertThat(respuesta.isExito()).isTrue();
+            assertThat(respuesta.getTotalReactivos()).isEqualTo(60);
         }
     }
 }

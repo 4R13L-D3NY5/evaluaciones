@@ -5,6 +5,8 @@ import com.xpertiflow.evaluaciones.api.dto.banco.BancoPreguntasResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.CargaBancoResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.ReactivoResponseDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
+import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
 import com.xpertiflow.evaluaciones.application.HistorialVerificacionService;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaVerificacion;
@@ -52,14 +54,15 @@ public class BancoPreguntasService {
     private final VerificacionExamenRepository verificacionRepository;
     private final AuditoriaVerificacionRepository auditoriaVerificacionRepository;
     private final HistorialVerificacionService historialVerificacionService;
+    private final ConfiguracionEvaluacionesService configuracionEvaluacionesService;
 
     private static final int TOTAL_REQUERIDO = 60;
     private static final int CUOTA_FACILES = 15;
     private static final int CUOTA_MEDIAS = 30;
     private static final int CUOTA_DIFICILES = 15;
-    private static final int CUOTA_GRUPO_1 = 20;
-    private static final int CUOTA_GRUPO_2 = 20;
-    private static final int CUOTA_GRUPO_3 = 20;
+    private static final int CUOTA_GRUPO_1 = 15;
+    private static final int CUOTA_GRUPO_2 = 30;
+    private static final int CUOTA_GRUPO_3 = 15;
     private static final Set<String> TIPOS_GRUPO_1 = Set.of(
             "VERDADERO_O_FALSO_SIMPLE",
             "VERDADERO_O_FALSO_COMPLEJAS",
@@ -987,14 +990,29 @@ public class BancoPreguntasService {
         if (dificiles < CUOTA_DIFICILES) {
             errores.add("Debe haber como mínimo " + CUOTA_DIFICILES + " preguntas difíciles; se encontraron " + dificiles);
         }
-        if (g1 < CUOTA_GRUPO_1) {
-            errores.add("Debe haber como mínimo " + CUOTA_GRUPO_1 + " preguntas del Grupo 1 (Fáciles y Verdaderos / Premisas); se encontraron " + g1);
+
+        boolean validarGrupos = true;
+        if (configuracionEvaluacionesService != null) {
+            try {
+                ConfiguracionEvaluacionesDto config = configuracionEvaluacionesService.obtener();
+                if (config != null && config.getValidarCuotasGrupos() != null) {
+                    validarGrupos = config.getValidarCuotasGrupos();
+                }
+            } catch (Exception e) {
+                log.warn("No se pudo obtener la configuración institucional para validar cuotas de grupos: {}", e.getMessage());
+            }
         }
-        if (g2 < CUOTA_GRUPO_2) {
-            errores.add("Debe haber como mínimo " + CUOTA_GRUPO_2 + " preguntas del Grupo 2 (Selección de la mejor respuesta); se encontraron " + g2);
-        }
-        if (g3 < CUOTA_GRUPO_3) {
-            errores.add("Debe haber como mínimo " + CUOTA_GRUPO_3 + " preguntas del Grupo 3 (Emparejamiento y Casos o Problemas); se encontraron " + g3);
+
+        if (validarGrupos) {
+            if (g1 < CUOTA_GRUPO_1) {
+                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_1 + " preguntas del Grupo 1 (Falso y Verdadero / Premisas); se encontraron " + g1);
+            }
+            if (g2 < CUOTA_GRUPO_2) {
+                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_2 + " preguntas del Grupo 2 (Selección de la mejor respuesta); se encontraron " + g2);
+            }
+            if (g3 < CUOTA_GRUPO_3) {
+                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_3 + " preguntas del Grupo 3 (Emparejamiento y Casos o Problemas); se encontraron " + g3);
+            }
         }
     }
 

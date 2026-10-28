@@ -64,6 +64,8 @@ public class ConfiguracionEvaluacionesDto {
 
     private String examenEnCurso;
 
+    private Boolean validarCuotasGrupos;
+
     private LocalDateTime actualizadoEn;
 
     private String actualizadoPor;

@@ -19,6 +19,7 @@ export interface ConfiguracionEvaluaciones {
   horasCandado72: number;
   minutosMinimosDevolucion?: number;
   examenEnCurso?: string;
+  validarCuotasGrupos?: boolean;
   actualizadoEn?: string;
   actualizadoPor?: string;
 }
@@ -70,7 +71,8 @@ export class ConfiguracionEvaluacionesService {
     horasAntesLista: 24,
     horasCandado72: 72,
     minutosMinimosDevolucion: 45,
-    examenEnCurso: ConfiguracionEvaluacionesService.obtenerExamenEnCursoCache()
+    examenEnCurso: ConfiguracionEvaluacionesService.obtenerExamenEnCursoCache(),
+    validarCuotasGrupos: true
   });
 
   public resolverParcialDisplay(valor?: string): '1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia' {

@@ -969,19 +969,19 @@ export interface DiaCalendario {
               </div>
             </div>
 
-            <!-- Tarjeta 3: Conteo por Grupo de Tipo (OBLIGATORIO) -->
+            <!-- Tarjeta 3: Conteo por Grupo de Tipo -->
             <div class="lg:col-span-4 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
               <div class="flex items-center justify-between border-b border-border pb-2">
                 <span class="text-xs font-black text-foreground uppercase tracking-wide">Cuotas por Grupo de Tipo</span>
-                <span class="bg-rose-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
-                  OBLIGATORIO
+                <span [class]="validarCuotasGrupos() ? 'bg-rose-600 text-white' : 'bg-muted text-muted-foreground'" class="font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
+                  {{ validarCuotasGrupos() ? 'OBLIGATORIO' : 'OPCIONAL' }}
                 </span>
               </div>
 
               <div class="space-y-2.5 text-xs">
                 <div>
                   <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-emerald-700">G1: Fáciles / V-F / Premisas</span>
+                    <span class="text-emerald-700">G1: Falso y Verdadero / Premisas</span>
                     <span class="font-mono text-foreground">{{ countG1() }}/{{ cuotasGrupos().g1 }} mín.</span>
                   </div>
                   <div class="h-2.5 bg-muted rounded-full overflow-hidden">
@@ -1012,7 +1012,7 @@ export interface DiaCalendario {
 
               <div [class]="cuotaGruposCumplida() ? 'text-emerald-700' : 'text-amber-700'" class="text-[10px] font-extrabold flex items-center gap-1 pt-1">
                 <i [class]="cuotaGruposCumplida() ? 'pi pi-check-circle text-xs' : 'pi pi-exclamation-circle text-xs'"></i>
-                <span>{{ cuotaGruposCumplida() ? 'Cuotas mínimas de tipos de reactivos alcanzadas (20/20/20)' : 'Faltan preguntas para completar las cuotas de tipos (20/20/20)' }}</span>
+                <span>{{ validarCuotasGrupos() ? (cuotaGruposCumplida() ? 'Cuotas mínimas de tipos alcanzadas (15/30/15)' : 'Faltan preguntas para completar las cuotas de tipos (15/30/15)') : 'Validación institucional de grupos tipológicos desactivada' }}</span>
               </div>
             </div>
 
@@ -3935,11 +3935,18 @@ export class BancoPreguntasComponent implements OnInit {
     return { facil: 15, medio: 30, dificil: 15, total: 60 };
   });
 
+  public validarCuotasGrupos = computed(() => {
+    return this._configuracionService.configuracion().validarCuotasGrupos ?? true;
+  });
+
   public cuotasGrupos = computed(() => {
-    return { g1: 20, g2: 20, g3: 20 };
+    return { g1: 15, g2: 30, g3: 15 };
   });
 
   public cuotaGruposCumplida = computed(() => {
+    if (!this.validarCuotasGrupos()) {
+      return true;
+    }
     const cg = this.cuotasGrupos();
     return this.countG1() >= cg.g1 && this.countG2() >= cg.g2 && this.countG3() >= cg.g3;
   });
@@ -4019,15 +4026,17 @@ export class BancoPreguntasComponent implements OnInit {
       observaciones.push(`Cuota de dificultad difícil incompleta: hay ${this.countDificiles()} y se requieren como mínimo ${cuotas.dificil}. Corrección: agrega o corrige ${cuotas.dificil - this.countDificiles()} pregunta(s) con dificultad 3.`);
     }
 
-    const cuotasG = this.cuotasGrupos();
-    if (this.countG1() < cuotasG.g1) {
-      observaciones.push(`Cuota del Grupo 1 (Fáciles y Verdaderos / Premisas) incompleta: hay ${this.countG1()} y se requieren como mínimo ${cuotasG.g1}. Corrección: agrega o corrige preguntas de V/F o Selección de premisas.`);
-    }
-    if (this.countG2() < cuotasG.g2) {
-      observaciones.push(`Cuota del Grupo 2 (Selección de la mejor respuesta) incompleta: hay ${this.countG2()} y se requieren como mínimo ${cuotasG.g2}. Corrección: agrega o corrige preguntas de Selección de la mejor respuesta.`);
-    }
-    if (this.countG3() < cuotasG.g3) {
-      observaciones.push(`Cuota del Grupo 3 (Casos/Problemas y Emparejamiento) incompleta: hay ${this.countG3()} y se requieren como mínimo ${cuotasG.g3}. Corrección: agrega o corrige subítems de casos o de emparejamiento.`);
+    if (this.validarCuotasGrupos()) {
+      const cuotasG = this.cuotasGrupos();
+      if (this.countG1() < cuotasG.g1) {
+        observaciones.push(`Cuota del Grupo 1 (Falso y Verdadero / Premisas) incompleta: hay ${this.countG1()} y se requieren como mínimo ${cuotasG.g1}. Corrección: agrega o corrige preguntas de V/F o Selección de premisas.`);
+      }
+      if (this.countG2() < cuotasG.g2) {
+        observaciones.push(`Cuota del Grupo 2 (Selección de la mejor respuesta) incompleta: hay ${this.countG2()} y se requieren como mínimo ${cuotasG.g2}. Corrección: agrega o corrige preguntas de Selección de la mejor respuesta.`);
+      }
+      if (this.countG3() < cuotasG.g3) {
+        observaciones.push(`Cuota del Grupo 3 (Casos/Problemas y Emparejamiento) incompleta: hay ${this.countG3()} y se requieren como mínimo ${cuotasG.g3}. Corrección: agrega o corrige subítems de casos o de emparejamiento.`);
+      }
     }
 
     return observaciones;
@@ -6317,7 +6326,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       return;
     }
     if (!this.esBancoTotalmenteValido()) {
-      this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas 15/30/15.', 'error');
+      this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas requeridas.', 'error');
       return;
     }
     if (!this.pdfPrevisualizadoYConforme() || !this.documentoRecorridoCompleto() || this.pdfPreviewPages().length === 0) {

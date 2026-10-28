@@ -73,6 +73,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setHorasCandado72(valorORango(request.getHorasCandado72(), HORAS_CANDADO_POR_DEFECTO, 0, 720));
         configuracion.setMinutosMinimosDevolucion(valorORango(request.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         configuracion.setExamenEnCurso(valorODefecto(request.getExamenEnCurso(), EXAMEN_EN_CURSO_POR_DEFECTO));
+        configuracion.setValidarCuotasGrupos(request.getValidarCuotasGrupos() != null ? request.getValidarCuotasGrupos() : true);
         configuracion.setActualizadoEn(LocalDateTime.now());
         String actorReal = (actor != null && !actor.isBlank()) ? actor : usuarioValido(request.getActualizadoPor());
         configuracion.setActualizadoPor(actorReal);
@@ -116,6 +117,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setHorasCandado72(HORAS_CANDADO_POR_DEFECTO);
         configuracion.setMinutosMinimosDevolucion(MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO);
         configuracion.setExamenEnCurso(EXAMEN_EN_CURSO_POR_DEFECTO);
+        configuracion.setValidarCuotasGrupos(true);
         configuracion.setActualizadoPor("ADMIN_EVALUACIONES");
         configuracion.setActualizadoEn(LocalDateTime.now());
         return configuracion;
@@ -141,6 +143,7 @@ public class ConfiguracionEvaluacionesService {
         dto.setHorasCandado72(valorORango(configuracion.getHorasCandado72(), HORAS_CANDADO_POR_DEFECTO, 0, 720));
         dto.setMinutosMinimosDevolucion(valorORango(configuracion.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         dto.setExamenEnCurso(valorODefecto(configuracion.getExamenEnCurso(), EXAMEN_EN_CURSO_POR_DEFECTO));
+        dto.setValidarCuotasGrupos(configuracion.getValidarCuotasGrupos() != null ? configuracion.getValidarCuotasGrupos() : true);
         dto.setActualizadoEn(configuracion.getActualizadoEn());
         dto.setActualizadoPor(configuracion.getActualizadoPor());
         return dto;

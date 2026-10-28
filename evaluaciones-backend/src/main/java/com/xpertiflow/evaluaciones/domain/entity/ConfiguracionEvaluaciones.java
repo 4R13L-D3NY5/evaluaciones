@@ -65,6 +65,9 @@ public class ConfiguracionEvaluaciones {
     @Column(name = "examen_en_curso", nullable = false, length = 50)
     private String examenEnCurso = "1ER_PARCIAL";
 
+    @Column(name = "validar_cuotas_grupos", nullable = false)
+    private Boolean validarCuotasGrupos = true;
+
     @Column(name = "actualizado_en", nullable = false)
     private LocalDateTime actualizadoEn;
 
