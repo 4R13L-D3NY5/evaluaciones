@@ -379,9 +379,15 @@ public class BancoPreguntasService {
                     .erroresValidacion(Collections.emptyList())
                     .build();
 
-        } catch (IOException | RuntimeException e) {
-            log.warn("No se pudo validar el archivo Excel del rol {}", rol.getId(), e);
+        } catch (IOException e) {
+            log.warn("No se pudo leer el archivo Excel del rol {}", rol.getId(), e);
             return respuestaFallida(rol, List.of("El archivo Excel no se puede leer o tiene una estructura inválida."));
+        } catch (Exception e) {
+            log.error("Error al procesar y cifrar el banco de preguntas del rol {}", rol.getId(), e);
+            String mensaje = (e.getMessage() != null && !e.getMessage().isBlank())
+                    ? e.getMessage()
+                    : "Error interno al cifrar y registrar el banco en el servidor.";
+            return respuestaFallida(rol, List.of(mensaje));
         }
     }
 
