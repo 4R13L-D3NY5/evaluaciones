@@ -73,6 +73,9 @@ public class BancoPreguntas {
     @Column(name = "estado", length = 30, nullable = false)
     private String estado = "VALIDADO";
 
+    @Column(name = "cuotas_grupos_aplicadas", nullable = false)
+    private Boolean cuotasGruposAplicadas = false;
+
     @Column(name = "docente_aprobador", length = 150, nullable = false)
     private String docenteAprobador;
 

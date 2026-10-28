@@ -559,6 +559,7 @@ class BancoPreguntasServiceTest {
             CargaBancoResponseDto respuesta = service.cargarDesdeExcel(rol.getId(), archivo, "Docente Oficial");
             assertThat(respuesta.isExito()).isTrue();
             assertThat(respuesta.getTotalReactivos()).isEqualTo(60);
+            assertThat(respuesta.getCuotasGruposAplicadas()).isTrue();
         }
     }
 }

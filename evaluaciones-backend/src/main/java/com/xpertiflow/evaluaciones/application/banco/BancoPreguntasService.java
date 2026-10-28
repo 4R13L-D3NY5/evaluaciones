@@ -125,6 +125,7 @@ public class BancoPreguntasService {
                 .nombreArchivoExcel(banco.getNombreArchivoExcel())
                 .hashSha256Integridad(banco.getHashSha256Integridad())
                 .estado(banco.getEstado())
+                .cuotasGruposAplicadas(Boolean.TRUE.equals(banco.getCuotasGruposAplicadas()))
                 .docenteAprobador(banco.getDocenteAprobador())
                 .fechaAprobacion(banco.getFechaAprobacion())
                 .estadoVerificacion(verificacionRepository.findByRolExamenId(banco.getRolExamenId()).map(v -> v.getEstado()).orElse(null))
@@ -245,13 +246,15 @@ public class BancoPreguntasService {
             validarEstructuraAgrupada(estructura, errores);
 
             int totalPreguntas = contarPreguntasContables(reactivos);
-            validarCuotas(faciles, medias, dificiles, g1, g2, g3, totalPreguntas, errores);
+            boolean cuotasGruposAplicadas = resolverValidarCuotasGrupos();
+            validarCuotas(faciles, medias, dificiles, g1, g2, g3, totalPreguntas, cuotasGruposAplicadas, errores);
 
             if (!errores.isEmpty()) {
                 return CargaBancoResponseDto.builder()
                         .exito(false)
                         .mensaje("Validacion fallida")
                         .rolExamenId(rol.getId())
+                        .cuotasGruposAplicadas(cuotasGruposAplicadas)
                         .erroresValidacion(errores)
                         .build();
             }
@@ -320,6 +323,7 @@ public class BancoPreguntasService {
             banco.setContenidoKekVersion(paqueteCifrado.getKeyVersion());
             banco.setContenidoAlgoritmo(paqueteCifrado.getAlgorithm());
             banco.setEstado("VALIDADO");
+            banco.setCuotasGruposAplicadas(cuotasGruposAplicadas);
             banco.setDocenteAprobador(docenteOficial.trim());
             banco.setFechaAprobacion(LocalDateTime.now());
             bancoRepository.save(banco);
@@ -375,6 +379,7 @@ public class BancoPreguntasService {
                     .facilesCount(faciles)
                     .mediasCount(medias)
                     .dificilesCount(dificiles)
+                    .cuotasGruposAplicadas(cuotasGruposAplicadas)
                     .hashSha256(hash)
                     .erroresValidacion(Collections.emptyList())
                     .build();
@@ -983,7 +988,21 @@ public class BancoPreguntasService {
                 .trim().toLowerCase(Locale.ROOT);
     }
 
-    private void validarCuotas(int faciles, int medias, int dificiles, int g1, int g2, int g3, int total, List<String> errores) {
+    private boolean resolverValidarCuotasGrupos() {
+        if (configuracionEvaluacionesService != null) {
+            try {
+                ConfiguracionEvaluacionesDto config = configuracionEvaluacionesService.obtener();
+                if (config != null && config.getValidarCuotasGrupos() != null) {
+                    return config.getValidarCuotasGrupos();
+                }
+            } catch (Exception e) {
+                log.warn("No se pudo obtener la configuración institucional para validar cuotas de grupos: {}", e.getMessage());
+            }
+        }
+        return true;
+    }
+
+    private void validarCuotas(int faciles, int medias, int dificiles, int g1, int g2, int g3, int total, boolean validarGrupos, List<String> errores) {
         if (total < TOTAL_REQUERIDO) {
             errores.add("El banco debe tener como mínimo " + TOTAL_REQUERIDO + " preguntas; se encontraron " + total);
         }
@@ -995,18 +1014,6 @@ public class BancoPreguntasService {
         }
         if (dificiles < CUOTA_DIFICILES) {
             errores.add("Debe haber como mínimo " + CUOTA_DIFICILES + " preguntas difíciles; se encontraron " + dificiles);
-        }
-
-        boolean validarGrupos = true;
-        if (configuracionEvaluacionesService != null) {
-            try {
-                ConfiguracionEvaluacionesDto config = configuracionEvaluacionesService.obtener();
-                if (config != null && config.getValidarCuotasGrupos() != null) {
-                    validarGrupos = config.getValidarCuotasGrupos();
-                }
-            } catch (Exception e) {
-                log.warn("No se pudo obtener la configuración institucional para validar cuotas de grupos: {}", e.getMessage());
-            }
         }
 
         if (validarGrupos) {

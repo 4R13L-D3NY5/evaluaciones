@@ -372,6 +372,15 @@ export interface DiaCalendario {
                               <i class="pi pi-clock text-[10px]"></i> Pendiente de verificación
                             </span>
                           }
+                          @if (banco.cuotasGruposAplicadas) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 border border-indigo-300 text-indigo-800 px-2 py-0.5 text-[10px] font-black uppercase" title="Banco cargado con validación obligatoria de cuotas por grupo tipológico (15/30/15)">
+                              <i class="pi pi-list-check text-[10px]"></i> Cuotas 15/30/15 aplicadas
+                            </span>
+                          } @else {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 text-slate-700 px-2 py-0.5 text-[10px] font-bold uppercase" title="Banco cargado sin validación de cuotas por grupo tipológico">
+                              <i class="pi pi-minus-circle text-[10px]"></i> Sin cuotas de grupos
+                            </span>
+                          }
                         </div>
                         <span class="text-[10px]" [class]="esExamenDevuelto() ? 'text-rose-900/90' : (esExamenPendienteVerificacion() ? 'text-amber-900/90' : 'text-emerald-900/80')">
                           {{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · 

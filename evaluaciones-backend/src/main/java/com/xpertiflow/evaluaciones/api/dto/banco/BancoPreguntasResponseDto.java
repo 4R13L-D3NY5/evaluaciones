@@ -23,6 +23,7 @@ public class BancoPreguntasResponseDto {
     private String nombreArchivoExcel;
     private String hashSha256Integridad;
     private String estado;
+    private Boolean cuotasGruposAplicadas;
     private String docenteAprobador;
     private LocalDateTime fechaAprobacion;
     private String estadoVerificacion;
