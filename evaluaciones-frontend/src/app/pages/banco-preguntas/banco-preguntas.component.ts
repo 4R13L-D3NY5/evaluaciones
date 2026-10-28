@@ -3549,6 +3549,7 @@ export class BancoPreguntasComponent implements OnInit {
   public esExamenVerificado = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
+    if (!this.bancoPersistido() && !this.documentoSinCartilla()) return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'VERIFICADO' || estadoRol === 'VERIFICADO';
@@ -3556,6 +3557,7 @@ export class BancoPreguntasComponent implements OnInit {
   public esExamenDevuelto = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
+    if (!this.bancoPersistido() && !this.documentoSinCartilla()) return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'DEVUELTO' || estadoRol === 'DEVUELTO';
@@ -3563,6 +3565,7 @@ export class BancoPreguntasComponent implements OnInit {
   public esExamenPendienteVerificacion = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
+    if (!this.bancoPersistido() && !this.documentoSinCartilla()) return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'PENDIENTE' || estadoRol === 'PENDIENTE';
