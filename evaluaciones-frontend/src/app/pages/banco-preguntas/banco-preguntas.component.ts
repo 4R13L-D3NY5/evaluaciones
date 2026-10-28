@@ -2296,7 +2296,7 @@ export interface DiaCalendario {
                   <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
                   <div>
                     <strong class="text-foreground">Validación de Redacción y Estructura Técnica:</strong>
-                    Certifico haber revisado minuciosamente la redacción, formulación técnica y estructuración de cada enunciado, opciones e imágenes de las {{ totalPreguntasValidas() }} preguntas, garantizando claridad conceptual y ausencia de ambigüedades.
+                    Certifico haber revisado minuciosamente la redacción, formulación técnica y estructuración de cada enunciado y sus opciones en las {{ totalPreguntasValidas() }} preguntas, garantizando claridad conceptual y ausencia de ambigüedades.
                   </div>
                 </div>
 
@@ -5450,13 +5450,35 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public descargarExcelBaseMacro(): void {
-    const filename = 'formato_banco_preguntas_asig_EF_1P.xlsx';
+    const parcial = this.parcialActivo();
+    let filename = 'formato_banco_preguntas_asig_EF_2P.xlsx';
+    let downloadName = 'PLANTILLA_BANCO_PREGUNTAS_2P.xlsx';
+
+    switch (parcial) {
+      case '1er Parcial':
+        filename = 'formato_banco_preguntas_asig_EF_1P.xlsx';
+        downloadName = 'PLANTILLA_BANCO_PREGUNTAS_1P.xlsx';
+        break;
+      case '2do Parcial':
+        filename = 'formato_banco_preguntas_asig_EF_2P.xlsx';
+        downloadName = 'PLANTILLA_BANCO_PREGUNTAS_2P.xlsx';
+        break;
+      case 'Examen Final':
+        filename = 'formato_banco_preguntas_asig_EF.xlsx';
+        downloadName = 'PLANTILLA_BANCO_PREGUNTAS_FINAL.xlsx';
+        break;
+      case '2da Instancia':
+        filename = 'formato_banco_preguntas_asig_EF_2P.xlsx';
+        downloadName = 'PLANTILLA_BANCO_PREGUNTAS_2DA_INSTANCIA.xlsx';
+        break;
+    }
+
     const asigNombre = this.asignaturaNombreCompleto();
     const link = document.createElement('a');
     link.href = `assets/${filename}`;
-    link.download = 'PLANTILLA_BANCO_PREGUNTAS_1P.xlsx';
+    link.download = downloadName;
     link.click();
-    this._mostrarToast(`Plantilla oficial descargada para ${asigNombre} (${this.grupoSeleccionado()}).`);
+    this._mostrarToast(`Plantilla oficial descargada para ${asigNombre} (${this.grupoSeleccionado()}) - ${parcial}.`);
   }
 
   // ============================================================
