@@ -2239,7 +2239,7 @@ export interface DiaCalendario {
       <!-- MODAL: DECLARACIÓN JURADA Y COMPROMISO ACADÉMICO DEL DOCENTE     -->
       <!-- ================================================================= -->
       @if (dialogDeclaracionDocente()) {
-        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-60 animate-fade-in overflow-y-auto">
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-[70] animate-fade-in overflow-y-auto">
           <div class="bg-card border border-border rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto">
             
             <!-- Cabecera -->
