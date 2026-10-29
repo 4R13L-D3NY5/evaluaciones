@@ -5,6 +5,8 @@ import com.xpertiflow.evaluaciones.api.dto.banco.BancoPreguntasResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.CargaBancoResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.banco.ReactivoResponseDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
+import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
 import com.xpertiflow.evaluaciones.application.HistorialVerificacionService;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaVerificacion;
@@ -52,11 +54,27 @@ public class BancoPreguntasService {
     private final VerificacionExamenRepository verificacionRepository;
     private final AuditoriaVerificacionRepository auditoriaVerificacionRepository;
     private final HistorialVerificacionService historialVerificacionService;
+    private final ConfiguracionEvaluacionesService configuracionEvaluacionesService;
 
     private static final int TOTAL_REQUERIDO = 60;
     private static final int CUOTA_FACILES = 15;
     private static final int CUOTA_MEDIAS = 30;
     private static final int CUOTA_DIFICILES = 15;
+    private static final int CUOTA_GRUPO_1 = 15;
+    private static final int CUOTA_GRUPO_2 = 30;
+    private static final int CUOTA_GRUPO_3 = 15;
+    private static final Set<String> TIPOS_GRUPO_1 = Set.of(
+            "VERDADERO_O_FALSO_SIMPLE",
+            "VERDADERO_O_FALSO_COMPLEJAS",
+            "RESPUESTA_PREMISAS_ABCD"
+    );
+    private static final Set<String> TIPOS_GRUPO_2 = Set.of(
+            "SELECCION_MEJOR_RESPUESTA"
+    );
+    private static final Set<String> TIPOS_GRUPO_3 = Set.of(
+            "SUBITEM_CASO",
+            "OPCION_EMPAREJAMIENTO"
+    );
     private static final int MIN_HIJOS_AGRUPADOS = 2;
     private static final int MAX_HIJOS_AGRUPADOS = 10;
     private static final long MAX_ARCHIVO_BYTES = 10L * 1024L * 1024L;
@@ -107,6 +125,7 @@ public class BancoPreguntasService {
                 .nombreArchivoExcel(banco.getNombreArchivoExcel())
                 .hashSha256Integridad(banco.getHashSha256Integridad())
                 .estado(banco.getEstado())
+                .cuotasGruposAplicadas(Boolean.TRUE.equals(banco.getCuotasGruposAplicadas()))
                 .docenteAprobador(banco.getDocenteAprobador())
                 .fechaAprobacion(banco.getFechaAprobacion())
                 .estadoVerificacion(verificacionRepository.findByRolExamenId(banco.getRolExamenId()).map(v -> v.getEstado()).orElse(null))
@@ -179,6 +198,7 @@ public class BancoPreguntasService {
             if (!errores.isEmpty()) return respuestaFallida(rol, errores);
 
             int faciles = 0, medias = 0, dificiles = 0;
+            int g1 = 0, g2 = 0, g3 = 0;
             Set<String> huellasPreguntas = new HashSet<>();
             List<FilaEstructura> estructura = new ArrayList<>();
 
@@ -211,6 +231,13 @@ public class BancoPreguntasService {
                             case 2 -> medias++;
                             case 3 -> dificiles++;
                         }
+                        if (TIPOS_GRUPO_1.contains(r.getTipoReactivo())) {
+                            g1++;
+                        } else if (TIPOS_GRUPO_2.contains(r.getTipoReactivo())) {
+                            g2++;
+                        } else if (TIPOS_GRUPO_3.contains(r.getTipoReactivo())) {
+                            g3++;
+                        }
                     }
                 }
                 rowNum++;
@@ -219,13 +246,15 @@ public class BancoPreguntasService {
             validarEstructuraAgrupada(estructura, errores);
 
             int totalPreguntas = contarPreguntasContables(reactivos);
-            validarCuotas(faciles, medias, dificiles, totalPreguntas, errores);
+            boolean cuotasGruposAplicadas = resolverValidarCuotasGrupos();
+            validarCuotas(faciles, medias, dificiles, g1, g2, g3, totalPreguntas, cuotasGruposAplicadas, errores);
 
             if (!errores.isEmpty()) {
                 return CargaBancoResponseDto.builder()
                         .exito(false)
                         .mensaje("Validacion fallida")
                         .rolExamenId(rol.getId())
+                        .cuotasGruposAplicadas(cuotasGruposAplicadas)
                         .erroresValidacion(errores)
                         .build();
             }
@@ -294,6 +323,7 @@ public class BancoPreguntasService {
             banco.setContenidoKekVersion(paqueteCifrado.getKeyVersion());
             banco.setContenidoAlgoritmo(paqueteCifrado.getAlgorithm());
             banco.setEstado("VALIDADO");
+            banco.setCuotasGruposAplicadas(cuotasGruposAplicadas);
             banco.setDocenteAprobador(docenteOficial.trim());
             banco.setFechaAprobacion(LocalDateTime.now());
             bancoRepository.save(banco);
@@ -349,13 +379,20 @@ public class BancoPreguntasService {
                     .facilesCount(faciles)
                     .mediasCount(medias)
                     .dificilesCount(dificiles)
+                    .cuotasGruposAplicadas(cuotasGruposAplicadas)
                     .hashSha256(hash)
                     .erroresValidacion(Collections.emptyList())
                     .build();
 
-        } catch (IOException | RuntimeException e) {
-            log.warn("No se pudo validar el archivo Excel del rol {}", rol.getId(), e);
+        } catch (IOException e) {
+            log.warn("No se pudo leer el archivo Excel del rol {}", rol.getId(), e);
             return respuestaFallida(rol, List.of("El archivo Excel no se puede leer o tiene una estructura inválida."));
+        } catch (Exception e) {
+            log.error("Error al procesar y cifrar el banco de preguntas del rol {}", rol.getId(), e);
+            String mensaje = (e.getMessage() != null && !e.getMessage().isBlank())
+                    ? e.getMessage()
+                    : "Error interno al cifrar y registrar el banco en el servidor.";
+            return respuestaFallida(rol, List.of(mensaje));
         }
     }
 
@@ -951,7 +988,21 @@ public class BancoPreguntasService {
                 .trim().toLowerCase(Locale.ROOT);
     }
 
-    private void validarCuotas(int faciles, int medias, int dificiles, int total, List<String> errores) {
+    private boolean resolverValidarCuotasGrupos() {
+        if (configuracionEvaluacionesService != null) {
+            try {
+                ConfiguracionEvaluacionesDto config = configuracionEvaluacionesService.obtener();
+                if (config != null && config.getValidarCuotasGrupos() != null) {
+                    return config.getValidarCuotasGrupos();
+                }
+            } catch (Exception e) {
+                log.warn("No se pudo obtener la configuración institucional para validar cuotas de grupos: {}", e.getMessage());
+            }
+        }
+        return true;
+    }
+
+    private void validarCuotas(int faciles, int medias, int dificiles, int g1, int g2, int g3, int total, boolean validarGrupos, List<String> errores) {
         if (total < TOTAL_REQUERIDO) {
             errores.add("El banco debe tener como mínimo " + TOTAL_REQUERIDO + " preguntas; se encontraron " + total);
         }
@@ -963,6 +1014,18 @@ public class BancoPreguntasService {
         }
         if (dificiles < CUOTA_DIFICILES) {
             errores.add("Debe haber como mínimo " + CUOTA_DIFICILES + " preguntas difíciles; se encontraron " + dificiles);
+        }
+
+        if (validarGrupos) {
+            if (g1 < CUOTA_GRUPO_1) {
+                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_1 + " preguntas del Grupo 1 (Falso y Verdadero / Premisas); se encontraron " + g1);
+            }
+            if (g2 < CUOTA_GRUPO_2) {
+                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_2 + " preguntas del Grupo 2 (Selección de la mejor respuesta); se encontraron " + g2);
+            }
+            if (g3 < CUOTA_GRUPO_3) {
+                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_3 + " preguntas del Grupo 3 (Emparejamiento y Casos o Problemas); se encontraron " + g3);
+            }
         }
     }
 

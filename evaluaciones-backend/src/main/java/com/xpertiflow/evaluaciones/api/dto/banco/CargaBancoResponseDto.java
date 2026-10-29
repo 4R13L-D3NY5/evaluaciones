@@ -18,6 +18,7 @@ public class CargaBancoResponseDto {
     private Integer facilesCount;
     private Integer mediasCount;
     private Integer dificilesCount;
+    private Boolean cuotasGruposAplicadas;
     private String hashSha256;
     private List<String> erroresValidacion;
 }

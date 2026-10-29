@@ -237,7 +237,7 @@ export class TopbarComponent implements OnInit {
 
   public puedeVerNotificaciones(): boolean {
     const rol = this._authService.usuario()?.rol;
-    return rol === 'DOCENTE' || rol === 'DIRECTOR_CARRERA';
+    return rol === 'DOCENTE' || rol === 'DIRECTOR_CARRERA' || rol === 'PERSONAL_EVALUACIONES' || rol === 'RESPONSABLE_EVALUACIONES';
   }
 
   public toggleMenuNotificaciones(): void {

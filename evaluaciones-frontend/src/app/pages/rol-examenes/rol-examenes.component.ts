@@ -74,10 +74,10 @@ interface InstanciaImportacionItem {
         <div class="flex items-center justify-end gap-2.5 flex-wrap">
           @if (esVicerrector()) {
             <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
-              <i class="pi pi-eye"></i> Consulta por sede
+              <i class="pi pi-shield"></i> Gestión Vicerrectorado
             </span>
-          } @else {
-            @if (esAdministrador()) {
+          }
+          @if (esAdministrador()) {
               <!-- Acciones de gestión reservadas exclusivamente al Administrador del Sistema -->
               <button
                 (click)="abrirModalReprogramarRango()"
@@ -101,14 +101,13 @@ interface InstanciaImportacionItem {
               </button>
             }
 
-            @if (puedeVerBotonAnadirExamen()) {
-              <button
-                (click)="abrirModalAnadirManual()"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
-                <i class="pi pi-plus"></i>
-                <span>Añadir Examen al Rol de Examen</span>
-              </button>
-            }
+          @if (puedeVerBotonAnadirExamen()) {
+            <button
+              (click)="abrirModalAnadirManual()"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
+              <i class="pi pi-plus"></i>
+              <span>Añadir Examen al Rol de Examen</span>
+            </button>
           }
         </div>
       </div>
@@ -1165,7 +1164,7 @@ export class RolExamenesComponent implements OnInit {
   public readonly esDirectorCarrera = computed(() => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA');
 
   public readonly puedeVerBotonAnadirExamen = computed(() => {
-    if (this.esAdministrador() || this.esResponsable()) return true;
+    if (this.esAdministrador() || this.esResponsable() || this.esVicerrector()) return true;
     if (!this.esDirectorCarrera()) return false;
 
     // Si el director filtró por una fecha 'desde', esa fecha debe respetar el candado de 72h
@@ -1238,7 +1237,7 @@ export class RolExamenesComponent implements OnInit {
   public formMateriaObj = signal<Course | null>(null);
   public formGrupoObj = signal<GroupItem | null>(null);
 
-  public formTipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' = '1er Parcial';
+  public formTipo: '1er Parcial' | '2do Parcial' | 'Final' | '2da Instancia' = this._configuracionService.resolverParcialDisplayCorto();
   public formFecha = '';
   public formHoraInicio = '08:15';
   public formHoraFin = '09:45';
@@ -1330,7 +1329,13 @@ export class RolExamenesComponent implements OnInit {
   public ngOnInit(): void {
     this._cargarSedes();
     this._configuracionService.cargar().subscribe({
-      next: config => this.horasCandado72.set(config.horasCandado72 ?? 72)
+      next: config => {
+        this.horasCandado72.set(config.horasCandado72 ?? 72);
+        if (config?.examenEnCurso) {
+          const parcialDefecto = this._configuracionService.resolverParcialDisplayCorto(config.examenEnCurso);
+          this.formTipo = parcialDefecto;
+        }
+      }
     });
     this._route.queryParams.subscribe(params => {
       const busqueda = params['busqueda'];
@@ -2297,7 +2302,7 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public abrirModalAnadirManual(): void {
-    if (!this.esAdministrador() && !this.esResponsable() && !this.esDirectorCarrera()) {
+    if (!this.esAdministrador() && !this.esResponsable() && !this.esDirectorCarrera() && !this.esVicerrector()) {
       this._mostrarToast('No tienes permiso para registrar exámenes en el rol de examen.');
       return;
     }
@@ -2309,11 +2314,11 @@ export class RolExamenesComponent implements OnInit {
       this.formMateriaObj.set(null);
       this.formGrupoObj.set(null);
     }
-    this.formTipo = '1er Parcial';
+    this.formTipo = this._configuracionService.resolverParcialDisplayCorto();
     const fDesde = this.filtroFechaDesde();
     if (fDesde && !this.estaFechaBloqueadaPorCandado(fDesde)) {
       this.formFecha = fDesde;
-    } else if (!this.esAdministrador()) {
+    } else if (!this.esAdministrador() && !this.esVicerrector() && !this.esDirectorCarrera()) {
       this.formFecha = this.fechaMinimaReprogramacion();
     } else {
       this.formFecha = '';
@@ -2360,7 +2365,7 @@ export class RolExamenesComponent implements OnInit {
 
   public guardarExamenModal(): void {
     const edit = this.itemEditando();
-    if (!this.esAdministrador()) {
+    if (!this.esAdministrador() && !this.esVicerrector() && !this.esDirectorCarrera()) {
       if (edit && this.estaBloqueadoPorCandado(edit)) {
         this._mostrarToast(`No se puede modificar un examen que está dentro del candado de ${this.horasCandado72()} horas.`);
         return;
@@ -2512,17 +2517,21 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public puedeEditar(item: RolExamenItem): boolean {
-    if (this.esVicerrector()) return false;
     if (this.esAdministrador()) {
       return true;
+    }
+    if (this.esVicerrector() || this.esDirectorCarrera()) {
+      return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
       && !this.estaBloqueadoPorCandado(item);
   }
 
   public puedeEliminar(item: RolExamenItem): boolean {
-    if (this.esVicerrector()) return false;
     if (this.esAdministrador()) {
+      return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
+    }
+    if (this.esVicerrector() || this.esDirectorCarrera()) {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
@@ -2530,7 +2539,7 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public getTooltipEditar(item: RolExamenItem): string {
-    if (!this.esAdministrador() && this.estaBloqueadoPorCandado(item)) {
+    if (!this.esAdministrador() && !this.esVicerrector() && !this.esDirectorCarrera() && this.estaBloqueadoPorCandado(item)) {
       return `Bloqueado por candado de seguridad: faltan menos de ${this.horasCandado72()}h para el examen.`;
     }
     if (this.esAdministrador() && item.estado !== 'PROGRAMADO' && item.estado !== 'VALIDADO') {
@@ -2540,7 +2549,7 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public fechaMinimaReprogramacion(): string {
-    if (this.esAdministrador()) {
+    if (this.esAdministrador() || this.esVicerrector() || this.esDirectorCarrera()) {
       return '2020-01-01';
     }
     const horas = this.horasCandado72();

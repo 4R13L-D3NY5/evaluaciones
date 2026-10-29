@@ -36,7 +36,7 @@ INSTRUCCIONES_POR_TIPO = {
     ),
     "VERDADERO_O_FALSO_SIMPLE": (
         "VERDADERO O FALSO SIMPLE",
-        "INSTRUCCIONES: Marque la respuesta correcta.",
+        "INSTRUCCIONES: Marque A si la proposición es Verdadera o B si es Falsa en su cartilla de respuestas.",
     ),
     "RESPUESTA_PREMISAS_ABCD": (
         "RESPUESTA A/B/AMBAS/NINGUNA",
@@ -378,7 +378,9 @@ def _typst_content(texto: str) -> str:
     return "".join(partes)
 
 
-_OPCION_PREFIX_RE = re.compile(r"^\s*(?:[A-Ea-e]|[1-5])\s*[\.\):\-]\s*")
+_OPCION_PREFIX_RE = re.compile(
+    r"^\s*(?:[A-Ea-e]\s*[\.\):\-]\s*|[1-5]\s*[\):\-]\s*|[1-5]\.\s+(?!\d))"
+)
 
 
 def _limpiar_prefijo_opcion(texto: Any) -> str:

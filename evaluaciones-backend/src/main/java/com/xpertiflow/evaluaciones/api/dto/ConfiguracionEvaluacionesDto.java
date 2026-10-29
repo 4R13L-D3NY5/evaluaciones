@@ -62,6 +62,10 @@ public class ConfiguracionEvaluacionesDto {
     @Max(1440)
     private Integer minutosMinimosDevolucion;
 
+    private String examenEnCurso;
+
+    private Boolean validarCuotasGrupos;
+
     private LocalDateTime actualizadoEn;
 
     private String actualizadoPor;

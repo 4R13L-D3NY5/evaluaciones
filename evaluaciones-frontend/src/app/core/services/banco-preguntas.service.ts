@@ -17,6 +17,7 @@ export interface BancoPreguntasResponse {
   nombreArchivoExcel: string;
   hashSha256Integridad: string;
   estado: string;
+  cuotasGruposAplicadas?: boolean;
   docenteAprobador: string;
   fechaAprobacion: string;
   estadoVerificacion?: string;
@@ -34,6 +35,7 @@ export interface CargaBancoResponse {
   facilesCount?: number;
   mediasCount?: number;
   dificilesCount?: number;
+  cuotasGruposAplicadas?: boolean;
   hashSha256?: string;
   erroresValidacion: string[];
 }

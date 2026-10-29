@@ -372,6 +372,15 @@ export interface DiaCalendario {
                               <i class="pi pi-clock text-[10px]"></i> Pendiente de verificación
                             </span>
                           }
+                          @if (banco.cuotasGruposAplicadas) {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 border border-indigo-300 text-indigo-800 px-2 py-0.5 text-[10px] font-black uppercase" title="Banco cargado con validación obligatoria de cuotas por grupo tipológico (15/30/15)">
+                              <i class="pi pi-list-check text-[10px]"></i> Cuotas 15/30/15 aplicadas
+                            </span>
+                          } @else {
+                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 text-slate-700 px-2 py-0.5 text-[10px] font-bold uppercase" title="Banco cargado sin validación de cuotas por grupo tipológico">
+                              <i class="pi pi-minus-circle text-[10px]"></i> Sin cuotas de grupos
+                            </span>
+                          }
                         </div>
                         <span class="text-[10px]" [class]="esExamenDevuelto() ? 'text-rose-900/90' : (esExamenPendienteVerificacion() ? 'text-amber-900/90' : 'text-emerald-900/80')">
                           {{ banco.totalReactivos }} preguntas · {{ banco.nombreArchivoExcel }} · 
@@ -608,18 +617,18 @@ export interface DiaCalendario {
                 <p class="text-xs text-muted-foreground">Sube el archivo .xlsx completado con las preguntas oficiales</p>
               </div>
 
-              <!-- La previsualización PDF es el único paso previo al guardado. -->
-              @if (esBancoTotalmenteValido() && rolPuedeCargarBanco() && !bancoRegistrado()) {
+              <!-- La previsualización PDF permite verificar avances parciales o el banco completo. -->
+              @if (totalPreguntasValidas() > 0 && rolPuedeCargarBanco() && !bancoRegistrado()) {
                 <div class="flex flex-wrap items-center gap-2.5 animate-fade-in">
                   @if (rolExamenActivo()) {
                   
-                  <!-- BOTÓN 1: PREVISUALIZAR PDF (OBLIGATORIO) -->
+                  <!-- BOTÓN 1: PREVISUALIZAR PDF -->
                   <button 
                     (click)="abrirModalPrevisualizacionPdf()"
-                    [class]="!pdfPrevisualizadoYConforme() ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg ring-4 ring-blue-400/30 animate-pulse font-black' : 'bg-blue-600 hover:bg-blue-700 text-white font-bold'"
+                    [class]="esBancoTotalmenteValido() && !pdfPrevisualizadoYConforme() ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg ring-4 ring-blue-400/30 animate-pulse font-black' : 'bg-blue-600 hover:bg-blue-700 text-white font-bold'"
                     class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all hover:scale-105 cursor-pointer">
                     <i class="pi pi-file-pdf text-sm"></i>
-                    <span>{{ pdfPrevisualizadoYConforme() ? 'Volver a Previsualizar PDF' : 'Previsualizar Examen (Paso 1 Obligatorio)' }}</span>
+                    <span>{{ esBancoTotalmenteValido() ? (pdfPrevisualizadoYConforme() ? 'Volver a Previsualizar PDF' : 'Previsualizar Examen (Paso 1 Obligatorio)') : 'Previsualizar Avance Parcial (' + totalPreguntasValidas() + '/60)' }}</span>
                     @if (pdfPrevisualizadoYConforme()) {
                       <i class="pi pi-check text-[10px] text-emerald-300 font-bold"></i>
                     }
@@ -630,6 +639,28 @@ export interface DiaCalendario {
                 </div>
               }
             </div>
+
+            <!-- Banner de Modo de Verificación Parcial -->
+            @if (rolExamenActivo() && totalPreguntasValidas() > 0 && !esBancoTotalmenteValido() && rolPuedeCargarBanco()) {
+              <div class="p-4 bg-blue-500/10 border border-blue-300 dark:border-blue-700 rounded-2xl flex items-start gap-3.5 shadow-2xs animate-fade-in">
+                <div class="h-9 w-9 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 flex items-center justify-center shrink-0 mt-0.5 border border-blue-300">
+                  <i class="pi pi-info-circle text-base"></i>
+                </div>
+                <div class="space-y-1 flex-1">
+                  <div class="flex items-center justify-between">
+                    <h5 class="text-xs font-black text-blue-950 dark:text-blue-200 uppercase tracking-tight">
+                      Modo de Verificación Parcial ({{ totalPreguntasValidas() }}/60 preguntas)
+                    </h5>
+                    <span class="bg-blue-200 dark:bg-blue-900/80 text-blue-900 dark:text-blue-200 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                      Avance Habilitado
+                    </span>
+                  </div>
+                  <p class="text-xs text-blue-900/90 dark:text-blue-300/90 font-medium leading-relaxed">
+                    Puedes previsualizar el PDF oficial en cualquier momento con las preguntas redactadas hasta ahora para verificar su formato, diagramación y fórmulas. Para oficializar y aprobar el examen en el sistema, debes completar las 60 preguntas cumpliendo todas las cuotas mínimas.
+                  </p>
+                </div>
+              </div>
+            }
 
             <!-- Banner de Estado de Previsualización Obligatoria -->
             @if (rolExamenActivo() && esBancoTotalmenteValido() && rolPuedeCargarBanco()) {
@@ -947,50 +978,51 @@ export interface DiaCalendario {
               </div>
             </div>
 
-            <!-- Tarjeta 3: Conteo por Grupo de Tipo (REFERENCIAL) -->
+            <!-- Tarjeta 3: Conteo por Grupo de Tipo -->
             <div class="lg:col-span-4 bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
               <div class="flex items-center justify-between border-b border-border pb-2">
-                <span class="text-xs font-black text-foreground uppercase tracking-wide">Mezcla por Grupo de Tipo</span>
-                <span class="bg-slate-700 text-white font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
-                  REFERENCIAL
+                <span class="text-xs font-black text-foreground uppercase tracking-wide">Cuotas por Grupo de Tipo</span>
+                <span [class]="validarCuotasGrupos() ? 'bg-rose-600 text-white' : 'bg-muted text-muted-foreground'" class="font-extrabold text-[9px] px-2 py-0.5 rounded uppercase shadow-2xs">
+                  {{ validarCuotasGrupos() ? 'OBLIGATORIO' : 'OPCIONAL' }}
                 </span>
               </div>
 
               <div class="space-y-2.5 text-xs">
                 <div>
                   <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-emerald-700">G1 (VF + Compuesta + Clave)</span>
-                    <span class="font-mono text-foreground">{{ countG1() }}/{{ cuotasGrupos().g1 }}</span>
+                    <span class="text-emerald-700">G1: Falso y Verdadero / Premisas</span>
+                    <span class="font-mono text-foreground">{{ countG1() }}/{{ cuotasGrupos().g1 }} mín.</span>
                   </div>
                   <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="(countG1() / cuotasGrupos().g1) * 100"></div>
+                    <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" [style.width.%]="porcentajeCuota(countG1(), cuotasGrupos().g1)"></div>
                   </div>
                 </div>
 
                 <div>
                   <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-blue-600">G2 (Selección Simple / Mejor Rpta)</span>
-                    <span class="font-mono text-foreground">{{ countG2() }}/{{ cuotasGrupos().g2 }}</span>
+                    <span class="text-blue-600">G2: Selección Mejor Respuesta</span>
+                    <span class="font-mono text-foreground">{{ countG2() }}/{{ cuotasGrupos().g2 }} mín.</span>
                   </div>
                   <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-blue-500 rounded-full transition-all duration-500" [style.width.%]="(countG2() / cuotasGrupos().g2) * 100"></div>
+                    <div class="h-full bg-blue-500 rounded-full transition-all duration-500" [style.width.%]="porcentajeCuota(countG2(), cuotasGrupos().g2)"></div>
                   </div>
                 </div>
 
                 <div>
                   <div class="flex justify-between font-bold text-[11px] mb-1">
-                    <span class="text-purple-700">G3 (Casos / Fórmulas + Emp.)</span>
-                    <span class="font-mono text-foreground">{{ countG3() }}/{{ cuotasGrupos().g3 }}</span>
+                    <span class="text-purple-700">G3: Casos / Problemas y Emparej.</span>
+                    <span class="font-mono text-foreground">{{ countG3() }}/{{ cuotasGrupos().g3 }} mín.</span>
                   </div>
                   <div class="h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div class="h-full bg-purple-600 rounded-full transition-all duration-500" [style.width.%]="(countG3() / cuotasGrupos().g3) * 100"></div>
+                    <div class="h-full bg-purple-600 rounded-full transition-all duration-500" [style.width.%]="porcentajeCuota(countG3(), cuotasGrupos().g3)"></div>
                   </div>
                 </div>
               </div>
 
-              <p class="text-[10px] text-muted-foreground leading-tight pt-1">
-                Balance referencial de tipos de preguntas.
-              </p>
+              <div [class]="cuotaGruposCumplida() ? 'text-emerald-700' : 'text-amber-700'" class="text-[10px] font-extrabold flex items-center gap-1 pt-1">
+                <i [class]="cuotaGruposCumplida() ? 'pi pi-check-circle text-xs' : 'pi pi-exclamation-circle text-xs'"></i>
+                <span>{{ validarCuotasGrupos() ? (cuotaGruposCumplida() ? 'Cuotas mínimas de tipos alcanzadas (15/30/15)' : 'Faltan preguntas para completar las cuotas de tipos (15/30/15)') : 'Validación institucional de grupos tipológicos desactivada' }}</span>
+              </div>
             </div>
 
           </div>
@@ -2190,9 +2222,15 @@ export interface DiaCalendario {
                   Cerrar
                 </button>
 
+                @if (!esBancoTotalmenteValido()) {
+                  <span class="text-[10px] text-amber-700 dark:text-amber-300 font-bold hidden sm:inline bg-amber-50 dark:bg-amber-950/40 border border-amber-200 px-2 py-1 rounded-lg">
+                    Avance parcial ({{ totalPreguntasValidas() }}/60 preguntas). Complete las 60 preguntas para habilitar la aprobación final.
+                  </span>
+                }
+
                 <button 
-                  [disabled]="!pdfPrevisualizadoYConforme() || !documentoRecorridoCompleto() || !rolExamenActivo() || !archivoExcelSeleccionado() || cargandoBanco() || pdfPreviewPages().length === 0"
-                  (click)="aprobarDiagramacionPdf()"
+                  [disabled]="!esBancoTotalmenteValido() || !pdfPrevisualizadoYConforme() || !documentoRecorridoCompleto() || !rolExamenActivo() || !archivoExcelSeleccionado() || cargandoBanco() || pdfPreviewPages().length === 0"
+                  (click)="iniciarAprobacionDocente()"
                   class="flex-1 sm:flex-none justify-center px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm">
                   <i class="pi pi-check-circle text-sm shrink-0"></i>
                   <span class="truncate">
@@ -2200,6 +2238,106 @@ export interface DiaCalendario {
                   </span>
                 </button>
               </div>
+            </div>
+
+          </div>
+        </div>
+      }
+
+      <!-- ================================================================= -->
+      <!-- MODAL: DECLARACIÓN JURADA Y COMPROMISO ACADÉMICO DEL DOCENTE     -->
+      <!-- ================================================================= -->
+      @if (dialogDeclaracionDocente()) {
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-[70] animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto">
+            
+            <!-- Cabecera -->
+            <div class="bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 text-white p-5 flex items-center justify-between border-b border-purple-800/40">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 text-xl shrink-0">
+                  <i class="pi pi-shield"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-black">Declaración y Compromiso Académico</h3>
+                  <p class="text-xs text-purple-200/80 font-mono">
+                    {{ rolExamenActivo()?.materiaCodigo }} · {{ rolExamenActivo()?.materiaNombre }} (Grupo {{ rolExamenActivo()?.grupo }})
+                  </p>
+                </div>
+              </div>
+              <button 
+                (click)="cerrarDeclaracionDocente()" 
+                class="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <!-- Cuerpo del Compromiso -->
+            <div class="p-6 space-y-4 text-xs text-foreground leading-relaxed">
+              <div class="p-3.5 bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-xl space-y-2">
+                <h4 class="font-black text-purple-950 dark:text-purple-200 uppercase tracking-tight flex items-center gap-2">
+                  <i class="pi pi-info-circle text-purple-700 dark:text-purple-400"></i>
+                  Responsabilidad y Conformidad Institucional de la Evaluación
+                </h4>
+                <p class="text-purple-900/90 dark:text-purple-300/90">
+                  Estimado(a) docente: La oficialización de este banco de preguntas compromete la validez académica y la confiabilidad del proceso evaluativo de la Universidad.
+                </p>
+              </div>
+
+              <div class="space-y-2.5 text-muted-foreground">
+                <div class="flex items-start gap-2.5">
+                  <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
+                  <div>
+                    <strong class="text-foreground">Conformidad con la Previsualización y el Algoritmo de Selección:</strong>
+                    Habiendo previsualizado íntegramente el examen generado, declaro mi total conformidad con la forma en que se presentarán y diagramarán las preguntas en caso de ser seleccionadas por el algoritmo oficial de elaboración de variantes de los exámenes.
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-2.5">
+                  <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
+                  <div>
+                    <strong class="text-foreground">Validación de Redacción y Estructura Técnica:</strong>
+                    Certifico haber revisado minuciosamente la redacción, formulación técnica y estructuración de cada enunciado y sus opciones en las {{ totalPreguntasValidas() }} preguntas, garantizando claridad conceptual y ausencia de ambigüedades.
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-2.5">
+                  <i class="pi pi-check text-emerald-600 mt-0.5 shrink-0 font-bold"></i>
+                  <div>
+                    <strong class="text-foreground">Exactitud del Patrón de Respuestas del Archivo:</strong>
+                    Declaro bajo mi responsabilidad que las respuestas correctas asignadas a cada pregunta en el archivo Excel cargado son rigurosamente precisas y constituirán el patrón oficial inalterable para la calificación automatizada OMR.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Checkbox de Aceptación Obligatoria -->
+              <div class="pt-3 border-t border-border">
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-border bg-muted/40 hover:bg-muted/70 cursor-pointer transition-colors">
+                  <input 
+                    type="checkbox" 
+                    [checked]="declaracionAceptada()" 
+                    (change)="declaracionAceptada.set(!declaracionAceptada())" 
+                    class="mt-0.5 h-4 w-4 rounded border-border text-purple-700 focus:ring-purple-500 cursor-pointer">
+                  <span class="text-xs font-semibold text-foreground select-none">
+                    He previsualizado el examen en su totalidad, estoy de acuerdo con la presentación de las preguntas que seleccione el algoritmo, apruebo su redacción y estructura, y asumo la plena responsabilidad académica del banco cargado.
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Botones -->
+            <div class="bg-muted/30 border-t border-border p-4 flex items-center justify-end gap-2.5">
+              <button 
+                (click)="cerrarDeclaracionDocente()" 
+                class="px-4 py-2.5 bg-muted hover:bg-border text-foreground rounded-xl font-bold transition-colors cursor-pointer text-xs">
+                Volver a revisar
+              </button>
+              <button 
+                [disabled]="!declaracionAceptada() || cargandoBanco()" 
+                (click)="confirmarDeclaracionYGuardar()" 
+                class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-xs">
+                <i [class]="cargandoBanco() ? 'pi pi-spin pi-spinner' : 'pi pi-check-circle'"></i>
+                <span>{{ cargandoBanco() ? 'Registrando...' : 'Confirmar y Guardar Banco Oficial' }}</span>
+              </button>
             </div>
 
           </div>
@@ -3095,6 +3233,16 @@ export class BancoPreguntasComponent implements OnInit {
       next: usuario => {
         if (!usuario) return;
         this._configuracionService.cargar().subscribe({
+          next: config => {
+            const params = this._route.snapshot.queryParamMap;
+            if (!params.get('rolId') && config?.examenEnCurso) {
+              const display = this._configuracionService.resolverParcialDisplay(config.examenEnCurso);
+              this.parcialActivo.set(display);
+              if (this.rolesOficiales().length > 0) {
+                this._sincronizarRolSeleccionadoConContexto();
+              }
+            }
+          },
           error: () => {
             // Se conservan los valores oficiales predeterminados del servicio.
           }
@@ -3380,7 +3528,7 @@ export class BancoPreguntasComponent implements OnInit {
 
   public examenSeleccionadoModal = signal<ExamenDocenteCronograma | null>(null);
 
-  public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>('1er Parcial');
+  public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>(this._configuracionService.resolverParcialDisplay());
   public nombreArchivoCargado = signal<string | null>(null);
   public imagenBase64Generada = signal<string | null>(null);
   public imagenNombre = signal<string | null>(null);
@@ -3410,6 +3558,7 @@ export class BancoPreguntasComponent implements OnInit {
   public esExamenVerificado = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
+    if (!this.bancoPersistido() && !this.documentoSinCartilla()) return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'VERIFICADO' || estadoRol === 'VERIFICADO';
@@ -3417,6 +3566,7 @@ export class BancoPreguntasComponent implements OnInit {
   public esExamenDevuelto = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
+    if (!this.bancoPersistido() && !this.documentoSinCartilla()) return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'DEVUELTO' || estadoRol === 'DEVUELTO';
@@ -3424,6 +3574,7 @@ export class BancoPreguntasComponent implements OnInit {
   public esExamenPendienteVerificacion = computed(() => {
     const estado = this.rolExamenActivo()?.estadoFlujo;
     if (estado && estado !== 'PROGRAMADO' && estado !== 'VALIDADO') return false;
+    if (!this.bancoPersistido() && !this.documentoSinCartilla()) return false;
     const estadoBanco = this.bancoPersistido()?.estadoVerificacion;
     const estadoRol = this.rolExamenActivo()?.estadoVerificacion;
     return estadoBanco === 'PENDIENTE' || estadoRol === 'PENDIENTE';
@@ -3435,6 +3586,8 @@ export class BancoPreguntasComponent implements OnInit {
   public dialogEjemplos = signal<boolean>(false);
   public filtroGuiaTipo = signal<string>('TODOS');
   public dialogPrevisualizacionPdf = signal<boolean>(false);
+  public dialogDeclaracionDocente = signal<boolean>(false);
+  public declaracionAceptada = signal<boolean>(false);
   public pdfPreviewUrl = signal<SafeResourceUrl | null>(null);
   public pdfPreviewPages = signal<string[]>([]);
   private pdfPreviewObjectUrl: string | null = null;
@@ -3794,8 +3947,20 @@ export class BancoPreguntasComponent implements OnInit {
     return { facil: 15, medio: 30, dificil: 15, total: 60 };
   });
 
+  public validarCuotasGrupos = computed(() => {
+    return this._configuracionService.configuracion().validarCuotasGrupos ?? true;
+  });
+
   public cuotasGrupos = computed(() => {
     return { g1: 15, g2: 30, g3: 15 };
+  });
+
+  public cuotaGruposCumplida = computed(() => {
+    if (!this.validarCuotasGrupos()) {
+      return true;
+    }
+    const cg = this.cuotasGrupos();
+    return this.countG1() >= cg.g1 && this.countG2() >= cg.g2 && this.countG3() >= cg.g3;
   });
 
   public totalPreguntasRequeridas = computed(() => this.cuotasDificultad().total);
@@ -3838,7 +4003,10 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public esBancoTotalmenteValido = computed(() => {
-    return this.totalPreguntasValidas() >= this.totalPreguntasRequeridas() && this.cuotaDificultadCumplida() && this.preguntasConErrores().length === 0;
+    return this.totalPreguntasValidas() >= this.totalPreguntasRequeridas()
+      && this.cuotaDificultadCumplida()
+      && this.cuotaGruposCumplida()
+      && this.preguntasConErrores().length === 0;
   });
 
   public preguntasConErrores = computed(() => {
@@ -3868,6 +4036,19 @@ export class BancoPreguntasComponent implements OnInit {
     }
     if (this.countDificiles() < cuotas.dificil) {
       observaciones.push(`Cuota de dificultad difícil incompleta: hay ${this.countDificiles()} y se requieren como mínimo ${cuotas.dificil}. Corrección: agrega o corrige ${cuotas.dificil - this.countDificiles()} pregunta(s) con dificultad 3.`);
+    }
+
+    if (this.validarCuotasGrupos()) {
+      const cuotasG = this.cuotasGrupos();
+      if (this.countG1() < cuotasG.g1) {
+        observaciones.push(`Cuota del Grupo 1 (Falso y Verdadero / Premisas) incompleta: hay ${this.countG1()} y se requieren como mínimo ${cuotasG.g1}. Corrección: agrega o corrige preguntas de V/F o Selección de premisas.`);
+      }
+      if (this.countG2() < cuotasG.g2) {
+        observaciones.push(`Cuota del Grupo 2 (Selección de la mejor respuesta) incompleta: hay ${this.countG2()} y se requieren como mínimo ${cuotasG.g2}. Corrección: agrega o corrige preguntas de Selección de la mejor respuesta.`);
+      }
+      if (this.countG3() < cuotasG.g3) {
+        observaciones.push(`Cuota del Grupo 3 (Casos/Problemas y Emparejamiento) incompleta: hay ${this.countG3()} y se requieren como mínimo ${cuotasG.g3}. Corrección: agrega o corrige subítems de casos o de emparejamiento.`);
+      }
     }
 
     return observaciones;
@@ -5269,13 +5450,35 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public descargarExcelBaseMacro(): void {
-    const filename = 'formato_banco_preguntas_asig_EF_1P.xlsx';
+    const parcial = this.parcialActivo();
+    let filename = 'formato_banco_preguntas_asig_EF_2P.xlsx';
+    let downloadName = 'PLANTILLA_BANCO_PREGUNTAS_2P.xlsx';
+
+    switch (parcial) {
+      case '1er Parcial':
+        filename = 'formato_banco_preguntas_asig_EF_1P.xlsx';
+        downloadName = 'PLANTILLA_BANCO_PREGUNTAS_1P.xlsx';
+        break;
+      case '2do Parcial':
+        filename = 'formato_banco_preguntas_asig_EF_2P.xlsx';
+        downloadName = 'PLANTILLA_BANCO_PREGUNTAS_2P.xlsx';
+        break;
+      case 'Examen Final':
+        filename = 'formato_banco_preguntas_asig_EF.xlsx';
+        downloadName = 'PLANTILLA_BANCO_PREGUNTAS_FINAL.xlsx';
+        break;
+      case '2da Instancia':
+        filename = 'formato_banco_preguntas_asig_EF_2P.xlsx';
+        downloadName = 'PLANTILLA_BANCO_PREGUNTAS_2DA_INSTANCIA.xlsx';
+        break;
+    }
+
     const asigNombre = this.asignaturaNombreCompleto();
     const link = document.createElement('a');
     link.href = `assets/${filename}`;
-    link.download = 'PLANTILLA_BANCO_PREGUNTAS_1P.xlsx';
+    link.download = downloadName;
     link.click();
-    this._mostrarToast(`Plantilla oficial descargada para ${asigNombre} (${this.grupoSeleccionado()}).`);
+    this._mostrarToast(`Plantilla oficial descargada para ${asigNombre} (${this.grupoSeleccionado()}) - ${parcial}.`);
   }
 
   // ============================================================
@@ -5728,7 +5931,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     const instruccionTipo = (tipo: string): string => {
       const instrucciones: Record<string, string> = {
         SELECCION_MEJOR_RESPUESTA: 'INSTRUCCIONES: Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.',
-        VERDADERO_O_FALSO_SIMPLE: 'INSTRUCCIONES: Marque la respuesta correcta.',
+        VERDADERO_O_FALSO_SIMPLE: 'INSTRUCCIONES: Marque A si la proposición es Verdadera o B si es Falsa en su cartilla de respuestas.',
         RESPUESTA_PREMISAS_ABCD: 'INSTRUCCIONES: Las siguientes preguntas están compuestas por dos premisas.\nResponda con:\nA: Si solo la primera premisa es verdadera.\nB: Si solo la segunda premisa es verdadera.\nC: Si ambas premisas son verdaderas.\nD: Si ninguna premisa es verdadera.',
         VERDADERO_O_FALSO_COMPLEJAS: 'INSTRUCCIONES: Seleccione la opción correcta de acuerdo con la siguiente clave:\nA: 1, 2 y 3 son verdaderas.\nB: 1 y 3 son verdaderas.\nC: 2 y 4 son verdaderas.\nD: Solo 4 es verdadera.\nE: Todas son verdaderas.',
         CASO_CLINICO_TRONCO: 'INSTRUCCIONES: El siguiente caso clínico o problema tendrá varias preguntas.\nSeleccione la respuesta correcta en cada una.',
@@ -6115,6 +6318,32 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
     return parcial;
   }
 
+  public iniciarAprobacionDocente(): void {
+    if (!this.esBancoTotalmenteValido()) {
+      this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas.', 'error');
+      return;
+    }
+    if (!this.pdfPrevisualizadoYConforme() || !this.documentoRecorridoCompleto() || this.pdfPreviewPages().length === 0) {
+      this._mostrarToast('Debes previsualizar el examen completo y llegar a la última página antes de guardar el banco.', 'error');
+      return;
+    }
+    this.declaracionAceptada.set(false);
+    this.dialogDeclaracionDocente.set(true);
+  }
+
+  public cerrarDeclaracionDocente(): void {
+    this.dialogDeclaracionDocente.set(false);
+  }
+
+  public confirmarDeclaracionYGuardar(): void {
+    if (!this.declaracionAceptada()) {
+      this._mostrarToast('Debe aceptar la declaración de responsabilidad académica para continuar.', 'error');
+      return;
+    }
+    this.dialogDeclaracionDocente.set(false);
+    this.aprobarDiagramacionPdf();
+  }
+
   public aprobarDiagramacionPdf(): void {
     const rol = this.rolExamenActivo();
     const file = this.archivoExcelSeleccionado();
@@ -6131,7 +6360,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       return;
     }
     if (!this.esBancoTotalmenteValido()) {
-      this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas 15/30/15.', 'error');
+      this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas requeridas.', 'error');
       return;
     }
     if (!this.pdfPrevisualizadoYConforme() || !this.documentoRecorridoCompleto() || this.pdfPreviewPages().length === 0) {

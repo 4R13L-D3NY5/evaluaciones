@@ -177,6 +177,7 @@ public class AutenticacionService {
             case "ADMINISTRADOR_SISTEMA" -> "Administrador del sistema";
             case "RESPONSABLE_EVALUACIONES" -> "Responsable de evaluaciones";
             case "PERSONAL_EVALUACIONES" -> "Personal de evaluaciones";
+            case "EVALUADOR_VOCACIONAL" -> "Evaluador de test vocacionales";
             case "DOCENTE" -> "Docente";
             case "VICERRECTOR" -> "Vicerrector";
             case "DIRECTOR_CARRERA" -> "Director de carrera";

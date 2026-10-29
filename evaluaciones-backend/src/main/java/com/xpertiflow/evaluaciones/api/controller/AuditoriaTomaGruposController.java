@@ -27,7 +27,7 @@ public class AuditoriaTomaGruposController {
     private final AuditoriaTomaGruposService auditoriaTomaGruposService;
 
     @GetMapping("/buscar-evaluaciones")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
     @Operation(summary = "Buscar evaluaciones para auditoría forense y peritaje de calificaciones")
     public ResponseEntity<List<AuditoriaEvaluacionItemDto>> buscarEvaluaciones(
             @RequestParam(required = false) String criterio,
@@ -37,21 +37,21 @@ public class AuditoriaTomaGruposController {
     }
 
     @GetMapping("/grupo")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
     @Operation(summary = "Auditoría forense de nómina por GroupId")
     public ResponseEntity<AuditoriaTomaGrupoReporteDto> obtenerPorGrupo(@RequestParam String groupId) {
         return ResponseEntity.ok(auditoriaTomaGruposService.obtenerAuditoriaPorGrupo(groupId));
     }
 
     @GetMapping("/rol/{rolExamenId}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
     @Operation(summary = "Auditoría forense de nómina por RolExamenId")
     public ResponseEntity<AuditoriaTomaGrupoReporteDto> obtenerPorRol(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(auditoriaTomaGruposService.obtenerAuditoriaPorRol(rolExamenId));
     }
 
     @GetMapping("/estudiante")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
     @Operation(summary = "Búsqueda forense global de todas las asignaturas de un estudiante")
     public ResponseEntity<AuditoriaEstudianteGlobalDto> buscarPorEstudiante(
             @RequestParam String studentCode,
@@ -60,7 +60,7 @@ public class AuditoriaTomaGruposController {
     }
 
     @GetMapping("/exportar-excel")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
     @Operation(summary = "Descargar acta forense oficial de trazabilidad en Excel")
     public ResponseEntity<byte[]> exportarExcel(@RequestParam String groupId) throws IOException {
         byte[] bytes = auditoriaTomaGruposService.exportarReporteExcel(groupId);

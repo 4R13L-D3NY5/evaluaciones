@@ -20,4 +20,9 @@ public interface AuditoriaEvaluacionRepository extends JpaRepository<AuditoriaEv
             String rolExamenId, String etapaDestino);
 
     List<AuditoriaEvaluacion> findAllByOrderByFechaEventoDesc(Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Query("SELECT a FROM AuditoriaEvaluacion a JOIN FETCH a.rolExamen WHERE a.accion IN :acciones AND a.fechaEvento >= :fechaDesde ORDER BY a.fechaEvento DESC")
+    List<AuditoriaEvaluacion> findReprogramacionesRecientes(
+            @org.springframework.data.repository.query.Param("acciones") java.util.Collection<String> acciones,
+            @org.springframework.data.repository.query.Param("fechaDesde") java.time.LocalDateTime fechaDesde);
 }
