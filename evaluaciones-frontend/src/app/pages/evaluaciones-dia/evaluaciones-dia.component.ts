@@ -2699,7 +2699,7 @@ interface CampusDisponible extends Campus {
                 </div>
                 <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-2.5 text-[11px] text-indigo-950">
                   <i class="pi pi-eye mr-1.5"></i>
-                  Verifique cada número de pregunta comparando la respuesta del estudiante con el patrón oficial de su variante. @if (puedeAjustarIncisosOmr()) { El responsable de evaluaciones puede ajustar manualmente el inciso cuando exista una no coincidencia. } @else { Las respuestas son informativas y no se pueden modificar con este perfil. }
+                  Verifique cada número de pregunta comparando la respuesta del estudiante con el patrón oficial de su variante. @if (puedeAjustarIncisosOmr()) { El responsable o personal de evaluaciones puede ajustar manualmente el inciso cuando exista una no coincidencia. } @else { Las respuestas son informativas y no se pueden modificar con este perfil. }
                 </div>
                 <div class="border border-border rounded-xl overflow-hidden divide-y divide-border">
                   @for (lectura of lecturasOmrFiltradas(); track lectura.pagina) {
@@ -4963,7 +4963,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public puedeRecalificar(item: EvaluacionItemUI | null | undefined): boolean {
     if (!item) return false;
-    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones())
+    return (this.esAdministradorSistema() || this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones())
       && !this.esConsultaAcademica()
       && item.modalidad === 'PRESENCIAL_CARTILLA'
       && ['Calificado', 'Confirmado'].includes(item.etapa);
@@ -6247,7 +6247,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public puedeAjustarIncisosOmr(): boolean {
     const etapa = this.evaluacionSeleccionadaOmr()?.etapa;
-    return (this.esResponsableEvaluaciones() || this.esAdministradorSistema())
+    return (this.esResponsableEvaluaciones() || this.esPersonalEvaluaciones() || this.esAdministradorSistema())
       && (etapa === 'Devuelto' || etapa === 'Pendiente de notas' || etapa === 'Calificado' || etapa === 'Confirmado');
   }
 
