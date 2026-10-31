@@ -1096,9 +1096,10 @@ public class OmrProcesamientoService {
     private void validarRolAjuste(Authentication authentication) {
         boolean autorizado = authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_RESPONSABLE_EVALUACIONES".equals(authority.getAuthority())
+                        || "ROLE_PERSONAL_EVALUACIONES".equals(authority.getAuthority())
                         || "ROLE_ADMINISTRADOR_SISTEMA".equals(authority.getAuthority()));
         if (!autorizado) {
-            throw new AccessDeniedException("Solo el responsable de evaluaciones o el administrador pueden realizar esta acción.");
+            throw new AccessDeniedException("Solo el personal o responsable de evaluaciones o el administrador pueden realizar esta acción.");
         }
     }
 
@@ -1487,9 +1488,10 @@ public class OmrProcesamientoService {
     private RolExamen validarAjusteManual(String rolExamenId, Authentication authentication) {
         boolean autorizado = authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_RESPONSABLE_EVALUACIONES".equals(authority.getAuthority())
+                        || "ROLE_PERSONAL_EVALUACIONES".equals(authority.getAuthority())
                         || "ROLE_ADMINISTRADOR_SISTEMA".equals(authority.getAuthority()));
         if (!autorizado) {
-            throw new AccessDeniedException("Solo el responsable de evaluaciones o el administrador pueden ajustar manualmente los incisos.");
+            throw new AccessDeniedException("Solo el personal o responsable de evaluaciones o el administrador pueden ajustar manualmente los incisos.");
         }
         RolExamen rol = rolExamenRepository.findById(rolExamenId)
                 .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));

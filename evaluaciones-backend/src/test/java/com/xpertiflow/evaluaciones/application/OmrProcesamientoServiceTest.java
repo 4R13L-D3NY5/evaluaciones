@@ -1,6 +1,7 @@
 package com.xpertiflow.evaluaciones.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertiflow.evaluaciones.api.dto.AjustarCalificacionOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.AnulacionPreguntaOmrResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.CalificacionOmrResponseDto;
@@ -539,5 +540,62 @@ class OmrProcesamientoServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("34 páginas")
                 .hasMessageContaining("35 cartillas generadas para los exámenes oficiales en la base de datos");
+    }
+    @Test
+    void recalificarEvaluacion_permitePersonalEvaluaciones() {
+        when(rolExamenRepository.findById(rolId)).thenReturn(Optional.of(rol));
+        when(varianteRepository.findByRolExamenId(rolId)).thenReturn(Collections.emptyList());
+        when(calificacionRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolId)).thenReturn(Collections.emptyList());
+
+        Authentication authPersonal = new UsernamePasswordAuthenticationToken(
+                "operador.eval",
+                "secret",
+                List.of(new SimpleGrantedAuthority("ROLE_PERSONAL_EVALUACIONES"))
+        );
+
+        RecalificarOmrRequestDto req = new RecalificarOmrRequestDto();
+        req.setMotivo("Recalificación por ajuste de cartillas OMR");
+
+        List<CalificacionOmrResponseDto> resultado = service.recalificarEvaluacion(
+                rolId, req, authPersonal, "10.0.0.8");
+
+        assertThat(resultado).isEmpty();
+        verify(auditoriaRepository).save(any(AuditoriaEvaluacion.class));
+    }
+
+    @Test
+    void recalificarEvaluacion_deniegaRolNoAutorizado() {
+        Authentication authDocente = new UsernamePasswordAuthenticationToken(
+                "docente.titular",
+                "secret",
+                List.of(new SimpleGrantedAuthority("ROLE_DOCENTE"))
+        );
+
+        RecalificarOmrRequestDto req = new RecalificarOmrRequestDto();
+        req.setMotivo("Intento de recalificación no autorizado");
+
+        assertThatThrownBy(() -> service.recalificarEvaluacion(
+                rolId, req, authDocente, "10.0.0.8"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Solo el personal o responsable de evaluaciones o el administrador pueden realizar esta acción");
+    }
+
+    @Test
+    void ajustarCalificacion_ajusteManual_deniegaRolNoAutorizado() {
+        Authentication authDocente = new UsernamePasswordAuthenticationToken(
+                "docente.titular",
+                "secret",
+                List.of(new SimpleGrantedAuthority("ROLE_DOCENTE"))
+        );
+
+        AjustarCalificacionOmrRequestDto req = new AjustarCalificacionOmrRequestDto();
+        req.setAjusteManual(true);
+        req.setCodigoEstudiante("EST-001");
+        req.setRespuestas(java.util.Map.of("1", "A"));
+
+        assertThatThrownBy(() -> service.ajustarCalificacion(
+                rolId, req, authDocente, "10.0.0.8"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Solo el personal o responsable de evaluaciones o el administrador pueden ajustar manualmente los incisos");
     }
 }

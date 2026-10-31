@@ -222,7 +222,7 @@ public class OmrProcesamientoController {
     }
 
     @PostMapping("/{rolExamenId}/recalificar")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#rolExamenId, authentication)")
     @Operation(summary = "Recalificar una evaluación OMR con auditoría formal")
     public ResponseEntity<List<CalificacionOmrResponseDto>> recalificarEvaluacion(
             @PathVariable String rolExamenId,

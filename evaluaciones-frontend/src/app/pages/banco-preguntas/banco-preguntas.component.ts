@@ -186,14 +186,32 @@ export interface DiaCalendario {
         <!-- Parcial y recursos oficiales disponibles también para docentes -->
         <div class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Parcial a validar</span>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Parcial a validar</span>
+              <span class="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 border border-purple-200">
+                <i class="pi pi-shield text-[9px]"></i> Vigente: <strong>{{ parcialEnVigencia() }}</strong>
+              </span>
+            </div>
             <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
               @for (p of ['1er Parcial', '2do Parcial', 'Examen Final', '2da Instancia']; track p) {
                 <button
+                  type="button"
                   (click)="cambiarParcial(p)"
-                  [class]="parcialActivo() === p ? 'bg-purple-700 text-white font-black shadow-xs' : 'bg-muted/70 text-muted-foreground hover:text-foreground font-bold'"
-                  class="cursor-pointer rounded-xl px-3.5 py-1.5 text-xs transition-all">
-                  {{ p }} ({{ getResumenCuota(p) }})
+                  [disabled]="!esParcialVigente(p) && parcialActivo() !== p"
+                  [class]="parcialActivo() === p 
+                    ? 'bg-purple-700 text-white font-black shadow-xs cursor-default' 
+                    : (!esParcialVigente(p)
+                      ? 'bg-muted/40 text-muted-foreground/45 border border-dashed border-border/80 cursor-not-allowed opacity-50 font-bold select-none' 
+                      : 'bg-muted/70 text-muted-foreground hover:text-foreground font-bold cursor-pointer')"
+                  [title]="!esParcialVigente(p) ? 'Periodo no vigente en la administración institucional de evaluaciones (bloqueado)' : 'Periodo evaluativo oficial en curso'"
+                  class="rounded-xl px-3.5 py-1.5 text-xs transition-all flex items-center gap-1.5">
+                  @if (!esParcialVigente(p)) {
+                    <i class="pi pi-lock text-[10px] opacity-70"></i>
+                  }
+                  <span>{{ p }} ({{ getResumenCuota(p) }})</span>
+                  @if (!esParcialVigente(p)) {
+                    <span class="text-[9px] uppercase tracking-wider font-extrabold bg-muted px-1.5 py-0.5 rounded text-muted-foreground/60">Bloqueado</span>
+                  }
                 </button>
               }
             </div>
@@ -3528,7 +3546,12 @@ export class BancoPreguntasComponent implements OnInit {
 
   public examenSeleccionadoModal = signal<ExamenDocenteCronograma | null>(null);
 
+  public parcialEnVigencia = computed(() => this._configuracionService.resolverParcialDisplay());
   public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>(this._configuracionService.resolverParcialDisplay());
+
+  public esParcialVigente(parcial: string): boolean {
+    return this.parcialEnVigencia() === parcial;
+  }
   public nombreArchivoCargado = signal<string | null>(null);
   public imagenBase64Generada = signal<string | null>(null);
   public imagenNombre = signal<string | null>(null);
@@ -4383,6 +4406,10 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   public cambiarParcial(parcial: string): void {
+    if (!this.esParcialVigente(parcial)) {
+      this._mostrarToast(`El ${parcial} se encuentra bloqueado porque no está en vigencia institucional.`, 'error');
+      return;
+    }
     this.parcialActivo.set(parcial as any);
     this.examenRolSeleccionadoId.set(null);
     this._sincronizarRolSeleccionadoConContexto();
