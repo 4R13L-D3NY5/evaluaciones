@@ -111,6 +111,23 @@ public class BancoPreguntasService {
                 ? contarPorDificultad(reactivosPersistidos, 3)
                 : banco.getDificilesCount();
 
+        int g1 = 0;
+        int g2 = 0;
+        int g3 = 0;
+        if (tieneDetallePersistido) {
+            for (Reactivo r : reactivosPersistidos) {
+                if (esPreguntaContable(r)) {
+                    if (TIPOS_GRUPO_1.contains(r.getTipoReactivo())) {
+                        g1++;
+                    } else if (TIPOS_GRUPO_2.contains(r.getTipoReactivo())) {
+                        g2++;
+                    } else if (TIPOS_GRUPO_3.contains(r.getTipoReactivo())) {
+                        g3++;
+                    }
+                }
+            }
+        }
+
         return BancoPreguntasResponseDto.builder()
                 .id(banco.getId())
                 .rolExamenId(banco.getRolExamenId())
@@ -122,6 +139,9 @@ public class BancoPreguntasService {
                 .facilesCount(faciles)
                 .mediasCount(medias)
                 .dificilesCount(dificiles)
+                .grupo1Count(tieneDetallePersistido ? g1 : (Boolean.TRUE.equals(banco.getCuotasGruposAplicadas()) ? 15 : null))
+                .grupo2Count(tieneDetallePersistido ? g2 : (Boolean.TRUE.equals(banco.getCuotasGruposAplicadas()) ? 30 : null))
+                .grupo3Count(tieneDetallePersistido ? g3 : (Boolean.TRUE.equals(banco.getCuotasGruposAplicadas()) ? 15 : null))
                 .nombreArchivoExcel(banco.getNombreArchivoExcel())
                 .hashSha256Integridad(banco.getHashSha256Integridad())
                 .estado(banco.getEstado())
@@ -379,6 +399,9 @@ public class BancoPreguntasService {
                     .facilesCount(faciles)
                     .mediasCount(medias)
                     .dificilesCount(dificiles)
+                    .grupo1Count(g1)
+                    .grupo2Count(g2)
+                    .grupo3Count(g3)
                     .cuotasGruposAplicadas(cuotasGruposAplicadas)
                     .hashSha256(hash)
                     .erroresValidacion(Collections.emptyList())

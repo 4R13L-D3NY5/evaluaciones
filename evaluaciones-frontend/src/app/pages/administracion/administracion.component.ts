@@ -568,6 +568,47 @@ export interface ParcialConfig {
                 </div>
               </div>
 
+              <!-- Permisos de Directores de Carrera (Registro Manual y Edición de Roles) -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
+                <div class="flex items-center justify-between border-b border-border pb-3">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-user-edit text-purple-600"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Permisos de Directores de Carrera en Rol de Exámenes</h4>
+                      <p class="text-[10px] text-muted-foreground">Control de visibilidad y acceso para el registro manual y la edición de exámenes en el calendario académico.</p>
+                    </div>
+                  </div>
+                  <span [class]="permitirDirectorEdicionRoles ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700'" class="border rounded-full px-3 py-1 text-[10px] font-mono font-black uppercase">
+                    {{ permitirDirectorEdicionRoles ? 'HABILITADO' : 'OCULTO / BLOQUEADO' }}
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div class="flex flex-col justify-center space-y-2">
+                    <label class="flex items-center gap-3 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        [(ngModel)]="permitirDirectorEdicionRoles"
+                        class="w-4 h-4 text-purple-600 rounded border-border focus:ring-purple-500 cursor-pointer">
+                      <span class="text-xs font-bold text-foreground">
+                        Permitir a Directores de Carrera el registro manual y la edición de roles de examen
+                      </span>
+                    </label>
+                    <p class="text-[10px] text-muted-foreground">
+                      Si está marcado, los Directores de Carrera verán el botón de "Añadir Examen al Rol" y los botones de edición/reprogramación. Si se desmarca, estos botones quedarán completamente ocultos para ellos.
+                    </p>
+                  </div>
+
+                  <div class="p-3 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl space-y-1">
+                    <span class="text-[10px] font-bold text-purple-700 dark:text-purple-300 block uppercase">Efecto en la Interfaz del Director:</span>
+                    <p class="text-[11px] text-muted-foreground leading-snug">
+                      • <strong>Marcado:</strong> El Director puede crear exámenes manualmente y editar horarios/fechas dentro de los plazos reglamentarios.<br>
+                      • <strong>Desmarcado:</strong> Se ocultan el botón <em>"Añadir Examen al Rol"</em> y el botón de edición <em>(lápiz)</em> en la tabla de exámenes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Validación de Cuotas por Grupos Tipológicos (15/30/15) -->
               <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
                 <div class="flex items-center justify-between border-b border-border pb-3">
@@ -1111,6 +1152,7 @@ export class AdministracionEvaluacionesComponent {
   public ratioEstudiantesPorVariante: number = 5;
   public examenEnCurso: string = '1ER_PARCIAL';
   public validarCuotasGrupos: boolean = true;
+  public permitirDirectorEdicionRoles: boolean = true;
   public readonly opcionesExamenEnCurso = [
     { valor: '1ER_PARCIAL', etiqueta: 'Primer Parcial (1er Parcial)' },
     { valor: '2DO_PARCIAL', etiqueta: 'Segundo Parcial (2do Parcial)' },
@@ -1367,6 +1409,7 @@ export class AdministracionEvaluacionesComponent {
     this.ratioEstudiantesPorVariante = configuracion.ratioEstudiantesPorVariante;
     this.examenEnCurso = configuracion.examenEnCurso || '1ER_PARCIAL';
     this.validarCuotasGrupos = configuracion.validarCuotasGrupos ?? true;
+    this.permitirDirectorEdicionRoles = configuracion.permitirDirectorEdicionRoles ?? true;
     this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
     this.cuentaRegresivaInicioVirtualSegundos = configuracion.cuentaRegresivaInicioVirtualSegundos ?? 15;
     this.typstFormatoHoja = configuracion.formatoHoja;
@@ -1898,6 +1941,7 @@ export class AdministracionEvaluacionesComponent {
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
       examenEnCurso: this.examenEnCurso,
       validarCuotasGrupos: this.validarCuotasGrupos,
+      permitirDirectorEdicionRoles: this.permitirDirectorEdicionRoles,
       duracionExamenVirtualMinutos: this.normalizarDuracionVirtual(),
       cuentaRegresivaInicioVirtualSegundos: this.normalizarCuentaRegresivaVirtual(),
       formatoHoja: this.typstFormatoHoja,
@@ -1938,6 +1982,7 @@ export class AdministracionEvaluacionesComponent {
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
       examenEnCurso: this.examenEnCurso,
       validarCuotasGrupos: this.validarCuotasGrupos,
+      permitirDirectorEdicionRoles: this.permitirDirectorEdicionRoles,
       duracionExamenVirtualMinutos: this.duracionExamenVirtualMinutos,
       cuentaRegresivaInicioVirtualSegundos: this.cuentaRegresivaInicioVirtualSegundos,
       formatoHoja: this.typstFormatoHoja,

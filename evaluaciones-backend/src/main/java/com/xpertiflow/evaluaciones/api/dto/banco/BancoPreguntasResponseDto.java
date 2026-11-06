@@ -20,6 +20,9 @@ public class BancoPreguntasResponseDto {
     private Integer facilesCount;
     private Integer mediasCount;
     private Integer dificilesCount;
+    private Integer grupo1Count;
+    private Integer grupo2Count;
+    private Integer grupo3Count;
     private String nombreArchivoExcel;
     private String hashSha256Integridad;
     private String estado;

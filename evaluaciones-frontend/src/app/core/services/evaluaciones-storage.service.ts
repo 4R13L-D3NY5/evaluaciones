@@ -28,6 +28,10 @@ export interface PlanExamenResumen extends DificultadesBanco {
   clave: string;
   etiqueta: string;
   fecha: string;
+  horario?: string;
+  grupo1?: number;
+  grupo2?: number;
+  grupo3?: number;
   rolId?: string;
   modalidadCodigo?: 'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL';
   modalidad: string;

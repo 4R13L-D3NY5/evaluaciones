@@ -425,14 +425,21 @@ interface InstanciaImportacionItem {
                         </div>
                         <span class="text-[10px] text-muted-foreground font-medium">{{ row.dia }} (Sem {{ row.semana }})</span>
                       } @else {
-                        <button 
-                          (click)="abrirModalEditar(row)"
-                          [disabled]="!puedeEditar(row)"
-                          [title]="getTooltipEditar(row)"
-                          class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-                          <i class="pi pi-calendar-plus text-[9px]"></i>
-                          <span>Por Programar</span>
-                        </button>
+                        @if (puedeVerBotonEditar(row)) {
+                          <button 
+                            (click)="abrirModalEditar(row)"
+                            [disabled]="!puedeEditar(row)"
+                            [title]="getTooltipEditar(row)"
+                            class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="pi pi-calendar-plus text-[9px]"></i>
+                            <span>Por Programar</span>
+                          </button>
+                        } @else {
+                          <span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md opacity-60">
+                            <i class="pi pi-calendar text-[9px]"></i>
+                            <span>Por Programar</span>
+                          </span>
+                        }
                       }
                     </td>
 
@@ -450,21 +457,25 @@ interface InstanciaImportacionItem {
                     <!-- Acciones -->
                     <td class="p-3.5 text-right">
                       <div class="inline-flex items-center gap-1.5">
-                        <button 
-                          (click)="abrirModalEditar(row)"
-                          [disabled]="!puedeEditar(row)"
-                          [title]="getTooltipEditar(row)"
-                          class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
-                          <i class="pi pi-pencil text-xs"></i>
-                        </button>
-                        
-                        <button 
-                          (click)="eliminarExamen(row)"
-                          [disabled]="!puedeEliminar(row)"
-                          title="Eliminar del rol de examen"
-                          class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
-                          <i class="pi pi-trash text-xs"></i>
-                        </button>
+                        @if (puedeVerBotonEditar(row)) {
+                          <button 
+                            (click)="abrirModalEditar(row)"
+                            [disabled]="!puedeEditar(row)"
+                            [title]="getTooltipEditar(row)"
+                            class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                            <i class="pi pi-pencil text-xs"></i>
+                          </button>
+                          
+                          <button 
+                            (click)="eliminarExamen(row)"
+                            [disabled]="!puedeEliminar(row)"
+                            title="Eliminar del rol de examen"
+                            class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                            <i class="pi pi-trash text-xs"></i>
+                          </button>
+                        } @else {
+                          <span class="text-[10px] font-bold text-muted-foreground/60 italic px-1">Solo lectura</span>
+                        }
                       </div>
                     </td>
 
@@ -1162,10 +1173,22 @@ export class RolExamenesComponent implements OnInit {
     this.puedeListarTodasLasCarreras() && !this.carreraSeleccionada()
   );
   public readonly esDirectorCarrera = computed(() => this._auth.usuario()?.rol === 'DIRECTOR_CARRERA');
+  public readonly permitirDirectorEdicionRoles = computed(() => {
+    return this._configuracionService.configuracion().permitirDirectorEdicionRoles ?? true;
+  });
+
+  public puedeVerBotonEditar(row?: RolExamenItem): boolean {
+    if (this.esAdministrador() || this.esResponsable() || this.esVicerrector()) return true;
+    if (this.esDirectorCarrera()) {
+      return this.permitirDirectorEdicionRoles();
+    }
+    return false;
+  }
 
   public readonly puedeVerBotonAnadirExamen = computed(() => {
     if (this.esAdministrador() || this.esResponsable() || this.esVicerrector()) return true;
     if (!this.esDirectorCarrera()) return false;
+    if (!this.permitirDirectorEdicionRoles()) return false;
 
     // Si el director filtró por una fecha 'desde', esa fecha debe respetar el candado de 72h
     const fDesde = this.filtroFechaDesde();
@@ -2517,10 +2540,14 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public puedeEditar(item: RolExamenItem): boolean {
-    if (this.esAdministrador()) {
+    if (this.esAdministrador() || this.esResponsable()) {
       return true;
     }
-    if (this.esVicerrector() || this.esDirectorCarrera()) {
+    if (this.esDirectorCarrera()) {
+      if (!this.permitirDirectorEdicionRoles()) return false;
+      return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
+    }
+    if (this.esVicerrector()) {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
@@ -2528,10 +2555,14 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public puedeEliminar(item: RolExamenItem): boolean {
-    if (this.esAdministrador()) {
+    if (this.esAdministrador() || this.esResponsable()) {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
-    if (this.esVicerrector() || this.esDirectorCarrera()) {
+    if (this.esDirectorCarrera()) {
+      if (!this.permitirDirectorEdicionRoles()) return false;
+      return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
+    }
+    if (this.esVicerrector()) {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
@@ -2539,6 +2570,9 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public getTooltipEditar(item: RolExamenItem): string {
+    if (this.esDirectorCarrera() && !this.permitirDirectorEdicionRoles()) {
+      return 'La edición y registro de exámenes está deshabilitada para Directores de Carrera por política institucional.';
+    }
     if (!this.esAdministrador() && !this.esVicerrector() && !this.esDirectorCarrera() && this.estaBloqueadoPorCandado(item)) {
       return `Bloqueado por candado de seguridad: faltan menos de ${this.horasCandado72()}h para el examen.`;
     }

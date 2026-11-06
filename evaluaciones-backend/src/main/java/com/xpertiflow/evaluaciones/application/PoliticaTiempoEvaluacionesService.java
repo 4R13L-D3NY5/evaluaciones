@@ -175,11 +175,28 @@ public class PoliticaTiempoEvaluacionesService {
         return esVicerrector(authentication) || esDirectorCarrera(authentication);
     }
 
+    public void exigirCreacionPermitida(Authentication authentication) {
+        if (esDirectorCarrera(authentication)) {
+            Boolean permitirDirector = configuracion().getPermitirDirectorEdicionRoles();
+            if (permitirDirector != null && !permitirDirector) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "El Director de Carrera tiene deshabilitado el registro manual de exámenes por configuración institucional.");
+            }
+        }
+    }
+
     public void exigirEdicionPermitida(RolExamen rol, java.time.LocalDate nuevaFecha, Authentication authentication) {
         exigirEdicionPermitida(rol, nuevaFecha, null, authentication);
     }
 
     public void exigirEdicionPermitida(RolExamen rol, java.time.LocalDate nuevaFecha, String nuevoHorario, Authentication authentication) {
+        if (esDirectorCarrera(authentication)) {
+            Boolean permitirDirector = configuracion().getPermitirDirectorEdicionRoles();
+            if (permitirDirector != null && !permitirDirector) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "El Director de Carrera tiene deshabilitada la edición de roles de examen por configuración institucional.");
+            }
+        }
         if (esAdministrador(authentication) || esAutoridadAcademica(authentication)) {
             return;
         }
@@ -234,6 +251,13 @@ public class PoliticaTiempoEvaluacionesService {
     }
 
     public void exigirEliminacionPermitida(RolExamen rol, Authentication authentication) {
+        if (esDirectorCarrera(authentication)) {
+            Boolean permitirDirector = configuracion().getPermitirDirectorEdicionRoles();
+            if (permitirDirector != null && !permitirDirector) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "El Director de Carrera tiene deshabilitada la eliminación de roles de examen por configuración institucional.");
+            }
+        }
         if (esAdministrador(authentication) || esAutoridadAcademica(authentication)) {
             return;
         }

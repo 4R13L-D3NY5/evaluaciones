@@ -14,6 +14,9 @@ export interface BancoPreguntasResponse {
   facilesCount: number;
   mediasCount: number;
   dificilesCount: number;
+  grupo1Count?: number;
+  grupo2Count?: number;
+  grupo3Count?: number;
   nombreArchivoExcel: string;
   hashSha256Integridad: string;
   estado: string;
@@ -35,6 +38,9 @@ export interface CargaBancoResponse {
   facilesCount?: number;
   mediasCount?: number;
   dificilesCount?: number;
+  grupo1Count?: number;
+  grupo2Count?: number;
+  grupo3Count?: number;
   cuotasGruposAplicadas?: boolean;
   hashSha256?: string;
   erroresValidacion: string[];

@@ -31,7 +31,7 @@ public class ConfiguracionEvaluacionesController {
     private final ConfiguracionVerificacionService configuracionVerificacionService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE','PERSONAL_EVALUACIONES')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DOCENTE','PERSONAL_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
     @Operation(summary = "Consultar la configuración vigente de evaluaciones")
     public ResponseEntity<ConfiguracionEvaluacionesDto> obtener() {
         return ResponseEntity.ok(service.obtener());

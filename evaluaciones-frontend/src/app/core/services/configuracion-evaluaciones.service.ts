@@ -20,6 +20,7 @@ export interface ConfiguracionEvaluaciones {
   minutosMinimosDevolucion?: number;
   examenEnCurso?: string;
   validarCuotasGrupos?: boolean;
+  permitirDirectorEdicionRoles?: boolean;
   actualizadoEn?: string;
   actualizadoPor?: string;
 }
@@ -51,6 +52,16 @@ export class ConfiguracionEvaluacionesService {
     return '1ER_PARCIAL';
   }
 
+  private static obtenerPermitirDirectorCache(): boolean {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const val = localStorage.getItem('sea_config_permitir_director_edicion_roles');
+        if (val !== null) return val === 'true';
+      }
+    } catch (_) {}
+    return true;
+  }
+
   public readonly configuracion = signal<ConfiguracionEvaluaciones>({
     ratioEstudiantesPorVariante: 5,
     duracionExamenVirtualMinutos: 45,
@@ -72,7 +83,8 @@ export class ConfiguracionEvaluacionesService {
     horasCandado72: 72,
     minutosMinimosDevolucion: 45,
     examenEnCurso: ConfiguracionEvaluacionesService.obtenerExamenEnCursoCache(),
-    validarCuotasGrupos: true
+    validarCuotasGrupos: true,
+    permitirDirectorEdicionRoles: ConfiguracionEvaluacionesService.obtenerPermitirDirectorCache()
   });
 
   public resolverParcialDisplay(valor?: string): '1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia' {
@@ -109,6 +121,13 @@ export class ConfiguracionEvaluacionesService {
             }
           } catch (_) {}
         }
+        if (configuracion?.permitirDirectorEdicionRoles !== undefined) {
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('sea_config_permitir_director_edicion_roles', String(configuracion.permitirDirectorEdicionRoles));
+            }
+          } catch (_) {}
+        }
         this.configuracion.set(configuracion);
       }),
       catchError(error => {
@@ -125,6 +144,13 @@ export class ConfiguracionEvaluacionesService {
           try {
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem('sea_config_examen_en_curso', configuracion.examenEnCurso);
+            }
+          } catch (_) {}
+        }
+        if (configuracion?.permitirDirectorEdicionRoles !== undefined) {
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('sea_config_permitir_director_edicion_roles', String(configuracion.permitirDirectorEdicionRoles));
             }
           } catch (_) {}
         }

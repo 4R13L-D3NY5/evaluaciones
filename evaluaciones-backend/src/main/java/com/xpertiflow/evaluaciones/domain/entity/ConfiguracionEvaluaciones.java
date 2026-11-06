@@ -68,6 +68,9 @@ public class ConfiguracionEvaluaciones {
     @Column(name = "validar_cuotas_grupos", nullable = false)
     private Boolean validarCuotasGrupos = true;
 
+    @Column(name = "permitir_director_edicion_roles", nullable = false)
+    private Boolean permitirDirectorEdicionRoles = true;
+
     @Column(name = "actualizado_en", nullable = false)
     private LocalDateTime actualizadoEn;
 

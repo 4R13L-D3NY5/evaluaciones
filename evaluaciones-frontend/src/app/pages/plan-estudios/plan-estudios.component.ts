@@ -254,7 +254,7 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
       }
 
       <!-- Tarjetas de Estadísticas -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <!-- Total de registros por grupo -->
         <div class="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
@@ -286,6 +286,17 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
           </div>
           <div class="h-12 w-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
             <i class="pi pi-user-minus text-xl"></i>
+          </div>
+        </div>
+
+        <!-- Sin fecha programada (Parcial Seleccionado) -->
+        <div class="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
+          <div class="space-y-0.5">
+            <span class="text-3xl font-black text-rose-600 font-mono">{{ totalSinFechaProgramada() }}</span>
+            <p class="text-xs font-bold text-muted-foreground">Sin fecha en {{ parcialLabel() }}</p>
+          </div>
+          <div class="h-12 w-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+            <i class="pi pi-calendar-times text-xl"></i>
           </div>
         </div>
 
@@ -329,7 +340,7 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
                       <th class="p-3.5 text-center">Horas</th>
                       <th class="p-3.5">Docente / Grupo</th>
                       <th class="p-3.5 text-center">Tipo de examen</th>
-                      <th class="p-3.5 w-[285px] min-w-[255px] max-w-[305px]">Información del parcial</th>
+                      <th class="p-3.5 w-[300px] min-w-[270px] max-w-[340px]">Información del parcial</th>
                       <th class="p-3.5 text-center">Estado</th>
                       <th class="p-3.5 text-center">Asignación</th>
                       <th class="p-3.5 text-right">Tipo</th>
@@ -409,14 +420,17 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
                         </td>
 
                         <!-- Información compacta del parcial seleccionado -->
-                        <td class="p-2 w-[285px] min-w-[255px] max-w-[305px]">
+                        <td class="p-2 w-[300px] min-w-[270px] max-w-[340px]">
                           @let info = getInformacionParcial(asig);
                           @if (info?.tieneRol) {
                             <div [class]="'rounded-lg border px-2.5 py-1.5 ' + (info?.cumple || esEstadoPosteriorAValidado(info) ? 'border-emerald-200 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/50')">
                               <div class="flex items-center justify-between gap-2 min-w-0">
                                 <span class="text-[10px] font-black text-primary truncate">{{ info?.etiqueta }}</span>
-                                <span class="inline-flex items-center gap-1 text-[9px] font-black text-foreground whitespace-nowrap" [title]="'Fecha del examen: ' + (info?.fecha || 'sin fecha')">
+                                <span class="inline-flex items-center gap-1 text-[9px] font-black text-foreground whitespace-nowrap" [title]="'Fecha y horario: ' + (info?.fecha || 'sin fecha') + (info?.horario ? ' (' + info?.horario + ')' : '')">
                                   <i class="pi pi-calendar text-primary text-[9px]"></i>{{ info?.fecha || '—' }}
+                                  @if (info?.horario) {
+                                    <span class="text-muted-foreground font-semibold">· {{ info?.horario }}</span>
+                                  }
                                 </span>
                               </div>
                               <div class="mt-1 flex items-center justify-between gap-2 min-w-0">
@@ -434,6 +448,12 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
                                   <span class="text-amber-700 text-[9px] font-black whitespace-nowrap">Pendiente</span>
                                 }
                               </div>
+                              <div class="mt-1 pt-1 border-t border-border/40 flex items-center justify-between gap-1 text-[9px] font-mono text-muted-foreground min-w-0">
+                                <span class="text-[8px] font-bold uppercase tracking-wider text-muted-foreground/80">Grupos:</span>
+                                <span class="truncate" title="Grupo 1 (V/F y Premisas): {{ info?.grupo1 ?? 0 }} | Grupo 2 (Selección): {{ info?.grupo2 ?? 0 }} | Grupo 3 (Casos y Emparejamiento): {{ info?.grupo3 ?? 0 }}">
+                                  <span class="font-bold text-foreground">G1:</span> {{ info?.grupo1 ?? 0 }} · <span class="font-bold text-foreground">G2:</span> {{ info?.grupo2 ?? 0 }} · <span class="font-bold text-foreground">G3:</span> {{ info?.grupo3 ?? 0 }}
+                                </span>
+                              </div>
                             </div>
                           } @else if (info?.bancoCargado) {
                             <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
@@ -444,6 +464,12 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
                               <div class="mt-1 flex items-center justify-between gap-2 text-[9px] font-mono text-emerald-900">
                                 <span>{{ info?.facil }}F · {{ info?.medio }}M · {{ info?.dificil }}D · {{ info?.total }} total</span>
                                 <span class="font-sans font-black">Pendiente de programación</span>
+                              </div>
+                              <div class="mt-1 pt-1 border-t border-emerald-200/60 flex items-center justify-between gap-1 text-[9px] font-mono text-emerald-800 min-w-0">
+                                <span class="text-[8px] font-bold uppercase tracking-wider text-emerald-700">Grupos:</span>
+                                <span class="truncate" title="Grupo 1 (V/F y Premisas): {{ info?.grupo1 ?? 0 }} | Grupo 2 (Selección): {{ info?.grupo2 ?? 0 }} | Grupo 3 (Casos y Emparejamiento): {{ info?.grupo3 ?? 0 }}">
+                                  <span class="font-bold">G1:</span> {{ info?.grupo1 ?? 0 }} · <span class="font-bold">G2:</span> {{ info?.grupo2 ?? 0 }} · <span class="font-bold">G3:</span> {{ info?.grupo3 ?? 0 }}
+                                </span>
                               </div>
                             </div>
                           } @else {
@@ -620,6 +646,12 @@ export class PlanEstudiosComponent implements OnInit {
     (total, semestre) => total + semestre.asignaturas.filter(asignatura => asignatura.asignada).length, 0
   ));
   public totalSinAsignar = computed(() => this.totalPlan() - this.totalAsignadas());
+  public totalSinFechaProgramada = computed(() => this.semestresFiltrados().reduce(
+    (total, semestre) => total + semestre.asignaturas.filter(asig => {
+      const info = this.getInformacionParcial(asig);
+      return !info || !info.tieneRol || !info.fecha || info.fecha === '—' || info.fecha.trim() === '';
+    }).length, 0
+  ));
   public planesCurriculares = computed(() => [...new Set(
     this.planSemestres()
       .flatMap(semestre => semestre.asignaturas)
@@ -894,10 +926,20 @@ export class PlanEstudiosComponent implements OnInit {
       const fechas = [...new Set(rolesDelParcial
         .map(item => this.formatearFechaExamen(item.fechaDisplay, item.fecha))
         .filter(Boolean))];
+      const horarios = [...new Set(rolesDelParcial
+        .map(item => item.horario?.trim())
+        .filter(Boolean))];
+      const grupo1 = banco?.grupo1Count ?? (banco?.cuotasGruposAplicadas ? 15 : (banco ? 0 : undefined));
+      const grupo2 = banco?.grupo2Count ?? (banco?.cuotasGruposAplicadas ? 30 : (banco ? 0 : undefined));
+      const grupo3 = banco?.grupo3Count ?? (banco?.cuotasGruposAplicadas ? 15 : (banco ? 0 : undefined));
       examenes[parcial.clave] = {
         clave: parcial.clave,
         etiqueta: parcial.etiqueta,
         fecha: fechas.join(' · '),
+        horario: horarios.join(' · ') || rol?.horario || '',
+        grupo1,
+        grupo2,
+        grupo3,
         rolId: rol?.id,
         modalidadCodigo: rol?.modalidad,
         facil,
