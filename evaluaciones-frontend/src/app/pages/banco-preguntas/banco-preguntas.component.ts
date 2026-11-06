@@ -2495,9 +2495,19 @@ export interface DiaCalendario {
                 </div>
               </div>
 
-              <button (click)="cerrarModalEjemplos()" class="text-white/80 hover:text-white p-2 text-base cursor-pointer">
-                <i class="pi pi-times"></i>
-              </button>
+              <div class="flex items-center gap-2">
+                <a
+                  href="assets/manual_llenado_banco_preguntas_unitepc.pdf"
+                  target="_blank"
+                  download="manual_llenado_banco_preguntas_unitepc.pdf"
+                  class="flex items-center gap-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 text-xs font-bold transition-all shadow-xs">
+                  <i class="pi pi-file-pdf text-xs"></i>
+                  <span>Descargar Manual PDF</span>
+                </a>
+                <button (click)="cerrarModalEjemplos()" class="text-white/80 hover:text-white p-2 text-base cursor-pointer">
+                  <i class="pi pi-times"></i>
+                </button>
+              </div>
             </div>
 
             <!-- Filtro de Tipos de Pregunta -->

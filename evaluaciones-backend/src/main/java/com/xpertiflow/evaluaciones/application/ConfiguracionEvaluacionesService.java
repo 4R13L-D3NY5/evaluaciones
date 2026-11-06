@@ -74,6 +74,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setMinutosMinimosDevolucion(valorORango(request.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         configuracion.setExamenEnCurso(valorODefecto(request.getExamenEnCurso(), EXAMEN_EN_CURSO_POR_DEFECTO));
         configuracion.setValidarCuotasGrupos(request.getValidarCuotasGrupos() != null ? request.getValidarCuotasGrupos() : true);
+        configuracion.setPermitirDirectorEdicionRoles(request.getPermitirDirectorEdicionRoles() != null ? request.getPermitirDirectorEdicionRoles() : true);
         configuracion.setActualizadoEn(LocalDateTime.now());
         String actorReal = (actor != null && !actor.isBlank()) ? actor : usuarioValido(request.getActualizadoPor());
         configuracion.setActualizadoPor(actorReal);
@@ -85,8 +86,8 @@ public class ConfiguracionEvaluacionesService {
                     .collect(java.util.stream.Collectors.joining(", "))
                 : "estándar";
 
-        String resumen = String.format("Formato hoja: %s, Tipo letra: %s (%dpt), Examen activo: %s, Preguntas por parcial: [%s]",
-                guardado.getFormatoHoja(), guardado.getTipoLetra(), guardado.getTamanoLetraPt(), guardado.getExamenEnCurso(), parcialesInfo);
+        String resumen = String.format("Formato hoja: %s, Tipo letra: %s (%dpt), Examen activo: %s, Preguntas por parcial: [%s], Permitir director edición roles: %s",
+                guardado.getFormatoHoja(), guardado.getTipoLetra(), guardado.getTamanoLetraPt(), guardado.getExamenEnCurso(), parcialesInfo, guardado.getPermitirDirectorEdicionRoles());
 
         AuditoriaUsuario auditoria = new AuditoriaUsuario();
         auditoria.setAccion("CONFIGURACION_EXAMENES_ACTUALIZADA");
@@ -118,6 +119,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setMinutosMinimosDevolucion(MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO);
         configuracion.setExamenEnCurso(EXAMEN_EN_CURSO_POR_DEFECTO);
         configuracion.setValidarCuotasGrupos(true);
+        configuracion.setPermitirDirectorEdicionRoles(true);
         configuracion.setActualizadoPor("ADMIN_EVALUACIONES");
         configuracion.setActualizadoEn(LocalDateTime.now());
         return configuracion;
@@ -144,6 +146,7 @@ public class ConfiguracionEvaluacionesService {
         dto.setMinutosMinimosDevolucion(valorORango(configuracion.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         dto.setExamenEnCurso(valorODefecto(configuracion.getExamenEnCurso(), EXAMEN_EN_CURSO_POR_DEFECTO));
         dto.setValidarCuotasGrupos(configuracion.getValidarCuotasGrupos() != null ? configuracion.getValidarCuotasGrupos() : true);
+        dto.setPermitirDirectorEdicionRoles(configuracion.getPermitirDirectorEdicionRoles() != null ? configuracion.getPermitirDirectorEdicionRoles() : true);
         dto.setActualizadoEn(configuracion.getActualizadoEn());
         dto.setActualizadoPor(configuracion.getActualizadoPor());
         return dto;

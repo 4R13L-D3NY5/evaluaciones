@@ -162,6 +162,7 @@ public class RolExamenService {
     @Transactional
     public RolExamenResponseDto crear(RolExamenRequestDto dto, Authentication authentication) {
         if (authentication != null && !politicaTiempoEvaluacionesService.esAdministrador(authentication)) {
+            politicaTiempoEvaluacionesService.exigirCreacionPermitida(authentication);
             if (!accesoAcademicoService.puedeConsultarCarrera(dto.getSedeCodigo(), dto.getCarreraCodigo(), authentication)) {
                 throw new org.springframework.security.access.AccessDeniedException(
                         "No tienes permiso para programar exámenes en la sede o carrera seleccionada");
