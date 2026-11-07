@@ -53,4 +53,8 @@ export class EvaluacionDocenteService {
   public aplicarEvaluacion(payload: EvaluacionDocenteAplicarRequest): Observable<EvaluacionDocenteRegistro> {
     return this._http.post<EvaluacionDocenteRegistro>(`${this._baseUrl}/aplicar`, payload);
   }
+
+  public restablecerEvaluacion(id: string): Observable<void> {
+    return this._http.delete<void>(`${this._baseUrl}/registros/${id}`);
+  }
 }

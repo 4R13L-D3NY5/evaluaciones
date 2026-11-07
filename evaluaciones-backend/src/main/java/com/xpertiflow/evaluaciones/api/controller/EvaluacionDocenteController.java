@@ -89,4 +89,15 @@ public class EvaluacionDocenteController {
             Authentication authentication) {
         return ResponseEntity.ok(evaluacionDocenteService.aplicarEvaluacion(dto, authentication));
     }
+
+    @DeleteMapping("/registros/{id}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Restablecer evaluación docente (exclusivo Administrador) para permitir re-evaluación")
+    public ResponseEntity<Void> restablecerEvaluacion(
+            @PathVariable String id,
+            Authentication authentication) {
+        String usuario = authentication != null ? authentication.getName() : "ADMIN_EVALUACIONES";
+        evaluacionDocenteService.restablecerEvaluacion(id, usuario);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -180,6 +180,17 @@ public class EvaluacionDocenteService {
     }
 
     @Transactional
+    public void restablecerEvaluacion(String id, String usuario) {
+        EvaluacionDocenteRegistro reg = registroRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Registro de evaluación no encontrado con ID: " + id));
+
+        log.info("Restableciendo evaluación docente (ID={}, Docente={}, Materia={}) por {}",
+                reg.getId(), reg.getDocenteNombre(), reg.getMateriaNombre(), usuario);
+
+        registroRepository.delete(reg);
+    }
+
+    @Transactional
     public EvaluacionDocenteRegistroDto aplicarEvaluacion(EvaluacionDocenteAplicarRequestDto req, Authentication auth) {
         String usuario = auth != null ? auth.getName() : "SISTEMA";
 

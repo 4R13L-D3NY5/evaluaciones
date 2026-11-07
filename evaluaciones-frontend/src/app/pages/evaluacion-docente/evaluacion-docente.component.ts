@@ -57,8 +57,16 @@ export interface DocenteEvaluacionRow {
           </p>
         </div>
 
-        <!-- Selector de Pestañas (Admin / Director) -->
+        <!-- Selector de Pestañas y Reporte -->
         <div class="flex items-center gap-2">
+          <button 
+            type="button" 
+            (click)="descargarReporteCarrera()"
+            [disabled]="docentesTotales().length === 0"
+            class="bg-card hover:bg-muted text-primary border border-border font-bold text-xs py-2 px-3.5 rounded-xl flex items-center gap-2 shadow-2xs transition-colors cursor-pointer disabled:opacity-50">
+            <i class="pi pi-download"></i>
+            <span>Descargar Reporte</span>
+          </button>
           @if (esAdminOResponsable()) {
             <div class="bg-muted p-1 rounded-xl flex items-center gap-1 border border-border">
               <button 
@@ -429,13 +437,16 @@ export interface DocenteEvaluacionRow {
                                         <i class="pi pi-file text-primary"></i>
                                         <span>Ver Ficha</span>
                                       </button>
-                                      <button 
-                                        type="button" 
-                                        (click)="iniciarEvaluacionMateria(doc, mat)"
-                                        title="Re-evaluar"
-                                        class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs">
-                                        <i class="pi pi-refresh"></i>
-                                      </button>
+                                      @if (esAdminOResponsable()) {
+                                        <button 
+                                          type="button" 
+                                          (click)="confirmarRestablecer(doc, mat)"
+                                          title="Restablecer evaluación (Exclusivo Administrador)"
+                                          class="px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer">
+                                          <i class="pi pi-undo text-[10px]"></i>
+                                          <span>Restablecer</span>
+                                        </button>
+                                      }
                                     } @else {
                                       <button 
                                         type="button" 
@@ -532,6 +543,13 @@ export interface DocenteEvaluacionRow {
                     </td>
 
                     <td class="p-3.5 text-right">
+                      <button 
+                        type="button" 
+                        (click)="verCriteriosInstrumento(inst)"
+                        class="px-2.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-bold text-xs inline-flex items-center gap-1 transition-colors mr-2 cursor-pointer shadow-2xs">
+                        <i class="pi pi-eye text-primary"></i>
+                        <span>Ver Criterios</span>
+                      </button>
                       @if (inst.estado !== 'VIGENTE') {
                         <button 
                           type="button" 
@@ -841,6 +859,77 @@ export interface DocenteEvaluacionRow {
         </div>
       }
 
+      <!-- MODAL CONFIRMAR RESTABLECER (ADMIN) -->
+      @if (materiaParaRestablecer(); as item) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex items-center gap-3 text-red-600">
+              <div class="h-10 w-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-lg shrink-0">
+                <i class="pi pi-exclamation-triangle"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-black text-foreground">¿Restablecer evaluación docente?</h3>
+                <p class="text-[11px] text-muted-foreground">Acción exclusiva para Administrador</p>
+              </div>
+            </div>
+            <p class="text-xs text-muted-foreground leading-relaxed">
+              Se eliminará la calificación actual de <strong>{{ item.doc.docenteNombre }}</strong> en la asignatura <strong>{{ item.mat.materiaNombre }}</strong>.
+              La materia volverá a quedar en estado <strong>Pendiente</strong> para que el Director de Carrera pueda evaluarla nuevamente desde cero.
+            </p>
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <button 
+                type="button" 
+                (click)="materiaParaRestablecer.set(null)"
+                class="px-4 py-2 rounded-xl border border-border text-xs font-bold hover:bg-muted text-foreground">
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                (click)="ejecutarRestablecer()"
+                [disabled]="guardandoEvaluacion()"
+                class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer">
+                <i class="pi pi-undo"></i>
+                <span>Sí, Restablecer</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL VER CRITERIOS DEL TEST -->
+      @if (instrumentoParaVer(); as inst) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-border flex items-center justify-between bg-muted/40">
+              <div>
+                <h3 class="text-sm font-black text-foreground">{{ inst.titulo }}</h3>
+                <p class="text-[11px] text-muted-foreground">Código: {{ inst.codigo }} · {{ inst.totalCriterios }} indicadores oficiales</p>
+              </div>
+              <button (click)="instrumentoParaVer.set(null)" class="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 overflow-y-auto space-y-4">
+              @for (sec of inst.secciones; track sec.id) {
+                <div class="border border-border rounded-xl p-3.5 bg-muted/20 space-y-2">
+                  <h4 class="text-xs font-black text-primary uppercase flex items-center gap-2">
+                    <span class="h-5 w-5 rounded bg-primary/10 text-primary flex items-center justify-center text-[10px]">{{ sec.orden }}</span>
+                    <span>{{ sec.nombre }}</span>
+                  </h4>
+                  <ul class="text-xs space-y-1.5 pl-6 list-disc text-muted-foreground">
+                    @for (crit of sec.criterios; track crit.id) {
+                      <li>
+                        <strong class="text-foreground font-mono">{{ crit.numero }}:</strong> {{ crit.enunciado }}
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -891,6 +980,12 @@ export class EvaluacionDocenteComponent implements OnInit {
 
   // Modal Ver Ficha
   public fichaVisualizada = signal<EvaluacionDocenteRegistro | null>(null);
+
+  // Modal Confirmar Restablecer
+  public materiaParaRestablecer = signal<{ doc: DocenteEvaluacionRow, mat: MateriaDocenteItem } | null>(null);
+
+  // Modal Ver Criterios
+  public instrumentoParaVer = signal<EvaluacionInstrumento | null>(null);
 
   public esAdminOResponsable = computed(() => {
     const rol = this.auth.usuario()?.rol;
@@ -1280,6 +1375,71 @@ export class EvaluacionDocenteComponent implements OnInit {
         console.error(err);
       }
     });
+  }
+
+  public confirmarRestablecer(doc: DocenteEvaluacionRow, mat: MateriaDocenteItem): void {
+    this.materiaParaRestablecer.set({ doc, mat });
+  }
+
+  public ejecutarRestablecer(): void {
+    const item = this.materiaParaRestablecer();
+    if (!item || !item.mat.registroEvaluacion) return;
+
+    const regId = item.mat.registroEvaluacion.id;
+    this.guardandoEvaluacion.set(true);
+    this.evaluacionService.restablecerEvaluacion(regId).subscribe({
+      next: () => {
+        this.guardandoEvaluacion.set(false);
+        this.materiaParaRestablecer.set(null);
+        this.mostrarToast(`Evaluación de '${item.doc.docenteNombre}' en '${item.mat.materiaNombre}' restablecida correctamente.`);
+        this.recargarPlan();
+      },
+      error: err => {
+        this.guardandoEvaluacion.set(false);
+        this.mostrarToast('Error al restablecer la evaluación.');
+        console.error(err);
+      }
+    });
+  }
+
+  public verCriteriosInstrumento(inst: EvaluacionInstrumento): void {
+    if (inst.secciones && inst.secciones.length > 0) {
+      this.instrumentoParaVer.set(inst);
+    } else {
+      this.evaluacionService.obtenerInstrumentoPorId(inst.id).subscribe({
+        next: full => this.instrumentoParaVer.set(full),
+        error: () => this.mostrarToast('No fue posible cargar el detalle del instrumento.')
+      });
+    }
+  }
+
+  public descargarReporteCarrera(): void {
+    const docentes = this.docentesTotales();
+    if (docentes.length === 0) return;
+
+    const carreraNombre = this.filtroCarreraNombre();
+    const sede = this.filtroSedeCodigo;
+    const gestion = this.storage.gestionActiva();
+
+    let csv = '\uFEFF'; // UTF-8 BOM for Excel
+    csv += 'REPORTE OFICIAL DE EVALUACIÓN DOCENTE\n';
+    csv += `Gestión: ${gestion};Sede: ${sede};Carrera: ${carreraNombre}\n\n`;
+    csv += 'Docente;CI;Materias Asignadas;Materias Evaluadas;% Avance;Promedio (Pts / 100);Estado\n';
+
+    docentes.forEach(d => {
+      const estado = d.porcentajeEvaluacion === 100 ? 'COMPLETA' : d.porcentajeEvaluacion > 0 ? 'EN PROGRESO' : 'PENDIENTE';
+      const promedio = d.promedioPuntaje !== null ? `${d.promedioPuntaje}` : '—';
+      csv += `"${d.docenteNombre}";"${d.docenteCi || ''}";${d.totalMaterias};${d.evaluadasCount};${d.porcentajeEvaluacion}%;${promedio};${estado}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Reporte_Evaluacion_Docente_${carreraNombre.replace(/\s+/g, '_')}_${gestion}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.mostrarToast('Reporte generado y descargado exitosamente.');
   }
 
   public abrirFichaEvaluacion(reg: EvaluacionDocenteRegistro): void {
