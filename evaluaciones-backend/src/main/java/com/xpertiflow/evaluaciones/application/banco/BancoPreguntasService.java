@@ -214,6 +214,7 @@ public class BancoPreguntasService {
             }
 
             FormulaEvaluator evaluador = workbook.getCreationHelper().createFormulaEvaluator();
+            evaluador.setIgnoreMissingWorkbooks(true);
             Map<String, Integer> columnas = validarEncabezados(sheet, evaluador, errores);
             if (!errores.isEmpty()) return respuestaFallida(rol, errores);
 
@@ -1100,7 +1101,15 @@ public class BancoPreguntasService {
     private String getCellString(Cell cell, FormulaEvaluator evaluador) {
         if (cell == null) return "";
         DataFormatter formatter = new DataFormatter(Locale.ROOT);
-        return formatter.formatCellValue(cell, evaluador).trim();
+        try {
+            return formatter.formatCellValue(cell, evaluador).trim();
+        } catch (Exception e) {
+            try {
+                return formatter.formatCellValue(cell).trim();
+            } catch (Exception ex) {
+                return cell.toString().trim();
+            }
+        }
     }
 
     private String toJson(Object obj) {

@@ -283,6 +283,13 @@ export class SidebarComponent implements OnInit {
       roles: ['DIRECTOR_CARRERA', 'VICERRECTOR']
     },
     {
+      label: 'Evaluación Docente',
+      route: '/evaluacion-docente',
+      icon: 'pi pi-user-edit',
+      description: 'Evaluación de competencias docentes por Director de Carrera y Administrador',
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR']
+    },
+    {
       label: 'Banco de Preguntas',
       route: '/banco-preguntas',
       icon: 'pi pi-question-circle',
