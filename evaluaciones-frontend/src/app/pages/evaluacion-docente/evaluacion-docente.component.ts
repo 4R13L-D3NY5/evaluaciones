@@ -398,13 +398,24 @@ export interface DocenteEvaluacionRow {
 
                       <!-- Acciones -->
                       <td class="p-3.5 text-right align-top">
-                        <button 
-                          type="button" 
-                          (click)="alternarExpansionDocente(doc.docenteNombre)"
-                          class="px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                          <span>{{ docenteExpandido(doc.docenteNombre) ? 'Ocultar Materias' : 'Gestionar / Evaluar' }}</span>
-                          <i [class]="docenteExpandido(doc.docenteNombre) ? 'pi pi-chevron-up text-[10px]' : 'pi pi-chevron-down text-[10px]'"></i>
-                        </button>
+                        <div class="flex items-center justify-end gap-1.5">
+                          <button 
+                            type="button" 
+                            (click)="descargarReporteDocentePdf(doc)"
+                            [disabled]="doc.evaluadasCount === 0"
+                            title="Descargar reporte oficial consolidado de este docente en formato PDF con firma y desglose"
+                            class="px-2.5 py-1.5 rounded-xl border border-red-200/80 hover:border-red-300 bg-card hover:bg-red-50/50 text-red-700 text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="pi pi-file-pdf text-red-600 text-xs"></i>
+                            <span>Reporte PDF</span>
+                          </button>
+                          <button 
+                            type="button" 
+                            (click)="alternarExpansionDocente(doc.docenteNombre)"
+                            class="px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                            <span>{{ docenteExpandido(doc.docenteNombre) ? 'Ocultar Materias' : 'Gestionar / Evaluar' }}</span>
+                            <i [class]="docenteExpandido(doc.docenteNombre) ? 'pi pi-chevron-up text-[10px]' : 'pi pi-chevron-down text-[10px]'"></i>
+                          </button>
+                        </div>
                       </td>
 
                     </tr>
@@ -1857,9 +1868,15 @@ export class EvaluacionDocenteComponent implements OnInit {
       pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', margin, 16);
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(11);
+      pdf.setFontSize(10);
       pdf.setTextColor(dark.r, dark.g, dark.b);
-      pdf.text('REPORTE OFICIAL DE EVALUACIÓN DOCENTE POR CARRERA', margin, 22);
+      const titPrincipal = `REPORTE OFICIAL: ${instNom.toUpperCase()}`;
+      pdf.text(titPrincipal, margin, 21);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text('CONSOLIDADO GENERAL DE EVALUACIÓN DOCENTE POR CARRERA', margin, 25);
 
       // Metadatos derecha
       pdf.setFont('helvetica', 'normal');
@@ -1871,7 +1888,7 @@ export class EvaluacionDocenteComponent implements OnInit {
 
       pdf.setDrawColor(purple.r, purple.g, purple.b);
       pdf.setLineWidth(0.6);
-      pdf.line(margin, 25, pageWidth - margin, 25);
+      pdf.line(margin, 27, pageWidth - margin, 27);
     };
 
     const dibujarCabeceraTabla = (currY: number): number => {
@@ -1898,7 +1915,7 @@ export class EvaluacionDocenteComponent implements OnInit {
     dibujarCabecera(paginaActual);
 
     // Metadata Box (Página 1)
-    const metaY = 28;
+    const metaY = 30;
     const metaH = 14;
     pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
     pdf.setDrawColor(border.r, border.g, border.b);
@@ -2143,16 +2160,24 @@ export class EvaluacionDocenteComponent implements OnInit {
     pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', margin, 16);
 
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(11);
+    pdf.setFontSize(10);
     pdf.setTextColor(dark.r, dark.g, dark.b);
-    pdf.text('FICHA OFICIAL DE EVALUACIÓN DE LA COMPETENCIA DOCENTE', margin, 22);
+    const titFicha = reg.instrumentoTitulo 
+      ? `FICHA OFICIAL: ${reg.instrumentoTitulo.toUpperCase()}`
+      : 'FICHA OFICIAL DE EVALUACIÓN DE LA COMPETENCIA DOCENTE';
+    pdf.text(titFicha, margin, 21);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(purple.r, purple.g, purple.b);
+    pdf.text('REGISTRO INDIVIDUAL DE EVALUACIÓN DOCENTE EN AULA', margin, 25);
 
     pdf.setDrawColor(purple.r, purple.g, purple.b);
     pdf.setLineWidth(0.6);
-    pdf.line(margin, 25, pageWidth - margin, 25);
+    pdf.line(margin, 27, pageWidth - margin, 27);
 
     // Cuadro de Datos Generales
-    const metaY = 28;
+    const metaY = 30;
     const metaH = 34;
     pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
     pdf.setDrawColor(border.r, border.g, border.b);
@@ -2350,6 +2375,355 @@ export class EvaluacionDocenteComponent implements OnInit {
 
     pdf.save(`Ficha_Evaluacion_${reg.docenteNombre.replace(/\s+/g, '_')}_${reg.materiaCodigo}.pdf`);
     this.mostrarToast(`Ficha de evaluación de ${reg.docenteNombre} descargada en PDF.`);
+  }
+
+
+  public descargarReporteDocentePdf(doc: DocenteEvaluacionRow): void {
+    if (doc.evaluadasCount === 0) {
+      this.mostrarToast(`El docente ${doc.docenteNombre} aún no tiene materias evaluadas.`);
+      return;
+    }
+
+    const carreraNombre = this.filtroCarreraNombre();
+    const sedeNombre = this.sedes().find(s => s.code === this.filtroSedeCodigo)?.name || this.filtroSedeCodigo;
+    const gestion = this.storage.gestionActiva();
+    const instVigente = this.instrumentoVigente();
+    const instNom = instVigente?.titulo || 'Evaluación de la Competencia Docente';
+
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter', compress: true });
+    const pageWidth = 215.9;
+    const pageHeight = 279.4;
+    const margin = 14;
+    const contentWidth = pageWidth - margin * 2;
+
+    const purple = { r: 49, g: 39, b: 130 };
+    const dark = { r: 24, g: 30, b: 42 };
+    const muted = { r: 100, g: 110, b: 125 };
+    const lightBg = { r: 247, g: 249, b: 252 };
+    const border = { r: 215, g: 222, b: 232 };
+    const green = { r: 16, g: 130, b: 80 };
+    const blue = { r: 25, g: 90, b: 180 };
+    const amber = { r: 185, g: 100, b: 15 };
+
+    const fechaStr = new Date().toLocaleDateString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    let concepto = '—';
+    let colConc = muted;
+    if (doc.promedioPuntaje !== null) {
+      if (doc.promedioPuntaje >= 85) {
+        concepto = 'Sobresaliente';
+        colConc = green;
+      } else if (doc.promedioPuntaje >= 70) {
+        concepto = 'Bueno';
+        colConc = green;
+      } else if (doc.promedioPuntaje >= 51) {
+        concepto = 'Aprobado';
+        colConc = blue;
+      } else {
+        concepto = 'Insuficiente';
+        colConc = { r: 180, g: 30, b: 30 };
+      }
+    }
+
+    const dibujarCabecera = (pagActual: number) => {
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOPOLITANA - UNITEPC', margin, 12);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', margin, 16);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.text(`REPORTE OFICIAL: ${instNom.toUpperCase()}`, margin, 21);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text('INFORME DETALLADO DE DESEMPEÑO DOCENTE POR ASIGNATURAS', margin, 25);
+
+      // Metadatos derecha
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(`Emisión: ${fechaStr}`, pageWidth - margin, 12, { align: 'right' });
+      pdf.text(`Gestión: ${gestion}`, pageWidth - margin, 16, { align: 'right' });
+      pdf.text(`Página ${pagActual}`, pageWidth - margin, 20, { align: 'right' });
+
+      pdf.setDrawColor(purple.r, purple.g, purple.b);
+      pdf.setLineWidth(0.6);
+      pdf.line(margin, 27, pageWidth - margin, 27);
+    };
+
+    let paginaActual = 1;
+    dibujarCabecera(paginaActual);
+
+    // Cuadro de Datos Generales del Docente (Página 1)
+    const metaY = 30;
+    const metaH = 22;
+    pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+    pdf.setDrawColor(border.r, border.g, border.b);
+    pdf.setLineWidth(0.2);
+    pdf.roundedRect(margin, metaY, contentWidth, metaH, 1.5, 1.5, 'FD');
+
+    const col1X = margin + 3;
+    const col2X = margin + contentWidth / 2 + 3;
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text('DOCENTE EVALUADO:', col1X, metaY + 4.5);
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text(doc.docenteNombre, col1X, metaY + 9);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text('CÉDULA DE IDENTIDAD:', col2X, metaY + 4.5);
+    pdf.setFontSize(8);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text(doc.docenteCi || 'No registrada', col2X, metaY + 9);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text('CARRERA:', col1X, metaY + 14);
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text(`${carreraNombre} (${this.filtroCarreraCodigo})`, col1X, metaY + 18.5);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text('SEDE / GESTIÓN:', col2X, metaY + 14);
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text(`${sedeNombre} · Gestión ${gestion}`, col2X, metaY + 18.5);
+
+    // KPI Strip de Desempeño
+    const kpiY = metaY + metaH + 3;
+    const kpiH = 12;
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(margin, kpiY, contentWidth, kpiH, 1.5, 1.5, 'FD');
+
+    const kpiColW = contentWidth / 4;
+    const kpis = [
+      { label: 'MATERIAS ASIGNADAS', val: `${doc.totalMaterias}`, color: dark },
+      { label: 'MATERIAS EVALUADAS', val: `${doc.evaluadasCount} (${doc.porcentajeEvaluacion}%)`, color: doc.porcentajeEvaluacion === 100 ? green : blue },
+      { label: 'PROMEDIO FINAL', val: `${doc.promedioPuntaje ?? '—'} / 100 Pts`, color: purple },
+      { label: 'CONCEPTO CUALITATIVO', val: concepto, color: colConc }
+    ];
+
+    kpis.forEach((kpi, idx) => {
+      const x = margin + idx * kpiColW;
+      if (idx > 0) {
+        pdf.setDrawColor(border.r, border.g, border.b);
+        pdf.line(x, kpiY + 1.5, x, kpiY + kpiH - 1.5);
+      }
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(kpi.label, x + kpiColW / 2, kpiY + 4, { align: 'center' });
+
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(kpi.color.r, kpi.color.g, kpi.color.b);
+      pdf.text(kpi.val, x + kpiColW / 2, kpiY + 9, { align: 'center' });
+    });
+
+    // Tabla Detallada de Asignaturas
+    let currY = kpiY + kpiH + 5;
+
+    const dibujarCabeceraTablaMaterias = (y: number): number => {
+      pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.setLineWidth(0.2);
+      pdf.rect(margin, y, contentWidth, 7, 'FD');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+
+      pdf.text('#', margin + 3, y + 4.5);
+      pdf.text('CÓDIGO / ASIGNATURA', margin + 10, y + 4.5);
+      pdf.text('GRUPO', margin + 78, y + 4.5);
+      pdf.text('FECHA EVAL.', margin + 98, y + 4.5);
+      pdf.text('COMP. ACT / PROC / COG', margin + 122, y + 4.5);
+      pdf.text('PUNTAJE TOTAL', margin + 162, y + 4.5, { align: 'center' });
+      pdf.text('ESTADO', margin + 180, y + 4.5, { align: 'center' });
+
+      return y + 7;
+    };
+
+    currY = dibujarCabeceraTablaMaterias(currY);
+
+    doc.materias.forEach((mat, idx) => {
+      const rowH = 8;
+      if (currY + rowH > pageHeight - 50) {
+        pdf.addPage();
+        paginaActual++;
+        dibujarCabecera(paginaActual);
+        currY = 32;
+        currY = dibujarCabeceraTablaMaterias(currY);
+      }
+
+      if (idx % 2 === 1) {
+        pdf.setFillColor(252, 253, 254);
+        pdf.rect(margin, currY, contentWidth, rowH, 'F');
+      }
+
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.setLineWidth(0.15);
+      pdf.line(margin, currY + rowH, margin + contentWidth, currY + rowH);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(String(idx + 1).padStart(2, '0'), margin + 3, currY + 5);
+
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.setFontSize(7);
+      const matNom = pdf.splitTextToSize(`${mat.materiaCodigo} - ${mat.materiaNombre}`, 66)[0];
+      pdf.text(matNom, margin + 10, currY + 5);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.text(mat.grupoCodigo, margin + 78, currY + 5);
+
+      const reg = mat.registroEvaluacion;
+      if (reg) {
+        pdf.text(reg.fechaEvaluacion, margin + 98, currY + 5);
+        pdf.text(`${reg.puntajeActitudinal} / ${reg.puntajeProcedimental} / ${reg.puntajeCognitivo}`, margin + 122, currY + 5);
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(purple.r, purple.g, purple.b);
+        pdf.text(`${reg.puntajeTotal} / ${reg.puntajeMaximo} (${reg.porcentaje}%)`, margin + 162, currY + 5, { align: 'center' });
+
+        pdf.setTextColor(green.r, green.g, green.b);
+        pdf.text('EVALUADO', margin + 180, currY + 5, { align: 'center' });
+      } else {
+        pdf.setTextColor(muted.r, muted.g, muted.b);
+        pdf.text('—', margin + 98, currY + 5);
+        pdf.text('—', margin + 122, currY + 5);
+        pdf.text('—', margin + 162, currY + 5, { align: 'center' });
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(amber.r, amber.g, amber.b);
+        pdf.text('PENDIENTE', margin + 180, currY + 5, { align: 'center' });
+      }
+
+      currY += rowH;
+    });
+
+    // Sección de Observaciones y Retroalimentaciones por Asignatura (si existen)
+    const materiasConObs = doc.materias.filter(m => m.registroEvaluacion?.observaciones?.trim());
+    if (materiasConObs.length > 0) {
+      currY += 4;
+      if (currY + 25 > pageHeight - 45) {
+        pdf.addPage();
+        paginaActual++;
+        dibujarCabecera(paginaActual);
+        currY = 32;
+      }
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text('OBSERVACIONES Y RETROALIMENTACIÓN DE LA DIRECCIÓN DE CARRERA', margin, currY);
+      currY += 3;
+
+      materiasConObs.forEach(m => {
+        const obs = m.registroEvaluacion!.observaciones!.trim();
+        const obsLines = pdf.splitTextToSize(`• [${m.materiaCodigo} - ${m.materiaNombre} · Gr. ${m.grupoCodigo}]: ${obs}`, contentWidth - 4);
+        const boxH = Math.max(7, obsLines.length * 3.5 + 4);
+
+        if (currY + boxH > pageHeight - 45) {
+          pdf.addPage();
+          paginaActual++;
+          dibujarCabecera(paginaActual);
+          currY = 32;
+        }
+
+        pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+        pdf.setDrawColor(border.r, border.g, border.b);
+        pdf.rect(margin, currY, contentWidth, boxH, 'FD');
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(dark.r, dark.g, dark.b);
+        pdf.text(obsLines, margin + 2, currY + 4);
+
+        currY += boxH + 2;
+      });
+    }
+
+    // Firmas Oficiales al pie del documento
+    if (currY + 40 > pageHeight - 16) {
+      pdf.addPage();
+      paginaActual++;
+      dibujarCabecera(paginaActual);
+      currY = 38;
+    } else {
+      currY += 12;
+    }
+
+    const sigW = 75;
+    const sig1X = margin + 12;
+    const sig2X = pageWidth - margin - sigW - 12;
+
+    // Firma 1: Director(a) de Carrera / Evaluador
+    pdf.setDrawColor(dark.r, dark.g, dark.b);
+    pdf.setLineWidth(0.4);
+    pdf.line(sig1X, currY + 18, sig1X + sigW, currY + 18);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text('DIRECCIÓN DE CARRERA / EVALUADOR', sig1X + sigW / 2, currY + 22, { align: 'center' });
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    const usuarioActivo = this.auth.usuario();
+    const esDirector = usuarioActivo?.rol === 'DIRECTOR_CARRERA';
+    const nombreDirector = esDirector && usuarioActivo?.nombreCompleto ? usuarioActivo.nombreCompleto : 'DIRECCIÓN ACADÉMICA';
+    pdf.text(nombreDirector, sig1X + sigW / 2, currY + 26, { align: 'center' });
+    pdf.text(`Carrera: ${carreraNombre}`, sig1X + sigW / 2, currY + 30, { align: 'center' });
+
+    // Firma 2: Docente Evaluado
+    pdf.line(sig2X, currY + 18, sig2X + sigW, currY + 18);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text('DOCENTE EVALUADO', sig2X + sigW / 2, currY + 22, { align: 'center' });
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text(doc.docenteNombre, sig2X + sigW / 2, currY + 26, { align: 'center' });
+    pdf.text(`C.I.: ${doc.docenteCi || '—'} (Firma y Conformidad)`, sig2X + sigW / 2, currY + 30, { align: 'center' });
+
+    // Pie de página
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(6);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text(
+      'Este documento constituye el informe individual de evaluación de la competencia docente emitido por el Sistema de Evaluación Académica (SEA) de UNITEPC.',
+      pageWidth / 2,
+      pageHeight - 8,
+      { align: 'center' }
+    );
+
+    const safeDoc = doc.docenteNombre.replace(/\s+/g, '_').substring(0, 30);
+    pdf.save(`Reporte_Docente_${safeDoc}_${gestion}.pdf`);
+    this.mostrarToast(`Reporte detallado en PDF del docente ${doc.docenteNombre} generado y descargado.`);
   }
 
   public abrirFichaEvaluacion(reg: EvaluacionDocenteRegistro): void {
