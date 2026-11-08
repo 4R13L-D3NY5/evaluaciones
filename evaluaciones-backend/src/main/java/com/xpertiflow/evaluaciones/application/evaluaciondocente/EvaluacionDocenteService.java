@@ -70,10 +70,14 @@ public class EvaluacionDocenteService {
         EvaluacionInstrumento inst;
 
         if (esNuevo) {
+            String codigoNormalizado = dto.getCodigo().trim().toUpperCase();
+            if (instrumentoRepository.findByCodigo(codigoNormalizado).isPresent()) {
+                throw new IllegalArgumentException("Ya existe un instrumento registrado con el código: " + codigoNormalizado);
+            }
             String nuevoId = "inst-" + UUID.randomUUID().toString().substring(0, 8);
             inst = EvaluacionInstrumento.builder()
                     .id(nuevoId)
-                    .codigo(dto.getCodigo().trim().toUpperCase())
+                    .codigo(codigoNormalizado)
                     .titulo(dto.getTitulo().trim())
                     .descripcion(dto.getDescripcion())
                     .estado("BORRADOR")
@@ -98,7 +102,7 @@ public class EvaluacionDocenteService {
             inst.setEstado("VIGENTE");
         }
 
-        EvaluacionInstrumento guardado = instrumentoRepository.save(inst);
+        EvaluacionInstrumento guardado = instrumentoRepository.saveAndFlush(inst);
 
         if (dto.getSecciones() != null && !dto.getSecciones().isEmpty()) {
             int secOrden = 1;
@@ -136,7 +140,7 @@ public class EvaluacionDocenteService {
                 }
                 guardado.getSecciones().add(sec);
             }
-            guardado = instrumentoRepository.save(guardado);
+            guardado = instrumentoRepository.saveAndFlush(guardado);
         }
 
         return mapInstrumentoCompleto(guardado);

@@ -8,10 +8,26 @@ import { EvaluacionDocenteService } from '../../core/services/evaluacion-docente
 import { BranchOffice, Career, Course, GroupItem } from '../../core/models/unitepc-gateway.models';
 import {
   EvaluacionInstrumento,
+  EvaluacionSeccion,
+  EvaluacionCriterio,
   EvaluacionDocenteRegistro,
   EvaluacionDocenteAplicarRequest,
   EvaluacionDocenteRespuesta
 } from '../../core/models/evaluacion-docente.models';
+
+export interface FormCriterioItem {
+  id?: string;
+  numero: string;
+  enunciado: string;
+}
+
+export interface FormSeccionItem {
+  id?: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  criterios: FormCriterioItem[];
+}
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -546,9 +562,17 @@ export interface DocenteEvaluacionRow {
                       <button 
                         type="button" 
                         (click)="verCriteriosInstrumento(inst)"
-                        class="px-2.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-bold text-xs inline-flex items-center gap-1 transition-colors mr-2 cursor-pointer shadow-2xs">
+                        class="px-2.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-bold text-xs inline-flex items-center gap-1 transition-colors mr-1 cursor-pointer shadow-2xs">
                         <i class="pi pi-eye text-primary"></i>
                         <span>Ver Criterios</span>
+                      </button>
+                      <button 
+                        type="button" 
+                        (click)="duplicarInstrumento(inst)"
+                        title="Duplicar este instrumento para crear una nueva versión"
+                        class="px-2.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-bold text-xs inline-flex items-center gap-1 transition-colors mr-1 cursor-pointer shadow-2xs">
+                        <i class="pi pi-copy text-amber-600"></i>
+                        <span>Duplicar</span>
                       </button>
                       @if (inst.estado !== 'VIGENTE') {
                         <button 
@@ -930,6 +954,348 @@ export interface DocenteEvaluacionRow {
         </div>
       }
 
+      <!-- =================================================================== -->
+      <!-- MODAL CREAR / EDITAR INSTRUMENTO DE EVALUACIÓN (ADMIN)              -->
+      <!-- =================================================================== -->
+      @if (modalCrearInstrumento()) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-border bg-muted/40 flex items-start justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded bg-primary/10 text-primary font-black text-[10px] tracking-wide uppercase">
+                    Configuración de Instrumentos
+                  </span>
+                  <h3 class="text-base sm:text-lg font-black text-foreground">
+                    {{ modoEdicionInstrumento() ? 'Editar Instrumento de Evaluación' : 'Crear Nuevo Instrumento de Evaluación' }}
+                  </h3>
+                </div>
+                <p class="text-xs text-muted-foreground mt-1">
+                  Define los datos generales, dimensiones y preguntas/criterios del test. <strong>Solo 1 test puede estar vigente a la vez.</strong>
+                </p>
+              </div>
+
+              <button 
+                type="button" 
+                (click)="cerrarModalCrearInstrumento()"
+                class="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-5 overflow-y-auto space-y-6">
+              
+              <!-- Barra de Acciones Rápidas de Creación -->
+              <div class="bg-primary/5 border border-primary/20 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-primary">
+                  <i class="pi pi-bolt"></i>
+                  <span>Opciones rápidas para armar el test:</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button 
+                    type="button" 
+                    (click)="clonarDesdeVigente()"
+                    title="Carga las 3 dimensiones y 20 criterios oficiales como base para no tipear desde cero"
+                    class="px-2.5 py-1.5 rounded-lg border border-primary/30 bg-card hover:bg-primary/10 text-primary font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors">
+                    <i class="pi pi-copy"></i>
+                    <span>Clonar del Test Vigente</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    (click)="mostrarPanelImportar.set(!mostrarPanelImportar())"
+                    class="px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors">
+                    <i class="pi pi-file-import"></i>
+                    <span>{{ mostrarPanelImportar() ? 'Ocultar Importador' : 'Importar Preguntas' }}</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    (click)="limpiarFormularioInstrumento()"
+                    class="px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors">
+                    <i class="pi pi-refresh"></i>
+                    <span>Limpiar</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Panel Desplegable de Importación por Texto / Archivo -->
+              @if (mostrarPanelImportar()) {
+                <div class="border border-border rounded-xl p-4 bg-muted/30 space-y-3 animate-in fade-in">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h4 class="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
+                        <i class="pi pi-file-edit text-primary"></i>
+                        <span>Importador rápido de preguntas / criterios</span>
+                      </h4>
+                      <p class="text-[11px] text-muted-foreground mt-0.5">
+                        Pega texto con dimensiones entre corchetes <code class="bg-muted px-1 rounded">[Competencia ...]</code> y criterios numerados <code class="bg-muted px-1 rounded">1. ...</code>, o sube un archivo <code class="bg-muted px-1 rounded">.txt</code>.
+                      </p>
+                    </div>
+                    <label class="px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs">
+                      <i class="pi pi-upload text-primary"></i>
+                      <span>Subir archivo .txt</span>
+                      <input type="file" accept=".txt,.json,.csv" (change)="onArchivoImportarSeleccionado($event)" class="hidden" />
+                    </label>
+                  </div>
+
+                  <textarea 
+                    [(ngModel)]="textoImportarPreguntas"
+                    rows="6"
+                    placeholder="Ejemplo:&#10;[Competencia Actitudinal]&#10;1. Cumple puntualmente con el inicio de sus clases.&#10;2. Demuestra empatía y respeto con los estudiantes.&#10;&#10;[Competencia Procedimental]&#10;3. Aplica estrategias dinámicas de enseñanza."
+                    class="w-full text-xs font-mono p-3 rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-primary focus:outline-hidden"></textarea>
+
+                  <div class="flex items-center justify-end gap-2">
+                    <button 
+                      type="button" 
+                      (click)="mostrarPanelImportar.set(false)"
+                      class="px-3 py-1.5 rounded-lg border border-border text-xs font-bold hover:bg-muted text-foreground">
+                      Cancelar
+                    </button>
+                    <button 
+                      type="button" 
+                      (click)="parsearTextoImportado()"
+                      class="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer">
+                      <i class="pi pi-check"></i>
+                      <span>Procesar y Cargar Preguntas</span>
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <!-- Datos Generales del Test -->
+              <div class="space-y-4">
+                <h4 class="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
+                  <i class="pi pi-info-circle text-primary"></i>
+                  <span>1. Datos Generales del Instrumento</span>
+                </h4>
+
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+                  
+                  <div class="sm:col-span-8 space-y-1">
+                    <label class="font-bold text-muted-foreground uppercase text-[10px]">Título del Instrumento *</label>
+                    <input 
+                      type="text" 
+                      [(ngModel)]="formInstTitulo"
+                      placeholder="Ej: EVALUACIÓN DE LA COMPETENCIA DOCENTE II-2026"
+                      class="w-full p-2.5 rounded-lg border border-border bg-card text-foreground font-bold focus:ring-2 focus:ring-primary focus:outline-hidden" />
+                  </div>
+
+                  <div class="sm:col-span-4 space-y-1">
+                    <label class="font-bold text-muted-foreground uppercase text-[10px]">Código Identificador *</label>
+                    <input 
+                      type="text" 
+                      [(ngModel)]="formInstCodigo"
+                      (input)="formInstCodigo = formInstCodigo.toUpperCase()"
+                      placeholder="Ej: EVAL-DIR-2026-V2"
+                      class="w-full p-2.5 rounded-lg border border-border bg-card text-foreground font-mono font-bold uppercase focus:ring-2 focus:ring-primary focus:outline-hidden" />
+                  </div>
+
+                  <div class="sm:col-span-8 space-y-1">
+                    <label class="font-bold text-muted-foreground uppercase text-[10px]">Descripción Institucional</label>
+                    <input 
+                      type="text" 
+                      [(ngModel)]="formInstDescripcion"
+                      placeholder="Ej: Instrumento oficial aplicado por Directores de Carrera a la planta docente"
+                      class="w-full p-2.5 rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-primary focus:outline-hidden" />
+                  </div>
+
+                  <div class="sm:col-span-4 space-y-1">
+                    <label class="font-bold text-muted-foreground uppercase text-[10px]">Escala de Valoración</label>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs text-muted-foreground font-bold">Mín:</span>
+                      <input 
+                        type="number" 
+                        [(ngModel)]="formInstEscalaMin" 
+                        min="1" 
+                        max="5"
+                        class="w-16 p-2 rounded-lg border border-border bg-card text-center font-bold font-mono" />
+                      <span class="text-xs text-muted-foreground font-bold">Máx:</span>
+                      <input 
+                        type="number" 
+                        [(ngModel)]="formInstEscalaMax" 
+                        min="2" 
+                        max="10"
+                        class="w-16 p-2 rounded-lg border border-border bg-card text-center font-bold font-mono" />
+                    </div>
+                  </div>
+
+                  <div class="sm:col-span-12 pt-2">
+                    <label class="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        [(ngModel)]="formInstPonerEnVigencia"
+                        class="h-4 w-4 rounded text-primary focus:ring-primary" />
+                      <div>
+                        <strong class="text-xs text-foreground block">Poner este instrumento en VIGENCIA inmediatamente</strong>
+                        <span class="text-[11px] text-muted-foreground">Si se activa, pasará a ser el test oficial que aplican los Directores de Carrera en todo el sistema.</span>
+                      </div>
+                    </label>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Dimensiones y Criterios -->
+              <div class="space-y-4 pt-2">
+                <div class="flex items-center justify-between border-b border-border pb-2">
+                  <div class="flex items-center gap-2">
+                    <h4 class="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
+                      <i class="pi pi-list text-primary"></i>
+                      <span>2. Dimensiones y Criterios / Preguntas</span>
+                    </h4>
+                    <span class="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono font-bold text-[10px]">
+                      {{ totalCriteriosFormulario() }} preguntas en {{ formInstSecciones.length }} dimensiones
+                    </span>
+                  </div>
+
+                  <button 
+                    type="button" 
+                    (click)="agregarSeccion()"
+                    class="px-2.5 py-1 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
+                    <i class="pi pi-plus text-[10px]"></i>
+                    <span>Agregar Dimensión</span>
+                  </button>
+                </div>
+
+                @if (formInstSecciones.length === 0) {
+                  <div class="p-8 text-center border-2 border-dashed border-border rounded-xl text-muted-foreground text-xs space-y-2">
+                    <i class="pi pi-inbox text-3xl text-muted-foreground/50"></i>
+                    <p>No hay dimensiones definidas aún. Agrega una dimensión o usa las opciones rápidas arriba.</p>
+                    <button 
+                      type="button" 
+                      (click)="agregarSeccion()"
+                      class="px-3 py-1.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs">
+                      + Crear Primera Dimensión
+                    </button>
+                  </div>
+                } @else {
+                  <div class="space-y-4">
+                    @for (sec of formInstSecciones; track $index; let sIdx = $index) {
+                      <div class="border border-border rounded-xl bg-card shadow-2xs overflow-hidden">
+                        
+                        <!-- Encabezado de la Dimensión -->
+                        <div class="p-3 bg-muted/40 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div class="flex items-center gap-2 flex-1">
+                            <span class="h-6 w-6 rounded bg-primary text-primary-foreground font-black text-xs flex items-center justify-center shrink-0">
+                              {{ sIdx + 1 }}
+                            </span>
+                            <input 
+                              type="text" 
+                              [(ngModel)]="sec.nombre" 
+                              placeholder="Nombre de la dimensión (ej: Competencia Actitudinal)" 
+                              class="font-bold text-xs p-1.5 rounded border border-border bg-card text-foreground flex-1 focus:ring-1 focus:ring-primary" />
+                            <input 
+                              type="text" 
+                              [(ngModel)]="sec.codigo" 
+                              placeholder="Código (ej: SEC-1)" 
+                              class="font-mono text-[11px] p-1.5 rounded border border-border bg-card text-muted-foreground w-24 uppercase" />
+                          </div>
+
+                          <div class="flex items-center gap-2 self-end sm:self-center">
+                            <span class="text-[10px] text-muted-foreground font-bold">
+                              {{ sec.criterios.length }} criterios
+                            </span>
+                            <button 
+                              type="button" 
+                              (click)="agregarCriterio(sIdx)"
+                              class="px-2 py-1 rounded bg-card hover:bg-muted border border-border text-foreground font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer">
+                              <i class="pi pi-plus text-[9px] text-primary"></i>
+                              <span>Pregunta</span>
+                            </button>
+                            @if (formInstSecciones.length > 1) {
+                              <button 
+                                type="button" 
+                                (click)="eliminarSeccion(sIdx)"
+                                title="Eliminar esta dimensión completa"
+                                class="h-7 w-7 rounded border border-red-200 text-red-600 hover:bg-red-50 flex items-center justify-center text-xs cursor-pointer">
+                                <i class="pi pi-trash text-[10px]"></i>
+                              </button>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- Lista de Criterios de la Dimensión -->
+                        <div class="p-3 space-y-2">
+                          @for (crit of sec.criterios; track $index; let cIdx = $index) {
+                            <div class="flex items-start gap-2 group">
+                              <input 
+                                type="text" 
+                                [(ngModel)]="crit.numero" 
+                                placeholder="#" 
+                                class="w-10 p-1.5 rounded border border-border bg-muted/20 font-mono font-bold text-xs text-center shrink-0" />
+                              <textarea 
+                                [(ngModel)]="crit.enunciado" 
+                                rows="2"
+                                placeholder="Enunciado de la pregunta o indicador de desempeño docente..." 
+                                class="flex-1 p-2 rounded border border-border bg-card text-xs text-foreground focus:ring-1 focus:ring-primary focus:outline-hidden resize-y"></textarea>
+                              <button 
+                                type="button" 
+                                (click)="eliminarCriterio(sIdx, cIdx)"
+                                title="Eliminar este criterio"
+                                class="h-8 w-8 rounded border border-border text-muted-foreground hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center shrink-0 cursor-pointer transition-colors">
+                                <i class="pi pi-times text-xs"></i>
+                              </button>
+                            </div>
+                          }
+
+                          <div class="pt-1">
+                            <button 
+                              type="button" 
+                              (click)="agregarCriterio(sIdx)"
+                              class="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer">
+                              <i class="pi pi-plus text-[10px]"></i>
+                              <span>Agregar otro criterio a esta dimensión</span>
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+                    }
+                  </div>
+                }
+
+              </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-border bg-muted/30 flex items-center justify-between gap-3">
+              <div class="text-xs text-muted-foreground">
+                <span class="font-bold text-foreground">{{ formInstSecciones.length }}</span> dimensiones · 
+                <span class="font-bold text-foreground">{{ totalCriteriosFormulario() }}</span> preguntas en total
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  (click)="cerrarModalCrearInstrumento()"
+                  class="px-4 py-2 rounded-xl border border-border text-xs font-bold hover:bg-muted text-foreground">
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  (click)="guardarNuevoInstrumento()"
+                  [disabled]="guardandoInstrumento()"
+                  class="px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-black shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50">
+                  @if (guardandoInstrumento()) {
+                    <i class="pi pi-spin pi-spinner"></i>
+                    <span>Guardando Instrumento...</span>
+                  } @else {
+                    <i class="pi pi-check"></i>
+                    <span>Guardar Instrumento</span>
+                  }
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -986,6 +1352,26 @@ export class EvaluacionDocenteComponent implements OnInit {
 
   // Modal Ver Criterios
   public instrumentoParaVer = signal<EvaluacionInstrumento | null>(null);
+
+  // Modal Crear / Editar Instrumento
+  public modalCrearInstrumento = signal<boolean>(false);
+  public modoEdicionInstrumento = signal<boolean>(false);
+  public guardandoInstrumento = signal<boolean>(false);
+  public mostrarPanelImportar = signal<boolean>(false);
+  public textoImportarPreguntas = '';
+
+  public formInstId: string | null = null;
+  public formInstCodigo = '';
+  public formInstTitulo = '';
+  public formInstDescripcion = '';
+  public formInstEscalaMin = 1;
+  public formInstEscalaMax = 5;
+  public formInstPonerEnVigencia = false;
+  public formInstSecciones: FormSeccionItem[] = [];
+
+  public totalCriteriosFormulario = computed(() => {
+    return this.formInstSecciones.reduce((acc, s) => acc + (s.criterios ? s.criterios.length : 0), 0);
+  });
 
   public esAdminOResponsable = computed(() => {
     const rol = this.auth.usuario()?.rol;
@@ -1451,7 +1837,326 @@ export class EvaluacionDocenteComponent implements OnInit {
   }
 
   public crearNuevoInstrumento(): void {
-    this.mostrarToast('Función disponible en la siguiente versión de plantillas dinámicas.');
+    this.limpiarFormularioInstrumento();
+    this.modalCrearInstrumento.set(true);
+  }
+
+  public cerrarModalCrearInstrumento(): void {
+    this.modalCrearInstrumento.set(false);
+    this.mostrarPanelImportar.set(false);
+  }
+
+  public limpiarFormularioInstrumento(): void {
+    const anio = new Date().getFullYear();
+    const versionSiguiente = (this.instrumentos().length || 1) + 1;
+    this.formInstId = null;
+    this.modoEdicionInstrumento.set(false);
+    this.formInstCodigo = `EVAL-DIR-${anio}-V${versionSiguiente}`;
+    this.formInstTitulo = '';
+    this.formInstDescripcion = 'Instrumento institucional de evaluación docente aplicado por Directores de Carrera y Administradores.';
+    this.formInstEscalaMin = 1;
+    this.formInstEscalaMax = 5;
+    this.formInstPonerEnVigencia = false;
+    this.formInstSecciones = [
+      {
+        codigo: 'SEC-1',
+        nombre: 'Competencia Actitudinal',
+        criterios: [
+          { numero: '1', enunciado: '' }
+        ]
+      }
+    ];
+    this.textoImportarPreguntas = '';
+    this.mostrarPanelImportar.set(false);
+  }
+
+  public clonarDesdeVigente(): void {
+    const vigente = this.instrumentoVigente();
+    if (!vigente) {
+      this.mostrarToast('No hay un instrumento vigente disponible para clonar.');
+      return;
+    }
+
+    this.evaluacionService.obtenerInstrumentoPorId(vigente.id).subscribe({
+      next: full => {
+        this.formInstId = null;
+        this.modoEdicionInstrumento.set(false);
+        this.formInstTitulo = `${full.titulo} (Nueva Versión)`;
+        this.formInstCodigo = `${full.codigo}-V${(this.instrumentos().length || 1) + 1}`;
+        this.formInstDescripcion = full.descripcion || '';
+        this.formInstEscalaMin = full.escalaMin || 1;
+        this.formInstEscalaMax = full.escalaMax || 5;
+        this.formInstPonerEnVigencia = false;
+
+        if (full.secciones && full.secciones.length > 0) {
+          this.formInstSecciones = full.secciones.map((sec, sIdx) => ({
+            codigo: sec.codigo || `SEC-${sIdx + 1}`,
+            nombre: sec.nombre,
+            descripcion: sec.descripcion,
+            criterios: (sec.criterios || []).map((c, cIdx) => ({
+              numero: c.numero || `${cIdx + 1}`,
+              enunciado: c.enunciado
+            }))
+          }));
+        }
+        const total = this.totalCriteriosFormulario();
+        this.mostrarToast(`Clonado desde ${full.codigo}: ${this.formInstSecciones.length} dimensiones y ${total} criterios precargados.`);
+      },
+      error: () => this.mostrarToast('Error al cargar criterios del test vigente.')
+    });
+  }
+
+  public duplicarInstrumento(inst: EvaluacionInstrumento): void {
+    this.evaluacionService.obtenerInstrumentoPorId(inst.id).subscribe({
+      next: full => {
+        this.formInstId = null;
+        this.modoEdicionInstrumento.set(false);
+        this.formInstTitulo = `${full.titulo} (Copia)`;
+        this.formInstCodigo = `${full.codigo}-V${(this.instrumentos().length || 1) + 1}`;
+        this.formInstDescripcion = full.descripcion || '';
+        this.formInstEscalaMin = full.escalaMin || 1;
+        this.formInstEscalaMax = full.escalaMax || 5;
+        this.formInstPonerEnVigencia = false;
+
+        if (full.secciones && full.secciones.length > 0) {
+          this.formInstSecciones = full.secciones.map((sec, sIdx) => ({
+            codigo: sec.codigo || `SEC-${sIdx + 1}`,
+            nombre: sec.nombre,
+            descripcion: sec.descripcion,
+            criterios: (sec.criterios || []).map((c, cIdx) => ({
+              numero: c.numero || `${cIdx + 1}`,
+              enunciado: c.enunciado
+            }))
+          }));
+        }
+        this.modalCrearInstrumento.set(true);
+        this.mostrarToast(`Instrumento duplicado en el formulario. Modifícalo y guárdalo.`);
+      },
+      error: () => this.mostrarToast('Error al obtener datos del instrumento para duplicar.')
+    });
+  }
+
+  public agregarSeccion(): void {
+    const secNum = this.formInstSecciones.length + 1;
+    const nuevoCriterioNum = (this.totalCriteriosFormulario() + 1).toString();
+    this.formInstSecciones.push({
+      codigo: `SEC-${secNum}`,
+      nombre: `Nueva Dimensión ${secNum}`,
+      criterios: [
+        { numero: nuevoCriterioNum, enunciado: '' }
+      ]
+    });
+  }
+
+  public eliminarSeccion(index: number): void {
+    if (this.formInstSecciones.length <= 1) {
+      this.mostrarToast('Debe existir al menos una dimensión o sección.');
+      return;
+    }
+    this.formInstSecciones.splice(index, 1);
+    this.renumerarCriterios();
+  }
+
+  public agregarCriterio(secIndex: number): void {
+    const sec = this.formInstSecciones[secIndex];
+    if (!sec) return;
+    const nuevoNum = (this.totalCriteriosFormulario() + 1).toString();
+    sec.criterios.push({
+      numero: nuevoNum,
+      enunciado: ''
+    });
+  }
+
+  public eliminarCriterio(secIndex: number, critIndex: number): void {
+    const sec = this.formInstSecciones[secIndex];
+    if (!sec) return;
+    if (sec.criterios.length <= 1 && this.formInstSecciones.length <= 1) {
+      this.mostrarToast('Debe existir al menos un criterio o pregunta en el test.');
+      return;
+    }
+    sec.criterios.splice(critIndex, 1);
+    this.renumerarCriterios();
+  }
+
+  public renumerarCriterios(): void {
+    let globalOrden = 1;
+    for (const sec of this.formInstSecciones) {
+      for (const crit of sec.criterios) {
+        crit.numero = (globalOrden++).toString();
+      }
+    }
+  }
+
+  public parsearTextoImportado(): void {
+    const texto = this.textoImportarPreguntas.trim();
+    if (!texto) {
+      this.mostrarToast('Por favor escribe o pega el texto con las preguntas antes de procesar.');
+      return;
+    }
+
+    const lineas = texto.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    const secciones: FormSeccionItem[] = [];
+    let seccionActual: FormSeccionItem | null = null;
+    let contadorCriterios = 0;
+
+    for (const linea of lineas) {
+      const matchCorchetes = linea.match(/^\[(.*?)\]$/);
+      const matchDimension = linea.match(/^(?:DIMENSI[OÓ]N|COMPETENCIA|SECCI[OÓ]N|ÁREA|DIMENSION)\s*(?:\d+)?\s*[:\-–—]?\s*(.*)$/i);
+
+      if (matchCorchetes || matchDimension) {
+        const nombreSec = matchCorchetes ? matchCorchetes[1].trim() : (matchDimension![1].trim() || linea);
+        seccionActual = {
+          codigo: `SEC-${secciones.length + 1}`,
+          nombre: nombreSec,
+          criterios: []
+        };
+        secciones.push(seccionActual);
+        continue;
+      }
+
+      const matchNumero = linea.match(/^(\d+)[\.\)\-\s]\s*(.*)$/);
+      const matchVineta = linea.match(/^[\*\-•]\s*(.*)$/);
+
+      let numero = '';
+      let enunciado = '';
+
+      if (matchNumero) {
+        numero = matchNumero[1];
+        enunciado = matchNumero[2].trim();
+      } else if (matchVineta) {
+        contadorCriterios++;
+        numero = contadorCriterios.toString();
+        enunciado = matchVineta[1].trim();
+      } else {
+        if (seccionActual && linea.length > 5) {
+          contadorCriterios++;
+          numero = contadorCriterios.toString();
+          enunciado = linea;
+        } else {
+          seccionActual = {
+            codigo: `SEC-${secciones.length + 1}`,
+            nombre: linea,
+            criterios: []
+          };
+          secciones.push(seccionActual);
+          continue;
+        }
+      }
+
+      if (enunciado) {
+        if (!seccionActual) {
+          seccionActual = {
+            codigo: 'SEC-1',
+            nombre: 'Competencia General',
+            criterios: []
+          };
+          secciones.push(seccionActual);
+        }
+        contadorCriterios++;
+        if (!numero) numero = contadorCriterios.toString();
+        seccionActual.criterios.push({ numero, enunciado });
+      }
+    }
+
+    if (secciones.length === 0 || secciones.every(s => s.criterios.length === 0)) {
+      this.mostrarToast('No se pudieron extraer criterios válidos. Revisa el formato del texto.');
+      return;
+    }
+
+    this.formInstSecciones = secciones;
+    this.renumerarCriterios();
+    this.mostrarPanelImportar.set(false);
+    const totalCrit = this.totalCriteriosFormulario();
+    this.mostrarToast(`Se procesaron exitosamente ${secciones.length} dimensiones y ${totalCrit} criterios.`);
+  }
+
+  public onArchivoImportarSeleccionado(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (content) {
+        this.textoImportarPreguntas = content;
+        this.parsearTextoImportado();
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  public guardarNuevoInstrumento(): void {
+    if (!this.formInstTitulo.trim()) {
+      this.mostrarToast('El título del instrumento es obligatorio.');
+      return;
+    }
+    if (!this.formInstCodigo.trim()) {
+      this.mostrarToast('El código identificador es obligatorio.');
+      return;
+    }
+    if (this.formInstSecciones.length === 0) {
+      this.mostrarToast('Debes incluir al menos una dimensión o sección.');
+      return;
+    }
+
+    for (const sec of this.formInstSecciones) {
+      if (!sec.nombre.trim()) {
+        this.mostrarToast('Todas las dimensiones deben tener un nombre.');
+        return;
+      }
+      if (!sec.criterios || sec.criterios.length === 0) {
+        this.mostrarToast(`La dimensión '${sec.nombre}' no tiene ningún criterio.`);
+        return;
+      }
+      for (const crit of sec.criterios) {
+        if (!crit.enunciado.trim()) {
+          this.mostrarToast(`Existe un criterio sin enunciado en '${sec.nombre}'.`);
+          return;
+        }
+      }
+    }
+
+    const payload: any = {
+      id: this.formInstId,
+      codigo: this.formInstCodigo.trim().toUpperCase(),
+      titulo: this.formInstTitulo.trim(),
+      descripcion: this.formInstDescripcion.trim(),
+      estado: this.formInstPonerEnVigencia ? 'VIGENTE' : 'BORRADOR',
+      escalaMin: Number(this.formInstEscalaMin) || 1,
+      escalaMax: Number(this.formInstEscalaMax) || 5,
+      secciones: this.formInstSecciones.map((sec, sIdx) => ({
+        id: sec.id,
+        codigo: (sec.codigo || `SEC-${sIdx + 1}`).trim().toUpperCase(),
+        nombre: sec.nombre.trim(),
+        descripcion: sec.descripcion,
+        orden: sIdx + 1,
+        criterios: sec.criterios.map((c, cIdx) => ({
+          id: c.id,
+          numero: c.numero || `${cIdx + 1}`,
+          enunciado: c.enunciado.trim(),
+          orden: cIdx + 1
+        }))
+      }))
+    };
+
+    this.guardandoInstrumento.set(true);
+    this.evaluacionService.guardarInstrumento(payload).subscribe({
+      next: guardado => {
+        this.guardandoInstrumento.set(false);
+        this.cerrarModalCrearInstrumento();
+        this.mostrarToast(`Instrumento '${guardado.titulo}' (${guardado.codigo}) guardado con éxito con ${guardado.totalCriterios} indicadores.`);
+        this.cargarTodosInstrumentos();
+        if (this.formInstPonerEnVigencia) {
+          this.cargarInstrumentoVigente();
+        }
+      },
+      error: err => {
+        this.guardandoInstrumento.set(false);
+        const msg = err.error?.message || err.message || 'Error al guardar el instrumento';
+        this.mostrarToast(msg);
+        console.error(err);
+      }
+    });
   }
 
   public obtenerIniciales(nombre: string): string {
