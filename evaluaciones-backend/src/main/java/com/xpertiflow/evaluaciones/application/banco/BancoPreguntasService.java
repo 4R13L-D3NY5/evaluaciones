@@ -1101,13 +1101,33 @@ public class BancoPreguntasService {
     private String getCellString(Cell cell, FormulaEvaluator evaluador) {
         if (cell == null) return "";
         DataFormatter formatter = new DataFormatter(Locale.ROOT);
+        formatter.setUseCachedValuesForFormulaCells(true);
+
+        if (cell.getCellType() == CellType.FORMULA) {
+            try {
+                return switch (cell.getCachedFormulaResultType()) {
+                    case STRING -> cell.getStringCellValue() != null ? cell.getStringCellValue().trim() : "";
+                    case NUMERIC -> formatter.formatCellValue(cell).trim();
+                    case BOOLEAN -> String.valueOf(cell.getBooleanCellValue()).trim();
+                    case ERROR -> "";
+                    default -> formatter.formatCellValue(cell).trim();
+                };
+            } catch (Throwable tCached) {
+                // Fallback si la celda de formula presenta inconsistencia de cache
+            }
+        }
+
         try {
             return formatter.formatCellValue(cell, evaluador).trim();
-        } catch (Exception e) {
+        } catch (Throwable t) {
             try {
                 return formatter.formatCellValue(cell).trim();
-            } catch (Exception ex) {
-                return cell.toString().trim();
+            } catch (Throwable ex) {
+                try {
+                    return cell.getStringCellValue() != null ? cell.getStringCellValue().trim() : "";
+                } catch (Throwable ex2) {
+                    return cell.toString().trim();
+                }
             }
         }
     }
