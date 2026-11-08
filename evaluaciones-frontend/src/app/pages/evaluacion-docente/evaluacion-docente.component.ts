@@ -1,3 +1,4 @@
+import { UNITEPC_LOGO_PNG } from '../../core/constants/unitepc-assets';
 import { jsPDF } from 'jspdf';
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -835,8 +836,12 @@ export interface DocenteEvaluacionRow {
             <div id="ficha-evaluacion-print" class="p-8 overflow-y-auto space-y-6 text-foreground bg-white text-black font-sans">
               
               <div class="text-center border-b pb-4">
+                <img src="assets/logo_unitepc_clean.png" alt="UNITEPC" class="h-10 mx-auto mb-2 object-contain" />
                 <h2 class="text-lg font-black tracking-wide uppercase">EVALUACIÓN DE LA COMPETENCIA DOCENTE</h2>
-                <p class="text-xs text-gray-600 font-bold mt-1">UNIVERSIDAD TÉCNICA PRIVADA COSMOPOLITA - UNITEPC</p>
+                <p class="text-xs text-gray-600 font-bold mt-0.5">UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC</p>
+                <span class="inline-block px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase mt-1.5">
+                  {{ reg.instrumentoTitulo }}
+                </span>
               </div>
 
               <!-- DATOS GENERALES -->
@@ -1857,38 +1862,47 @@ export class EvaluacionDocenteComponent implements OnInit {
     });
 
     const dibujarCabecera = (pagActual: number) => {
+      // Logo institucional UNITEPC estratégico en esquina superior izquierda
+      try {
+        pdf.addImage(UNITEPC_LOGO_PNG, 'PNG', margin, 8.5, 36, 8.1);
+      } catch (e) {
+        console.warn('No se pudo incrustar el logo en el PDF', e);
+      }
+
+      const textStartX = margin + 40;
+
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9.5);
+      pdf.setFontSize(9);
       pdf.setTextColor(purple.r, purple.g, purple.b);
-      pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOPOLITANA - UNITEPC', margin, 12);
+      pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC', textStartX, 11);
 
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
+      pdf.setFontSize(6.5);
       pdf.setTextColor(muted.r, muted.g, muted.b);
-      pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', margin, 16);
+      pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', textStartX, 14.5);
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
+      pdf.setFontSize(9.5);
       pdf.setTextColor(dark.r, dark.g, dark.b);
-      const titPrincipal = `REPORTE OFICIAL: ${instNom.toUpperCase()}`;
-      pdf.text(titPrincipal, margin, 21);
+      pdf.text('REPORTE OFICIAL DE EVALUACIÓN DOCENTE POR CARRERA', textStartX, 19);
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7.5);
+      pdf.setFontSize(7);
       pdf.setTextColor(purple.r, purple.g, purple.b);
-      pdf.text('CONSOLIDADO GENERAL DE EVALUACIÓN DOCENTE POR CARRERA', margin, 25);
+      const titPrincipal = pdf.splitTextToSize(`INSTRUMENTO APLICADO: ${instNom.toUpperCase()}`, 110)[0];
+      pdf.text(titPrincipal, textStartX, 23);
 
       // Metadatos derecha
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
+      pdf.setFontSize(6.5);
       pdf.setTextColor(muted.r, muted.g, muted.b);
-      pdf.text(`Emisión: ${fechaStr}`, pageWidth - margin, 12, { align: 'right' });
-      pdf.text(`Gestión: ${gestion}`, pageWidth - margin, 16, { align: 'right' });
-      pdf.text(`Página ${pagActual}`, pageWidth - margin, 20, { align: 'right' });
+      pdf.text(`Emisión: ${fechaStr}`, pageWidth - margin, 11, { align: 'right' });
+      pdf.text(`Gestión: ${gestion}`, pageWidth - margin, 15, { align: 'right' });
+      pdf.text(`Página ${pagActual}`, pageWidth - margin, 19, { align: 'right' });
 
       pdf.setDrawColor(purple.r, purple.g, purple.b);
-      pdf.setLineWidth(0.6);
-      pdf.line(margin, 27, pageWidth - margin, 27);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, 25.5, pageWidth - margin, 25.5);
     };
 
     const dibujarCabeceraTabla = (currY: number): number => {
@@ -2116,7 +2130,7 @@ export class EvaluacionDocenteComponent implements OnInit {
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
     pdf.setTextColor(muted.r, muted.g, muted.b);
-    pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOPOLITANA', sig2X + sigW / 2, currentY + 26, { align: 'center' });
+    pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS', sig2X + sigW / 2, currentY + 26, { align: 'center' });
     pdf.text(`SEDE ACADÉMICA ${sedeNombre}`, sig2X + sigW / 2, currentY + 30, { align: 'center' });
 
     // Pie de página institucional
@@ -2148,33 +2162,41 @@ export class EvaluacionDocenteComponent implements OnInit {
     const lightBg = { r: 247, g: 249, b: 252 };
     const border = { r: 215, g: 222, b: 232 };
 
+    // Logo institucional UNITEPC estratégico en esquina superior izquierda
+    try {
+      pdf.addImage(UNITEPC_LOGO_PNG, 'PNG', margin, 8.5, 36, 8.1);
+    } catch (e) {
+      console.warn('No se pudo incrustar el logo en el PDF', e);
+    }
+
+    const textStartX = margin + 40;
+
     // Cabecera Oficial
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
+    pdf.setFontSize(9);
     pdf.setTextColor(purple.r, purple.g, purple.b);
-    pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOPOLITANA - UNITEPC', margin, 12);
+    pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC', textStartX, 11);
 
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7);
+    pdf.setFontSize(6.5);
     pdf.setTextColor(muted.r, muted.g, muted.b);
-    pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', margin, 16);
+    pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', textStartX, 14.5);
 
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
+    pdf.setFontSize(9.5);
     pdf.setTextColor(dark.r, dark.g, dark.b);
-    const titFicha = reg.instrumentoTitulo 
-      ? `FICHA OFICIAL: ${reg.instrumentoTitulo.toUpperCase()}`
-      : 'FICHA OFICIAL DE EVALUACIÓN DE LA COMPETENCIA DOCENTE';
-    pdf.text(titFicha, margin, 21);
+    pdf.text('FICHA OFICIAL DE EVALUACIÓN INDIVIDUAL', textStartX, 19);
 
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(7.5);
+    pdf.setFontSize(7);
     pdf.setTextColor(purple.r, purple.g, purple.b);
-    pdf.text('REGISTRO INDIVIDUAL DE EVALUACIÓN DOCENTE EN AULA', margin, 25);
+    const instTxt = reg.instrumentoTitulo ? reg.instrumentoTitulo.toUpperCase() : 'EVALUACIÓN DE LA COMPETENCIA DOCENTE';
+    const titFichaCorto = pdf.splitTextToSize(`INSTRUMENTO APLICADO: ${instTxt}`, 110)[0];
+    pdf.text(titFichaCorto, textStartX, 23);
 
     pdf.setDrawColor(purple.r, purple.g, purple.b);
-    pdf.setLineWidth(0.6);
-    pdf.line(margin, 27, pageWidth - margin, 27);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, 25.5, pageWidth - margin, 25.5);
 
     // Cuadro de Datos Generales
     const metaY = 30;
@@ -2428,37 +2450,47 @@ export class EvaluacionDocenteComponent implements OnInit {
     }
 
     const dibujarCabecera = (pagActual: number) => {
+      // Logo institucional UNITEPC estratégico en esquina superior izquierda
+      try {
+        pdf.addImage(UNITEPC_LOGO_PNG, 'PNG', margin, 8.5, 36, 8.1);
+      } catch (e) {
+        console.warn('No se pudo incrustar el logo en el PDF', e);
+      }
+
+      const textStartX = margin + 40;
+
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9.5);
+      pdf.setFontSize(9);
       pdf.setTextColor(purple.r, purple.g, purple.b);
-      pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOPOLITANA - UNITEPC', margin, 12);
+      pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC', textStartX, 11);
 
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
+      pdf.setFontSize(6.5);
       pdf.setTextColor(muted.r, muted.g, muted.b);
-      pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', margin, 16);
+      pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', textStartX, 14.5);
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
+      pdf.setFontSize(9.5);
       pdf.setTextColor(dark.r, dark.g, dark.b);
-      pdf.text(`REPORTE OFICIAL: ${instNom.toUpperCase()}`, margin, 21);
+      pdf.text('INFORME DETALLADO DE DESEMPEÑO DOCENTE', textStartX, 19);
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7.5);
+      pdf.setFontSize(7);
       pdf.setTextColor(purple.r, purple.g, purple.b);
-      pdf.text('INFORME DETALLADO DE DESEMPEÑO DOCENTE POR ASIGNATURAS', margin, 25);
+      const tituloInstCorto = pdf.splitTextToSize(`INSTRUMENTO APLICADO: ${instNom.toUpperCase()}`, 110)[0];
+      pdf.text(tituloInstCorto, textStartX, 23);
 
       // Metadatos derecha
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
+      pdf.setFontSize(6.5);
       pdf.setTextColor(muted.r, muted.g, muted.b);
-      pdf.text(`Emisión: ${fechaStr}`, pageWidth - margin, 12, { align: 'right' });
-      pdf.text(`Gestión: ${gestion}`, pageWidth - margin, 16, { align: 'right' });
-      pdf.text(`Página ${pagActual}`, pageWidth - margin, 20, { align: 'right' });
+      pdf.text(`Emisión: ${fechaStr}`, pageWidth - margin, 11, { align: 'right' });
+      pdf.text(`Gestión: ${gestion}`, pageWidth - margin, 15, { align: 'right' });
+      pdf.text(`Página ${pagActual}`, pageWidth - margin, 19, { align: 'right' });
 
       pdf.setDrawColor(purple.r, purple.g, purple.b);
-      pdf.setLineWidth(0.6);
-      pdf.line(margin, 27, pageWidth - margin, 27);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, 25.5, pageWidth - margin, 25.5);
     };
 
     let paginaActual = 1;
