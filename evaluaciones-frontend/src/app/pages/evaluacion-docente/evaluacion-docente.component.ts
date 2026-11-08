@@ -1837,6 +1837,31 @@ export class EvaluacionDocenteComponent implements OnInit {
     const instVigente = this.instrumentoVigente();
     const instNom = instVigente?.titulo || 'Evaluación de la Competencia Docente';
 
+    // Agrupación y conteo de todos los instrumentos aplicados en la carrera
+    const instUsoMap = new Map<string, number>();
+    let totalEvaluacionesCarrera = 0;
+
+    docentes.forEach(d => {
+      d.materias.forEach(m => {
+        if (m.registroEvaluacion) {
+          totalEvaluacionesCarrera++;
+          const nom = (m.registroEvaluacion.instrumentoTitulo || instNom).trim();
+          instUsoMap.set(nom, (instUsoMap.get(nom) || 0) + 1);
+        }
+      });
+    });
+
+    const instEntries = Array.from(instUsoMap.entries()).map(([titulo, count]) => ({
+      titulo,
+      count
+    }));
+
+    // Formatear listado con [cantidad]
+    // Ejemplo: "EVALUACIÓN DE LA COMPETENCIA DOCENTE [1]   ·   EVALUACIÓN DE LA COMPETENCIA DOCENTE (COPIA) [1]"
+    const instrumentosTextoResumen = instEntries.length > 0
+      ? instEntries.map(e => `${e.titulo} [${e.count}]`).join('   ·   ')
+      : `${instNom} [0]`;
+
     // Cálculo del promedio general de la carrera
     const conPuntaje = docentes.filter(d => d.promedioPuntaje !== null);
     const promedioGeneral = conPuntaje.length > 0
@@ -1889,10 +1914,11 @@ export class EvaluacionDocenteComponent implements OnInit {
       pdf.text('REPORTE OFICIAL DE EVALUACIÓN DOCENTE POR CARRERA', textStartX, 19);
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7);
+      pdf.setFontSize(6.5);
       pdf.setTextColor(purple.r, purple.g, purple.b);
-      const titPrincipal = pdf.splitTextToSize(`INSTRUMENTO APLICADO: ${instNom.toUpperCase()}`, 110)[0];
-      pdf.text(titPrincipal, textStartX, 23);
+      const labelInstHeader = instEntries.length > 1 ? 'INSTRUMENTOS APLICADOS:' : 'INSTRUMENTO APLICADO:';
+      const titPrincipal = pdf.splitTextToSize(`${labelInstHeader} ${instrumentosTextoResumen.toUpperCase()}`, 115);
+      pdf.text(titPrincipal[0], textStartX, 23);
 
       // Metadatos derecha
       pdf.setFont('helvetica', 'normal');
@@ -1930,9 +1956,11 @@ export class EvaluacionDocenteComponent implements OnInit {
     let paginaActual = 1;
     dibujarCabecera(paginaActual);
 
-    // Metadata Box (Página 1)
+    // Metadata Box (Página 1) - Con listado completo de instrumentos aplicados y [conteo]
+    const instLines = pdf.splitTextToSize(instrumentosTextoResumen, contentWidth - 6);
+    const extraLine = instLines.length > 1;
     const metaY = 30;
-    const metaH = 14;
+    const metaH = extraLine ? 22 : 18;
     pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
     pdf.setDrawColor(border.r, border.g, border.b);
     pdf.setLineWidth(0.2);
@@ -1943,27 +1971,49 @@ export class EvaluacionDocenteComponent implements OnInit {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(6.5);
     pdf.setTextColor(muted.r, muted.g, muted.b);
-    pdf.text('SEDE ACADÉMICA:', margin + 3, metaY + 4.5);
-    pdf.setFontSize(8);
-    pdf.setTextColor(dark.r, dark.g, dark.b);
-    pdf.text(sedeNombre, margin + 3, metaY + 9.5);
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(6.5);
-    pdf.setTextColor(muted.r, muted.g, muted.b);
-    pdf.text('CARRERA:', margin + colW + 3, metaY + 4.5);
-    pdf.setFontSize(8);
-    pdf.setTextColor(dark.r, dark.g, dark.b);
-    const carreraTruncada = pdf.splitTextToSize(`${carreraNombre} (${this.filtroCarreraCodigo})`, colW - 6)[0];
-    pdf.text(carreraTruncada, margin + colW + 3, metaY + 9.5);
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(6.5);
-    pdf.setTextColor(muted.r, muted.g, muted.b);
-    pdf.text('INSTRUMENTO OFICIAL:', margin + colW * 2 + 3, metaY + 4.5);
+    pdf.text('SEDE ACADÉMICA:', margin + 3, metaY + 4);
     pdf.setFontSize(7.5);
     pdf.setTextColor(dark.r, dark.g, dark.b);
-    pdf.text(pdf.splitTextToSize(instNom, colW - 6)[0], margin + colW * 2 + 3, metaY + 9.5);
+    pdf.text(sedeNombre, margin + 3, metaY + 8);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text('CARRERA:', margin + colW + 3, metaY + 4);
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    const carreraTruncada = pdf.splitTextToSize(`${carreraNombre} (${this.filtroCarreraCodigo})`, colW - 6)[0];
+    pdf.text(carreraTruncada, margin + colW + 3, metaY + 8);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text('GESTIÓN ACADÉMICA:', margin + colW * 2 + 3, metaY + 4);
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text(`Gestión ${gestion}`, margin + colW * 2 + 3, metaY + 8);
+
+    // Divisor horizontal interior
+    pdf.setDrawColor(border.r, border.g, border.b);
+    pdf.setLineWidth(0.15);
+    pdf.line(margin + 2, metaY + 10.5, margin + contentWidth - 2, metaY + 10.5);
+
+    // Fila 2: Listado de instrumentos usados con [cantidad]
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    const labelBox = instEntries.length > 1
+      ? `INSTRUMENTOS UTILIZADOS EN LA CARRERA (${instEntries.length}):`
+      : 'INSTRUMENTO OFICIAL APLICADO:';
+    pdf.text(labelBox, margin + 3, metaY + 14);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(purple.r, purple.g, purple.b);
+    pdf.text(instLines[0], margin + 3, metaY + 17.2);
+    if (extraLine) {
+      pdf.text(instLines[1], margin + 3, metaY + 20.4);
+    }
 
     // KPI Summary Strip (Página 1)
     const kpiY = metaY + metaH + 3;
@@ -2413,6 +2463,19 @@ export class EvaluacionDocenteComponent implements OnInit {
     const instVigente = this.instrumentoVigente();
     const instNom = instVigente?.titulo || 'Evaluación de la Competencia Docente';
 
+    // Agrupación de instrumentos aplicados a este docente
+    const teacherInstMap = new Map<string, number>();
+    doc.materias.forEach(m => {
+      if (m.registroEvaluacion) {
+        const nom = (m.registroEvaluacion.instrumentoTitulo || instNom).trim();
+        teacherInstMap.set(nom, (teacherInstMap.get(nom) || 0) + 1);
+      }
+    });
+    const teacherInstEntries = Array.from(teacherInstMap.entries()).map(([titulo, count]) => ({ titulo, count }));
+    const teacherInstResumen = teacherInstEntries.length > 0
+      ? teacherInstEntries.map(e => `${e.titulo} [${e.count}]`).join('   ·   ')
+      : `${instNom} [0]`;
+
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter', compress: true });
     const pageWidth = 215.9;
     const pageHeight = 279.4;
@@ -2476,9 +2539,10 @@ export class EvaluacionDocenteComponent implements OnInit {
       pdf.text('INFORME DETALLADO DE DESEMPEÑO DOCENTE', textStartX, 19);
 
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7);
+      pdf.setFontSize(6.5);
       pdf.setTextColor(purple.r, purple.g, purple.b);
-      const tituloInstCorto = pdf.splitTextToSize(`INSTRUMENTO APLICADO: ${instNom.toUpperCase()}`, 110)[0];
+      const labelInstHeader = teacherInstEntries.length > 1 ? 'INSTRUMENTOS APLICADOS:' : 'INSTRUMENTO APLICADO:';
+      const tituloInstCorto = pdf.splitTextToSize(`${labelInstHeader} ${teacherInstResumen.toUpperCase()}`, 115)[0];
       pdf.text(tituloInstCorto, textStartX, 23);
 
       // Metadatos derecha
