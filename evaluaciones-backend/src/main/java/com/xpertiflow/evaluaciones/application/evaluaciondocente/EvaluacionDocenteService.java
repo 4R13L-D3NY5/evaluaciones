@@ -159,8 +159,30 @@ public class EvaluacionDocenteService {
             );
         }
 
+        if (registros.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> regIds = registros.stream().map(EvaluacionDocenteRegistro::getId).collect(Collectors.toList());
+        List<EvaluacionDocenteRespuesta> todasRespuestas = respuestaRepository.findByRegistroIdInOrderByCriterioOrdenAsc(regIds);
+
+        Map<String, List<EvaluacionDocenteRespuestaDto>> respuestasPorRegistro = todasRespuestas.stream()
+                .collect(Collectors.groupingBy(
+                        r -> r.getRegistro().getId(),
+                        Collectors.mapping(r -> EvaluacionDocenteRespuestaDto.builder()
+                                .criterioId(r.getCriterio().getId())
+                                .numero(r.getCriterio().getNumero())
+                                .seccionCodigo(r.getCriterio().getSeccion() != null ? r.getCriterio().getSeccion().getCodigo() : null)
+                                .puntuacion(r.getPuntuacion())
+                                .build(), Collectors.toList())
+                ));
+
         return registros.stream()
-                .map(this::mapRegistroResumen)
+                .map(reg -> {
+                    EvaluacionDocenteRegistroDto dto = mapRegistroResumen(reg);
+                    dto.setRespuestas(respuestasPorRegistro.getOrDefault(reg.getId(), Collections.emptyList()));
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 

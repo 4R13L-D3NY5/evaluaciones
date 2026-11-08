@@ -819,12 +819,6 @@ export interface DocenteEvaluacionRow {
                 </button>
                 <button 
                   type="button" 
-                  (click)="imprimirFicha()" 
-                  class="px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:bg-primary/90 cursor-pointer">
-                  <i class="pi pi-print"></i> Imprimir
-                </button>
-                <button 
-                  type="button" 
                   (click)="fichaVisualizada.set(null)" 
                   class="h-8 w-8 rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center">
                   <i class="pi pi-times"></i>
@@ -1834,6 +1828,7 @@ export class EvaluacionDocenteComponent implements OnInit {
     const sedeNombre = this.sedes().find(s => s.code === this.filtroSedeCodigo)?.name || this.filtroSedeCodigo;
     const gestion = this.storage.gestionActiva();
     const instVigente = this.instrumentoVigente();
+    const instNom = instVigente?.titulo || 'Evaluación de la Competencia Docente';
 
     // Cálculo del promedio general de la carrera
     const conPuntaje = docentes.filter(d => d.promedioPuntaje !== null);
@@ -1961,7 +1956,6 @@ export class EvaluacionDocenteComponent implements OnInit {
     pdf.text('INSTRUMENTO OFICIAL:', margin + colW * 2 + 3, metaY + 4.5);
     pdf.setFontSize(7.5);
     pdf.setTextColor(dark.r, dark.g, dark.b);
-    const instNom = instVigente?.titulo || 'Evaluación de la Competencia Docente';
     pdf.text(pdf.splitTextToSize(instNom, colW - 6)[0], margin + colW * 2 + 3, metaY + 9.5);
 
     // KPI Summary Strip (Página 1)
@@ -2652,6 +2646,176 @@ export class EvaluacionDocenteComponent implements OnInit {
 
       currY += rowH;
     });
+
+    // Sección: Patrón de Respuestas / Matriz Horizontal del Director por Asignatura
+    const matsEvaluadas = doc.materias.filter(m => !!m.registroEvaluacion);
+    if (matsEvaluadas.length > 0) {
+      currY += 5;
+      if (currY + 28 > pageHeight - 45) {
+        pdf.addPage();
+        paginaActual++;
+        dibujarCabecera(paginaActual);
+        currY = 32;
+      }
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text('PATRÓN DE RESPUESTAS REGISTRADAS POR LA DIRECCIÓN (MATRIZ DE CALIFICACIÓN 1 A 5)', margin, currY);
+      currY += 3.5;
+
+      matsEvaluadas.forEach(m => {
+        const reg = m.registroEvaluacion!;
+        const rawRespuestas = reg.respuestas || [];
+        const respuestasOrdenadas = [...rawRespuestas].sort((a, b) => {
+          const numA = parseFloat((a.numero || '').replace(/[^0-9.]/g, '')) || 0;
+          const numB = parseFloat((b.numero || '').replace(/[^0-9.]/g, '')) || 0;
+          if (numA && numB) return numA - numB;
+          return (a.numero || '').localeCompare(b.numero || '');
+        });
+
+        const matrixH = 22;
+        if (currY + matrixH > pageHeight - 45) {
+          pdf.addPage();
+          paginaActual++;
+          dibujarCabecera(paginaActual);
+          currY = 32;
+        }
+
+        // Subcabecera de la Materia
+        const subHeadH = 5;
+        pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+        pdf.setDrawColor(border.r, border.g, border.b);
+        pdf.setLineWidth(0.2);
+        pdf.rect(margin, currY, contentWidth, subHeadH, 'FD');
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(dark.r, dark.g, dark.b);
+        const matTit = pdf.splitTextToSize(`ASIGNATURA: ${m.materiaCodigo} - ${m.materiaNombre} (Grupo ${m.grupoCodigo})`, 115)[0];
+        pdf.text(matTit, margin + 3, currY + 3.5);
+
+        pdf.setTextColor(purple.r, purple.g, purple.b);
+        pdf.text(`PUNTAJE: ${reg.puntajeTotal} / ${reg.puntajeMaximo} Pts (${reg.porcentaje}%)`, margin + 120, currY + 3.5);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(muted.r, muted.g, muted.b);
+        pdf.text(`Fecha: ${reg.fechaEvaluacion}`, margin + 165, currY + 3.5);
+
+        currY += subHeadH;
+
+        // Construcción de la matriz horizontal
+        const totalCols = Math.max(respuestasOrdenadas.length, 20);
+        const colLabelW = 27.9;
+        const cellW = (contentWidth - colLabelW) / totalCols;
+
+        // Fila 1: Encabezados de Dimensión / Competencia
+        const row1H = 4.2;
+        pdf.setFillColor(243, 245, 249);
+        pdf.setDrawColor(border.r, border.g, border.b);
+        pdf.rect(margin, currY, colLabelW, row1H, 'FD');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(5);
+        pdf.setTextColor(muted.r, muted.g, muted.b);
+        pdf.text('DIMENSIÓN', margin + 2, currY + 2.9);
+
+        if (totalCols === 20) {
+          const actW = cellW * 7;
+          const procW = cellW * 7;
+          const cogW = cellW * 6;
+
+          pdf.setFillColor(238, 242, 250);
+          pdf.rect(margin + colLabelW, currY, actW, row1H, 'FD');
+          pdf.setTextColor(purple.r, purple.g, purple.b);
+          pdf.text('ACTITUDINAL (1.1 - 1.7)', margin + colLabelW + actW / 2, currY + 2.9, { align: 'center' });
+
+          pdf.setFillColor(243, 247, 243);
+          pdf.rect(margin + colLabelW + actW, currY, procW, row1H, 'FD');
+          pdf.setTextColor(16, 120, 70);
+          pdf.text('PROCEDIMENTAL (2.1 - 2.7)', margin + colLabelW + actW + procW / 2, currY + 2.9, { align: 'center' });
+
+          pdf.setFillColor(253, 247, 240);
+          pdf.rect(margin + colLabelW + actW + procW, currY, cogW, row1H, 'FD');
+          pdf.setTextColor(170, 90, 15);
+          pdf.text('COGNITIVA (3.1 - 3.6)', margin + colLabelW + actW + procW + cogW / 2, currY + 2.9, { align: 'center' });
+        } else {
+          pdf.setFillColor(238, 242, 250);
+          pdf.rect(margin + colLabelW, currY, contentWidth - colLabelW, row1H, 'FD');
+          pdf.setTextColor(purple.r, purple.g, purple.b);
+          pdf.text('ITEMS EVALUADOS DEL INSTRUMENTO', margin + colLabelW + (contentWidth - colLabelW) / 2, currY + 2.9, { align: 'center' });
+        }
+
+        currY += row1H;
+
+        // Fila 2: Número de Ítem / Pregunta
+        const row2H = 4.2;
+        pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+        pdf.rect(margin, currY, colLabelW, row2H, 'FD');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(5);
+        pdf.setTextColor(dark.r, dark.g, dark.b);
+        pdf.text('ÍTEM / PREGUNTA', margin + 2, currY + 2.9);
+
+        for (let i = 0; i < totalCols; i++) {
+          const x = margin + colLabelW + i * cellW;
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(x, currY, cellW, row2H, 'FD');
+
+          const r = respuestasOrdenadas[i];
+          const numTxt = r ? (r.numero || `${i + 1}`) : `${i + 1}`;
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(5);
+          pdf.setTextColor(dark.r, dark.g, dark.b);
+          pdf.text(numTxt, x + cellW / 2, currY + 2.9, { align: 'center' });
+        }
+
+        currY += row2H;
+
+        // Fila 3: Valor Marcado (Puntaje 1 a 5)
+        const row3H = 5.2;
+        pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+        pdf.rect(margin, currY, colLabelW, row3H, 'FD');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(5);
+        pdf.setTextColor(purple.r, purple.g, purple.b);
+        pdf.text('VALOR ASIGNADO (1-5)', margin + 2, currY + 3.6);
+
+        for (let i = 0; i < totalCols; i++) {
+          const x = margin + colLabelW + i * cellW;
+          const r = respuestasOrdenadas[i];
+          const score = r ? r.puntuacion : null;
+
+          if (score === 5) {
+            pdf.setFillColor(220, 252, 231);
+            pdf.setTextColor(16, 130, 80);
+          } else if (score === 4) {
+            pdf.setFillColor(209, 250, 229);
+            pdf.setTextColor(5, 120, 80);
+          } else if (score === 3) {
+            pdf.setFillColor(239, 246, 255);
+            pdf.setTextColor(25, 90, 180);
+          } else if (score !== null && score > 0) {
+            pdf.setFillColor(254, 226, 226);
+            pdf.setTextColor(180, 30, 30);
+          } else {
+            pdf.setFillColor(250, 250, 250);
+            pdf.setTextColor(muted.r, muted.g, muted.b);
+          }
+
+          pdf.rect(x, currY, cellW, row3H, 'FD');
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(7.5);
+          pdf.text(score !== null ? `${score}` : '—', x + cellW / 2, currY + 3.8, { align: 'center' });
+        }
+
+        currY += row3H + 3.5;
+      });
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(5.5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text('Escala de Calificación del Director: 1 = Muy Deficiente  |  2 = Regular  |  3 = Aceptable  |  4 = Bueno  |  5 = Excelente', margin, currY);
+      currY += 2;
+    }
 
     // Sección de Observaciones y Retroalimentaciones por Asignatura (si existen)
     const materiasConObs = doc.materias.filter(m => m.registroEvaluacion?.observaciones?.trim());
