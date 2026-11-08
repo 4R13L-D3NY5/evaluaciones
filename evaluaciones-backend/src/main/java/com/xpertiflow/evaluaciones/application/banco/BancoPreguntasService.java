@@ -207,6 +207,7 @@ public class BancoPreguntasService {
         if (!errores.isEmpty()) return respuestaFallida(rol, errores);
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
+            sanitizarFormulas(workbook);
             Sheet sheet = encontrarHojaBanco(workbook);
             if (sheet == null) {
                 errores.add("No se encontró la hoja oficial 'Banco' (se ignoran otras hojas). ");
@@ -1098,6 +1099,26 @@ public class BancoPreguntasService {
         };
     }
 
+    private void sanitizarFormulas(Workbook workbook) {
+        if (workbook == null) return;
+        for (Sheet s : workbook) {
+            for (Row r : s) {
+                for (Cell c : r) {
+                    if (c.getCellType() == CellType.FORMULA) {
+                        try {
+                            String f = c.getCellFormula();
+                            if (f != null && f.contains("[")) {
+                                String limpia = f.replaceAll("\\[[^\\]]+\\]", "");
+                                c.setCellFormula(limpia);
+                            }
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private String getCellString(Cell cell, FormulaEvaluator evaluador) {
         if (cell == null) return "";
         DataFormatter formatter = new DataFormatter(Locale.ROOT);
@@ -1118,16 +1139,38 @@ public class BancoPreguntasService {
         }
 
         try {
-            return formatter.formatCellValue(cell, evaluador).trim();
-        } catch (Throwable t) {
-            try {
-                return formatter.formatCellValue(cell).trim();
-            } catch (Throwable ex) {
-                try {
-                    return cell.getStringCellValue() != null ? cell.getStringCellValue().trim() : "";
-                } catch (Throwable ex2) {
-                    return cell.toString().trim();
+            String val = formatter.formatCellValue(cell, evaluador);
+            if (val != null) {
+                String trimmed = val.trim();
+                if (!ERRORES_FORMULA.contains(trimmed)) {
+                    return trimmed;
                 }
+            }
+        } catch (Throwable t) {
+        }
+
+        if (cell.getCellType() == CellType.FORMULA) {
+            try {
+                if (cell instanceof org.apache.poi.xssf.usermodel.XSSFCell xcell && xcell.getRawValue() != null) {
+                    return xcell.getRawValue().trim();
+                }
+            } catch (Throwable ignored) {
+            }
+            try {
+                String str = cell.getStringCellValue();
+                if (str != null && !str.isBlank() && !str.startsWith("=")) return str.trim();
+            } catch (Throwable ignored) {
+            }
+            return "";
+        }
+
+        try {
+            return formatter.formatCellValue(cell).trim();
+        } catch (Throwable ex) {
+            try {
+                return cell.getStringCellValue() != null ? cell.getStringCellValue().trim() : "";
+            } catch (Throwable ex2) {
+                return "";
             }
         }
     }

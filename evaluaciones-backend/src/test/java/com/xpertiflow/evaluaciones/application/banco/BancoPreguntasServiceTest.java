@@ -18,6 +18,7 @@ import com.xpertiflow.evaluaciones.domain.repository.ReactivoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.security.BancoCifradoService;
 import com.xpertiflow.evaluaciones.security.BancoEncryptedPayload;
+import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -560,6 +561,60 @@ class BancoPreguntasServiceTest {
             assertThat(respuesta.isExito()).isTrue();
             assertThat(respuesta.getTotalReactivos()).isEqualTo(60);
             assertThat(respuesta.getCuotasGruposAplicadas()).isTrue();
+        }
+    }
+
+    @Test
+    void aceptaFormulasConReferenciasExternasSanitizadas() throws Exception {
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Banco");
+            Sheet sheetVal = workbook.createSheet("VALIDACIONES");
+            Row rVal = sheetVal.createRow(0);
+            rVal.createCell(6).setCellValue("1P"); // G1 = 1P
+
+            String[] columnas = {"tipo", "grupo", "enunciado", "A", "B", "C", "D", "E", "respuesta", "dificultad", "parcial"};
+            Row header = sheet.createRow(0);
+            for (int cIdx = 0; cIdx < columnas.length; cIdx++) {
+                header.createCell(cIdx).setCellValue(columnas[cIdx]);
+            }
+
+            for (int i = 1; i <= 60; i++) {
+                String dif = i <= 15 ? "1" : (i <= 45 ? "2" : "3");
+                Row r = sheet.createRow(i);
+                r.createCell(0).setCellValue("Selección de la mejor respuesta");
+                r.createCell(1).setCellValue("G" + i);
+                r.createCell(2).setCellValue("Pregunta con formula " + i);
+                if (i == 24) {
+                    Cell cellD = r.createCell(3);
+                    cellD.setCellFormula("[1]Banco!D23");
+                } else {
+                    r.createCell(3).setCellValue("Opción A " + i);
+                }
+                r.createCell(4).setCellValue("Opción B");
+                r.createCell(5).setCellValue("Opción C");
+                r.createCell(6).setCellValue("Opción D");
+                r.createCell(7).setCellValue("Opción E");
+                r.createCell(8).setCellValue("A");
+                r.createCell(9).setCellValue(dif);
+
+                Cell cellK = r.createCell(10);
+                if (i == 49) {
+                    cellK.setCellFormula("IF(TRIM($A49)=\"\",\"\",[1]VALIDACIONES!$G$1)");
+                } else {
+                    cellK.setCellValue("1P");
+                }
+            }
+
+            workbook.write(output);
+            MockMultipartFile archivo = new MockMultipartFile("file", "banco-formulas.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", output.toByteArray());
+
+            CargaBancoResponseDto respuesta = service.cargarDesdeExcel(rol.getId(), archivo, "Docente Oficial");
+            assertThat(respuesta.isExito()).isTrue();
+            assertThat(respuesta.getTotalReactivos()).isEqualTo(60);
         }
     }
 }
