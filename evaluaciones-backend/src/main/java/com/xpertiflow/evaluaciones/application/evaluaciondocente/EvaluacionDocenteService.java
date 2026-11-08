@@ -220,15 +220,15 @@ public class EvaluacionDocenteService {
     public EvaluacionDocenteRegistroDto aplicarEvaluacion(EvaluacionDocenteAplicarRequestDto req, Authentication auth) {
         String usuario = auth != null ? auth.getName() : "SISTEMA";
 
-        EvaluacionInstrumento inst;
-        if (req.getInstrumentoId() != null && !req.getInstrumentoId().isBlank()) {
-            inst = instrumentoRepository.findById(req.getInstrumentoId())
-                    .orElseGet(() -> instrumentoRepository.findByEstado("VIGENTE")
-                            .orElseThrow(() -> new IllegalStateException("No hay instrumento de evaluación disponible")));
-        } else {
-            inst = instrumentoRepository.findByEstado("VIGENTE")
-                    .orElseThrow(() -> new IllegalStateException("No hay un instrumento vigente para aplicar evaluaciones"));
-        }
+        // Siempre aplicar con el instrumento que se encuentra oficialmente VIGENTE
+        EvaluacionInstrumento inst = instrumentoRepository.findByEstado("VIGENTE")
+                .orElseGet(() -> {
+                    if (req.getInstrumentoId() != null && !req.getInstrumentoId().isBlank()) {
+                        return instrumentoRepository.findById(req.getInstrumentoId())
+                                .orElseThrow(() -> new IllegalStateException("No hay instrumento de evaluación disponible en el sistema"));
+                    }
+                    throw new IllegalStateException("No hay un instrumento en vigencia oficial para aplicar evaluaciones");
+                });
 
         Map<String, EvaluacionCriterio> criteriosMap = criterioRepository.findAll().stream()
                 .collect(Collectors.toMap(EvaluacionCriterio::getId, c -> c));

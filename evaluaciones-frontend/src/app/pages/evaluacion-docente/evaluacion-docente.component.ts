@@ -456,8 +456,12 @@ export interface DocenteEvaluacionRow {
                                         <div class="font-black text-xs text-emerald-600 font-mono">
                                           {{ reg.puntajeTotal }} / {{ reg.puntajeMaximo }} Pts ({{ reg.porcentaje }}%)
                                         </div>
-                                        <div class="text-[10px] text-muted-foreground">
-                                          Evaluado el {{ reg.fechaEvaluacion }}
+                                        <div class="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
+                                          <span>{{ reg.fechaEvaluacion }}</span>
+                                          <span>·</span>
+                                          <span class="text-primary font-bold truncate max-w-[200px]" [title]="reg.instrumentoTitulo">
+                                            {{ reg.instrumentoTitulo }}
+                                          </span>
                                         </div>
                                       </div>
                                       <button 
@@ -1687,6 +1691,9 @@ export class EvaluacionDocenteComponent implements OnInit {
     this.formHoraAplicacion = hoy.toTimeString().substring(0, 5);
     this.formObservaciones = '';
 
+    // Asegurar que siempre se cargue la versión actualmente VIGENTE del instrumento oficial
+    this.cargarInstrumentoVigente();
+
     if (mat.registroEvaluacion) {
       this.evaluacionService.obtenerRegistroPorId(mat.registroEvaluacion.id).subscribe({
         next: fullReg => {
@@ -2590,7 +2597,7 @@ export class EvaluacionDocenteComponent implements OnInit {
     currY = dibujarCabeceraTablaMaterias(currY);
 
     doc.materias.forEach((mat, idx) => {
-      const rowH = 8;
+      const rowH = 9.5;
       if (currY + rowH > pageHeight - 50) {
         pdf.addPage();
         paginaActual++;
@@ -2611,37 +2618,43 @@ export class EvaluacionDocenteComponent implements OnInit {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(6.5);
       pdf.setTextColor(muted.r, muted.g, muted.b);
-      pdf.text(String(idx + 1).padStart(2, '0'), margin + 3, currY + 5);
+      pdf.text(String(idx + 1).padStart(2, '0'), margin + 3, currY + 4.5);
 
       pdf.setTextColor(dark.r, dark.g, dark.b);
       pdf.setFontSize(7);
       const matNom = pdf.splitTextToSize(`${mat.materiaCodigo} - ${mat.materiaNombre}`, 66)[0];
-      pdf.text(matNom, margin + 10, currY + 5);
+      pdf.text(matNom, margin + 10, currY + 4.5);
+
+      const reg = mat.registroEvaluacion;
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      const txtInstMat = reg ? `Test: ${reg.instrumentoTitulo || 'Oficial UNITEPC'}` : `Test: ${instNom} (Pendiente)`;
+      pdf.text(pdf.splitTextToSize(txtInstMat, 66)[0], margin + 10, currY + 8);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(6.5);
-      pdf.text(mat.grupoCodigo, margin + 78, currY + 5);
+      pdf.text(mat.grupoCodigo, margin + 78, currY + 5.5);
 
-      const reg = mat.registroEvaluacion;
       if (reg) {
-        pdf.text(reg.fechaEvaluacion, margin + 98, currY + 5);
-        pdf.text(`${reg.puntajeActitudinal} / ${reg.puntajeProcedimental} / ${reg.puntajeCognitivo}`, margin + 122, currY + 5);
+        pdf.text(reg.fechaEvaluacion, margin + 98, currY + 5.5);
+        pdf.text(`${reg.puntajeActitudinal} / ${reg.puntajeProcedimental} / ${reg.puntajeCognitivo}`, margin + 122, currY + 5.5);
 
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(purple.r, purple.g, purple.b);
-        pdf.text(`${reg.puntajeTotal} / ${reg.puntajeMaximo} (${reg.porcentaje}%)`, margin + 162, currY + 5, { align: 'center' });
+        pdf.text(`${reg.puntajeTotal} / ${reg.puntajeMaximo} (${reg.porcentaje}%)`, margin + 162, currY + 5.5, { align: 'center' });
 
         pdf.setTextColor(green.r, green.g, green.b);
-        pdf.text('EVALUADO', margin + 180, currY + 5, { align: 'center' });
+        pdf.text('EVALUADO', margin + 180, currY + 5.5, { align: 'center' });
       } else {
         pdf.setTextColor(muted.r, muted.g, muted.b);
-        pdf.text('—', margin + 98, currY + 5);
-        pdf.text('—', margin + 122, currY + 5);
-        pdf.text('—', margin + 162, currY + 5, { align: 'center' });
+        pdf.text('—', margin + 98, currY + 5.5);
+        pdf.text('—', margin + 122, currY + 5.5);
+        pdf.text('—', margin + 162, currY + 5.5, { align: 'center' });
 
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(amber.r, amber.g, amber.b);
-        pdf.text('PENDIENTE', margin + 180, currY + 5, { align: 'center' });
+        pdf.text('PENDIENTE', margin + 180, currY + 5.5, { align: 'center' });
       }
 
       currY += rowH;
@@ -2683,7 +2696,7 @@ export class EvaluacionDocenteComponent implements OnInit {
         }
 
         // Subcabecera de la Materia
-        const subHeadH = 5;
+        const subHeadH = 7.5;
         pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
         pdf.setDrawColor(border.r, border.g, border.b);
         pdf.setLineWidth(0.2);
@@ -2692,14 +2705,22 @@ export class EvaluacionDocenteComponent implements OnInit {
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(6.5);
         pdf.setTextColor(dark.r, dark.g, dark.b);
-        const matTit = pdf.splitTextToSize(`ASIGNATURA: ${m.materiaCodigo} - ${m.materiaNombre} (Grupo ${m.grupoCodigo})`, 115)[0];
-        pdf.text(matTit, margin + 3, currY + 3.5);
+        const matTit = pdf.splitTextToSize(`ASIGNATURA: ${m.materiaCodigo} - ${m.materiaNombre} (Grupo ${m.grupoCodigo})`, 110)[0];
+        pdf.text(matTit, margin + 3, currY + 3.2);
 
         pdf.setTextColor(purple.r, purple.g, purple.b);
-        pdf.text(`PUNTAJE: ${reg.puntajeTotal} / ${reg.puntajeMaximo} Pts (${reg.porcentaje}%)`, margin + 120, currY + 3.5);
+        pdf.text(`PUNTAJE: ${reg.puntajeTotal} / ${reg.puntajeMaximo} Pts (${reg.porcentaje}%)`, margin + 115, currY + 3.2);
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(5.5);
+        pdf.setTextColor(purple.r, purple.g, purple.b);
+        const txtInstSub = pdf.splitTextToSize(`INSTRUMENTO EVALUADO: ${reg.instrumentoTitulo || instNom}`, 130)[0];
+        pdf.text(txtInstSub, margin + 3, currY + 6.3);
+
         pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(5.5);
         pdf.setTextColor(muted.r, muted.g, muted.b);
-        pdf.text(`Fecha: ${reg.fechaEvaluacion}`, margin + 165, currY + 3.5);
+        pdf.text(`Fecha de Aplicación: ${reg.fechaEvaluacion}`, pageWidth - margin - 3, currY + 6.3, { align: 'right' });
 
         currY += subHeadH;
 
