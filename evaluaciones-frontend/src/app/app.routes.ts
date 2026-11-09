@@ -20,6 +20,7 @@ import { RespaldosComponent } from './pages/respaldos/respaldos.component';
 import { VerificarExamenesComponent } from './pages/verificar-examenes/verificar-examenes.component';
 import { SincronizacionSeaComponent } from './pages/sincronizacion-sea/sincronizacion-sea.component';
 import { TestVocacionalComponent } from './pages/test-vocacional/test-vocacional.component';
+import { EvaluacionDocenteComponent } from './pages/evaluacion-docente/evaluacion-docente.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard], title: 'Acceso - Sistema de Evaluaciones' },
@@ -35,6 +36,7 @@ export const routes: Routes = [
       { path: 'catalogo-academico', component: CatalogoUnitepcComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Servicios académicos - Sistema de Evaluaciones' },
       { path: 'servicios-sea', component: CatalogoUnitepcComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Servicios académicos - Sistema de Evaluaciones' },
       { path: 'plan-estudios', component: PlanEstudiosComponent, canActivate: [roleGuard(['DIRECTOR_CARRERA', 'VICERRECTOR'])], title: 'Plan de Estudios - Sistema de Evaluaciones' },
+      { path: 'evaluacion-docente', component: EvaluacionDocenteComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR'])], title: 'Evaluación Docente - Sistema de Evaluaciones' },
       { path: 'evaluaciones-dia', component: EvaluacionesDiaComponent, canActivate: [roleGuard(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR', 'DOCENTE'])], title: 'Lista de Evaluaciones por Día - Sistema de Evaluaciones' },
       { path: 'salas-virtuales', component: SalaVirtualComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DOCENTE'])], title: 'Salas virtuales - Sistema de Evaluaciones' },
       { path: 'calificacion-omr', component: CalificacionOmrComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Calificación OMR - Sistema de Evaluaciones' },
