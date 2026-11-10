@@ -12,6 +12,8 @@ public interface MapeoEstudianteVarianteRepository extends JpaRepository<MapeoEs
 
     List<MapeoEstudianteVariante> findByRolExamenId(String rolExamenId);
 
+    List<MapeoEstudianteVariante> findByRolExamenIdIn(List<String> rolesIds);
+
     Optional<MapeoEstudianteVariante> findByRolExamenIdAndCodigoEstudiante(String rolExamenId, String codigoEstudiante);
 
     List<MapeoEstudianteVariante> findByCodigoEstudianteOrderByCreadoEnDesc(String codigoEstudiante);

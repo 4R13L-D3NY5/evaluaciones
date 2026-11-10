@@ -4,7 +4,10 @@ import { Observable } from 'rxjs';
 import {
   EvaluacionInstrumento,
   EvaluacionDocenteRegistro,
-  EvaluacionDocenteAplicarRequest
+  EvaluacionDocenteAplicarRequest,
+  EstudianteAvanceEvaluacion,
+  EvaluacionEstudianteAplicarRequest,
+  EvaluacionConsolidadaDocenteMateria
 } from '../models/evaluacion-docente.models';
 
 @Injectable({
@@ -13,6 +16,7 @@ import {
 export class EvaluacionDocenteService {
   private readonly _http = inject(HttpClient);
   private readonly _baseUrl = '/api/evaluacion-docente';
+  private readonly _estudianteBaseUrl = '/api/evaluacion-docente-estudiante';
 
   public obtenerInstrumentoVigente(): Observable<EvaluacionInstrumento> {
     return this._http.get<EvaluacionInstrumento>(`${this._baseUrl}/instrumento-vigente`);
@@ -26,8 +30,8 @@ export class EvaluacionDocenteService {
     return this._http.get<EvaluacionInstrumento>(`${this._baseUrl}/instrumentos/${id}`);
   }
 
-  public guardarInstrumento(instrumento: Partial<EvaluacionInstrumento>): Observable<EvaluacionInstrumento> {
-    return this._http.post<EvaluacionInstrumento>(`${this._baseUrl}/instrumentos`, instrumento);
+  public guardarInstrumento(payload: any): Observable<EvaluacionInstrumento> {
+    return this._http.post<EvaluacionInstrumento>(`${this._baseUrl}/instrumentos`, payload);
   }
 
   public ponerEnVigencia(id: string): Observable<EvaluacionInstrumento> {
@@ -56,5 +60,37 @@ export class EvaluacionDocenteService {
 
   public restablecerEvaluacion(id: string): Observable<void> {
     return this._http.delete<void>(`${this._baseUrl}/registros/${id}`);
+  }
+
+  // --- Evaluaciones de Estudiantes ---
+
+  public consultarMateriasEstudiante(codigoEstudiante: string, gestion?: string): Observable<EstudianteAvanceEvaluacion> {
+    let params = new HttpParams().set('codigoEstudiante', codigoEstudiante);
+    if (gestion) params = params.set('gestion', gestion);
+    return this._http.get<EstudianteAvanceEvaluacion>(`${this._estudianteBaseUrl}/materias`, { params });
+  }
+
+  public obtenerInstrumentoEstudianteVigente(): Observable<EvaluacionInstrumento> {
+    return this._http.get<EvaluacionInstrumento>(`${this._estudianteBaseUrl}/instrumento-vigente`);
+  }
+
+  public aplicarEvaluacionEstudiante(payload: EvaluacionEstudianteAplicarRequest): Observable<any> {
+    return this._http.post<any>(`${this._estudianteBaseUrl}/evaluar`, payload);
+  }
+
+  public listarAvanceEstudiantesPorCarrera(sedeCodigo: string, carreraCodigo: string, gestion?: string): Observable<EstudianteAvanceEvaluacion[]> {
+    let params = new HttpParams()
+      .set('sedeCodigo', sedeCodigo)
+      .set('carreraCodigo', carreraCodigo);
+    if (gestion) params = params.set('gestion', gestion);
+    return this._http.get<EstudianteAvanceEvaluacion[]>(`${this._baseUrl}/avance-estudiantes`, { params });
+  }
+
+  public listarResumenConsolidado(sedeCodigo: string, carreraCodigo: string, gestion?: string): Observable<EvaluacionConsolidadaDocenteMateria[]> {
+    let params = new HttpParams()
+      .set('sedeCodigo', sedeCodigo)
+      .set('carreraCodigo', carreraCodigo);
+    if (gestion) params = params.set('gestion', gestion);
+    return this._http.get<EvaluacionConsolidadaDocenteMateria[]>(`${this._baseUrl}/resumen-consolidado`, { params });
   }
 }

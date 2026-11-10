@@ -28,6 +28,9 @@ public class CrearOEditarInstrumentoRequestDto {
     private String estado = "BORRADOR";
 
     @Builder.Default
+    private String destinatario = "DIRECTOR";
+
+    @Builder.Default
     private Integer escalaMin = 1;
 
     @Builder.Default

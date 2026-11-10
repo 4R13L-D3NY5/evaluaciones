@@ -19,6 +19,7 @@ public class EvaluacionInstrumentoDto {
     private String titulo;
     private String descripcion;
     private String estado;
+    private String destinatario;
     private Integer escalaMin;
     private Integer escalaMax;
     private String creadoPor;
