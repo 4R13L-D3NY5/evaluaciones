@@ -46,6 +46,10 @@ export interface RolExamenResponse {
   fechaSincronizacionSea?: string;
   sincronizadoSeaPor?: string;
   sincronizacionSeaResultado?: string;
+  fueRestablecido?: boolean;
+  estadoPrevioRestablecimiento?: string;
+  motivoRestablecimiento?: string;
+  fechaRestablecimiento?: string;
 }
 
 export interface RolExamenCreateRequest {
@@ -229,6 +233,15 @@ export class RolExamenService {
     return this._http.post<RolExamenResponse>(`${this._baseUrl}/${id}/restablecer`, dto).pipe(
       catchError(err => {
         console.error(`[RolExamenService] Error al restablecer el rol ${id}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public restaurarEstadoPrevio(id: string, dto?: { motivo?: string; estadoDestino?: string }): Observable<RolExamenResponse> {
+    return this._http.post<RolExamenResponse>(`${this._baseUrl}/${id}/restaurar-previo`, dto || {}).pipe(
+      catchError(err => {
+        console.error(`[RolExamenService] Error al restaurar el rol ${id}:`, err);
         return throwError(() => err);
       })
     );

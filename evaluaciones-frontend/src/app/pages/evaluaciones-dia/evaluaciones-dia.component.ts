@@ -774,6 +774,24 @@ interface CampusDisponible extends Campus {
                           </div>
                         }
 
+                        <!-- 5B. Botón Restaurar a Estado Previo (cuando fue restablecido) -->
+                        @if (puedeRestaurar(item)) {
+                          <div class="relative group/restaurar">
+                            <button 
+                              (click)="solicitarRestauracion(item)"
+                              class="h-7 w-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                              aria-label="Restaurar examen a su estado previo">
+                              <i class="pi pi-undo text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/restaurar:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-emerald-950 text-emerald-100 text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                                Restaurar a {{ item.estadoPrevioRestablecimiento || 'Entregado' }}
+                              </span>
+                              <div class="w-2 h-2 bg-emerald-950 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
                       </div>
                     </td>
 
@@ -1892,6 +1910,45 @@ interface CampusDisponible extends Campus {
         </div>
       }
 
+      <!-- MODAL 5B: RESTAURACIÓN / DESHACER RESTABLECIMIENTO -->
+      @if (evaluacionSeleccionadaParaRestaurar()) {
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-scale-in">
+            <div class="flex items-start justify-between border-b border-border pb-3">
+              <div class="flex items-center gap-2.5">
+                <div class="h-9 w-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
+                  <i class="pi pi-undo text-base"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">Restaurar Evaluación a '{{ evaluacionSeleccionadaParaRestaurar()?.estadoPrevioRestablecimiento || 'Entregado' }}'</h3>
+                  <p class="text-xs text-muted-foreground">[{{ evaluacionSeleccionadaParaRestaurar()?.codigo }}] {{ evaluacionSeleccionadaParaRestaurar()?.materia }}</p>
+                </div>
+              </div>
+              <button (click)="cancelarRestauracion()" class="text-muted-foreground hover:text-foreground text-sm cursor-pointer"><i class="pi pi-times"></i></button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+              <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-950 text-xs space-y-1">
+                <div class="font-bold flex items-center gap-1.5"><i class="pi pi-shield"></i> Examen y banco protegidos</div>
+                <p class="text-[11px] text-emerald-800">
+                  Esta acción revierte el restablecimiento erróneo y restituye el estado a <strong>{{ evaluacionSeleccionadaParaRestaurar()?.estadoPrevioRestablecimiento || 'Entregado' }}</strong>. Las variantes Typst, patrones de respuesta y cartillas impresas se mantienen intactas.
+                </p>
+              </div>
+
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Motivo de la Restauración (Opcional)</label>
+              <textarea [(ngModel)]="motivoRestauracion" rows="2" placeholder="Deshacer restablecimiento por error..." class="w-full bg-muted border border-border rounded-xl p-3 text-xs font-medium text-foreground outline-none"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-border">
+              <button (click)="cancelarRestauracion()" class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground cursor-pointer">Cancelar</button>
+              <button [disabled]="restaurando()" (click)="confirmarRestauracion()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs disabled:opacity-50 cursor-pointer">
+                {{ restaurando() ? 'Restaurando...' : ('Confirmar Restauración a ' + (evaluacionSeleccionadaParaRestaurar()?.estadoPrevioRestablecimiento || 'Entregado')) }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- MODAL 6: BITÁCORA -->
       @if (evaluacionSeleccionadaParaBitacora()) {
         <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -1932,6 +1989,13 @@ interface CampusDisponible extends Campus {
                     </div>
                     @if (detalleAuditoria(evento)) {
                       <div class="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-[10px] text-muted-foreground">{{ detalleAuditoria(evento) }}</div>
+                    }
+                    @if (evento.accion === 'RESTABLECIMIENTO_A_VALIDADO' && evaluacionSeleccionadaParaBitacora()?.etapa === 'Validado') {
+                      <div class="mt-2 flex justify-end">
+                        <button (click)="solicitarRestauracion(evaluacionSeleccionadaParaBitacora()!)" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black cursor-pointer shadow-xs transition-colors">
+                          <i class="pi pi-undo text-[10px]"></i> Restaurar a {{ evento.etapaOrigen || 'Entregado' }}
+                        </button>
+                      </div>
                     }
                   </div>
                 }
@@ -4073,6 +4137,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public evaluacionSeleccionadaParaReestablecer = signal<EvaluacionItemUI | null>(null);
   public motivoReestablecimiento = '';
   public restableciendo = signal<boolean>(false);
+  public evaluacionSeleccionadaParaRestaurar = signal<EvaluacionItemUI | null>(null);
+  public motivoRestauracion = '';
+  public restaurando = signal<boolean>(false);
 
   public dialogVisorExamen = signal<boolean>(false);
   public tabVisorActiva = signal<'examen' | 'patron'>('examen');
@@ -4820,7 +4887,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       estadoVerificacion: rol.estadoVerificacion,
       cantidadDevoluciones: rol.cantidadDevoluciones,
       verificadoPor: rol.verificadoPor,
-      fechaVerificacion: rol.fechaVerificacion
+      fechaVerificacion: rol.fechaVerificacion,
+      fueRestablecido: rol.fueRestablecido,
+      estadoPrevioRestablecimiento: rol.estadoPrevioRestablecimiento as EtapaEvaluacion,
+      motivoRestablecimiento: rol.motivoRestablecimiento,
+      fechaRestablecimiento: rol.fechaRestablecimiento
     };
   }
 
@@ -4854,6 +4925,11 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }
     return ['Generado', 'Impreso', 'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado']
       .includes(item.etapa);
+  }
+
+  public puedeRestaurar(item: EvaluacionItemUI): boolean {
+    if (this.esConsultaAcademica()) return false;
+    return item.etapa === 'Validado' && !!item.fueRestablecido;
   }
 
   /**
@@ -8993,6 +9069,44 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       error: err => {
         this.restableciendo.set(false);
         const detalle = err?.error?.message || err?.error?.error || 'No se pudo restablecer la evaluación.';
+        this._mostrarToast(detalle, 'error');
+      }
+    });
+  }
+
+  public solicitarRestauracion(item: EvaluacionItemUI): void {
+    if (!this.puedeRestaurar(item)) {
+      this._mostrarToast('Solo se puede restaurar una evaluación que fue restablecida a Validado.', 'error');
+      return;
+    }
+    this.evaluacionSeleccionadaParaRestaurar.set(item);
+    this.motivoRestauracion = '';
+  }
+
+  public cancelarRestauracion(): void {
+    this.evaluacionSeleccionadaParaRestaurar.set(null);
+  }
+
+  public confirmarRestauracion(): void {
+    const item = this.evaluacionSeleccionadaParaRestaurar();
+    if (!item || !this.puedeRestaurar(item) || this.restaurando()) return;
+
+    this.restaurando.set(true);
+    this._rolService.restaurarEstadoPrevio(item.id, {
+      motivo: this.motivoRestauracion.trim() || undefined
+    }).subscribe({
+      next: rol => {
+        const actualizado = this._mapearRolResponseA_UI(rol);
+        this.evaluaciones.update(items => items.map(actual =>
+          actual.id === item.id ? actualizado : actual
+        ));
+        this.evaluacionSeleccionadaParaRestaurar.set(null);
+        this.restaurando.set(false);
+        this._mostrarToast(`${item.codigo}: Restaurado con éxito al estado '${this.etiquetaPaso(actualizado, actualizado.etapa)}'.`);
+      },
+      error: err => {
+        this.restaurando.set(false);
+        const detalle = err?.error?.message || err?.error?.error || 'No se pudo restaurar la evaluación.';
         this._mostrarToast(detalle, 'error');
       }
     });

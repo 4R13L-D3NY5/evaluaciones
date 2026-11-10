@@ -4,6 +4,7 @@ import com.xpertiflow.evaluaciones.api.dto.AuditoriaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.RestaurarRolRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto;
 import com.xpertiflow.evaluaciones.api.mapper.RolExamenMapper;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
@@ -354,6 +355,15 @@ public class RolExamenService {
                     && !grupoOficial.getTeacherIdentityNumber().isBlank()) {
                 dto.setDocenteCi(grupoOficial.getTeacherIdentityNumber().trim());
             }
+        }
+        if (rol.getEstadoFlujo() == EstadoFlujo.VALIDADO) {
+            auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rol.getId(), "RESTABLECIMIENTO_A_VALIDADO")
+                    .ifPresent(a -> {
+                        dto.setFueRestablecido(true);
+                        dto.setEstadoPrevioRestablecimiento(a.getEtapaOrigen() != null ? a.getEtapaOrigen().getValor() : null);
+                        dto.setMotivoRestablecimiento(a.getDetalle());
+                        dto.setFechaRestablecimiento(a.getFechaEvento());
+                    });
         }
         return dto;
     }
@@ -977,7 +987,59 @@ public class RolExamenService {
                 dto.getIpOrigen() != null && !dto.getIpOrigen().isBlank() ? dto.getIpOrigen() : "127.0.0.1",
                 dto.getMotivo());
 
-        return mapper.toResponseDto(guardado);
+        return mapearRolConDocenteOficial(guardado);
+    }
+
+    @Transactional
+    public RolExamenResponseDto restaurarEstadoPrevio(String id, RestaurarRolRequestDto dto) {
+        return restaurarEstadoPrevio(id, dto, null);
+    }
+
+    @Transactional
+    public RolExamenResponseDto restaurarEstadoPrevio(String id, RestaurarRolRequestDto dto,
+                                                     Authentication authentication) {
+        RolExamen rol = rolExamenRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
+
+        if (rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
+            throw new RuntimeException(
+                    "Solo se puede restaurar un rol de examen actualmente en VALIDADO; estado actual: "
+                            + rol.getEstadoFlujo().getValor());
+        }
+
+        Optional<AuditoriaEvaluacion> ultimoRestablecimiento = auditoriaRepository
+                .findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rol.getId(), "RESTABLECIMIENTO_A_VALIDADO");
+
+        EstadoFlujo destino = null;
+        if (dto != null && dto.getEstadoDestino() != null) {
+            destino = dto.getEstadoDestino();
+        } else if (ultimoRestablecimiento.isPresent() && ultimoRestablecimiento.get().getEtapaOrigen() != null) {
+            destino = ultimoRestablecimiento.get().getEtapaOrigen();
+        }
+
+        if (destino == null || destino == EstadoFlujo.VALIDADO || destino == EstadoFlujo.PROGRAMADO) {
+            if (rol.getVariantesGeneradasCount() != null && rol.getVariantesGeneradasCount() > 0) {
+                destino = EstadoFlujo.ENTREGADO;
+            } else {
+                throw new RuntimeException("No se encontró un estado previo válido para restaurar.");
+            }
+        }
+
+        String motivo = (dto != null && dto.getMotivo() != null && !dto.getMotivo().isBlank())
+                ? dto.getMotivo()
+                : "Restauración de estado previa (" + rol.getEstadoFlujo().getValor() + " -> " + destino.getValor() + ")";
+
+        EstadoFlujo origen = rol.getEstadoFlujo();
+        rol.setEstadoFlujo(destino);
+        RolExamen guardado = rolExamenRepository.save(rol);
+
+        registrarAuditoria(guardado, origen, destino,
+                "RESTAURACION_ESTADO_PREVIO",
+                actor(authentication, dto != null ? dto.getUsuario() : null),
+                dto != null && dto.getIpOrigen() != null && !dto.getIpOrigen().isBlank() ? dto.getIpOrigen() : "127.0.0.1",
+                motivo);
+
+        return mapearRolConDocenteOficial(guardado);
     }
 
     @Transactional(readOnly = true)

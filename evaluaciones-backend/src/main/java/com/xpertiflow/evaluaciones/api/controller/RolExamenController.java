@@ -7,6 +7,7 @@ import com.xpertiflow.evaluaciones.api.dto.ReprogramarRangoResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.RestaurarRolRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -116,6 +117,16 @@ public class RolExamenController {
             @Valid @RequestBody RestablecerRolRequestDto dto,
             Authentication authentication) {
         return ResponseEntity.ok(rolExamenService.restablecerAValidado(id, dto, authentication));
+    }
+
+    @PostMapping("/{id}/restaurar-previo")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
+    @Operation(summary = "Restaurar un rol de examen restablecido por error a su estado previo")
+    public ResponseEntity<RolExamenResponseDto> restaurarEstadoPrevio(
+            @PathVariable String id,
+            @RequestBody(required = false) RestaurarRolRequestDto dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(rolExamenService.restaurarEstadoPrevio(id, dto, authentication));
     }
 
     @GetMapping("/{id}/auditoria")

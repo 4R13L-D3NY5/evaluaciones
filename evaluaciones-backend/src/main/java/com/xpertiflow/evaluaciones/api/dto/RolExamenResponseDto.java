@@ -59,4 +59,8 @@ public class RolExamenResponseDto {
     private LocalDateTime fechaSincronizacionSea;
     private String sincronizadoSeaPor;
     private String sincronizacionSeaResultado;
+    private Boolean fueRestablecido;
+    private String estadoPrevioRestablecimiento;
+    private String motivoRestablecimiento;
+    private LocalDateTime fechaRestablecimiento;
 }
