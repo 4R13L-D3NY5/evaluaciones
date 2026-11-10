@@ -3,6 +3,7 @@ package com.xpertiflow.evaluaciones.application;
 import com.xpertiflow.evaluaciones.api.mapper.RolExamenMapper;
 import com.xpertiflow.evaluaciones.api.dto.RolExamenRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.RestaurarRolRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
@@ -178,6 +179,58 @@ class RolExamenServiceTest {
 
         verify(rolExamenRepository, never()).save(rol);
         verify(auditoriaRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void restaurarEstadoPrevioRecuperaEstadoOrigenDeAuditoria() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-TEST-RESTORE-001")
+                .estadoFlujo(EstadoFlujo.VALIDADO)
+                .variantesGeneradasCount(4)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(rolExamenRepository.save(rol)).thenReturn(rol);
+
+        AuditoriaEvaluacion aud = AuditoriaEvaluacion.builder()
+                .id(999L)
+                .rolExamen(rol)
+                .accion("RESTABLECIMIENTO_A_VALIDADO")
+                .etapaOrigen("ENTREGADO")
+                .etapaDestino("VALIDADO")
+                .detalle("error docente")
+                .build();
+        when(auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rol.getId(), "RESTABLECIMIENTO_A_VALIDADO"))
+                .thenReturn(Optional.of(aud));
+
+        service.restaurarEstadoPrevio(rol.getId(), RestaurarRolRequestDto.builder()
+                .motivo("Deshacer restablecimiento por error")
+                .usuario("Admin")
+                .build());
+
+        assertThat(rol.getEstadoFlujo()).isEqualTo(EstadoFlujo.ENTREGADO);
+        ArgumentCaptor<AuditoriaEvaluacion> auditoria = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);
+        verify(auditoriaRepository).save(auditoria.capture());
+        assertThat(auditoria.getValue().getEtapaOrigen()).isEqualTo("VALIDADO");
+        assertThat(auditoria.getValue().getEtapaDestino()).isEqualTo("ENTREGADO");
+        assertThat(auditoria.getValue().getAccion()).isEqualTo("RESTAURACION_ESTADO_PREVIO");
+        assertThat(auditoria.getValue().getDetallesJson()).contains("Deshacer restablecimiento por error");
+    }
+
+    @Test
+    void restaurarEstadoPrevioRechazaSiNoEstaEnValidado() {
+        RolExamen rol = RolExamen.builder()
+                .id("ROL-TEST-RESTORE-002")
+                .estadoFlujo(EstadoFlujo.ENTREGADO)
+                .build();
+        when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        assertThatThrownBy(() -> service.restaurarEstadoPrevio(rol.getId(), RestaurarRolRequestDto.builder()
+                .motivo("No debe ejecutarse")
+                .build()))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("actualmente en VALIDADO");
+
+        verify(rolExamenRepository, never()).save(rol);
     }
 
     @Test
