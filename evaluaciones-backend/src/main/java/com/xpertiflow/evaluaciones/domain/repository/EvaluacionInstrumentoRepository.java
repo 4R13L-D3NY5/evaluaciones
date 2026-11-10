@@ -13,15 +13,23 @@ import java.util.Optional;
 @Repository
 public interface EvaluacionInstrumentoRepository extends JpaRepository<EvaluacionInstrumento, String> {
 
-    Optional<EvaluacionInstrumento> findByEstado(String estado);
+    Optional<EvaluacionInstrumento> findFirstByEstado(String estado);
+
+    Optional<EvaluacionInstrumento> findFirstByDestinatarioAndEstado(String destinatario, String estado);
 
     Optional<EvaluacionInstrumento> findByCodigo(String codigo);
 
     List<EvaluacionInstrumento> findAllByOrderByCreadoEnDesc();
 
+    List<EvaluacionInstrumento> findByDestinatarioOrderByCreadoEnDesc(String destinatario);
+
     @Modifying
     @Query("UPDATE EvaluacionInstrumento i SET i.estado = 'HISTORICO' WHERE i.estado = 'VIGENTE'")
     void desactivarInstrumentosVigentes();
+
+    @Modifying
+    @Query("UPDATE EvaluacionInstrumento i SET i.estado = 'HISTORICO' WHERE i.estado = 'VIGENTE' AND i.destinatario = :destinatario")
+    void desactivarInstrumentosVigentesPorDestinatario(@Param("destinatario") String destinatario);
 
     @Modifying
     @Query("UPDATE EvaluacionInstrumento i SET i.estado = 'VIGENTE' WHERE i.id = :id")

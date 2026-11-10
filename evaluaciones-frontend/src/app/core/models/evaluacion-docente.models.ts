@@ -20,6 +20,7 @@ export interface EvaluacionInstrumento {
   titulo: string;
   descripcion?: string;
   estado: 'BORRADOR' | 'VIGENTE' | 'HISTORICO';
+  destinatario?: 'DIRECTOR' | 'ESTUDIANTE';
   escalaMin: number;
   escalaMax: number;
   creadoPor: string;
@@ -93,4 +94,75 @@ export interface EvaluacionDocenteRegistro {
   creadoPor: string;
   creadoEn: string;
   respuestas?: EvaluacionDocenteRespuesta[];
+}
+
+export interface MateriaEstudiante {
+  materiaCodigo: string;
+  materiaNombre: string;
+  grupoCodigo: string;
+  docenteId?: string;
+  docenteNombre: string;
+  sedeCodigo?: string;
+  carreraCodigo?: string;
+  evaluada: boolean;
+  fechaEvaluacion?: string;
+}
+
+export interface EstudianteAvanceEvaluacion {
+  estudianteCodigo: string;
+  estudianteNombre: string;
+  sedeCodigo?: string;
+  carreraCodigo?: string;
+  carreraNombre?: string;
+  gestion?: string;
+  totalMaterias: number;
+  materiasEvaluadas: number;
+  porcentajeAvance: number;
+  materias: MateriaEstudiante[];
+}
+
+export interface EvaluacionEstudianteAplicarRequest {
+  estudianteCodigo: string;
+  estudianteNombre?: string;
+  materiaCodigo: string;
+  materiaNombre: string;
+  grupoCodigo: string;
+  docenteId?: string;
+  docenteNombre: string;
+  gestion: string;
+  sedeCodigo?: string;
+  carreraCodigo?: string;
+  instrumentoId?: string;
+  observaciones?: string;
+  respuestas: Record<string, number>;
+}
+
+
+export interface EvaluacionConsolidadaDocenteMateria {
+  materiaCodigo: string;
+  materiaNombre: string;
+  grupoCodigo: string;
+  docenteNombre: string;
+  docenteCi?: string;
+  gestion: string;
+  sedeCodigo: string;
+  carreraCodigo: string;
+
+  // Director (50 Pts)
+  directorEvaluado: boolean;
+  directorPuntaje100?: number;
+  directorPuntos50: number;
+  directorFechaEvaluacion?: string;
+  directorObservaciones?: string;
+
+  // Estudiantes (50 Pts)
+  totalEstudiantesMatriculados: number;
+  totalEstudiantesEvaluaron: number;
+  estudiantesParticipacionPorcentaje: number;
+  estudiantesPromedioPorcentaje: number;
+  estudiantesPuntos50: number;
+
+  // Consolidado (100 Pts)
+  puntajeFinal100: number;
+  estadoFinal: string;
 }

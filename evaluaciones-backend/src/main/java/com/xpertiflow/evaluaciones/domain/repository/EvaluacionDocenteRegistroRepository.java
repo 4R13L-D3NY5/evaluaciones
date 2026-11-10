@@ -7,22 +7,28 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface EvaluacionDocenteRegistroRepository extends JpaRepository<EvaluacionDocenteRegistro, String> {
 
+    @Query("SELECT r FROM EvaluacionDocenteRegistro r WHERE (r.gestion = :gestion OR r.gestion = 'ACTIVA' OR :gestion = 'ACTIVA' OR (r.gestion IN ('II-2026', '2-2026') AND :gestion IN ('II-2026', '2-2026'))) " +
+           "AND r.sedeCodigo = :sedeCodigo AND r.carreraCodigo = :carreraCodigo ORDER BY r.creadoEn DESC")
     List<EvaluacionDocenteRegistro> findByGestionAndSedeCodigoAndCarreraCodigoOrderByCreadoEnDesc(
-            String gestion, String sedeCodigo, String carreraCodigo
+            @Param("gestion") String gestion,
+            @Param("sedeCodigo") String sedeCodigo,
+            @Param("carreraCodigo") String carreraCodigo
     );
 
+    @Query("SELECT r FROM EvaluacionDocenteRegistro r WHERE (r.gestion = :gestion OR r.gestion = 'ACTIVA' OR :gestion = 'ACTIVA' OR (r.gestion IN ('II-2026', '2-2026') AND :gestion IN ('II-2026', '2-2026'))) " +
+           "AND r.sedeCodigo = :sedeCodigo ORDER BY r.creadoEn DESC")
     List<EvaluacionDocenteRegistro> findByGestionAndSedeCodigoOrderByCreadoEnDesc(
-            String gestion, String sedeCodigo
+            @Param("gestion") String gestion,
+            @Param("sedeCodigo") String sedeCodigo
     );
 
     List<EvaluacionDocenteRegistro> findByDocenteNombreIgnoreCaseOrderByCreadoEnDesc(String docenteNombre);
 
-    @Query("SELECT r FROM EvaluacionDocenteRegistro r WHERE r.gestion = :gestion " +
+    @Query("SELECT r FROM EvaluacionDocenteRegistro r WHERE (r.gestion = :gestion OR r.gestion = 'ACTIVA' OR :gestion = 'ACTIVA' OR (r.gestion IN ('II-2026', '2-2026') AND :gestion IN ('II-2026', '2-2026'))) " +
            "AND r.sedeCodigo = :sedeCodigo AND r.carreraCodigo = :carreraCodigo " +
            "AND r.materiaCodigo = :materiaCodigo AND r.grupoCodigo = :grupoCodigo " +
            "ORDER BY r.creadoEn DESC")

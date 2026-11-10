@@ -28,8 +28,11 @@ public class EvaluacionDocenteService {
 
     @Transactional(readOnly = true)
     public EvaluacionInstrumentoDto obtenerInstrumentoVigente() {
-        EvaluacionInstrumento inst = instrumentoRepository.findByEstado("VIGENTE")
+        EvaluacionInstrumento inst = instrumentoRepository.findFirstByDestinatarioAndEstado("DIRECTOR", "VIGENTE")
+                .or(() -> instrumentoRepository.findByCodigo("EVAL-COMP-DOCENTE-2026"))
+                .or(() -> instrumentoRepository.findFirstByEstado("VIGENTE"))
                 .orElseGet(() -> instrumentoRepository.findAllByOrderByCreadoEnDesc().stream()
+                        .filter(i -> !"ESTUDIANTE".equalsIgnoreCase(i.getDestinatario()))
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("No hay ningún instrumento de evaluación registrado")));
 
@@ -55,7 +58,8 @@ public class EvaluacionDocenteService {
         EvaluacionInstrumento inst = instrumentoRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Instrumento no encontrado con ID: " + id));
 
-        instrumentoRepository.desactivarInstrumentosVigentes();
+        String dest = inst.getDestinatario() != null ? inst.getDestinatario() : "DIRECTOR";
+        instrumentoRepository.desactivarInstrumentosVigentesPorDestinatario(dest);
         inst.setEstado("VIGENTE");
         inst.setActualizadoEn(LocalDateTime.now());
         instrumentoRepository.save(inst);
@@ -98,7 +102,8 @@ public class EvaluacionDocenteService {
         }
 
         if ("VIGENTE".equalsIgnoreCase(dto.getEstado())) {
-            instrumentoRepository.desactivarInstrumentosVigentes();
+            String dest = inst.getDestinatario() != null ? inst.getDestinatario() : "DIRECTOR";
+        instrumentoRepository.desactivarInstrumentosVigentesPorDestinatario(dest);
             inst.setEstado("VIGENTE");
         }
 
@@ -220,15 +225,17 @@ public class EvaluacionDocenteService {
     public EvaluacionDocenteRegistroDto aplicarEvaluacion(EvaluacionDocenteAplicarRequestDto req, Authentication auth) {
         String usuario = auth != null ? auth.getName() : "SISTEMA";
 
-        // Siempre aplicar con el instrumento que se encuentra oficialmente VIGENTE
-        EvaluacionInstrumento inst = instrumentoRepository.findByEstado("VIGENTE")
-                .orElseGet(() -> {
-                    if (req.getInstrumentoId() != null && !req.getInstrumentoId().isBlank()) {
-                        return instrumentoRepository.findById(req.getInstrumentoId())
-                                .orElseThrow(() -> new IllegalStateException("No hay instrumento de evaluación disponible en el sistema"));
-                    }
-                    throw new IllegalStateException("No hay un instrumento en vigencia oficial para aplicar evaluaciones");
-                });
+        // Siempre aplicar con el instrumento que se encuentra oficialmente VIGENTE para el Director
+        EvaluacionInstrumento inst = (req.getInstrumentoId() != null && !req.getInstrumentoId().isBlank())
+                ? instrumentoRepository.findById(req.getInstrumentoId()).orElse(null)
+                : null;
+
+        if (inst == null) {
+            inst = instrumentoRepository.findFirstByDestinatarioAndEstado("DIRECTOR", "VIGENTE")
+                    .or(() -> instrumentoRepository.findByCodigo("EVAL-COMP-DOCENTE-2026"))
+                    .or(() -> instrumentoRepository.findFirstByEstado("VIGENTE"))
+                    .orElseThrow(() -> new IllegalStateException("No hay un instrumento en vigencia oficial para aplicar evaluaciones"));
+        }
 
         Map<String, EvaluacionCriterio> criteriosMap = criterioRepository.findAll().stream()
                 .collect(Collectors.toMap(EvaluacionCriterio::getId, c -> c));

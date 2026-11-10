@@ -35,6 +35,10 @@ public class EvaluacionInstrumento {
     @Builder.Default
     private String estado = "BORRADOR";
 
+    @Column(name = "destinatario", length = 30, nullable = false)
+    @Builder.Default
+    private String destinatario = "DIRECTOR";
+
     @Column(name = "escala_min", nullable = false)
     @Builder.Default
     private Integer escalaMin = 1;

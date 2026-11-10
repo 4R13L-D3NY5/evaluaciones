@@ -366,7 +366,7 @@ export class SidebarComponent implements OnInit {
       route: '/auditoria',
       icon: 'pi pi-shield-check',
       description: 'Peritaje forense de toma de grupos, nóminas, bitácora de IPs y accesos',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA']
+      roles: ['ADMINISTRADOR_SISTEMA']
     },
     {
       label: 'Respaldos y contingencia',

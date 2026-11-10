@@ -21,11 +21,14 @@ import { VerificarExamenesComponent } from './pages/verificar-examenes/verificar
 import { SincronizacionSeaComponent } from './pages/sincronizacion-sea/sincronizacion-sea.component';
 import { TestVocacionalComponent } from './pages/test-vocacional/test-vocacional.component';
 import { EvaluacionDocenteComponent } from './pages/evaluacion-docente/evaluacion-docente.component';
+import { EvaluacionEstudiantilComponent } from './pages/evaluacion-estudiantil/evaluacion-estudiantil.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard], title: 'Acceso - Sistema de Evaluaciones' },
   { path: 'cambiar-contrasena', component: CambiarContrasenaComponent, canActivate: [authGuard], title: 'Cambiar contraseña - Sistema de Evaluaciones' },
   { path: 'examen-virtual', component: ExamenVirtualComponent, title: 'Examen virtual - Sistema de Evaluaciones' },
+  { path: 'evaluacion-estudiantil', component: EvaluacionEstudiantilComponent, title: 'Evaluación Docente por Estudiantes - Sistema de Evaluaciones' },
+  { path: 'evaluacion-docente-estudiante', redirectTo: 'evaluacion-estudiantil', pathMatch: 'full' },
   {
     path: '',
     component: LayoutComponent,
@@ -45,11 +48,11 @@ export const routes: Routes = [
       { path: 'administracion-evaluaciones', component: AdministracionEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Administración - Sistema de Evaluaciones' },
       { path: 'reporte-evaluaciones', component: ReporteEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA', 'VERIFICADOR'])], title: 'Reporte Evaluaciones - Sistema de Evaluaciones' },
       { path: 'rol-examenes', component: RolExamenesComponent, canActivate: [roleGuard(['DIRECTOR_CARRERA', 'VICERRECTOR'])], title: 'Rol de Exámenes - Sistema de Evaluaciones' },
-      { path: 'auditoria', component: AuditoriaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA'])], title: 'Auditoría & Bitácora - Sistema de Evaluaciones' },
+      { path: 'auditoria', component: AuditoriaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Auditoría & Bitácora - Sistema de Evaluaciones' },
       { path: 'usuarios-sistema', component: UsuariosSistemaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Usuarios y accesos - Sistema de Evaluaciones' },
       { path: 'respaldos', component: RespaldosComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Respaldos y contingencia - Sistema de Evaluaciones' },
-      { path: 'sincronizacion-sea', component: SincronizacionSeaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Sincronización SEA - Sistema de Evaluaciones' },
-      { path: 'verificar-examenes', component: VerificarExamenesComponent, canActivate: [strictRoleGuard(['VERIFICADOR'])], title: 'Verificar exámenes - Sistema de Evaluaciones' }
+      { path: 'verificar-examenes', component: VerificarExamenesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'VERIFICADOR'])], title: 'Verificación de exámenes - Sistema de Evaluaciones' },
+      { path: 'sincronizacion-sea', component: SincronizacionSeaComponent, canActivate: [strictRoleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Sincronización SEA - Sistema de Evaluaciones' }
     ]
   },
   { path: '**', redirectTo: 'dashboard' }

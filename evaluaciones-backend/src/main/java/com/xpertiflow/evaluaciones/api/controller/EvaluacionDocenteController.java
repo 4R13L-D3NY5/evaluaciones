@@ -1,6 +1,7 @@
 package com.xpertiflow.evaluaciones.api.controller;
 
 import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.*;
+import com.xpertiflow.evaluaciones.application.evaluaciondocente.EvaluacionDocenteEstudianteService;
 import com.xpertiflow.evaluaciones.application.evaluaciondocente.EvaluacionDocenteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +23,7 @@ import java.util.List;
 public class EvaluacionDocenteController {
 
     private final EvaluacionDocenteService evaluacionDocenteService;
+    private final EvaluacionDocenteEstudianteService evaluacionDocenteEstudianteService;
 
     @GetMapping("/instrumento-vigente")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
@@ -99,5 +101,25 @@ public class EvaluacionDocenteController {
         String usuario = authentication != null ? authentication.getName() : "ADMIN_EVALUACIONES";
         evaluacionDocenteService.restablecerEvaluacion(id, usuario);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/avance-estudiantes")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @Operation(summary = "Consultar avance de evaluación docente por estudiantes (ej. 3/5) en una carrera")
+    public ResponseEntity<List<EstudianteAvanceEvaluacionDto>> listarAvanceEstudiantes(
+            @RequestParam String sedeCodigo,
+            @RequestParam String carreraCodigo,
+            @RequestParam(required = false) String gestion) {
+        return ResponseEntity.ok(evaluacionDocenteEstudianteService.listarAvanceEstudiantesPorCarrera(sedeCodigo, carreraCodigo, gestion));
+    }
+
+    @GetMapping("/resumen-consolidado")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @Operation(summary = "Obtener resumen consolidado (50% Director + 50% Estudiantes) por materia y docente")
+    public ResponseEntity<List<EvaluacionConsolidadaDocenteMateriaDto>> listarResumenConsolidado(
+            @RequestParam String sedeCodigo,
+            @RequestParam String carreraCodigo,
+            @RequestParam(required = false) String gestion) {
+        return ResponseEntity.ok(evaluacionDocenteEstudianteService.listarResumenConsolidado(sedeCodigo, carreraCodigo, gestion));
     }
 }

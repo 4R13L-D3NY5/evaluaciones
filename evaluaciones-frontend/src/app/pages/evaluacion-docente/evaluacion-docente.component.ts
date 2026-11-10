@@ -14,7 +14,9 @@ import {
   EvaluacionCriterio,
   EvaluacionDocenteRegistro,
   EvaluacionDocenteAplicarRequest,
-  EvaluacionDocenteRespuesta
+  EvaluacionDocenteRespuesta,
+  EstudianteAvanceEvaluacion,
+  EvaluacionConsolidadaDocenteMateria
 } from '../../core/models/evaluacion-docente.models';
 
 export interface FormCriterioItem {
@@ -42,6 +44,7 @@ export interface MateriaDocenteItem {
   grupoCodigo: string;
   tipoClase: string;
   registroEvaluacion?: EvaluacionDocenteRegistro;
+  consolidado?: EvaluacionConsolidadaDocenteMateria;
 }
 
 export interface DocenteEvaluacionRow {
@@ -52,6 +55,13 @@ export interface DocenteEvaluacionRow {
   evaluadasCount: number;
   porcentajeEvaluacion: number;
   promedioPuntaje: number | null;
+  // Métricas Consolidadas (50% Director + 50% Estudiantes)
+  promedioConsolidado: number | null;
+  promedioDirector50: number | null;
+  promedioEstudiantes50: number | null;
+  totalMatriculadosCarrera: number;
+  totalEvaluaronCarrera: number;
+  porcentajeParticipacionEstudiantes: number;
 }
 
 @Component({
@@ -86,26 +96,34 @@ export interface DocenteEvaluacionRow {
             <i class="pi pi-file-pdf text-red-600 text-sm"></i>
             <span>Descargar Reporte PDF</span>
           </button>
-          @if (esAdminOResponsable()) {
-            <div class="bg-muted p-1 rounded-xl flex items-center gap-1 border border-border">
-              <button 
-                type="button"
-                (click)="vistaActiva.set('evaluaciones')"
-                [class]="vistaActiva() === 'evaluaciones' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
-                class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5">
-                <i class="pi pi-users text-xs"></i>
-                <span>Evaluación por Docentes</span>
-              </button>
+          <div class="bg-muted p-1 rounded-xl flex items-center gap-1 border border-border">
+            <button 
+              type="button"
+              (click)="vistaActiva.set('evaluaciones')"
+              [class]="vistaActiva() === 'evaluaciones' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+              class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+              <i class="pi pi-users text-xs"></i>
+              <span>Evaluación por Docentes</span>
+            </button>
+            <button 
+              type="button"
+              (click)="cambiarAEstudiantes()"
+              [class]="vistaActiva() === 'estudiantes' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+              class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+              <i class="pi pi-id-card text-xs"></i>
+              <span>Seguimiento Estudiantil</span>
+            </button>
+            @if (esAdminOResponsable()) {
               <button 
                 type="button"
                 (click)="vistaActiva.set('instrumentos')"
                 [class]="vistaActiva() === 'instrumentos' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
-                class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5">
+                class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
                 <i class="pi pi-sliders-h text-xs"></i>
                 <span>Gestor de Tests</span>
               </button>
-            </div>
-          }
+            }
+          </div>
         </div>
       </div>
 
@@ -297,8 +315,8 @@ export interface DocenteEvaluacionRow {
                   <tr class="border-b border-border bg-muted/40 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
                     <th class="p-3.5">Docente</th>
                     <th class="p-3.5">Materias que Dicta</th>
-                    <th class="p-3.5 text-center">Porcentaje de Evaluación</th>
-                    <th class="p-3.5 text-center">Calificación Promedio</th>
+                    <th class="p-3.5 text-center">Avance de Evaluación</th>
+                    <th class="p-3.5 text-center">Calificación Consolidada (100 Pts)</th>
                     <th class="p-3.5 text-right">Acción</th>
                   </tr>
                 </thead>
@@ -331,67 +349,85 @@ export interface DocenteEvaluacionRow {
                             <div 
                               [class]="materia.registroEvaluacion 
                                 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                                : 'bg-muted/80 border-border text-muted-foreground'"
-                              class="border rounded-lg px-2 py-1 text-[11px] font-medium flex items-center gap-1.5 shadow-2xs">
-                              @if (materia.registroEvaluacion) {
-                                <i class="pi pi-check-circle text-emerald-600 text-[10px]"></i>
-                              } @else {
-                                <i class="pi pi-clock text-amber-500 text-[10px]"></i>
-                              }
-                              <span class="font-bold text-foreground">{{ materia.materiaNombre }}</span>
-                              @if (materia.registroEvaluacion; as reg) {
-                                <span class="bg-emerald-200/60 text-emerald-900 font-mono font-black text-[9px] px-1 rounded">
-                                  {{ reg.puntajeTotal }} pts
-                                </span>
+                                : (materia.consolidado && (materia.consolidado.totalEstudiantesEvaluaron || 0) > 0 ? 'bg-purple-50 border-purple-200 text-purple-900' : 'bg-muted/80 border-border text-muted-foreground')"
+                              class="border rounded-lg px-2.5 py-1 text-[11px] font-medium flex flex-col gap-0.5 shadow-2xs">
+                              <div class="flex items-center gap-1.5">
+                                @if (materia.registroEvaluacion) {
+                                  <i class="pi pi-check-circle text-emerald-600 text-[10px]"></i>
+                                } @else {
+                                  <i class="pi pi-clock text-amber-500 text-[10px]"></i>
+                                }
+                                <span class="font-bold text-foreground">{{ materia.materiaNombre }}</span>
+                              </div>
+                              @if (materia.consolidado; as cons) {
+                                <div class="flex items-center gap-1.5 text-[10px] mt-0.5">
+                                  <span class="bg-primary/10 text-primary font-mono font-black px-1.5 py-0.2 rounded text-[9px]">
+                                    {{ cons.puntajeFinal100 }} pts
+                                  </span>
+                                  <span class="text-muted-foreground font-mono text-[9px]">
+                                    Est: {{ cons.totalEstudiantesEvaluaron }}/{{ cons.totalEstudiantesMatriculados }} ({{ cons.estudiantesPuntos50 }} pts)
+                                  </span>
+                                </div>
                               }
                             </div>
                           }
                         </div>
                       </td>
 
-                      <!-- Porcentaje de Evaluación -->
+                      <!-- Avance de Evaluación (Director y Estudiantes) -->
                       <td class="p-3.5 text-center align-top">
-                        <div class="flex flex-col items-center gap-1">
-                          <div class="flex items-center gap-2">
-                            <span 
-                              [class]="doc.porcentajeEvaluacion === 100 
-                                ? 'text-emerald-600' 
-                                : doc.porcentajeEvaluacion > 0 
-                                  ? 'text-blue-600' 
-                                  : 'text-amber-600'"
-                              class="text-sm font-black font-mono">
-                              {{ doc.porcentajeEvaluacion }}%
-                            </span>
-                            <span class="text-[10px] text-muted-foreground font-bold">
-                              ({{ doc.evaluadasCount }} de {{ doc.totalMaterias }} evaluadas)
-                            </span>
-                          </div>
+                        <div class="flex flex-col items-center gap-2">
                           
-                          <!-- Barra de progreso visual -->
-                          <div class="h-2 w-32 bg-muted rounded-full overflow-hidden border border-border/50">
-                            <div 
-                              [class]="doc.porcentajeEvaluacion === 100 
-                                ? 'bg-emerald-500' 
-                                : doc.porcentajeEvaluacion > 0 
-                                  ? 'bg-blue-600' 
-                                  : 'bg-amber-400'"
-                              class="h-full transition-all duration-300"
-                              [style.width.%]="doc.porcentajeEvaluacion"></div>
+                          <!-- Avance Director -->
+                          <div class="w-full max-w-[190px] bg-muted/40 p-2 rounded-lg border border-border/50 text-left">
+                            <div class="flex items-center justify-between text-[10px] font-bold">
+                              <span class="text-muted-foreground flex items-center gap-1">
+                                <i class="pi pi-user text-primary text-[10px]"></i> Director (50%)
+                              </span>
+                              <span [class]="doc.porcentajeEvaluacion === 100 ? 'text-emerald-600' : (doc.porcentajeEvaluacion > 0 ? 'text-blue-600' : 'text-amber-600')" class="font-mono font-black">
+                                {{ doc.porcentajeEvaluacion }}% ({{ doc.evaluadasCount }}/{{ doc.totalMaterias }})
+                              </span>
+                            </div>
+                            <div class="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-1 border border-border/40">
+                              <div [class]="doc.porcentajeEvaluacion === 100 ? 'bg-emerald-500' : (doc.porcentajeEvaluacion > 0 ? 'bg-blue-600' : 'bg-amber-400')"
+                                   class="h-full transition-all duration-300"
+                                   [style.width.%]="doc.porcentajeEvaluacion"></div>
+                            </div>
                           </div>
+
+                          <!-- Avance Estudiantes -->
+                          <div class="w-full max-w-[190px] bg-muted/40 p-2 rounded-lg border border-border/50 text-left">
+                            <div class="flex items-center justify-between text-[10px] font-bold">
+                              <span class="text-muted-foreground flex items-center gap-1">
+                                <i class="pi pi-users text-purple-600 text-[10px]"></i> Estudiantes (50%)
+                              </span>
+                              <span [class]="doc.totalEvaluaronCarrera > 0 ? 'text-purple-600' : 'text-muted-foreground'" class="font-mono font-black">
+                                {{ doc.totalEvaluaronCarrera }}/{{ doc.totalMatriculadosCarrera }} ({{ doc.porcentajeParticipacionEstudiantes }}%)
+                              </span>
+                            </div>
+                            <div class="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-1 border border-border/40">
+                              <div class="h-full bg-purple-500 transition-all duration-300"
+                                   [style.width.%]="doc.porcentajeParticipacionEstudiantes"></div>
+                            </div>
+                          </div>
+
                         </div>
                       </td>
 
-                      <!-- Calificación Promedio -->
+                      <!-- Calificación Consolidada (50 Director + 50 Estudiantes) -->
                       <td class="p-3.5 text-center align-top">
-                        @if (doc.promedioPuntaje !== null) {
-                          <div class="font-black font-mono text-xs text-foreground">
-                            {{ doc.promedioPuntaje }} / 100 Pts
+                        @if (doc.promedioConsolidado !== null) {
+                          <div class="font-black font-mono text-sm text-foreground">
+                            {{ doc.promedioConsolidado }} / 100 Pts
                           </div>
                           <span 
-                            [class]="doc.promedioPuntaje >= 80 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-blue-700 bg-blue-50 border-blue-200'"
+                            [class]="doc.promedioConsolidado >= 80 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : (doc.promedioConsolidado >= 51 ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-amber-700 bg-amber-50 border-amber-200')"
                             class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold border mt-0.5">
-                            {{ doc.promedioPuntaje >= 80 ? 'Sobresaliente' : 'Aprobado' }}
+                            {{ doc.promedioConsolidado >= 80 ? 'Sobresaliente' : (doc.promedioConsolidado >= 51 ? 'Aprobado' : 'Reprobado') }}
                           </span>
+                          <div class="text-[9px] text-muted-foreground mt-1 font-mono">
+                            Dir: {{ doc.promedioDirector50 }}/50 · Est: {{ doc.promedioEstudiantes50 }}/50
+                          </div>
                         } @else {
                           <span class="text-muted-foreground text-xs italic">Sin evaluaciones</span>
                         }
@@ -431,66 +467,127 @@ export interface DocenteEvaluacionRow {
                                 Materias asignadas a {{ doc.docenteNombre }}
                               </span>
                               <span class="text-[11px] text-muted-foreground font-bold">
-                                Selecciona una materia para aplicar el test oficial
+                                Desglose de Evaluación Oficial (50 Pts Director + 50 Pts Estudiantes)
                               </span>
                             </div>
 
                             <div class="divide-y divide-border/60">
                               @for (mat of doc.materias; track mat.materiaCodigo) {
-                                <div class="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                  <div>
-                                    <div class="flex items-center gap-2">
-                                      <span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono font-black text-[10px]">
-                                        {{ mat.materiaCodigo }}
-                                      </span>
-                                      <strong class="text-xs text-foreground">{{ mat.materiaNombre }}</strong>
+                                <div class="py-3 flex flex-col gap-2">
+                                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div>
+                                      <div class="flex items-center gap-2">
+                                        <span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono font-black text-[10px]">
+                                          {{ mat.materiaCodigo }}
+                                        </span>
+                                        <strong class="text-xs text-foreground">{{ mat.materiaNombre }}</strong>
+                                      </div>
+                                      <div class="text-[10px] text-muted-foreground mt-0.5">
+                                        Semestre {{ mat.semestre }} · {{ mat.horas }} Horas · Grupos: {{ mat.consolidado?.grupoCodigo || mat.grupoCodigo }}
+                                      </div>
                                     </div>
-                                    <div class="text-[10px] text-muted-foreground mt-0.5">
-                                      Semestre {{ mat.semestre }} · {{ mat.horas }} Horas · Grupo {{ mat.grupoCodigo }}
+
+                                    <div class="flex items-center gap-2 self-end sm:self-center">
+                                      @if (mat.registroEvaluacion; as reg) {
+                                        <button 
+                                          type="button" 
+                                          (click)="abrirFichaEvaluacion(reg)"
+                                          class="px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-bold inline-flex items-center gap-1 shadow-2xs">
+                                          <i class="pi pi-file text-primary"></i>
+                                          <span>Ficha Director</span>
+                                        </button>
+                                        @if (esAdminOResponsable()) {
+                                          <button 
+                                            type="button" 
+                                            (click)="confirmarRestablecer(doc, mat)"
+                                            title="Restablecer evaluación (Exclusivo Administrador)"
+                                            class="px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer">
+                                            <i class="pi pi-undo text-[10px]"></i>
+                                            <span>Restablecer</span>
+                                          </button>
+                                        }
+                                      } @else {
+                                        <button 
+                                          type="button" 
+                                          (click)="iniciarEvaluacionMateria(doc, mat)"
+                                          class="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer">
+                                          <i class="pi pi-pencil text-xs"></i>
+                                          <span>Evaluar Docente en esta Materia</span>
+                                        </button>
+                                      }
                                     </div>
                                   </div>
 
-                                  <div class="flex items-center gap-2 self-end sm:self-center">
-                                    @if (mat.registroEvaluacion; as reg) {
-                                      <div class="text-right mr-2">
-                                        <div class="font-black text-xs text-emerald-600 font-mono">
-                                          {{ reg.puntajeTotal }} / {{ reg.puntajeMaximo }} Pts ({{ reg.porcentaje }}%)
-                                        </div>
-                                        <div class="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
-                                          <span>{{ reg.fechaEvaluacion }}</span>
-                                          <span>·</span>
-                                          <span class="text-primary font-bold truncate max-w-[200px]" [title]="reg.instrumentoTitulo">
-                                            {{ reg.instrumentoTitulo }}
-                                          </span>
-                                        </div>
+                                  <!-- Dashboard Consolidado 50/50 de la Asignatura -->
+                                  <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 my-1 p-2.5 bg-muted/40 rounded-xl border border-border">
+                                    
+                                    <!-- Aporte Director (50 Pts) -->
+                                    <div class="space-y-1">
+                                      <div class="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                        <i class="pi pi-user text-primary text-[10px]"></i>
+                                        <span>1. Director (Máx 50 Pts)</span>
                                       </div>
-                                      <button 
-                                        type="button" 
-                                        (click)="abrirFichaEvaluacion(reg)"
-                                        class="px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-bold inline-flex items-center gap-1 shadow-2xs">
-                                        <i class="pi pi-file text-primary"></i>
-                                        <span>Ver Ficha</span>
-                                      </button>
-                                      @if (esAdminOResponsable()) {
-                                        <button 
-                                          type="button" 
-                                          (click)="confirmarRestablecer(doc, mat)"
-                                          title="Restablecer evaluación (Exclusivo Administrador)"
-                                          class="px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer">
-                                          <i class="pi pi-undo text-[10px]"></i>
-                                          <span>Restablecer</span>
-                                        </button>
+                                      @if (mat.consolidado?.directorEvaluado) {
+                                        <div class="flex items-baseline gap-1.5">
+                                          <span class="text-base font-black font-mono text-foreground">{{ mat.consolidado?.directorPuntos50 }}</span>
+                                          <span class="text-[10px] text-muted-foreground font-bold">/ 50 Pts</span>
+                                          <span class="text-[10px] text-emerald-600 font-bold">({{ mat.consolidado?.directorPuntaje100 }} / 100)</span>
+                                        </div>
+                                        <div class="text-[9px] text-muted-foreground">
+                                          Aplicado el {{ mat.consolidado?.directorFechaEvaluacion }}
+                                        </div>
+                                      } @else {
+                                        <div class="text-xs text-amber-600 font-bold italic">Pendiente</div>
+                                        <div class="text-[9px] text-muted-foreground">El director aún no aplicó el test</div>
                                       }
-                                    } @else {
-                                      <button 
-                                        type="button" 
-                                        (click)="iniciarEvaluacionMateria(doc, mat)"
-                                        class="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer">
-                                        <i class="pi pi-pencil text-xs"></i>
-                                        <span>Evaluar Docente en esta Materia</span>
-                                      </button>
-                                    }
+                                    </div>
+
+                                    <!-- Aporte Estudiantes (50 Pts) -->
+                                    <div class="space-y-1">
+                                      <div class="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                        <i class="pi pi-users text-purple-600 text-[10px]"></i>
+                                        <span>2. Estudiantes (Máx 50 Pts)</span>
+                                      </div>
+                                      @if (mat.consolidado && (mat.consolidado.totalEstudiantesEvaluaron || 0) > 0) {
+                                        <div class="flex items-baseline gap-1.5">
+                                          <span class="text-base font-black font-mono text-purple-600">{{ mat.consolidado.estudiantesPuntos50 }}</span>
+                                          <span class="text-[10px] text-muted-foreground font-bold">/ 50 Pts</span>
+                                          <span class="text-[10px] text-purple-600 font-bold">({{ mat.consolidado.estudiantesPromedioPorcentaje }}% prom.)</span>
+                                        </div>
+                                        <div class="text-[10px] font-bold text-foreground flex items-center gap-1">
+                                          <span class="px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 font-mono text-[10px]">
+                                            {{ mat.consolidado.totalEstudiantesEvaluaron }} / {{ mat.consolidado.totalEstudiantesMatriculados }}
+                                          </span>
+                                          <span class="text-[9px] text-muted-foreground">estudiantes completaron el test ({{ mat.consolidado.estudiantesParticipacionPorcentaje }}%)</span>
+                                        </div>
+                                      } @else {
+                                        <div class="text-xs text-amber-600 font-bold italic">
+                                          0 / {{ mat.consolidado?.totalEstudiantesMatriculados || 0 }} estudiantes
+                                        </div>
+                                        <div class="text-[9px] text-muted-foreground">Aún ningún estudiante aplicó el test</div>
+                                      }
+                                    </div>
+
+                                    <!-- Total Consolidado (100 Pts) -->
+                                    <div class="space-y-1 bg-card p-2 rounded-lg border border-border shadow-2xs flex flex-col justify-center">
+                                      <div class="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                                        <span>Total Consolidado</span>
+                                        <span [class]="mat.consolidado?.estadoFinal === 'Sobresaliente' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : (mat.consolidado?.estadoFinal === 'Aprobado' ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-amber-700 bg-amber-50 border-amber-200')"
+                                              class="px-1.5 py-0.2 rounded text-[9px] font-bold border">
+                                          {{ mat.consolidado?.estadoFinal || 'Pendiente' }}
+                                        </span>
+                                      </div>
+                                      <div class="flex items-baseline gap-1.5">
+                                        <span class="text-lg font-black font-mono text-primary">{{ mat.consolidado?.puntajeFinal100 || 0 }}</span>
+                                        <span class="text-xs text-muted-foreground font-bold">/ 100 Pts</span>
+                                      </div>
+                                      <div class="text-[9px] text-muted-foreground">
+                                        Dir: {{ mat.consolidado?.directorPuntos50 || 0 }} + Est: {{ mat.consolidado?.estudiantesPuntos50 || 0 }}
+                                      </div>
+                                    </div>
+
                                   </div>
+
                                 </div>
                               }
                             </div>
@@ -499,6 +596,258 @@ export interface DocenteEvaluacionRow {
                       </tr>
                     }
 
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+
+      }
+
+      <!-- =================================================================== -->
+      <!-- VISTA 3: SEGUIMIENTO DE EVALUACIÓN ESTUDIANTIL                     -->
+      <!-- =================================================================== -->
+      @if (vistaActiva() === 'estudiantes') {
+
+        <!-- Filtros Superiores -->
+        <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            
+            <!-- Selector de Gestión -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-calendar text-primary text-[10px]"></i> Gestión Académica
+              </label>
+              <select 
+                [ngModel]="storage.gestionActiva()" 
+                (ngModelChange)="onGestionChange($event)"
+                class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-black text-foreground outline-none cursor-pointer focus:border-primary">
+                <option value="II-2026">II-2026 (Gestión Activa)</option>
+              </select>
+            </div>
+
+            <!-- Selector de Sede -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-map-marker text-primary text-[10px]"></i> Sede Académica
+              </label>
+              <select 
+                [ngModel]="filtroSedeCodigo" 
+                (ngModelChange)="onSedeChange($event)"
+                [disabled]="cargandoSedes()"
+                class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
+                @if (cargandoSedes()) {
+                  <option value="">Cargando sedes...</option>
+                } @else {
+                  @for (sede of sedes(); track sede.branchOfficeId) {
+                    <option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>
+                  }
+                }
+              </select>
+            </div>
+
+            <!-- Selector de Carrera -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-graduation-cap text-primary text-[10px]"></i> Carrera
+              </label>
+              <select 
+                [ngModel]="filtroCarreraCodigo" 
+                (ngModelChange)="onCarreraChange($event)"
+                [disabled]="cargandoCarreras() || !filtroSedeCodigo"
+                class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
+                @if (cargandoCarreras()) {
+                  <option value="">Cargando carreras...</option>
+                } @else {
+                  @for (carrera of carreras(); track carrera.careerId) {
+                    <option [value]="carrera.careerCode">{{ carrera.careerName }} ({{ carrera.careerCode }})</option>
+                  }
+                }
+              </select>
+            </div>
+
+            <!-- Buscador de Estudiante -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-search text-primary text-[10px]"></i> Buscar Estudiante o Código
+              </label>
+              <div class="relative">
+                <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
+                <input 
+                  type="text" 
+                  [ngModel]="busquedaEstudiante()" 
+                  (ngModelChange)="busquedaEstudiante.set($event)"
+                  placeholder="Ej: 1108180, Bonifaz, Alex..."
+                  class="w-full bg-muted/70 border border-border rounded-xl pl-8 pr-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/60" />
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Píldoras de Filtro de Estado -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mr-1">
+                Estado Evaluación:
+              </span>
+              <button 
+                type="button" 
+                (click)="filtroEstadoEstudiante.set('todos')"
+                [class]="filtroEstadoEstudiante() === 'todos' ? 'bg-primary text-primary-foreground font-black' : 'bg-muted text-muted-foreground hover:text-foreground'"
+                class="px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer">
+                Todos ({{ metricasEstudiantes().total }})
+              </button>
+              <button 
+                type="button" 
+                (click)="filtroEstadoEstudiante.set('completados')"
+                [class]="filtroEstadoEstudiante() === 'completados' ? 'bg-emerald-600 text-white font-black' : 'bg-muted text-muted-foreground hover:text-foreground'"
+                class="px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer">
+                Completados 100% ({{ metricasEstudiantes().completados }})
+              </button>
+              <button 
+                type="button" 
+                (click)="filtroEstadoEstudiante.set('en_progreso')"
+                [class]="filtroEstadoEstudiante() === 'en_progreso' ? 'bg-blue-600 text-white font-black' : 'bg-muted text-muted-foreground hover:text-foreground'"
+                class="px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer">
+                En Progreso ({{ metricasEstudiantes().enProgreso }})
+              </button>
+              <button 
+                type="button" 
+                (click)="filtroEstadoEstudiante.set('pendientes')"
+                [class]="filtroEstadoEstudiante() === 'pendientes' ? 'bg-amber-600 text-white font-black' : 'bg-muted text-muted-foreground hover:text-foreground'"
+                class="px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer">
+                Sin Evaluar ({{ metricasEstudiantes().pendientes }})
+              </button>
+            </div>
+
+            <div class="text-[11px] text-muted-foreground font-bold flex items-center gap-1.5">
+              <i class="pi pi-link text-purple-600"></i>
+              <span>Link Estudiantil: <code class="bg-muted px-1.5 py-0.5 rounded text-foreground font-mono">/evaluacion-estudiantil</code></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjetas Estadísticas de Avance Estudiantil -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="bg-card border border-border rounded-xl p-4 shadow-2xs flex items-center justify-between">
+            <div>
+              <div class="text-2xl font-black font-mono text-foreground">{{ metricasEstudiantes().total }}</div>
+              <div class="text-xs text-muted-foreground font-bold">Total Estudiantes Carrera</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-lg">
+              <i class="pi pi-users"></i>
+            </div>
+          </div>
+
+          <div class="bg-card border border-border rounded-xl p-4 shadow-2xs flex items-center justify-between">
+            <div>
+              <div class="text-2xl font-black font-mono text-emerald-600">{{ metricasEstudiantes().completados }}</div>
+              <div class="text-xs text-muted-foreground font-bold">Evaluación Completa (100%)</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center text-lg">
+              <i class="pi pi-check-circle"></i>
+            </div>
+          </div>
+
+          <div class="bg-card border border-border rounded-xl p-4 shadow-2xs flex items-center justify-between">
+            <div>
+              <div class="text-2xl font-black font-mono text-blue-600">{{ metricasEstudiantes().enProgreso }}</div>
+              <div class="text-xs text-muted-foreground font-bold">En Progreso de Evaluación</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center text-lg">
+              <i class="pi pi-sync"></i>
+            </div>
+          </div>
+
+          <div class="bg-card border border-border rounded-xl p-4 shadow-2xs flex items-center justify-between">
+            <div>
+              <div class="text-2xl font-black font-mono text-amber-600">{{ metricasEstudiantes().pendientes }}</div>
+              <div class="text-xs text-muted-foreground font-bold">Sin Evaluar (0%)</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center text-lg">
+              <i class="pi pi-clock"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de Estudiantes y Avance -->
+        <div class="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+          @if (cargandoEstudiantes()) {
+            <div class="p-12 text-center text-muted-foreground">
+              <i class="pi pi-spin pi-spinner text-3xl text-primary mb-3 block"></i>
+              <p class="text-xs font-bold">Cargando nómina de estudiantes y avance académico...</p>
+            </div>
+          } @else if (estudiantesFiltrados().length === 0) {
+            <div class="p-12 text-center text-muted-foreground">
+              <i class="pi pi-info-circle text-3xl mb-2 block"></i>
+              <p class="text-xs font-bold">No se encontraron estudiantes para los filtros seleccionados.</p>
+            </div>
+          } @else {
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-border bg-muted/40 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                    <th class="p-3.5 text-center w-12">#</th>
+                    <th class="p-3.5">Estudiante</th>
+                    <th class="p-3.5 text-center">Materias Inscritas</th>
+                    <th class="p-3.5 text-center">Avance de Evaluación</th>
+                    <th class="p-3.5 text-center">Estado</th>
+                    <th class="p-3.5 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-border text-xs">
+                  @for (est of estudiantesFiltrados(); track est.estudianteCodigo; let idx = $index) {
+                    <tr class="hover:bg-muted/30 transition-colors">
+                      <td class="p-3.5 text-center font-mono font-bold text-muted-foreground">{{ idx + 1 }}</td>
+                      <td class="p-3.5">
+                        <div class="font-bold text-foreground text-xs">{{ est.estudianteNombre }}</div>
+                        <div class="text-[11px] text-muted-foreground font-mono">
+                          C.I. / Cód: <span class="text-primary font-bold">{{ est.estudianteCodigo }}</span>
+                        </div>
+                      </td>
+                      <td class="p-3.5 text-center font-bold text-muted-foreground">
+                        {{ est.totalMaterias }} materias
+                      </td>
+                      <td class="p-3.5 text-center">
+                        <div class="flex flex-col items-center gap-1 max-w-[200px] mx-auto">
+                          <span class="text-xs font-black font-mono"
+                                [class]="est.porcentajeAvance === 100 ? 'text-emerald-600' : (est.porcentajeAvance > 0 ? 'text-blue-600' : 'text-amber-600')">
+                            {{ est.materiasEvaluadas }} de {{ est.totalMaterias }} ({{ est.porcentajeAvance }}%)
+                          </span>
+                          <div class="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                            <div class="h-1.5 rounded-full transition-all"
+                                 [style.width.%]="est.porcentajeAvance"
+                                 [class]="est.porcentajeAvance === 100 ? 'bg-emerald-500' : (est.porcentajeAvance > 0 ? 'bg-blue-500' : 'bg-amber-400')">
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="p-3.5 text-center">
+                        @if (est.totalMaterias > 0 && est.materiasEvaluadas === est.totalMaterias) {
+                          <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold text-[10px]">
+                            Completado
+                          </span>
+                        } @else if (est.materiasEvaluadas > 0) {
+                          <span class="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 font-bold text-[10px]">
+                            En Progreso
+                          </span>
+                        } @else {
+                          <span class="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold text-[10px]">
+                            Pendiente
+                          </span>
+                        }
+                      </td>
+                      <td class="p-3.5 text-right">
+                        <button
+                          type="button"
+                          (click)="verMateriasEstudiante(est)"
+                          class="px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs">
+                          <i class="pi pi-list text-xs"></i>
+                          <span>Ver Materias ({{ est.materiasEvaluadas }}/{{ est.totalMaterias }})</span>
+                        </button>
+                      </td>
+                    </tr>
                   }
                 </tbody>
               </table>
@@ -1318,6 +1667,89 @@ export interface DocenteEvaluacionRow {
         </div>
       }
 
+      <!-- =================================================================== -->
+      <!-- MODAL VER MATERIAS Y AVANCE DEL ESTUDIANTE                            -->
+      <!-- =================================================================== -->
+      @if (estudianteSeleccionado(); as est) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-border bg-muted/40 flex items-start justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded bg-primary/10 text-primary font-black text-[10px] tracking-wide uppercase">
+                    Detalle de Evaluación Estudiantil
+                  </span>
+                  <h3 class="text-base font-black text-foreground">{{ est.estudianteNombre }}</h3>
+                </div>
+                <p class="text-xs text-muted-foreground mt-1">
+                  C.I. / Cód: <strong class="text-foreground font-mono">{{ est.estudianteCodigo }}</strong> · 
+                  Avance: <strong class="text-primary font-mono">{{ est.materiasEvaluadas }} de {{ est.totalMaterias }} ({{ est.porcentajeAvance }}%)</strong>
+                </p>
+              </div>
+              <button 
+                type="button" 
+                (click)="estudianteSeleccionado.set(null)"
+                class="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted cursor-pointer transition-colors">
+                <i class="pi pi-times text-base"></i>
+              </button>
+            </div>
+
+            <!-- Modal Body: Asignaturas -->
+            <div class="p-5 overflow-y-auto space-y-3 flex-1">
+              @for (mat of est.materias; track mat.materiaCodigo + mat.docenteNombre) {
+                <div class="p-3.5 rounded-xl border flex items-center justify-between gap-3 shadow-2xs"
+                     [class]="mat.evaluada ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : 'bg-muted/40 border-border'">
+                  <div class="space-y-0.5">
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono text-[10px] px-1.5 py-0.2 rounded font-black"
+                            [class]="mat.evaluada ? 'bg-emerald-200/60 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200' : 'bg-muted text-muted-foreground'">
+                        {{ mat.materiaCodigo }}
+                      </span>
+                      @if (mat.grupoCodigo) {
+                        <span class="text-[10px] text-muted-foreground font-bold">Grupo: {{ mat.grupoCodigo }}</span>
+                      }
+                    </div>
+                    <h4 class="text-xs font-black text-foreground">{{ mat.materiaNombre }}</h4>
+                    <div class="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <i class="pi pi-user text-[10px] text-primary"></i>
+                      <span>Docente: <strong>{{ mat.docenteNombre }}</strong></span>
+                    </div>
+                  </div>
+
+                  <div class="text-right shrink-0">
+                    @if (mat.evaluada) {
+                      <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-black text-[10px] inline-flex items-center gap-1">
+                        <i class="pi pi-check text-[9px]"></i> Evaluada
+                      </span>
+                      @if (mat.fechaEvaluacion) {
+                        <div class="text-[9px] text-muted-foreground mt-0.5">
+                          {{ mat.fechaEvaluacion | date:'dd/MM/yyyy HH:mm' }}
+                        </div>
+                      }
+                    } @else {
+                      <span class="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-black text-[10px] inline-flex items-center gap-1">
+                        <i class="pi pi-clock text-[9px]"></i> Pendiente
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-border bg-muted/30 flex justify-end">
+              <button 
+                type="button" 
+                (click)="estudianteSeleccionado.set(null)"
+                class="px-4 py-2 rounded-xl bg-card border border-border hover:bg-muted font-bold text-xs text-foreground cursor-pointer shadow-2xs">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -1335,7 +1767,14 @@ export class EvaluacionDocenteComponent implements OnInit {
   private readonly evaluacionService = inject(EvaluacionDocenteService);
   public readonly auth = inject(AuthService);
 
-  public vistaActiva = signal<'evaluaciones' | 'instrumentos'>('evaluaciones');
+  public vistaActiva = signal<'evaluaciones' | 'estudiantes' | 'instrumentos'>('evaluaciones');
+
+  // Seguimiento de Estudiantes
+  public estudiantesAvance = signal<EstudianteAvanceEvaluacion[]>([]);
+  public cargandoEstudiantes = signal(false);
+  public busquedaEstudiante = signal('');
+  public filtroEstadoEstudiante = signal<'todos' | 'completados' | 'en_progreso' | 'pendientes'>('todos');
+  public estudianteSeleccionado = signal<EstudianteAvanceEvaluacion | null>(null);
 
   // Filtros
   public sedes = signal<BranchOffice[]>([]);
@@ -1408,6 +1847,35 @@ export class EvaluacionDocenteComponent implements OnInit {
   public totalCompletados = computed(() => this.docentesTotales().filter(d => d.porcentajeEvaluacion === 100).length);
   public totalEnProgreso = computed(() => this.docentesTotales().filter(d => d.porcentajeEvaluacion > 0 && d.porcentajeEvaluacion < 100).length);
   public totalSinEvaluar = computed(() => this.docentesTotales().filter(d => d.porcentajeEvaluacion === 0).length);
+
+  public estudiantesFiltrados = computed(() => {
+    let lista = this.estudiantesAvance();
+    const q = this.busquedaEstudiante().trim().toLowerCase();
+    if (q) {
+      lista = lista.filter(e => 
+        (e.estudianteNombre && e.estudianteNombre.toLowerCase().includes(q)) || 
+        (e.estudianteCodigo && e.estudianteCodigo.toLowerCase().includes(q))
+      );
+    }
+    const estado = this.filtroEstadoEstudiante();
+    if (estado === 'completados') {
+      lista = lista.filter(e => e.totalMaterias > 0 && e.materiasEvaluadas === e.totalMaterias);
+    } else if (estado === 'en_progreso') {
+      lista = lista.filter(e => e.materiasEvaluadas > 0 && e.materiasEvaluadas < e.totalMaterias);
+    } else if (estado === 'pendientes') {
+      lista = lista.filter(e => e.materiasEvaluadas === 0);
+    }
+    return lista;
+  });
+
+  public metricasEstudiantes = computed(() => {
+    const todos = this.estudiantesAvance();
+    const total = todos.length;
+    const completados = todos.filter(e => e.totalMaterias > 0 && e.materiasEvaluadas === e.totalMaterias).length;
+    const enProgreso = todos.filter(e => e.materiasEvaluadas > 0 && e.materiasEvaluadas < e.totalMaterias).length;
+    const pendientes = todos.filter(e => e.materiasEvaluadas === 0).length;
+    return { total, completados, enProgreso, pendientes };
+  });
 
   public docentesFiltrados = computed(() => {
     let lista = this.docentesTotales();
@@ -1521,7 +1989,33 @@ export class EvaluacionDocenteComponent implements OnInit {
   public recargarPlan(): void {
     if (this.filtroSedeCodigo && this.filtroCarreraCodigo) {
       this.cargarDocentesReales(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+      this.cargarAvanceEstudiantes(this.filtroSedeCodigo, this.filtroCarreraCodigo);
     }
+  }
+
+  public cambiarAEstudiantes(): void {
+    this.vistaActiva.set('estudiantes');
+    if (this.filtroSedeCodigo && this.filtroCarreraCodigo) {
+      this.cargarAvanceEstudiantes(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+    }
+  }
+
+  public cargarAvanceEstudiantes(sede: string, carrera: string): void {
+    this.cargandoEstudiantes.set(true);
+    this.evaluacionService.listarAvanceEstudiantesPorCarrera(sede, carrera, this.storage.gestionActiva()).subscribe({
+      next: lista => {
+        this.estudiantesAvance.set(lista || []);
+        this.cargandoEstudiantes.set(false);
+      },
+      error: err => {
+        console.warn('Error cargando avance estudiantes:', err);
+        this.cargandoEstudiantes.set(false);
+      }
+    });
+  }
+
+  public verMateriasEstudiante(est: EstudianteAvanceEvaluacion): void {
+    this.estudianteSeleccionado.set(est);
   }
 
   private cargarSedes(): void {
@@ -1570,9 +2064,10 @@ export class EvaluacionDocenteComponent implements OnInit {
     forkJoin({
       cursos: carrera ? this.gateway.getCourses(codigoSede, carrera.careerId).pipe(catchError(() => of([] as Course[]))) : of([] as Course[]),
       grupos: grupos$,
-      registros: this.evaluacionService.listarRegistros(gestion, codigoSede, codigoCarrera).pipe(catchError(() => of([] as EvaluacionDocenteRegistro[])))
+      registros: this.evaluacionService.listarRegistros(gestion, codigoSede, codigoCarrera).pipe(catchError(() => of([] as EvaluacionDocenteRegistro[]))),
+      consolidado: this.evaluacionService.listarResumenConsolidado(codigoSede, codigoCarrera, gestion).pipe(catchError(() => of([] as EvaluacionConsolidadaDocenteMateria[])))
     }).subscribe({
-      next: ({ cursos, grupos, registros }) => {
+      next: ({ cursos, grupos, registros, consolidado }) => {
         // Mapa de cursos por syllabusCourseId
         const cursosMap = new Map<string, Course>();
         cursos.forEach(c => cursosMap.set(c.syllabusCourseId, c));
@@ -1582,6 +2077,13 @@ export class EvaluacionDocenteComponent implements OnInit {
         registros.forEach(r => {
           const key = `${r.docenteNombre.trim().toUpperCase()}_${r.materiaCodigo.trim().toUpperCase()}`;
           regMap.set(key, r);
+        });
+
+        // Mapa de resumen consolidado por clave: DOCENTE_MATERIA
+        const consMap = new Map<string, EvaluacionConsolidadaDocenteMateria>();
+        (consolidado || []).forEach(c => {
+          const key = `${c.docenteNombre.trim().toUpperCase()}_${c.materiaCodigo.trim().toUpperCase()}`;
+          consMap.set(key, c);
         });
 
         // Agrupación por Docente
@@ -1621,6 +2123,7 @@ export class EvaluacionDocenteComponent implements OnInit {
           if (!docEntry.materiasMap.has(matKey)) {
             const regKey = `${docKey}_${matKey}`;
             const reg = regMap.get(regKey);
+            const cons = consMap.get(regKey);
 
             docEntry.materiasMap.set(matKey, {
               cursoId: g.syllabusCourseId,
@@ -1630,7 +2133,8 @@ export class EvaluacionDocenteComponent implements OnInit {
               horas: horas,
               grupoCodigo: g.code,
               tipoClase: g.classType || 'TA',
-              registroEvaluacion: reg
+              registroEvaluacion: reg,
+              consolidado: cons
             });
           }
         });
@@ -1642,12 +2146,38 @@ export class EvaluacionDocenteComponent implements OnInit {
           const evaluadas = materiasList.filter(m => !!m.registroEvaluacion).length;
           const pct = totalMats > 0 ? Math.round((evaluadas / totalMats) * 100) : 0;
 
-          // Promedio de notas
+          // Promedio Director (0-100)
           let promedio: number | null = null;
           if (evaluadas > 0) {
             const sumaPuntos = materiasList.reduce((acc, m) => acc + (m.registroEvaluacion ? Number(m.registroEvaluacion.puntajeTotal) : 0), 0);
             promedio = Math.round((sumaPuntos / evaluadas) * 10) / 10;
           }
+
+          // Métricas Consolidadas (50 Pts Director + 50 Pts Estudiantes)
+          let totalMatriculados = 0;
+          let totalEvaluaron = 0;
+          let sumaConsolidado = 0;
+          let sumaDir50 = 0;
+          let sumaEst50 = 0;
+          let materiasConEvaluacion = 0;
+
+          materiasList.forEach(m => {
+            if (m.consolidado) {
+              totalMatriculados += m.consolidado.totalEstudiantesMatriculados || 0;
+              totalEvaluaron += m.consolidado.totalEstudiantesEvaluaron || 0;
+              if (m.consolidado.directorEvaluado || (m.consolidado.totalEstudiantesEvaluaron || 0) > 0) {
+                sumaConsolidado += Number(m.consolidado.puntajeFinal100 || 0);
+                sumaDir50 += Number(m.consolidado.directorPuntos50 || 0);
+                sumaEst50 += Number(m.consolidado.estudiantesPuntos50 || 0);
+                materiasConEvaluacion++;
+              }
+            }
+          });
+
+          const promedioConsolidado = materiasConEvaluacion > 0 ? Math.round((sumaConsolidado / materiasConEvaluacion) * 10) / 10 : null;
+          const promedioDirector50 = materiasConEvaluacion > 0 ? Math.round((sumaDir50 / materiasConEvaluacion) * 10) / 10 : null;
+          const promedioEstudiantes50 = materiasConEvaluacion > 0 ? Math.round((sumaEst50 / materiasConEvaluacion) * 10) / 10 : null;
+          const pctParticipacionEstudiantes = totalMatriculados > 0 ? Math.round((totalEvaluaron / totalMatriculados) * 100) : 0;
 
           return {
             docenteNombre: entry.docenteNombre,
@@ -1656,10 +2186,15 @@ export class EvaluacionDocenteComponent implements OnInit {
             totalMaterias: totalMats,
             evaluadasCount: evaluadas,
             porcentajeEvaluacion: pct,
-            promedioPuntaje: promedio
+            promedioPuntaje: promedio,
+            promedioConsolidado: promedioConsolidado,
+            promedioDirector50: promedioDirector50,
+            promedioEstudiantes50: promedioEstudiantes50,
+            totalMatriculadosCarrera: totalMatriculados,
+            totalEvaluaronCarrera: totalEvaluaron,
+            porcentajeParticipacionEstudiantes: pctParticipacionEstudiantes
           };
         });
-
         rows.sort((a, b) => a.docenteNombre.localeCompare(b.docenteNombre));
         this.docentesTotales.set(rows);
         this.cargandoDocentes.set(false);
@@ -1707,16 +2242,6 @@ export class EvaluacionDocenteComponent implements OnInit {
           if (fullReg.horaEvaluacion) this.formHoraAplicacion = fullReg.horaEvaluacion;
         }
       });
-    } else {
-      // Valor por defecto 3 (Bueno)
-      const inst = this.instrumentoVigente();
-      if (inst && inst.secciones) {
-        inst.secciones.forEach(sec => {
-          sec.criterios.forEach(crit => {
-            this.respuestasMap[crit.id] = 3;
-          });
-        });
-      }
     }
   }
 
