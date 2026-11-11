@@ -360,8 +360,8 @@ public class RolExamenService {
             auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rol.getId(), "RESTABLECIMIENTO_A_VALIDADO")
                     .ifPresent(a -> {
                         dto.setFueRestablecido(true);
-                        dto.setEstadoPrevioRestablecimiento(a.getEtapaOrigen() != null ? a.getEtapaOrigen().getValor() : null);
-                        dto.setMotivoRestablecimiento(a.getDetalle());
+                        dto.setEstadoPrevioRestablecimiento(a.getEtapaOrigen());
+                        dto.setMotivoRestablecimiento(extraerMotivo(a.getDetallesJson()));
                         dto.setFechaRestablecimiento(a.getFechaEvento());
                     });
         }
@@ -1014,7 +1014,11 @@ public class RolExamenService {
         if (dto != null && dto.getEstadoDestino() != null) {
             destino = dto.getEstadoDestino();
         } else if (ultimoRestablecimiento.isPresent() && ultimoRestablecimiento.get().getEtapaOrigen() != null) {
-            destino = ultimoRestablecimiento.get().getEtapaOrigen();
+            try {
+                destino = EstadoFlujo.fromValor(ultimoRestablecimiento.get().getEtapaOrigen());
+            } catch (Exception ignored) {
+                destino = null;
+            }
         }
 
         if (destino == null || destino == EstadoFlujo.VALIDADO || destino == EstadoFlujo.PROGRAMADO) {
@@ -1091,6 +1095,21 @@ public class RolExamenService {
                 .replace("\"", "\\\"")
                 .replace("\r", "\\r")
                 .replace("\n", "\\n");
+    }
+
+    private String extraerMotivo(String detallesJson) {
+        if (detallesJson == null || detallesJson.isBlank()) {
+            return null;
+        }
+        try {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"motivo\"\\s*:\\s*\"(.*?)(?<!\\\\)\"")
+                    .matcher(detallesJson);
+            if (m.find()) {
+                return m.group(1).replace("\\\"", "\"").replace("\\\\", "\\");
+            }
+        } catch (Exception ignored) {
+        }
+        return detallesJson;
     }
 
     private String usuarioValido(String usuario) {

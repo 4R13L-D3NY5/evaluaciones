@@ -197,7 +197,7 @@ class RolExamenServiceTest {
                 .accion("RESTABLECIMIENTO_A_VALIDADO")
                 .etapaOrigen("ENTREGADO")
                 .etapaDestino("VALIDADO")
-                .detalle("error docente")
+                .detallesJson("{\"motivo\":\"error docente\"}")
                 .build();
         when(auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(rol.getId(), "RESTABLECIMIENTO_A_VALIDADO"))
                 .thenReturn(Optional.of(aud));
