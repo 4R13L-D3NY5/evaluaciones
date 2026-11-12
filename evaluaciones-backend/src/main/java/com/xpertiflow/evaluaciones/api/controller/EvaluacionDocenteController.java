@@ -122,4 +122,37 @@ public class EvaluacionDocenteController {
             @RequestParam(required = false) String gestion) {
         return ResponseEntity.ok(evaluacionDocenteEstudianteService.listarResumenConsolidado(sedeCodigo, carreraCodigo, gestion));
     }
+
+    @GetMapping("/semestres/estados")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @Operation(summary = "Consultar el estado de habilitación de evaluación por semestres para una carrera")
+    public ResponseEntity<List<SemestreHabilitacionEstadoDto>> listarEstadosSemestres(
+            @RequestParam String sedeCodigo,
+            @RequestParam String carreraCodigo,
+            @RequestParam(required = false) String gestion) {
+        return ResponseEntity.ok(evaluacionDocenteEstudianteService.listarEstadosSemestres(sedeCodigo, carreraCodigo, gestion));
+    }
+
+    @PostMapping("/semestres/habilitar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
+    @Operation(summary = "Habilitar la evaluación docente por 90 minutos para uno o varios semestres")
+    public ResponseEntity<List<SemestreHabilitacionEstadoDto>> habilitarSemestres(
+            @Valid @RequestBody HabilitarSemestresRequestDto request,
+            Authentication authentication) {
+        String usuario = authentication != null ? authentication.getName() : "DIRECTOR";
+        return ResponseEntity.ok(evaluacionDocenteEstudianteService.habilitarSemestres(request, usuario));
+    }
+
+    @PostMapping("/semestres/deshabilitar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA')")
+    @Operation(summary = "Cerrar anticipadamente la ventana de evaluación para un semestre específico")
+    public ResponseEntity<List<SemestreHabilitacionEstadoDto>> deshabilitarSemestre(
+            @RequestParam String sedeCodigo,
+            @RequestParam String carreraCodigo,
+            @RequestParam Integer semestre,
+            @RequestParam(required = false) String gestion,
+            Authentication authentication) {
+        String usuario = authentication != null ? authentication.getName() : "DIRECTOR";
+        return ResponseEntity.ok(evaluacionDocenteEstudianteService.deshabilitarSemestre(sedeCodigo, carreraCodigo, gestion, semestre, usuario));
+    }
 }

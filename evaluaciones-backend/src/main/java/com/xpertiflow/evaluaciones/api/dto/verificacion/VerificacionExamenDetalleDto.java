@@ -28,6 +28,7 @@ public class VerificacionExamenDetalleDto {
     private String verificadoPor;
     private LocalDateTime fechaVerificacion;
     private Integer cantidadDevoluciones;
+    private Boolean puedeReabrir;
     private List<VerificacionPreguntaDto> preguntas = new ArrayList<>();
     private List<VerificacionHistorialDevolucionDto> historialDevoluciones = new ArrayList<>();
 }

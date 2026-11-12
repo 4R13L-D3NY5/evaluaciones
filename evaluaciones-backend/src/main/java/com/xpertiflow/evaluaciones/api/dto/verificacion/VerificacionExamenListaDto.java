@@ -31,4 +31,5 @@ public class VerificacionExamenListaDto {
     private LocalDateTime fechaVerificacion;
     private Boolean tieneHistorialDevoluciones;
     private Integer cantidadDevoluciones;
+    private Boolean puedeReabrir;
 }

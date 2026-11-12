@@ -1,5 +1,6 @@
-import { Component, Input, OnChanges, OnDestroy, SimpleChanges, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { VerificacionExamenDetalle, VerificacionExamenFiltros, VerificacionExamenLista, VerificacionExamenService, VerificacionHistorialDevolucion } from '../../core/services/verificacion-examen.service';
@@ -8,9 +9,20 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
 @Component({
   selector: 'sea-examenes-aprobados',
   standalone: true,
-  imports: [CommonModule, MathContentDirective],
+  imports: [CommonModule, FormsModule, MathContentDirective],
   template: `
     <div class="space-y-6">
+      @if (mensajeExito()) {
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 flex items-center justify-between shadow-2xs">
+          <div class="flex items-center">
+            <i class="pi pi-check-circle mr-2 text-base text-emerald-600"></i>
+            <span>{{ mensajeExito() }}</span>
+          </div>
+          <button type="button" class="text-emerald-700 hover:text-emerald-900 cursor-pointer" (click)="mensajeExito.set(null)">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+      }
       @if (error()) { <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-800"><i class="pi pi-exclamation-triangle mr-2"></i>{{ error() }}</div> }
       @if (cargando()) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground"><i class="pi pi-spin pi-spinner mr-2"></i>Cargando exámenes aprobados...</div> }
       @else if (!examenes().length) { <div class="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">No hay exámenes aprobados en tu alcance con estos filtros.</div> }
@@ -50,6 +62,16 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                                 (click)="abrirModalHistorial(examen, $event)">
                           <i class="pi pi-history"></i>
                           <span>Observaciones</span>
+                        </button>
+                      }
+                      @if (examen.puedeReabrir !== false) {
+                        <button type="button"
+                                class="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] font-bold text-amber-900 hover:bg-amber-100 transition shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                                title="Deshacer aprobación y reabrir verificación"
+                                [disabled]="reabriendo()"
+                                (click)="abrirModalReabrir(examen, $event)">
+                          <i class="pi pi-undo"></i>
+                          <span>Reabrir</span>
                         </button>
                       }
                       <button type="button" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs cursor-pointer inline-flex items-center gap-1" title="Previsualizar examen con patrones de respuesta (PDF)" [disabled]="procesando()" (click)="previsualizarDirecto(examen)">
@@ -94,6 +116,15 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
                 </p>
               </div>
               <div class="flex items-center gap-2">
+                @if (detalle()!.puedeReabrir !== false) {
+                  <button type="button"
+                          class="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-3 py-2 text-xs font-bold text-amber-900 shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                          [disabled]="reabriendo()"
+                          (click)="abrirModalReabrirDetalle()">
+                    <i class="pi pi-undo"></i>
+                    <span>Reabrir verificación</span>
+                  </button>
+                }
                 <button type="button" class="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-black text-white shadow-sm transition disabled:opacity-50 cursor-pointer" [disabled]="procesando()" (click)="previsualizar()">
                   <i class="pi" [class.pi-file-pdf]="!procesando()" [class.pi-spin]="procesando()" [class.pi-spinner]="procesando()"></i>
                   <span>{{ procesando() ? 'Generando PDF...' : 'Previsualizar con patrones (PDF)' }}</span>
@@ -536,10 +567,82 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
           </section>
         </div>
       }
+
+      <!-- MODAL: CONFIRMACIÓN DE REAPERTURA DE VERIFICACIÓN -->
+      @if (modalReabrirVisible() && examenParaReabrir(); as examenSel) {
+        <div class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-4">
+          <section class="w-full max-w-lg overflow-hidden rounded-2xl bg-card shadow-2xl border border-border">
+            <header class="flex items-center justify-between border-b border-border px-5 py-4 bg-amber-50/60 shrink-0">
+              <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-900">
+                  <i class="pi pi-undo text-lg"></i>
+                </span>
+                <div>
+                  <h3 class="text-sm font-black text-amber-950">Reabrir Verificación de Examen</h3>
+                  <p class="text-xs text-amber-800">Deshacer aprobación del examen seleccionado</p>
+                </div>
+              </div>
+              <button type="button" aria-label="Cerrar" class="icon-button" [disabled]="reabriendo()" (click)="cerrarModalReabrir()">
+                <i class="pi pi-times"></i>
+              </button>
+            </header>
+
+            <div class="p-5 space-y-4">
+              <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-950 space-y-2">
+                <p class="font-bold">
+                  {{ examenSel.materiaCodigo }} · {{ examenSel.materiaNombre }} · Grupo {{ examenSel.grupo }}
+                </p>
+                <p class="text-[11px] leading-relaxed text-amber-900">
+                  ¿Estás seguro de deshacer la aprobación de este examen?
+                  El examen volverá al estado <strong>Por verificar (Validado)</strong> para que puedas revisarlo nuevamente, registrar observaciones o devolverlo al docente.
+                </p>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-muted-foreground mb-1">
+                  Motivo de la reapertura (opcional):
+                </label>
+                <textarea [(ngModel)]="motivoReapertura"
+                          rows="3"
+                          placeholder="Ej: Aprobación por error involuntario; se requiere revisar nuevamente..."
+                          class="w-full rounded-xl border border-border bg-card p-3 text-xs focus:border-amber-500 focus:outline-none"></textarea>
+              </div>
+
+              @if (errorReabrir()) {
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-800">
+                  <i class="pi pi-exclamation-triangle mr-1.5"></i>{{ errorReabrir() }}
+                </div>
+              }
+            </div>
+
+            <footer class="border-t border-border px-5 py-3.5 bg-muted/20 flex justify-end gap-2 shrink-0">
+              <button type="button"
+                      class="rounded-xl border border-border bg-card hover:bg-muted px-4 py-2 text-xs font-bold text-foreground transition cursor-pointer"
+                      [disabled]="reabriendo()"
+                      (click)="cerrarModalReabrir()">
+                Cancelar
+              </button>
+              <button type="button"
+                      class="rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-xs font-black text-white shadow-xs transition cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
+                      [disabled]="reabriendo()"
+                      (click)="confirmarReapertura()">
+                @if (reabriendo()) {
+                  <i class="pi pi-spin pi-spinner"></i>
+                  <span>Reabriendo...</span>
+                } @else {
+                  <i class="pi pi-undo"></i>
+                  <span>Confirmar reapertura</span>
+                }
+              </button>
+            </footer>
+          </section>
+        </div>
+      }
     </div>
   `
 })
 export class ExamenesAprobadosComponent implements OnChanges, OnDestroy {
+  @Output() public readonly examenReabierto = new EventEmitter<string>();
   private readonly service = inject(VerificacionExamenService);
   private readonly generacion = inject(GeneracionTypstService);
   private readonly sanitizer = inject(DomSanitizer);
@@ -557,6 +660,12 @@ export class ExamenesAprobadosComponent implements OnChanges, OnDestroy {
   public readonly cargandoHistorial = signal(false);
   public readonly examenHistorialSeleccionado = signal<VerificacionExamenLista | null>(null);
   public readonly historialDevolucionesModal = signal<VerificacionHistorialDevolucion[]>([]);
+  public readonly modalReabrirVisible = signal(false);
+  public readonly examenParaReabrir = signal<VerificacionExamenLista | null>(null);
+  public motivoReapertura = '';
+  public readonly reabriendo = signal(false);
+  public readonly errorReabrir = signal<string | null>(null);
+  public readonly mensajeExito = signal<string | null>(null);
   public readonly alternativasVfComplejas = [
     { letra: 'A', texto: '1, 2 y 3 son verdaderas' },
     { letra: 'B', texto: '1 y 3 son verdaderas' },
@@ -714,6 +823,56 @@ export class ExamenesAprobadosComponent implements OnChanges, OnDestroy {
     this.modalHistorialVisible.set(false);
     this.examenHistorialSeleccionado.set(null);
     this.historialDevolucionesModal.set([]);
+  }
+
+  public abrirModalReabrir(examen: VerificacionExamenLista, event?: Event): void {
+    if (event) event.stopPropagation();
+    this.examenParaReabrir.set(examen);
+    this.motivoReapertura = '';
+    this.errorReabrir.set(null);
+    this.modalReabrirVisible.set(true);
+  }
+
+  public abrirModalReabrirDetalle(): void {
+    const det = this.detalle();
+    if (!det) return;
+    this.abrirModalReabrir(det);
+  }
+
+  public cerrarModalReabrir(): void {
+    if (this.reabriendo()) return;
+    this.modalReabrirVisible.set(false);
+    this.examenParaReabrir.set(null);
+    this.motivoReapertura = '';
+    this.errorReabrir.set(null);
+  }
+
+  public confirmarReapertura(): void {
+    const examen = this.examenParaReabrir();
+    if (!examen) return;
+
+    this.reabriendo.set(true);
+    this.errorReabrir.set(null);
+
+    this.service.reabrir(examen.rolExamenId, this.motivoReapertura?.trim() || undefined).subscribe({
+      next: () => {
+        this.reabriendo.set(false);
+        this.modalReabrirVisible.set(false);
+        const materia = `${examen.materiaCodigo} (${examen.grupo})`;
+        this.mensajeExito.set(`Se reabrió exitosamente la verificación del examen ${materia}. Ahora está nuevamente en estado 'Por verificar'.`);
+        if (this.detalle()?.rolExamenId === examen.rolExamenId) {
+          this.cerrar();
+        }
+        this.examenParaReabrir.set(null);
+        this.motivoReapertura = '';
+        this.cargar();
+        this.examenReabierto.emit(examen.rolExamenId);
+      },
+      error: err => {
+        this.reabriendo.set(false);
+        this.errorReabrir.set(this.mensajeError(err, 'No se pudo reabrir la verificación del examen.'));
+      }
+    });
   }
 
   public previsualizar(): void {

@@ -216,10 +216,13 @@ interface CampusDisponible extends Campus {
                 <i class="pi pi-building text-primary text-[10px]"></i> Campus
               </label>
               <select
-                [ngModel]="campusSeleccionado() ? campusKey(campusSeleccionado()!) : ''"
+                [ngModel]="todosCampusesSeleccionados() ? campusTodosCodigo : (campusSeleccionado() ? campusKey(campusSeleccionado()!) : '')"
                 (ngModelChange)="onCampusChange($event)"
                 [disabled]="cargando() || cargandoCampus() || !campuses().length"
                 class="w-full bg-muted/70 border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground outline-none cursor-pointer focus:border-primary disabled:opacity-50">
+                @if (campuses().length > 1) {
+                  <option [value]="campusTodosCodigo">Todos los campus ({{ campuses().length }})</option>
+                }
                 @for (campus of campuses(); track campusKey(campus)) {
                   <option [value]="campusKey(campus)">{{ campus.name }}{{ campus.code ? ' (' + campus.code + ')' : '' }}</option>
                 }
@@ -4056,6 +4059,8 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public sedeSeleccionada = signal<BranchOffice | null>(null);
   public campuses = signal<CampusDisponible[]>([]);
   public campusSeleccionado = signal<CampusDisponible | null>(null);
+  public readonly campusTodosCodigo = '__TODOS__';
+  public todosCampusesSeleccionados = signal<boolean>(false);
 
   public carreras = signal<Career[]>([]);
   public carreraSeleccionada = signal<Career | null>(null);
@@ -4795,14 +4800,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     const carrera = this.carreraSeleccionada();
     const campus = this.campusSeleccionado();
     const todasCarreras = this.puedeListarTodasLasCarreras() && this.todasCarrerasSeleccionadas();
-    if (!sede || (!carrera && !todasCarreras) || (this.esEvaluacionesPorCampus() && !campus)) return;
+    const todosCampuses = this.todosCampusesSeleccionados();
+    if (!sede || (!carrera && !todasCarreras) || (this.esEvaluacionesPorCampus() && !campus && !todosCampuses)) return;
 
     this.cargando.set(true);
 
     this._rolService.listar(
       sede.code,
       todasCarreras ? undefined : carrera?.careerCode,
-      this.esEvaluacionesPorCampus() ? campus?.name : undefined
+      this.esEvaluacionesPorCampus() && !todosCampuses ? campus?.name : undefined
     ).subscribe({
       next: roles => {
         const uiList: EvaluacionItemUI[] = roles.map(rol => this._mapearRolResponseA_UI(rol));
@@ -5844,11 +5850,25 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
 
   public etiquetaCarreraSeleccionada(): string {
     return this.todasCarrerasSeleccionadas()
-      ? (this.esEvaluacionesPorCampus() ? 'Todas las carreras del campus' : 'Todas las carreras de la sede')
+      ? (this.esEvaluacionesPorCampus() ? (this.todosCampusesSeleccionados() ? 'Todas las carreras (todos los campus)' : 'Todas las carreras del campus') : 'Todas las carreras de la sede')
       : (this.carreraSeleccionada()?.careerName || '—');
   }
 
   public onCampusChange(key: string): void {
+    if (key === this.campusTodosCodigo) {
+      this.todosCampusesSeleccionados.set(true);
+      this.campusSeleccionado.set(null);
+      const branchCode = this.campuses()[0]?.branchOfficeCode;
+      if (branchCode) {
+        this.sedeSeleccionada.set(
+          this.sedes().find(sede => sede.code === branchCode) || null
+        );
+        this._cargarCarreras(branchCode);
+      }
+      return;
+    }
+
+    this.todosCampusesSeleccionados.set(false);
     const campus = this.campuses().find(item => this.campusKey(item) === key);
     if (!campus) return;
 

@@ -7,7 +7,9 @@ import {
   EvaluacionDocenteAplicarRequest,
   EstudianteAvanceEvaluacion,
   EvaluacionEstudianteAplicarRequest,
-  EvaluacionConsolidadaDocenteMateria
+  EvaluacionConsolidadaDocenteMateria,
+  SemestreHabilitacionEstado,
+  HabilitarSemestresRequest
 } from '../models/evaluacion-docente.models';
 
 @Injectable({
@@ -92,5 +94,28 @@ export class EvaluacionDocenteService {
       .set('carreraCodigo', carreraCodigo);
     if (gestion) params = params.set('gestion', gestion);
     return this._http.get<EvaluacionConsolidadaDocenteMateria[]>(`${this._baseUrl}/resumen-consolidado`, { params });
+  }
+
+  // --- Habilitación de Semestres por Director (Ventana de 90 Minutos) ---
+
+  public listarEstadosSemestres(sedeCodigo: string, carreraCodigo: string, gestion?: string): Observable<SemestreHabilitacionEstado[]> {
+    let params = new HttpParams()
+      .set('sedeCodigo', sedeCodigo)
+      .set('carreraCodigo', carreraCodigo);
+    if (gestion) params = params.set('gestion', gestion);
+    return this._http.get<SemestreHabilitacionEstado[]>(`${this._baseUrl}/semestres/estados`, { params });
+  }
+
+  public habilitarSemestres(request: HabilitarSemestresRequest): Observable<SemestreHabilitacionEstado[]> {
+    return this._http.post<SemestreHabilitacionEstado[]>(`${this._baseUrl}/semestres/habilitar`, request);
+  }
+
+  public deshabilitarSemestre(sedeCodigo: string, carreraCodigo: string, semestre: number, gestion?: string): Observable<SemestreHabilitacionEstado[]> {
+    let params = new HttpParams()
+      .set('sedeCodigo', sedeCodigo)
+      .set('carreraCodigo', carreraCodigo)
+      .set('semestre', semestre.toString());
+    if (gestion) params = params.set('gestion', gestion);
+    return this._http.post<SemestreHabilitacionEstado[]>(`${this._baseUrl}/semestres/deshabilitar`, null, { params });
   }
 }

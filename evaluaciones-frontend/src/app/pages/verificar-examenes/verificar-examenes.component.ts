@@ -664,7 +664,7 @@ import { MathContentDirective } from '../../shared/components/math-content.direc
       }
       @if (pdfUrl()) { <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-3"><div class="h-[94vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-card"><div class="flex items-center justify-between border-b border-border px-4 py-3"><strong class="text-sm">Previsualización completa para verificación</strong><button type="button" class="icon-button" (click)="cerrarPdf()"><i class="pi pi-times"></i></button></div><iframe [src]="pdfUrl()" class="h-[calc(100%-3.5rem)] w-full" title="Previsualización del examen"></iframe></div></div> }
       @if (aprobadosInicializados) {
-        <div [hidden]="vistaActual !== 'aprobados'"><sea-examenes-aprobados #panelAprobados [filtros]="filtrosCompartidos" [activo]="vistaActual === 'aprobados'" /></div>
+        <div [hidden]="vistaActual !== 'aprobados'"><sea-examenes-aprobados #panelAprobados [filtros]="filtrosCompartidos" [activo]="vistaActual === 'aprobados'" (examenReabierto)="alReabrirExamen($event)" /></div>
       }
 
       @if (vistaActual === 'sin_banco') {
@@ -1208,6 +1208,17 @@ export class VerificarExamenesComponent implements OnDestroy {
     if (this.vistaActual === 'aprobados') {
       this.panelAprobados?.cargar(this.filtrosCompartidos);
     }
+  }
+
+  public alReabrirExamen(_rolExamenId: string): void {
+    this.service.listar({ ...this.filtrosCompartidos, estado: 'VERIFICADO' }).subscribe({
+      next: aprobados => { this.totalAprobados.set(aprobados?.length || 0); },
+      error: () => {}
+    });
+    this.service.listar({ ...this.filtrosCompartidos, estado: this.estado || undefined }).subscribe({
+      next: datos => { this.examenes.set(datos); },
+      error: () => {}
+    });
   }
 
   public totalExamenesHoySinBanco(): number {

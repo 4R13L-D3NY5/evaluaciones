@@ -19,6 +19,13 @@ public class MateriaEstudianteDto {
     private String docenteNombre;
     private String sedeCodigo;
     private String carreraCodigo;
+    private Integer semestre;
     private boolean evaluada;
     private LocalDateTime fechaEvaluacion;
+
+    @Builder.Default
+    private boolean habilitadaParaEvaluacion = false;
+
+    private String motivoBloqueo;
+    private Long segundosRestantesVentana;
 }

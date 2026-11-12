@@ -13,6 +13,7 @@ import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionHistorialDev
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionHistorialPreguntaDto;
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionOpcionDto;
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionPreguntaDto;
+import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionReaperturaRequestDto;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaVerificacion;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.Reactivo;
@@ -335,6 +336,39 @@ public class VerificacionExamenService {
     }
 
     @Transactional
+    public VerificacionExamenDetalleDto reabrir(String rolExamenId, VerificacionReaperturaRequestDto request,
+                                                Authentication authentication) {
+        RolExamen rol = rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+        if (!politicaService.aplica(rol) || !accesoAcademicoService.puedeAcceder(rol, authentication)) {
+            throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para modificar la verificación de este examen");
+        }
+        VerificacionExamen verificacion = verificacionRepository.findByRolExamenId(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("No existe registro de verificación para este examen"));
+        if (!"VERIFICADO".equalsIgnoreCase(verificacion.getEstado())) {
+            throw new IllegalStateException("El examen no se encuentra en estado VERIFICADO para poder reabrir su verificación");
+        }
+        if (rol.getEstadoFlujo() != EstadoFlujo.VALIDADO) {
+            throw new IllegalStateException("No se puede reabrir la verificación porque el examen ya avanzó al estado "
+                    + rol.getEstadoFlujo().getValor() + " (ya fue generado o impreso).");
+        }
+
+        verificacion.setEstado("PENDIENTE");
+        verificacion.setVerificadoPor(null);
+        verificacion.setFechaVerificacion(null);
+        verificacion.setActualizadoEn(LocalDateTime.now());
+        verificacionRepository.save(verificacion);
+
+        String motivo = (request != null && request.getMotivo() != null && !request.getMotivo().trim().isBlank())
+                ? request.getMotivo().trim()
+                : "Aprobación revertida por el verificador para revisión";
+
+        registrarAuditoria(rolExamenId, "REVERSION_APROBACION_VERIFICACION", authentication.getName(), motivo);
+
+        return obtenerDetalle(rolExamenId, authentication);
+    }
+
+    @Transactional
     public void reiniciarPorReemplazo(String rolExamenId, String bancoPreguntasId, String actor) {
         verificacionRepository.findByRolExamenId(rolExamenId).ifPresent(verificacion -> {
             BancoPreguntas bancoAnterior = bancoRepository.findById(verificacion.getBancoPreguntasId()).orElse(null);
@@ -625,6 +659,7 @@ public class VerificacionExamenService {
         long totalDevoluciones = devolucionesHistorial + ("DEVUELTO".equalsIgnoreCase(verificacion.getEstado()) ? 1 : 0);
         dto.setCantidadDevoluciones((int) totalDevoluciones);
         dto.setTieneHistorialDevoluciones(totalDevoluciones > 0);
+        dto.setPuedeReabrir("VERIFICADO".equalsIgnoreCase(verificacion.getEstado()) && rol.getEstadoFlujo() == EstadoFlujo.VALIDADO);
         return dto;
     }
 
@@ -658,6 +693,7 @@ public class VerificacionExamenService {
         dto.setFechaVerificacion(null);
         dto.setTieneHistorialDevoluciones(false);
         dto.setCantidadDevoluciones(0);
+        dto.setPuedeReabrir(false);
         return dto;
     }
 
@@ -678,6 +714,7 @@ public class VerificacionExamenService {
         long devolucionesHistorialDetalle = historialVerificacionRepository.countByRolExamenId(rol.getId());
         long totalDevolucionesDetalle = devolucionesHistorialDetalle + ("DEVUELTO".equalsIgnoreCase(verificacion.getEstado()) ? 1 : 0);
         dto.setCantidadDevoluciones((int) totalDevolucionesDetalle);
+        dto.setPuedeReabrir("VERIFICADO".equalsIgnoreCase(verificacion.getEstado()) && rol.getEstadoFlujo() == EstadoFlujo.VALIDADO);
         return dto;
     }
 

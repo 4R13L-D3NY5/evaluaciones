@@ -15,6 +15,7 @@ import com.xpertiflow.evaluaciones.domain.repository.ReactivoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
 import com.xpertiflow.evaluaciones.security.BancoCifradoService;
+import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionReaperturaRequestDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -287,6 +289,75 @@ class VerificacionExamenServiceTest {
         assertThat(resultados.get(0).getObservacionesGenerales()).contains("sin documento Word");
         assertThat(resultados.get(0).getAula()).isEqualTo("Aula 202");
         assertThat(resultados.get(0).getCampus()).isEqualTo("Sarmiento");
+    }
+
+    @Test
+    void reabrirExamenVerificadoExitosamenteCuandoEstadoFlujoEsValidado() {
+        RolExamen rol = rolAvanzado();
+        rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
+        BancoPreguntas banco = banco("BANCO-1", rol.getId());
+        VerificacionExamen verificacion = aprobacion("BANCO-1");
+
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(politicaService.aplica(rol)).thenReturn(true);
+        when(accesoAcademicoService.puedeAcceder(rol, authentication)).thenReturn(true);
+        when(verificacionRepository.findByRolExamenId(rol.getId())).thenReturn(Optional.of(verificacion));
+        when(bancoRepository.findTopByRolExamenIdOrderByFechaAprobacionDesc(rol.getId())).thenReturn(Optional.of(banco));
+        when(historialRepository.findByRolExamenIdOrderByFechaDevolucionDescIdDesc(rol.getId())).thenReturn(List.of());
+        when(cifradoService.descifrarTexto(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn("[]");
+
+        VerificacionReaperturaRequestDto req = new VerificacionReaperturaRequestDto();
+        req.setMotivo("Error al dar clic en aprobado");
+
+        var detalle = service.reabrir(rol.getId(), req, authentication);
+
+        assertThat(verificacion.getEstado()).isEqualTo("PENDIENTE");
+        assertThat(verificacion.getVerificadoPor()).isNull();
+        assertThat(verificacion.getFechaVerificacion()).isNull();
+        verify(verificacionRepository).save(verificacion);
+        verify(auditoriaRepository).save(org.mockito.ArgumentMatchers.argThat(auditoria ->
+                "REVERSION_APROBACION_VERIFICACION".equals(auditoria.getAccion())
+                        && "Error al dar clic en aprobado".equals(auditoria.getDetalle())));
+        assertThat(detalle.getEstadoVerificacion()).isEqualTo("VALIDADO");
+    }
+
+    @Test
+    void reabrirFallaSiElExamenYaAvanzoEnElFlujo() {
+        RolExamen rol = rolAvanzado();
+        rol.setEstadoFlujo(EstadoFlujo.GENERADO);
+        VerificacionExamen verificacion = aprobacion("BANCO-1");
+
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(politicaService.aplica(rol)).thenReturn(true);
+        when(accesoAcademicoService.puedeAcceder(rol, authentication)).thenReturn(true);
+        when(verificacionRepository.findByRolExamenId(rol.getId())).thenReturn(Optional.of(verificacion));
+
+        assertThatThrownBy(() -> service.reabrir(rol.getId(), null, authentication))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ya avanzó al estado");
+
+        verify(verificacionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void reabrirFallaSiElExamenNoEstaVerificado() {
+        RolExamen rol = rolAvanzado();
+        rol.setEstadoFlujo(EstadoFlujo.VALIDADO);
+        VerificacionExamen verificacion = new VerificacionExamen();
+        verificacion.setRolExamenId(rol.getId());
+        verificacion.setEstado("PENDIENTE");
+
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+        when(politicaService.aplica(rol)).thenReturn(true);
+        when(accesoAcademicoService.puedeAcceder(rol, authentication)).thenReturn(true);
+        when(verificacionRepository.findByRolExamenId(rol.getId())).thenReturn(Optional.of(verificacion));
+
+        assertThatThrownBy(() -> service.reabrir(rol.getId(), null, authentication))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no se encuentra en estado VERIFICADO");
+
+        verify(verificacionRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     private RolExamen rolAvanzado() {

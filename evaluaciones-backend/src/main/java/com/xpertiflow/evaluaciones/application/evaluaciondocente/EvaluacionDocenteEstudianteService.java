@@ -2,6 +2,7 @@ package com.xpertiflow.evaluaciones.application.evaluaciondocente;
 
 import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.*;
 import com.xpertiflow.evaluaciones.api.dto.gateway.TimeFrameDto;
+import com.xpertiflow.evaluaciones.application.VentanaTemporalException;
 import com.xpertiflow.evaluaciones.domain.entity.*;
 import com.xpertiflow.evaluaciones.domain.repository.*;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
@@ -12,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -29,6 +32,7 @@ public class EvaluacionDocenteEstudianteService {
     private final MapeoEstudianteVarianteRepository mapeoRepository;
     private final NotaDocenteRepository notaDocenteRepository;
     private final UnitepcGatewayClient unitepcGatewayClient;
+    private final EvaluacionHabilitacionSemestreRepository habilitacionSemestreRepository;
 
     /**
      * Normaliza los formatos de gestión (ej. '2-2026', 'II-2026', 'ACTIVA') al formato canónico 'II-2026'.
@@ -140,6 +144,29 @@ public class EvaluacionDocenteEstudianteService {
                     );
 
             boolean evaluada = regOpt.isPresent();
+            Integer semestre = rol.getSemestre();
+            boolean habilitada = false;
+            Long segRestantes = null;
+            String motivo = null;
+
+            if (semestre != null && rol.getSedeCodigo() != null && rol.getCarreraCodigo() != null) {
+                habilitada = habilitacionSemestreRepository.isSemestreActivo(
+                        rol.getSedeCodigo(), rol.getCarreraCodigo(), gestionActual, semestre, LocalDateTime.now()
+                );
+                if (habilitada) {
+                    Optional<EvaluacionHabilitacionSemestre> habOpt = habilitacionSemestreRepository
+                            .findBySedeCodigoAndCarreraCodigoAndGestionAndSemestre(
+                                    rol.getSedeCodigo(), rol.getCarreraCodigo(), gestionActual, semestre
+                            );
+                    if (habOpt.isPresent()) {
+                        segRestantes = habOpt.get().getSegundosRestantes();
+                    }
+                } else {
+                    motivo = "Evaluación no habilitada para el " + semestre + "° Semestre por Dirección de Carrera.";
+                }
+            } else {
+                motivo = "Semestre no definido para la asignatura.";
+            }
 
             materiasUnicas.put(claveMateriaDocente, MateriaEstudianteDto.builder()
                     .materiaCodigo(rol.getMateriaCodigo())
@@ -148,6 +175,10 @@ public class EvaluacionDocenteEstudianteService {
                     .docenteNombre(docenteNom)
                     .sedeCodigo(rol.getSedeCodigo())
                     .carreraCodigo(rol.getCarreraCodigo())
+                    .semestre(semestre)
+                    .habilitadaParaEvaluacion(habilitada)
+                    .motivoBloqueo(motivo)
+                    .segundosRestantesVentana(segRestantes)
                     .evaluada(evaluada)
                     .fechaEvaluacion(regOpt.map(EvaluacionEstudianteRegistro::getCreadoEn).orElse(null))
                     .build());
@@ -202,6 +233,29 @@ public class EvaluacionDocenteEstudianteService {
         if (estudianteRegistroRepository.findByEstudianteCodigoAndMateriaCodigoAndDocenteNombreAndGestion(
                 matricula, materiaCod, docenteNom, gestion).isPresent()) {
             throw new IllegalStateException("Ya registraste tu evaluación para este docente en esta materia durante la gestión actual.");
+        }
+
+        // 1.1 Validar que la ventana temporal de 90 minutos para el semestre esté activa
+        if (request.getSedeCodigo() != null && request.getCarreraCodigo() != null) {
+            List<RolExamen> rolesMat = rolExamenRepository.findBySedeCodigoAndCarreraCodigo(
+                    request.getSedeCodigo(), request.getCarreraCodigo()
+            );
+            Integer semestreMateria = rolesMat.stream()
+                    .filter(r -> materiaCod.equalsIgnoreCase(r.getMateriaCodigo()))
+                    .map(RolExamen::getSemestre)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+
+            if (semestreMateria != null) {
+                boolean semestreActivo = habilitacionSemestreRepository.isSemestreActivo(
+                        request.getSedeCodigo(), request.getCarreraCodigo(), gestion, semestreMateria, LocalDateTime.now()
+                );
+                if (!semestreActivo) {
+                    throw new VentanaTemporalException("La evaluación docente para el " + semestreMateria +
+                            "° Semestre no se encuentra habilitada o la ventana de 90 minutos ha expirado.");
+                }
+            }
         }
 
         // 2. Obtener instrumento
@@ -366,6 +420,7 @@ public class EvaluacionDocenteEstudianteService {
                         .docenteNombre(docenteNom)
                         .sedeCodigo(sedeCodigo)
                         .carreraCodigo(carreraCodigo)
+                        .semestre(rol.getSemestre())
                         .evaluada(evaluada)
                         .build());
             }
@@ -565,6 +620,139 @@ public class EvaluacionDocenteEstudianteService {
                 .thenComparing(EvaluacionConsolidadaDocenteMateriaDto::getMateriaNombre));
 
         return lista;
+    }
+
+    /**
+     * Habilita uno o varios semestres con una ventana temporal de duración configurable (por defecto 90 minutos).
+     * Se puede volver a habilitar las veces necesarias, renovando los 90 minutos desde el instante de activación.
+     */
+    @Transactional
+    public List<SemestreHabilitacionEstadoDto> habilitarSemestres(HabilitarSemestresRequestDto request, String usuario) {
+        if (request == null || request.getSedeCodigo() == null || request.getCarreraCodigo() == null) {
+            throw new IllegalArgumentException("Sede y Carrera son obligatorias para habilitar semestres.");
+        }
+        String sede = request.getSedeCodigo().trim();
+        String carrera = request.getCarreraCodigo().trim();
+        String gestion = resolverGestionActiva(request.getGestion());
+        int duracion = request.getDuracionMinutos() != null && request.getDuracionMinutos() > 0
+                ? request.getDuracionMinutos() : 90;
+
+        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime expira = ahora.plusMinutes(duracion);
+
+        if (request.getSemestres() != null) {
+            for (Integer semestre : request.getSemestres()) {
+                if (semestre == null || semestre < 1) continue;
+
+                EvaluacionHabilitacionSemestre entidad = habilitacionSemestreRepository
+                        .findBySedeCodigoAndCarreraCodigoAndGestionAndSemestre(sede, carrera, gestion, semestre)
+                        .orElseGet(() -> EvaluacionHabilitacionSemestre.builder()
+                                .id("HAB-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase(Locale.ROOT))
+                                .sedeCodigo(sede)
+                                .carreraCodigo(carrera)
+                                .gestion(gestion)
+                                .semestre(semestre)
+                                .build());
+
+                entidad.setHabilitado(true);
+                entidad.setHabilitadoEn(ahora);
+                entidad.setExpiraEn(expira);
+                entidad.setDuracionMinutos(duracion);
+                entidad.setHabilitadoPor(usuario != null ? usuario : "DIRECTOR");
+                entidad.setActualizadoEn(ahora);
+
+                habilitacionSemestreRepository.save(entidad);
+            }
+        }
+
+        return listarEstadosSemestres(sede, carrera, gestion);
+    }
+
+    /**
+     * Cierra anticipadamente la ventana de evaluación para un semestre específico.
+     */
+    @Transactional
+    public List<SemestreHabilitacionEstadoDto> deshabilitarSemestre(String sedeCodigo, String carreraCodigo,
+                                                                   String gestion, Integer semestre, String usuario) {
+        if (sedeCodigo == null || carreraCodigo == null || semestre == null) {
+            throw new IllegalArgumentException("Sede, Carrera y Semestre son obligatorios.");
+        }
+        String sede = sedeCodigo.trim();
+        String carrera = carreraCodigo.trim();
+        String gestionActual = resolverGestionActiva(gestion);
+
+        habilitacionSemestreRepository
+                .findBySedeCodigoAndCarreraCodigoAndGestionAndSemestre(sede, carrera, gestionActual, semestre)
+                .ifPresent(entidad -> {
+                    entidad.setHabilitado(false);
+                    entidad.setExpiraEn(LocalDateTime.now());
+                    entidad.setHabilitadoPor(usuario != null ? usuario : entidad.getHabilitadoPor());
+                    habilitacionSemestreRepository.save(entidad);
+                });
+
+        return listarEstadosSemestres(sede, carrera, gestionActual);
+    }
+
+    /**
+     * Consulta los estados de habilitación de todos los semestres de la carrera en la sede y gestión activas.
+     */
+    @Transactional(readOnly = true)
+    public List<SemestreHabilitacionEstadoDto> listarEstadosSemestres(String sedeCodigo, String carreraCodigo, String gestion) {
+        if (sedeCodigo == null || carreraCodigo == null) {
+            return Collections.emptyList();
+        }
+        String sede = sedeCodigo.trim();
+        String carrera = carreraCodigo.trim();
+        String gestionActual = resolverGestionActiva(gestion);
+
+        List<RolExamen> roles = rolExamenRepository.findBySedeCodigoAndCarreraCodigo(sede, carrera);
+
+        // Obtener semestres reales asociados a asignaturas de la carrera
+        Set<Integer> semestresPresentes = roles.stream()
+                .map(RolExamen::getSemestre)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Si la carrera no tiene roles aún, garantizar semestres estándar del 1 al 10
+        if (semestresPresentes.isEmpty()) {
+            for (int s = 1; s <= 10; s++) {
+                semestresPresentes.add(s);
+            }
+        }
+
+        // Obtener registros de habilitación existentes
+        Map<Integer, EvaluacionHabilitacionSemestre> habMap = habilitacionSemestreRepository
+                .findBySedeCodigoAndCarreraCodigoAndGestion(sede, carrera, gestionActual).stream()
+                .collect(Collectors.toMap(EvaluacionHabilitacionSemestre::getSemestre, h -> h, (a, b) -> a));
+
+        List<SemestreHabilitacionEstadoDto> resultado = new ArrayList<>();
+        LocalDateTime ahora = LocalDateTime.now();
+
+        for (Integer s : semestresPresentes.stream().sorted().toList()) {
+            EvaluacionHabilitacionSemestre hab = habMap.get(s);
+            boolean activo = hab != null && hab.isHabilitado() && hab.getExpiraEn() != null && ahora.isBefore(hab.getExpiraEn());
+            Long segRestantes = activo ? Duration.between(ahora, hab.getExpiraEn()).toSeconds() : 0L;
+
+            long matCount = roles.stream().filter(r -> Objects.equals(r.getSemestre(), s))
+                    .map(RolExamen::getMateriaCodigo).distinct().count();
+            long docCount = roles.stream().filter(r -> Objects.equals(r.getSemestre(), s))
+                    .map(RolExamen::getDocenteNombre).filter(Objects::nonNull).distinct().count();
+
+            resultado.add(SemestreHabilitacionEstadoDto.builder()
+                    .semestre(s)
+                    .semestreDisplay(s + "° Semestre")
+                    .activo(activo)
+                    .habilitadoEn(hab != null ? hab.getHabilitadoEn() : null)
+                    .expiraEn(hab != null ? hab.getExpiraEn() : null)
+                    .segundosRestantes(segRestantes)
+                    .duracionMinutos(hab != null ? hab.getDuracionMinutos() : 90)
+                    .habilitadoPor(hab != null ? hab.getHabilitadoPor() : null)
+                    .totalMaterias((int) matCount)
+                    .totalDocentes((int) docCount)
+                    .build());
+        }
+
+        return resultado;
     }
 
     private EvaluacionInstrumentoDto mapearInstrumentoADto(EvaluacionInstrumento inst) {
