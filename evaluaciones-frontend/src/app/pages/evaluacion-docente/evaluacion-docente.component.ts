@@ -2563,6 +2563,11 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
         }>();
 
         grupos.forEach(g => {
+          // Filtrar exclusivamente grupos teóricos (TA / T*)
+          if (!this.esGrupoTeorico(g)) {
+            return;
+          }
+
           const rawDocente = (g.teacherFullName || g.teacherName || '').trim();
           // Ignorar materias sin docente asignado
           if (!rawDocente || rawDocente.toUpperCase() === 'POR DESIGNAR' || rawDocente.toUpperCase().includes('SIN ASIGNAR')) {
@@ -4368,5 +4373,24 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
     const coincidencia = gestion.match(/^(I|II)-(\d{4})$/);
     if (!coincidencia) return gestion;
     return `${coincidencia[1] === 'II' ? '2' : '1'}-${coincidencia[2]}`;
+  }
+
+  /**
+   * Determina si un grupo corresponde a docencia teórica (TA / T*).
+   * Los grupos prácticos (PA, PL, PR, PS, etc.) están excluidos de este módulo de evaluación.
+   */
+  private esGrupoTeorico(g: GroupItem): boolean {
+    if (!g) return false;
+    const classType = (g.classType || '').trim().toUpperCase();
+    if (classType) {
+      if (classType.startsWith('P')) return false;
+      if (classType.startsWith('T')) return true;
+    }
+    const code = (g.code || '').trim().toUpperCase();
+    if (code) {
+      if (code.startsWith('P')) return false;
+      if (code.startsWith('T')) return true;
+    }
+    return true;
   }
 }
