@@ -106,7 +106,7 @@ export class UnitepcGatewayService {
 
     if (
       sedeCochabamba &&
-      (usuario?.rol === 'ADMINISTRADOR_SISTEMA' || this._sedeEstaAsignada(sedeCochabamba, sedesAsignadas))
+      (usuario?.rol === 'ADMINISTRADOR_SISTEMA' || usuario?.rol === 'VICERRECTOR' || this._sedeEstaAsignada(sedeCochabamba, sedesAsignadas))
     ) {
       return sedeCochabamba;
     }

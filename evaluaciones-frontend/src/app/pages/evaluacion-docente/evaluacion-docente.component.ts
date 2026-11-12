@@ -1,6 +1,6 @@
 import { UNITEPC_LOGO_PNG } from '../../core/constants/unitepc-assets';
 import { jsPDF } from 'jspdf';
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
@@ -16,7 +16,9 @@ import {
   EvaluacionDocenteAplicarRequest,
   EvaluacionDocenteRespuesta,
   EstudianteAvanceEvaluacion,
-  EvaluacionConsolidadaDocenteMateria
+  EvaluacionConsolidadaDocenteMateria,
+  SemestreHabilitacionEstado,
+  HabilitarSemestresRequest
 } from '../../core/models/evaluacion-docente.models';
 
 export interface FormCriterioItem {
@@ -79,9 +81,19 @@ export interface DocenteEvaluacionRow {
               <i class="pi pi-user-edit text-base"></i>
             </div>
             <h2 class="text-2xl font-black tracking-tight text-foreground">Evaluación Docente</h2>
+            @if (esVicerrector()) {
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800">
+                <i class="pi pi-eye text-xs"></i>
+                Modo Supervisión · Vicerrectorado
+              </span>
+            }
           </div>
           <p class="text-xs text-muted-foreground mt-1">
-            Evaluación de la competencia y desempeño docente por Director de Carrera y Administrador.
+            @if (esVicerrector()) {
+              Supervisión de resultados consolidados, avance estudiantil y reportes oficiales para Vicerrectorado.
+            } @else {
+              Evaluación de la competencia y desempeño docente por Director de Carrera y Administrador.
+            }
           </p>
         </div>
 
@@ -104,6 +116,14 @@ export interface DocenteEvaluacionRow {
               class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
               <i class="pi pi-users text-xs"></i>
               <span>Evaluación por Docentes</span>
+            </button>
+            <button 
+              type="button"
+              (click)="cambiarASemestres()"
+              [class]="vistaActiva() === 'semestres' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+              class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+              <i class="pi pi-clock text-xs"></i>
+              <span>Habilitación por Semestre</span>
             </button>
             <button 
               type="button"
@@ -449,7 +469,7 @@ export interface DocenteEvaluacionRow {
                             type="button" 
                             (click)="alternarExpansionDocente(doc.docenteNombre)"
                             class="px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                            <span>{{ docenteExpandido(doc.docenteNombre) ? 'Ocultar Materias' : 'Gestionar / Evaluar' }}</span>
+                            <span>{{ docenteExpandido(doc.docenteNombre) ? 'Ocultar Materias' : (puedeOperar() ? 'Gestionar / Evaluar' : 'Ver Materias / Detalle') }}</span>
                             <i [class]="docenteExpandido(doc.docenteNombre) ? 'pi pi-chevron-up text-[10px]' : 'pi pi-chevron-down text-[10px]'"></i>
                           </button>
                         </div>
@@ -507,13 +527,20 @@ export interface DocenteEvaluacionRow {
                                           </button>
                                         }
                                       } @else {
-                                        <button 
-                                          type="button" 
-                                          (click)="iniciarEvaluacionMateria(doc, mat)"
-                                          class="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer">
-                                          <i class="pi pi-pencil text-xs"></i>
-                                          <span>Evaluar Docente en esta Materia</span>
-                                        </button>
+                                        @if (puedeOperar()) {
+                                          <button 
+                                            type="button" 
+                                            (click)="iniciarEvaluacionMateria(doc, mat)"
+                                            class="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer">
+                                            <i class="pi pi-pencil text-xs"></i>
+                                            <span>Evaluar Docente en esta Materia</span>
+                                          </button>
+                                        } @else {
+                                          <span class="px-2.5 py-1.5 rounded-xl bg-muted text-muted-foreground border border-border text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs">
+                                            <i class="pi pi-clock text-[11px] text-amber-500"></i>
+                                            <span>Sin evaluación del Director</span>
+                                          </span>
+                                        }
                                       }
                                     </div>
                                   </div>
@@ -599,6 +626,267 @@ export interface DocenteEvaluacionRow {
                   }
                 </tbody>
               </table>
+            </div>
+          }
+        </div>
+
+      }
+
+      <!-- =================================================================== -->
+      <!-- VISTA 4: HABILITACIÓN POR SEMESTRE (Director de Carrera / Admin)    -->
+      <!-- =================================================================== -->
+      @if (vistaActiva() === 'semestres') {
+
+        <!-- Filtros Superiores (Sede y Carrera) -->
+        <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            
+            <!-- Selector de Gestión -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-calendar text-primary text-[10px]"></i> Gestión Académica
+              </label>
+              <select 
+                [ngModel]="storage.gestionActiva()" 
+                (ngModelChange)="onGestionChange($event)"
+                class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-black text-foreground outline-none cursor-pointer focus:border-primary">
+                <option value="II-2026">II-2026 (Gestión Activa)</option>
+                <option value="I-2026">I-2026 (Anterior)</option>
+                <option value="II-2025">II-2025 (Histórico)</option>
+              </select>
+            </div>
+
+            <!-- Selector de Sede -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-building text-primary text-[10px]"></i> Sede Académica
+              </label>
+              <select 
+                [ngModel]="filtroSedeCodigo" 
+                (ngModelChange)="onSedeChange($event)"
+                class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-black text-foreground outline-none cursor-pointer focus:border-primary">
+                @for (sede of sedes(); track sede.code) {
+                  <option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>
+                }
+              </select>
+            </div>
+
+            <!-- Selector de Carrera -->
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <i class="pi pi-graduation-cap text-primary text-[10px]"></i> Carrera Universitaria
+              </label>
+              <select 
+                [ngModel]="filtroCarreraCodigo" 
+                (ngModelChange)="onCarreraChange($event)"
+                class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-black text-foreground outline-none cursor-pointer focus:border-primary">
+                @for (car of carreras(); track car.careerCode) {
+                  <option [value]="car.careerCode">{{ car.careerName }}</option>
+                }
+              </select>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Banner de Control de Habilitación de Semestres -->
+        <div class="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+          <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div class="max-w-2xl space-y-2">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-xs font-bold uppercase tracking-wider">
+                <i class="pi pi-clock"></i>
+                <span>Ventanas de Evaluación Docente · 90 Minutos</span>
+              </div>
+              <h3 class="text-xl sm:text-2xl font-black tracking-tight text-white">
+                Habilitación por Semestre — {{ filtroCarreraNombre() }}
+              </h3>
+              <p class="text-xs sm:text-sm text-purple-200/90 leading-relaxed">
+                Selecciona uno o varios semestres para activar la evaluación por parte de los estudiantes.
+                Al habilitar, los estudiantes inscritos en las materias de esos semestres dispondrán de una ventana activa de <b>1 hora y media (90 minutos)</b>.
+                Puedes renovar el tiempo o habilitar tantas veces como sea necesario.
+              </p>
+            </div>
+
+            <!-- Acciones Principales -->
+            @if (puedeOperar()) {
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  (click)="seleccionarTodosSemestres()"
+                  class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-white transition-all cursor-pointer flex items-center justify-center gap-2">
+                  <i class="pi pi-check-square"></i>
+                  <span>Seleccionar Todos</span>
+                </button>
+                @if (semestresSeleccionados().size > 0) {
+                  <button
+                    type="button"
+                    (click)="deseleccionarTodosSemestres()"
+                    class="px-3 py-2.5 rounded-xl bg-white/10 hover:bg-rose-500/30 border border-white/20 text-xs font-bold text-white transition-all cursor-pointer flex items-center justify-center gap-1.5">
+                    <i class="pi pi-times"></i>
+                    <span>Limpiar ({{ semestresSeleccionados().size }})</span>
+                  </button>
+                }
+                <button
+                  type="button"
+                  (click)="habilitarSemestresSeleccionados()"
+                  [disabled]="semestresSeleccionados().size === 0 || guardandoHabilitacion()"
+                  class="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-xs sm:text-sm font-black shadow-lg shadow-emerald-500/30 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  @if (guardandoHabilitacion()) {
+                    <i class="pi pi-spin pi-spinner"></i>
+                    <span>Procesando...</span>
+                  } @else {
+                    <i class="pi pi-play"></i>
+                    <span>Habilitar Seleccionados (90 min)</span>
+                    @if (semestresSeleccionados().size > 0) {
+                      <span class="px-2 py-0.5 rounded-full bg-white/20 text-xs font-black">
+                        {{ semestresSeleccionados().size }}
+                      </span>
+                    }
+                  }
+                </button>
+              </div>
+            } @else {
+              <div class="px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white text-xs font-medium max-w-sm flex items-center gap-2.5">
+                <i class="pi pi-shield text-sky-400 text-lg shrink-0"></i>
+                <span>Vista de supervisión general. La habilitación y renovación de ventanas está reservada a Dirección de Carrera.</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Grilla de Semestres -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+              <i class="pi pi-th-large text-primary"></i>
+              <span>Semestres Disponibles en Carrera ({{ semestresEstado().length }})</span>
+            </h4>
+            <span class="text-xs text-muted-foreground font-medium">
+              Haz clic en la tarjeta o casilla para seleccionar los semestres
+            </span>
+          </div>
+
+          @if (cargandoSemestres()) {
+            <div class="p-12 text-center bg-card border border-border rounded-2xl">
+              <i class="pi pi-spin pi-spinner text-3xl text-primary mb-3"></i>
+              <p class="text-xs font-bold text-muted-foreground">Cargando estado de semestres...</p>
+            </div>
+          } @else if (semestresEstado().length === 0) {
+            <div class="p-12 text-center bg-card border border-border rounded-2xl text-muted-foreground">
+              <i class="pi pi-info-circle text-3xl mb-2 text-primary"></i>
+              <p class="text-sm font-bold">No se encontraron semestres o materias para esta sede y carrera.</p>
+            </div>
+          } @else {
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              @for (sem of semestresEstado(); track sem.semestre) {
+                <div
+                  (click)="puedeOperar() ? toggleSeleccionSemestre(sem.semestre) : null"
+                  [class]="'rounded-2xl p-5 border transition-all select-none flex flex-col justify-between relative group ' +
+                    (puedeOperar() ? 'cursor-pointer ' : '') +
+                    (semestresSeleccionados().has(sem.semestre) 
+                      ? 'ring-2 ring-purple-600 border-purple-600 bg-purple-50/20 dark:bg-purple-950/20' 
+                      : sem.activo 
+                        ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20' 
+                        : 'border-border bg-card')">
+                  
+                  <div>
+                    <!-- Cabecera de Tarjeta -->
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                      <div class="flex items-center gap-2.5">
+                        @if (puedeOperar()) {
+                          <input
+                            type="checkbox"
+                            [checked]="semestresSeleccionados().has(sem.semestre)"
+                            (click)="$event.stopPropagation(); toggleSeleccionSemestre(sem.semestre)"
+                            class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-border cursor-pointer"
+                          />
+                        }
+                        <span class="text-base font-black text-foreground">
+                          {{ sem.semestre }}° Semestre
+                        </span>
+                      </div>
+
+                      @if (sem.activo) {
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 animate-pulse">
+                          <i class="pi pi-clock text-xs"></i>
+                          Quedan {{ formatearSegundos(sem.segundosRestantes) }}
+                        </span>
+                      } @else {
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-muted text-muted-foreground border border-border">
+                          <i class="pi pi-lock text-xs"></i>
+                          Inactivo / Cerrado
+                        </span>
+                      }
+                    </div>
+
+                    <!-- Estadísticas Rápidas del Semestre -->
+                    <div class="grid grid-cols-2 gap-2 p-3 bg-muted/60 dark:bg-muted/40 rounded-xl mb-4 text-center">
+                      <div>
+                        <span class="block text-[10px] uppercase font-bold text-muted-foreground">Materias</span>
+                        <span class="text-xs font-black text-foreground">{{ sem.totalMaterias }}</span>
+                      </div>
+                      <div>
+                        <span class="block text-[10px] uppercase font-bold text-muted-foreground">Docentes</span>
+                        <span class="text-xs font-black text-foreground">{{ sem.totalDocentes }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Información de Expiración -->
+                    <div class="text-[11px] text-muted-foreground mb-4 space-y-1">
+                      @if (sem.activo && sem.expiraEn) {
+                        <div class="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+                          <span>Ventana válida hasta:</span>
+                          <span class="font-mono font-bold">{{ sem.expiraEn | date:'HH:mm:ss' }}</span>
+                        </div>
+                      } @else {
+                        <div class="text-muted-foreground italic">
+                          <span>No hay ventana activa en este momento</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Botones de Acción Individual -->
+                  <div class="pt-3 border-t border-border flex items-center gap-2" (click)="$event.stopPropagation()">
+                    @if (puedeOperar()) {
+                      @if (sem.activo) {
+                        <button
+                          type="button"
+                          (click)="habilitarUnSemestre(sem.semestre)"
+                          [disabled]="guardandoHabilitacion()"
+                          class="flex-1 py-2 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer">
+                          <i class="pi pi-refresh text-xs"></i>
+                          <span>Renovar 90 min</span>
+                        </button>
+                        <button
+                          type="button"
+                          (click)="deshabilitarSemestre(sem.semestre)"
+                          [disabled]="guardandoHabilitacion()"
+                          title="Cerrar la ventana temporal inmediatamente"
+                          class="py-2 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer">
+                          <i class="pi pi-stop-circle text-xs"></i>
+                          <span>Cerrar</span>
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          (click)="habilitarUnSemestre(sem.semestre)"
+                          [disabled]="guardandoHabilitacion()"
+                          class="w-full py-2 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer">
+                          <i class="pi pi-play text-xs"></i>
+                          <span>Habilitar (90 min)</span>
+                        </button>
+                      }
+                    } @else {
+                      <div class="w-full py-1.5 px-3 rounded-xl bg-muted/80 text-center text-[11px] font-bold text-muted-foreground flex items-center justify-center gap-1.5">
+                        <i class="pi" [class.pi-check-circle]="sem.activo" [class.pi-lock]="!sem.activo" [class.text-emerald-500]="sem.activo"></i>
+                        <span>{{ sem.activo ? 'Ventana Habilitada (Supervisión)' : 'Ventana Inactiva' }}</span>
+                      </div>
+                    }
+                  </div>
+
+                </div>
+              }
             </div>
           }
         </div>
@@ -1761,13 +2049,20 @@ export interface DocenteEvaluacionRow {
     </div>
   `
 })
-export class EvaluacionDocenteComponent implements OnInit {
+export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
   public readonly storage = inject(EvaluacionesStorageService);
   private readonly gateway = inject(UnitepcGatewayService);
   private readonly evaluacionService = inject(EvaluacionDocenteService);
   public readonly auth = inject(AuthService);
 
-  public vistaActiva = signal<'evaluaciones' | 'estudiantes' | 'instrumentos'>('evaluaciones');
+  public vistaActiva = signal<'evaluaciones' | 'semestres' | 'estudiantes' | 'instrumentos'>('evaluaciones');
+
+  // Habilitación por Semestres (Ventanas de 90 min)
+  public semestresEstado = signal<SemestreHabilitacionEstado[]>([]);
+  public cargandoSemestres = signal(false);
+  public semestresSeleccionados = signal<Set<number>>(new Set());
+  public guardandoHabilitacion = signal(false);
+  private _semestresTimerInterval: any = null;
 
   // Seguimiento de Estudiantes
   public estudiantesAvance = signal<EstudianteAvanceEvaluacion[]>([]);
@@ -1837,6 +2132,15 @@ export class EvaluacionDocenteComponent implements OnInit {
   public esAdminOResponsable = computed(() => {
     const rol = this.auth.usuario()?.rol;
     return rol === 'ADMINISTRADOR_SISTEMA' || rol === 'RESPONSABLE_EVALUACIONES';
+  });
+
+  public esVicerrector = computed(() => {
+    return this.auth.usuario()?.rol === 'VICERRECTOR';
+  });
+
+  public puedeOperar = computed(() => {
+    const rol = this.auth.usuario()?.rol;
+    return rol === 'DIRECTOR_CARRERA' || rol === 'ADMINISTRADOR_SISTEMA' || rol === 'RESPONSABLE_EVALUACIONES';
   });
 
   public filtroCarreraNombre = computed(() => {
@@ -1943,6 +2247,10 @@ export class EvaluacionDocenteComponent implements OnInit {
     this.cargarSedes();
   }
 
+  public ngOnDestroy(): void {
+    this._detenerTemporizadorSemestres();
+  }
+
   public cargarInstrumentoVigente(): void {
     this.evaluacionService.obtenerInstrumentoVigente().subscribe({
       next: inst => this.instrumentoVigente.set(inst),
@@ -1990,6 +2298,167 @@ export class EvaluacionDocenteComponent implements OnInit {
     if (this.filtroSedeCodigo && this.filtroCarreraCodigo) {
       this.cargarDocentesReales(this.filtroSedeCodigo, this.filtroCarreraCodigo);
       this.cargarAvanceEstudiantes(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+      this.cargarEstadosSemestres(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+    }
+  }
+
+  public cambiarASemestres(): void {
+    this.vistaActiva.set('semestres');
+    if (this.filtroSedeCodigo && this.filtroCarreraCodigo) {
+      this.cargarEstadosSemestres(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+    }
+  }
+
+  public cargarEstadosSemestres(sede: string, carrera: string): void {
+    this.cargandoSemestres.set(true);
+    this.evaluacionService.listarEstadosSemestres(sede, carrera, this.storage.gestionActiva()).subscribe({
+      next: lista => {
+        this.semestresEstado.set(lista || []);
+        this.cargandoSemestres.set(false);
+        this._iniciarTemporizadorSemestres();
+      },
+      error: err => {
+        console.warn('Error cargando estados de semestres:', err);
+        this.cargandoSemestres.set(false);
+      }
+    });
+  }
+
+  public toggleSeleccionSemestre(semestre: number): void {
+    const set = new Set(this.semestresSeleccionados());
+    if (set.has(semestre)) {
+      set.delete(semestre);
+    } else {
+      set.add(semestre);
+    }
+    this.semestresSeleccionados.set(set);
+  }
+
+  public seleccionarTodosSemestres(): void {
+    const todos = new Set(this.semestresEstado().map(s => s.semestre));
+    this.semestresSeleccionados.set(todos);
+  }
+
+  public deseleccionarTodosSemestres(): void {
+    this.semestresSeleccionados.set(new Set());
+  }
+
+  public habilitarSemestresSeleccionados(): void {
+    if (!this.puedeOperar()) {
+      this.mostrarToast('El rol Vicerrector cuenta con permisos de supervisión. La habilitación es operativa de Dirección.');
+      return;
+    }
+    const semestres = Array.from(this.semestresSeleccionados());
+    if (semestres.length === 0) {
+      this.mostrarToast('Por favor selecciona al menos un semestre.');
+      return;
+    }
+    this.guardandoHabilitacion.set(true);
+    const req: HabilitarSemestresRequest = {
+      sedeCodigo: this.filtroSedeCodigo,
+      carreraCodigo: this.filtroCarreraCodigo,
+      gestion: this.storage.gestionActiva(),
+      semestres: semestres,
+      duracionMinutos: 90
+    };
+    this.evaluacionService.habilitarSemestres(req).subscribe({
+      next: res => {
+        this.guardandoHabilitacion.set(false);
+        this.semestresSeleccionados.set(new Set());
+        this.mostrarToast(`¡Habilitados ${res.length} semestre(s) por 90 minutos con éxito!`);
+        this.cargarEstadosSemestres(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+      },
+      error: err => {
+        this.guardandoHabilitacion.set(false);
+        this.mostrarToast(err?.error?.message || 'Error al habilitar semestres.');
+      }
+    });
+  }
+
+  public habilitarUnSemestre(semestre: number): void {
+    if (!this.puedeOperar()) {
+      this.mostrarToast('El rol Vicerrector cuenta con permisos de supervisión.');
+      return;
+    }
+    this.guardandoHabilitacion.set(true);
+    const req: HabilitarSemestresRequest = {
+      sedeCodigo: this.filtroSedeCodigo,
+      carreraCodigo: this.filtroCarreraCodigo,
+      gestion: this.storage.gestionActiva(),
+      semestres: [semestre],
+      duracionMinutos: 90
+    };
+    this.evaluacionService.habilitarSemestres(req).subscribe({
+      next: () => {
+        this.guardandoHabilitacion.set(false);
+        this.mostrarToast(`Semestre ${semestre}° habilitado por 90 minutos.`);
+        this.cargarEstadosSemestres(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+      },
+      error: err => {
+        this.guardandoHabilitacion.set(false);
+        this.mostrarToast(err?.error?.message || 'Error al habilitar semestre.');
+      }
+    });
+  }
+
+  public deshabilitarSemestre(semestre: number): void {
+    if (!this.puedeOperar()) {
+      this.mostrarToast('El rol Vicerrector cuenta con permisos de supervisión.');
+      return;
+    }
+    this.guardandoHabilitacion.set(true);
+    this.evaluacionService.deshabilitarSemestre(this.filtroSedeCodigo, this.filtroCarreraCodigo, semestre, this.storage.gestionActiva()).subscribe({
+      next: () => {
+        this.guardandoHabilitacion.set(false);
+        this.mostrarToast(`Semestre ${semestre}° cerrado anticipadamente.`);
+        this.cargarEstadosSemestres(this.filtroSedeCodigo, this.filtroCarreraCodigo);
+      },
+      error: err => {
+        this.guardandoHabilitacion.set(false);
+        this.mostrarToast(err?.error?.message || 'Error al cerrar ventana del semestre.');
+      }
+    });
+  }
+
+  public formatearSegundos(segundos?: number): string {
+    if (segundos === undefined || segundos === null || segundos <= 0) return '00:00';
+    const h = Math.floor(segundos / 3600);
+    const m = Math.floor((segundos % 3600) / 60);
+    const s = segundos % 60;
+    const mm = m < 10 ? '0' + m : m;
+    const ss = s < 10 ? '0' + s : s;
+    if (h > 0) {
+      const hh = h < 10 ? '0' + h : h;
+      return `${hh}:${mm}:${ss}`;
+    }
+    return `${mm}:${ss}`;
+  }
+
+  private _iniciarTemporizadorSemestres(): void {
+    this._detenerTemporizadorSemestres();
+    this._semestresTimerInterval = setInterval(() => {
+      const lista = this.semestresEstado();
+      if (!lista || lista.length === 0) return;
+      let huboCambios = false;
+      for (const sem of lista) {
+        if (sem.segundosRestantes !== undefined && sem.segundosRestantes !== null && sem.segundosRestantes > 0) {
+          sem.segundosRestantes--;
+          if (sem.segundosRestantes <= 0) {
+            sem.activo = false;
+            huboCambios = true;
+          }
+        }
+      }
+      if (huboCambios) {
+        this.semestresEstado.set([...lista]);
+      }
+    }, 1000);
+  }
+
+  private _detenerTemporizadorSemestres(): void {
+    if (this._semestresTimerInterval) {
+      clearInterval(this._semestresTimerInterval);
+      this._semestresTimerInterval = null;
     }
   }
 
@@ -2218,6 +2687,10 @@ export class EvaluacionDocenteComponent implements OnInit {
   }
 
   public iniciarEvaluacionMateria(doc: DocenteEvaluacionRow, mat: MateriaDocenteItem): void {
+    if (!this.puedeOperar()) {
+      this.mostrarToast('El rol Vicerrector cuenta con permisos de supervisión. No puede registrar evaluaciones.');
+      return;
+    }
     this.evaluandoDocente.set(doc);
     this.evaluandoMateria.set(mat);
     this.respuestasMap = {};
@@ -2684,16 +3157,22 @@ export class EvaluacionDocenteComponent implements OnInit {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.setTextColor(dark.r, dark.g, dark.b);
-    pdf.text('FIRMA DEL DIRECTOR DE CARRERA', sig1X + sigW / 2, currentY + 22, { align: 'center' });
+    const usuarioActivo = this.auth.usuario();
+    const esVicerrector = usuarioActivo?.rol === 'VICERRECTOR';
+    const esDirector = usuarioActivo?.rol === 'DIRECTOR_CARRERA';
+    const tituloFirma = esVicerrector ? 'FIRMA DEL VICERRECTOR ACADÉMICO' : 'FIRMA DEL DIRECTOR DE CARRERA';
+    const cargoFirma = esVicerrector ? 'VICERRECTORADO ACADÉMICO NACIONAL' : `CARRERA: ${carreraNombre}`;
+    const nombreFirmante = usuarioActivo?.nombreCompleto 
+      ? usuarioActivo.nombreCompleto 
+      : (esVicerrector ? 'VICERRECTORADO ACADÉMICO' : 'DIRECCIÓN DE CARRERA');
+
+    pdf.text(tituloFirma, sig1X + sigW / 2, currentY + 22, { align: 'center' });
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
     pdf.setTextColor(muted.r, muted.g, muted.b);
-    const usuarioActivo = this.auth.usuario();
-    const esDirector = usuarioActivo?.rol === 'DIRECTOR_CARRERA';
-    const nombreDirector = esDirector && usuarioActivo?.nombreCompleto ? usuarioActivo.nombreCompleto : 'DIRECCIÓN DE CARRERA';
-    pdf.text(nombreDirector, sig1X + sigW / 2, currentY + 26, { align: 'center' });
-    pdf.text(`CARRERA: ${carreraNombre}`, sig1X + sigW / 2, currentY + 30, { align: 'center' });
+    pdf.text(nombreFirmante, sig1X + sigW / 2, currentY + 26, { align: 'center' });
+    pdf.text(cargoFirma, sig1X + sigW / 2, currentY + 30, { align: 'center' });
 
     // Línea de firma 2: Sello Oficial Dirección / Vicerrectorado
     pdf.line(sig2X, currentY + 18, sig2X + sigW, currentY + 18);
@@ -3491,16 +3970,22 @@ export class EvaluacionDocenteComponent implements OnInit {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.setTextColor(dark.r, dark.g, dark.b);
-    pdf.text('DIRECCIÓN DE CARRERA / EVALUADOR', sig1X + sigW / 2, currY + 22, { align: 'center' });
+    const usuarioActivo = this.auth.usuario();
+    const esVicerrector = usuarioActivo?.rol === 'VICERRECTOR';
+    const esDirector = usuarioActivo?.rol === 'DIRECTOR_CARRERA';
+    const tituloFirmaDoc = esVicerrector ? 'VICERRECTORADO ACADÉMICO' : 'DIRECCIÓN DE CARRERA / EVALUADOR';
+    const cargoFirmaDoc = esVicerrector ? 'Vicerrectorado Académico Nacional' : `Carrera: ${carreraNombre}`;
+    const nombreDirector = usuarioActivo?.nombreCompleto 
+      ? usuarioActivo.nombreCompleto 
+      : (esVicerrector ? 'VICERRECTORADO ACADÉMICO' : 'DIRECCIÓN ACADÉMICA');
+
+    pdf.text(tituloFirmaDoc, sig1X + sigW / 2, currY + 22, { align: 'center' });
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
     pdf.setTextColor(muted.r, muted.g, muted.b);
-    const usuarioActivo = this.auth.usuario();
-    const esDirector = usuarioActivo?.rol === 'DIRECTOR_CARRERA';
-    const nombreDirector = esDirector && usuarioActivo?.nombreCompleto ? usuarioActivo.nombreCompleto : 'DIRECCIÓN ACADÉMICA';
     pdf.text(nombreDirector, sig1X + sigW / 2, currY + 26, { align: 'center' });
-    pdf.text(`Carrera: ${carreraNombre}`, sig1X + sigW / 2, currY + 30, { align: 'center' });
+    pdf.text(cargoFirmaDoc, sig1X + sigW / 2, currY + 30, { align: 'center' });
 
     // Firma 2: Docente Evaluado
     pdf.line(sig2X, currY + 18, sig2X + sigW, currY + 18);

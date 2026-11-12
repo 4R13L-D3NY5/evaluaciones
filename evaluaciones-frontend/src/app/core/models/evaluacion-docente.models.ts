@@ -104,8 +104,33 @@ export interface MateriaEstudiante {
   docenteNombre: string;
   sedeCodigo?: string;
   carreraCodigo?: string;
+  semestre?: number;
   evaluada: boolean;
   fechaEvaluacion?: string;
+  habilitadaParaEvaluacion?: boolean;
+  motivoBloqueo?: string;
+  segundosRestantesVentana?: number;
+}
+
+export interface SemestreHabilitacionEstado {
+  semestre: number;
+  semestreDisplay: string;
+  activo: boolean;
+  habilitadoEn?: string;
+  expiraEn?: string;
+  segundosRestantes?: number;
+  duracionMinutos?: number;
+  habilitadoPor?: string;
+  totalMaterias: number;
+  totalDocentes: number;
+}
+
+export interface HabilitarSemestresRequest {
+  sedeCodigo: string;
+  carreraCodigo: string;
+  gestion?: string;
+  semestres: number[];
+  duracionMinutos?: number;
 }
 
 export interface EstudianteAvanceEvaluacion {

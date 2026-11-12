@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -173,23 +173,38 @@ import { UNITEPC_LOGO_PNG } from '../../core/constants/unitepc-assets';
                     class="bg-white dark:bg-slate-900 rounded-2xl p-5 border transition-all shadow-xs flex flex-col justify-between"
                     [class.border-emerald-300]="materia.evaluada"
                     [class.dark:border-emerald-800]="materia.evaluada"
-                    [class.border-slate-200]="!materia.evaluada"
-                    [class.dark:border-slate-800]="!materia.evaluada">
+                    [class.border-purple-200]="!materia.evaluada && materia.habilitadaParaEvaluacion"
+                    [class.dark:border-purple-900]="!materia.evaluada && materia.habilitadaParaEvaluacion"
+                    [class.border-slate-200]="!materia.evaluada && !materia.habilitadaParaEvaluacion"
+                    [class.dark:border-slate-800]="!materia.evaluada && !materia.habilitadaParaEvaluacion"
+                    [class.opacity-80]="!materia.evaluada && !materia.habilitadaParaEvaluacion">
                     <div>
                       <div class="flex items-start justify-between gap-3 mb-2">
-                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
-                          {{ materia.materiaCodigo }} · {{ materia.grupoCodigo.includes(',') ? 'Grupos: ' + materia.grupoCodigo : 'Grupo ' + materia.grupoCodigo }}
-                        </span>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <span class="text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                            {{ materia.materiaCodigo }} · {{ materia.grupoCodigo.includes(',') ? 'Grupos: ' + materia.grupoCodigo : 'Grupo ' + materia.grupoCodigo }}
+                          </span>
+                          @if (materia.semestre) {
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                              {{ materia.semestre }}° Semestre
+                            </span>
+                          }
+                        </div>
 
                         @if (materia.evaluada) {
                           <span class="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                             <i class="pi pi-check-circle text-xs"></i>
                             Evaluado
                           </span>
-                        } @else {
-                          <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        } @else if (materia.habilitadaParaEvaluacion) {
+                          <span class="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 animate-pulse">
                             <i class="pi pi-clock text-xs"></i>
-                            Pendiente
+                            Quedan {{ formatearTiempo(materia.segundosRestantesVentana) }}
+                          </span>
+                        } @else {
+                          <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                            <i class="pi pi-lock text-xs"></i>
+                            No Habilitado
                           </span>
                         }
                       </div>
@@ -210,13 +225,25 @@ import { UNITEPC_LOGO_PNG } from '../../core/constants/unitepc-assets';
                           <span>Evaluación completada</span>
                           <i class="pi pi-verified"></i>
                         </div>
-                      } @else {
+                      } @else if (materia.habilitadaParaEvaluacion) {
                         <button
                           (click)="abrirModalEvaluacion(materia)"
                           class="w-full py-2.5 px-4 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-black shadow-md shadow-purple-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer">
                           <i class="pi pi-pencil text-xs"></i>
                           <span>Evaluar a este Docente</span>
                         </button>
+                      } @else {
+                        <div class="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <button
+                            disabled
+                            class="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 cursor-not-allowed">
+                            <i class="pi pi-lock text-xs"></i>
+                            <span>Evaluación no disponible</span>
+                          </button>
+                          <p class="text-[10px] text-center text-slate-400 font-medium">
+                            {{ materia.motivoBloqueo || 'El semestre aún no fue habilitado por el Director de Carrera.' }}
+                          </p>
+                        </div>
                       }
                     </div>
                   </div>
@@ -398,8 +425,9 @@ import { UNITEPC_LOGO_PNG } from '../../core/constants/unitepc-assets';
     </div>
   `
 })
-export class EvaluacionEstudiantilComponent implements OnInit {
+export class EvaluacionEstudiantilComponent implements OnInit, OnDestroy {
   private readonly _evaluacionService = inject(EvaluacionDocenteService);
+  private _temporizadorInterval: any = null;
 
   public readonly logoUnitepc = UNITEPC_LOGO_PNG;
 
@@ -427,6 +455,10 @@ export class EvaluacionEstudiantilComponent implements OnInit {
     // Si viene código en query params, se podría auto-consultar
   }
 
+  public ngOnDestroy(): void {
+    this._detenerTemporizador();
+  }
+
   public consultarMaterias(): void {
     const cod = this.codigoIngresado.trim();
     if (!cod) return;
@@ -442,6 +474,7 @@ export class EvaluacionEstudiantilComponent implements OnInit {
           return;
         }
         this.estudiante.set(res);
+        this._iniciarTemporizador();
       },
       error: err => {
         this.cargandoConsulta.set(false);
@@ -451,12 +484,18 @@ export class EvaluacionEstudiantilComponent implements OnInit {
   }
 
   public salir(): void {
+    this._detenerTemporizador();
     this.estudiante.set(null);
     this.codigoIngresado = '';
     this.errorConsulta.set(null);
   }
 
   public abrirModalEvaluacion(materia: MateriaEstudiante): void {
+    if (!materia.habilitadaParaEvaluacion) {
+      this.mostrarToast(materia.motivoBloqueo || 'La evaluación no está habilitada actualmente para este semestre.', 'error');
+      return;
+    }
+
     this.materiaActiva.set(materia);
     this.respuestas = {};
     this.observaciones = '';
@@ -545,7 +584,10 @@ export class EvaluacionEstudiantilComponent implements OnInit {
 
         // Refrescar materias del estudiante
         this._evaluacionService.consultarMateriasEstudiante(est.estudianteCodigo, est.gestion).subscribe({
-          next: actualizado => this.estudiante.set(actualizado)
+          next: actualizado => {
+            this.estudiante.set(actualizado);
+            this._iniciarTemporizador();
+          }
         });
       },
       error: err => {
@@ -554,6 +596,49 @@ export class EvaluacionEstudiantilComponent implements OnInit {
         this.mostrarToast(msg, 'error');
       }
     });
+  }
+
+  public formatearTiempo(segundos?: number): string {
+    if (segundos === undefined || segundos === null || segundos <= 0) return '00:00';
+    const h = Math.floor(segundos / 3600);
+    const m = Math.floor((segundos % 3600) / 60);
+    const s = segundos % 60;
+    const mm = m < 10 ? '0' + m : m;
+    const ss = s < 10 ? '0' + s : s;
+    if (h > 0) {
+      const hh = h < 10 ? '0' + h : h;
+      return `${hh}:${mm}:${ss}`;
+    }
+    return `${mm}:${ss}`;
+  }
+
+  private _iniciarTemporizador(): void {
+    this._detenerTemporizador();
+    this._temporizadorInterval = setInterval(() => {
+      const est = this.estudiante();
+      if (!est || !est.materias) return;
+      let huboCambios = false;
+      for (const mat of est.materias) {
+        if (mat.segundosRestantesVentana !== undefined && mat.segundosRestantesVentana !== null && mat.segundosRestantesVentana > 0) {
+          mat.segundosRestantesVentana--;
+          if (mat.segundosRestantesVentana <= 0) {
+            mat.habilitadaParaEvaluacion = false;
+            mat.motivoBloqueo = 'El tiempo de habilitación para este semestre ha expirado';
+            huboCambios = true;
+          }
+        }
+      }
+      if (huboCambios) {
+        this.estudiante.set({ ...est });
+      }
+    }, 1000);
+  }
+
+  private _detenerTemporizador(): void {
+    if (this._temporizadorInterval) {
+      clearInterval(this._temporizadorInterval);
+      this._temporizadorInterval = null;
+    }
   }
 
   private mostrarToast(mensaje: string, tipo: 'success' | 'error' = 'success'): void {

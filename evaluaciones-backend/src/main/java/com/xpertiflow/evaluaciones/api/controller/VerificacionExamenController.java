@@ -6,6 +6,7 @@ import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionDecisionRequ
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionExamenDetalleDto;
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionExamenListaDto;
 import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionHistorialDevolucionDto;
+import com.xpertiflow.evaluaciones.api.dto.verificacion.VerificacionReaperturaRequestDto;
 import com.xpertiflow.evaluaciones.application.VerificacionExamenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -85,5 +86,13 @@ public class VerificacionExamenController {
             @Valid @RequestBody VerificacionDecisionRequestDto request,
             Authentication authentication) {
         return ResponseEntity.ok(service.decidir(rolExamenId, request, authentication));
+    }
+
+    @PostMapping("/{rolExamenId}/reabrir")
+    public ResponseEntity<VerificacionExamenDetalleDto> reabrir(
+            @PathVariable String rolExamenId,
+            @RequestBody(required = false) VerificacionReaperturaRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(service.reabrir(rolExamenId, request, authentication));
     }
 }

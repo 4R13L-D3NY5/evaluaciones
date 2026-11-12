@@ -29,6 +29,7 @@ export interface VerificacionExamenLista {
   fechaVerificacion?: string;
   tieneHistorialDevoluciones?: boolean;
   cantidadDevoluciones?: number;
+  puedeReabrir?: boolean;
 }
 
 export interface VerificacionOpcion { letra: string; texto: string; correcta: boolean; }
@@ -128,6 +129,10 @@ export class VerificacionExamenService {
 
   decidir(rolExamenId: string, decision: VerificacionDecision): Observable<VerificacionExamenDetalle> {
     return this.http.post<VerificacionExamenDetalle>(`${this.baseUrl}/${rolExamenId}/decision`, decision).pipe(catchError(this.error));
+  }
+
+  reabrir(rolExamenId: string, motivo?: string): Observable<VerificacionExamenDetalle> {
+    return this.http.post<VerificacionExamenDetalle>(`${this.baseUrl}/${rolExamenId}/reabrir`, { motivo }).pipe(catchError(this.error));
   }
 
   private error(error: unknown): Observable<never> {
