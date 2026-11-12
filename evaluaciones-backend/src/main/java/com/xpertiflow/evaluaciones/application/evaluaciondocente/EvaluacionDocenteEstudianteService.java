@@ -115,6 +115,11 @@ public class EvaluacionDocenteEstudianteService {
             if (rolOpt.isEmpty()) continue;
             RolExamen rol = rolOpt.get();
 
+            // REGLA INSTITUCIONAL: Este módulo aplica exclusivamente a grupos teóricos (TA / T*)
+            if (!esGrupoTeorico(rol)) {
+                continue;
+            }
+
             if (sedeCodigoPrincipal == null) {
                 sedeCodigoPrincipal = rol.getSedeCodigo();
                 carreraCodigoPrincipal = rol.getCarreraCodigo();
@@ -228,6 +233,11 @@ public class EvaluacionDocenteEstudianteService {
         String grupoCod = request.getGrupoCodigo().trim();
         String docenteNom = request.getDocenteNombre() != null ? request.getDocenteNombre().trim() : "";
         String gestion = resolverGestionActiva(request.getGestion());
+
+        // 0. Validar que la evaluación corresponda exclusivamente a un grupo teórico
+        if (!esGrupoTeorico(grupoCod)) {
+            throw new IllegalArgumentException("Este módulo de evaluación docente aplica exclusivamente a grupos teóricos.");
+        }
 
         // 1. Evitar evaluación duplicada por Estudiante + Materia + Docente
         if (estudianteRegistroRepository.findByEstudianteCodigoAndMateriaCodigoAndDocenteNombreAndGestion(
@@ -393,7 +403,7 @@ public class EvaluacionDocenteEstudianteService {
                 }
 
                 RolExamen rol = mapaRoles.get(m.getRolExamenId());
-                if (rol == null) continue;
+                if (rol == null || !esGrupoTeorico(rol)) continue;
 
                 String docenteNom = Optional.ofNullable(rol.getDocenteNombre())
                         .filter(s -> !s.isBlank())
@@ -497,9 +507,12 @@ public class EvaluacionDocenteEstudianteService {
             estRegMap.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
         }
 
-        // 5. Agrupar roles por Materia + Docente
+        // 5. Agrupar roles por Materia + Docente (exclusivamente grupos teóricos)
         Map<String, List<RolExamen>> rolesPorMateriaDocente = new LinkedHashMap<>();
         for (RolExamen r : roles) {
+            if (!esGrupoTeorico(r)) {
+                continue;
+            }
             String docNom = r.getDocenteNombre() != null ? r.getDocenteNombre().trim() : "";
             if (docNom.isBlank() || "POR DESIGNAR".equalsIgnoreCase(docNom) || docNom.toUpperCase().contains("SIN ASIGNAR")) {
                 continue;
@@ -733,9 +746,13 @@ public class EvaluacionDocenteEstudianteService {
             boolean activo = hab != null && hab.isHabilitado() && hab.getExpiraEn() != null && ahora.isBefore(hab.getExpiraEn());
             Long segRestantes = activo ? Duration.between(ahora, hab.getExpiraEn()).toSeconds() : 0L;
 
-            long matCount = roles.stream().filter(r -> Objects.equals(r.getSemestre(), s))
+            long matCount = roles.stream()
+                    .filter(this::esGrupoTeorico)
+                    .filter(r -> Objects.equals(r.getSemestre(), s))
                     .map(RolExamen::getMateriaCodigo).distinct().count();
-            long docCount = roles.stream().filter(r -> Objects.equals(r.getSemestre(), s))
+            long docCount = roles.stream()
+                    .filter(this::esGrupoTeorico)
+                    .filter(r -> Objects.equals(r.getSemestre(), s))
                     .map(RolExamen::getDocenteNombre).filter(Objects::nonNull).distinct().count();
 
             resultado.add(SemestreHabilitacionEstadoDto.builder()
@@ -790,5 +807,32 @@ public class EvaluacionDocenteEstudianteService {
                 .totalCriterios(totalCrit)
                 .secciones(seccionesDto)
                 .build();
+    }
+
+    /**
+     * Determina si un rol o grupo corresponde a docencia teórica (TA / T*).
+     * Los grupos prácticos (PA, PL, PR, PS, etc.) están excluidos de este módulo de evaluación.
+     */
+    public boolean esGrupoTeorico(RolExamen rol) {
+        if (rol == null) return false;
+        String tipoClase = rol.getTipoClase();
+        if (tipoClase != null && !tipoClase.isBlank()) {
+            return tipoClase.trim().toUpperCase().startsWith("T");
+        }
+        return esGrupoTeorico(rol.getGrupo());
+    }
+
+    public boolean esGrupoTeorico(String grupoCodigo) {
+        if (grupoCodigo == null || grupoCodigo.isBlank()) return true;
+        String g = grupoCodigo.trim().toUpperCase();
+        // Si comienza con P (PA, PL, PR, PS), es práctico -> false
+        if (g.startsWith("P")) {
+            return false;
+        }
+        // Si comienza con T (TA, T), es teórico -> true
+        if (g.startsWith("T")) {
+            return true;
+        }
+        return true;
     }
 }
