@@ -124,6 +124,38 @@ class SolicitudModificacionRolTest {
     }
 
     @Test
+    @DisplayName("Rechaza creación si la fecha propuesta es anterior a la fecha actual")
+    void rechazaSolicitudSiFechaPropuestaEsAnteriorAHoy() {
+        String username = "director_sistemas";
+        Authentication auth = crearAuth(username, "DIRECTOR_CARRERA");
+
+        UsuarioSistema usuario = new UsuarioSistema();
+        usuario.setId(10L);
+        usuario.setUsuario(username);
+        usuario.setRolCodigo("DIRECTOR_CARRERA");
+
+        when(usuarioRepository.findByUsuarioIgnoreCase(username)).thenReturn(Optional.of(usuario));
+
+        RolExamen rol = new RolExamen();
+        rol.setId("ROL-100");
+        rol.setEstadoFlujo(EstadoFlujo.PROGRAMADO);
+
+        when(rolExamenRepository.findById("ROL-100")).thenReturn(Optional.of(rol));
+        when(accesoAcademicoService.puedeAccederRol("ROL-100", auth)).thenReturn(true);
+
+        CrearSolicitudModificacionRequestDto dto = CrearSolicitudModificacionRequestDto.builder()
+                .rolExamenId("ROL-100")
+                .fechaPropuesta(LocalDate.now().minusDays(1))
+                .horarioPropuesto("10:00")
+                .modalidadPropuesta(ModalidadExamen.PRESENCIAL_CARTILLA)
+                .motivo("Intento con fecha en el pasado")
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.crearSolicitud(dto, auth));
+        assertTrue(ex.getMessage().contains("no puede ser anterior a la fecha actual"));
+    }
+
+    @Test
     @DisplayName("Rechaza creación si ya existe una solicitud PENDIENTE para el examen")
     void rechazaSolicitudSiYaExistePendiente() {
         String username = "director_sistemas";

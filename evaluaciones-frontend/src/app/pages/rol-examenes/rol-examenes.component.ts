@@ -1169,6 +1169,7 @@ interface InstanciaImportacionItem {
                     <input 
                       type="date" 
                       [(ngModel)]="solicitudFechaPropuesta"
+                      [min]="fechaMinimaSolicitud()"
                       class="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground focus:ring-2 focus:ring-amber-500 focus:outline-none">
                   </div>
                   <div>
@@ -2716,9 +2717,22 @@ export class RolExamenesComponent implements OnInit {
     return estado === 'PROGRAMADO' || estado === 'VALIDADO' || estado === 'GENERADO';
   }
 
+  public fechaMinimaSolicitud(): string {
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
   public abrirModalSolicitar(row: RolExamenItem): void {
     this.examenParaSolicitud.set(row);
-    this.solicitudFechaPropuesta = row.fecha || '';
+    const minFecha = this.fechaMinimaSolicitud();
+    if (row.fecha && row.fecha >= minFecha) {
+      this.solicitudFechaPropuesta = row.fecha;
+    } else {
+      this.solicitudFechaPropuesta = minFecha;
+    }
     this.solicitudHorarioPropuesto = row.horario || '08:00';
     this.solicitudModalidadPropuesta = row.modalidad || 'PRESENCIAL_CARTILLA';
     this.solicitudMotivo = '';
@@ -2737,6 +2751,11 @@ export class RolExamenesComponent implements OnInit {
 
     if (!this.solicitudFechaPropuesta) {
       this._mostrarToast('Debes seleccionar una fecha propuesta.');
+      return;
+    }
+    const minFecha = this.fechaMinimaSolicitud();
+    if (this.solicitudFechaPropuesta < minFecha) {
+      this._mostrarToast(`La fecha propuesta no puede ser anterior a la fecha actual (${minFecha}).`);
       return;
     }
     if (!this.solicitudHorarioPropuesto.trim()) {

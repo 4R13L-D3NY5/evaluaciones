@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -56,6 +57,14 @@ public class SolicitudModificacionRolService {
                 || estadoActual == EstadoFlujo.CALIFICADO
                 || estadoActual == EstadoFlujo.CONFIRMADO) {
             throw new IllegalStateException("No se puede solicitar modificación para un examen en estado " + (estadoActual != null ? estadoActual.getValor() : "-") + ". Las cartillas ya fueron generadas o el examen ya se rindió.");
+        }
+
+        // Validación de fecha propuesta: debe ser hoy o en adelante
+        if (dto.getFechaPropuesta() == null) {
+            throw new IllegalArgumentException("Debe especificar la nueva fecha propuesta");
+        }
+        if (dto.getFechaPropuesta().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha propuesta no puede ser anterior a la fecha actual (" + LocalDate.now() + "). Debe ser desde hoy en adelante.");
         }
 
         // Idempotencia: una sola solicitud pendiente
@@ -171,6 +180,10 @@ public class SolicitudModificacionRolService {
         }
 
         if (Boolean.TRUE.equals(dto.getAprobado())) {
+            if (solicitud.getFechaPropuesta() != null && solicitud.getFechaPropuesta().isBefore(LocalDate.now())) {
+                throw new IllegalStateException("No se puede aprobar la solicitud porque la fecha propuesta (" + solicitud.getFechaPropuesta() + ") ya ha vencido. El director debe emitir una nueva solicitud.");
+            }
+
             solicitud.setEstado(EstadoSolicitudModificacion.APROBADA);
 
             // Mutación atómica del examen
