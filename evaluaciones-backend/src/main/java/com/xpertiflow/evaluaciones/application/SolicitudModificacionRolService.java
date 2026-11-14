@@ -101,7 +101,7 @@ public class SolicitudModificacionRolService {
     public List<SolicitudModificacionResponseDto> listarPendientesVicerrector(Authentication authentication) {
         UsuarioSistema usuario = obtenerUsuarioAutenticado(authentication);
 
-        if (esRol(usuario, "ADMINISTRADOR_SISTEMA")) {
+        if (esRol(usuario, "ADMINISTRADOR_SISTEMA") || esRol(usuario, "RESPONSABLE_EVALUACIONES")) {
             return repository.findAll().stream()
                     .filter(s -> s.getEstado() == EstadoSolicitudModificacion.PENDIENTE)
                     .sorted(Comparator.comparing(SolicitudModificacionRol::getCreadoEn).reversed())
@@ -142,7 +142,7 @@ public class SolicitudModificacionRolService {
             Authentication authentication) {
 
         UsuarioSistema resolutor = obtenerUsuarioAutenticado(authentication);
-        boolean esAdmin = esRol(resolutor, "ADMINISTRADOR_SISTEMA");
+        boolean esAdmin = esRol(resolutor, "ADMINISTRADOR_SISTEMA") || esRol(resolutor, "RESPONSABLE_EVALUACIONES");
         boolean esVicerrector = esRol(resolutor, "VICERRECTOR");
 
         if (!esAdmin && !esVicerrector) {

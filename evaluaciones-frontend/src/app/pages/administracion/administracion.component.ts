@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import * as XLSX from 'xlsx';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
 import { ConfiguracionEvaluaciones, ConfiguracionEvaluacionesService, ConfiguracionVerificacion, VicerrectorEdicionRol } from '../../core/services/configuracion-evaluaciones.service';
@@ -11,6 +12,7 @@ import { BranchOffice, Campus, Career } from '../../core/models/unitepc-gateway.
 import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { SolicitudModificacionService } from '../../core/services/solicitud-modificacion.service';
 import { SolicitudModificacionResponse } from '../../core/models/solicitud-modificacion.models';
+import { AuthService } from '../../core/services/auth.service';
 
 export interface CampusItem {
   id: number;
@@ -84,45 +86,49 @@ export interface ParcialConfig {
         
         <!-- Pestañas Horizontales Oficiales -->
         <div class="flex items-center border-b border-border bg-muted/20 px-6 pt-3 gap-2 overflow-x-auto">
-          <button 
-            (click)="tabActual.set('campus')"
-            [class]="tabActual() === 'campus' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
-            class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
-            <i class="pi pi-building text-xs"></i>
-            <span>Campus por Sede</span>
-          </button>
+          @if (!esSoloVicerrector()) {
+            <button 
+              (click)="tabActual.set('campus')"
+              [class]="tabActual() === 'campus' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
+              class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
+              <i class="pi pi-building text-xs"></i>
+              <span>Campus por Sede</span>
+            </button>
 
-          <button 
-            (click)="tabActual.set('carreras')"
-            [class]="tabActual() === 'carreras' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
-            class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
-            <i class="pi pi-graduation-cap text-xs"></i>
-            <span>Carreras por Campus</span>
-          </button>
+            <button 
+              (click)="tabActual.set('carreras')"
+              [class]="tabActual() === 'carreras' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
+              class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
+              <i class="pi pi-graduation-cap text-xs"></i>
+              <span>Carreras por Campus</span>
+            </button>
 
-          <button 
-            (click)="tabActual.set('usuarios')"
-            [class]="tabActual() === 'usuarios' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
-            class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
-            <i class="pi pi-users text-xs"></i>
-            <span>Usuarios y accesos</span>
-          </button>
+            <button 
+              (click)="tabActual.set('usuarios')"
+              [class]="tabActual() === 'usuarios' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
+              class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
+              <i class="pi pi-users text-xs"></i>
+              <span>Usuarios y accesos</span>
+            </button>
+          }
 
           <button 
             (click)="tabActual.set('configuracion')"
             [class]="tabActual() === 'configuracion' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
             class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
             <i class="pi pi-sliders-h text-xs"></i>
-            <span>Configuración de Exámenes</span>
+            <span>{{ esSoloVicerrector() ? 'Aprobación y Configuración de Exámenes' : 'Configuración de Exámenes' }}</span>
           </button>
 
-          <button 
-            (click)="tabActual.set('tiempos')"
-            [class]="tabActual() === 'tiempos' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
-            class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
-            <i class="pi pi-clock text-xs"></i>
-            <span>Configuración de Tiempos</span>
-          </button>
+          @if (!esSoloVicerrector()) {
+            <button 
+              (click)="tabActual.set('tiempos')"
+              [class]="tabActual() === 'tiempos' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
+              class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
+              <i class="pi pi-clock text-xs"></i>
+              <span>Configuración de Tiempos</span>
+            </button>
+          }
         </div>
 
         <div class="p-6">
@@ -475,105 +481,6 @@ export interface ParcialConfig {
                         <option value="Medicina">Licenciatura en Medicina</option>
                       </select>
                     </div>
-                  </div>
-                }
-              </div>
-
-              <!-- Bandeja de Aprobación de Modificaciones de Exámenes (Vicerrectorado) -->
-              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
-                  <div class="flex items-center gap-2">
-                    <i class="pi pi-calendar-times text-amber-600 text-base"></i>
-                    <div>
-                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Bandeja de Aprobación de Modificaciones de Examen</h4>
-                      <p class="text-[10px] text-muted-foreground">Solicitudes de reprogramación de fecha, horario o modalidad emitidas por Directores de Carrera pendientes de autorización.</p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1 text-[10px] font-mono font-bold">
-                      {{ solicitudesPendientes().length }} Pendientes
-                    </span>
-                    <button 
-                      (click)="cargarSolicitudesPendientes()" 
-                      [disabled]="cargandoSolicitudes()"
-                      class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                      title="Refrescar solicitudes">
-                      <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoSolicitudes()"></i>
-                    </button>
-                  </div>
-                </div>
-
-                @if (cargandoSolicitudes()) {
-                  <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                    <i class="pi pi-spin pi-spinner text-amber-600"></i>
-                    <span>Cargando solicitudes de reprogramación...</span>
-                  </div>
-                } @else if (solicitudesPendientes().length === 0) {
-                  <div class="py-6 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
-                    <i class="pi pi-check-circle text-emerald-500 text-lg mb-1 block"></i>
-                    No hay solicitudes de modificación pendientes en tus sedes asignadas.
-                  </div>
-                } @else {
-                  <div class="overflow-x-auto border border-border rounded-xl">
-                    <table class="w-full text-left text-xs">
-                      <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
-                        <tr>
-                          <th class="py-2.5 px-4">Materia / Carrera</th>
-                          <th class="py-2.5 px-4">Solicitante</th>
-                          <th class="py-2.5 px-4">Horario Original</th>
-                          <th class="py-2.5 px-4">Horario Propuesto</th>
-                          <th class="py-2.5 px-4">Motivo Académico</th>
-                          <th class="py-2.5 px-4 text-right">Decisión</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-border">
-                        @for (sol of solicitudesPendientes(); track sol.id) {
-                          <tr class="hover:bg-muted/20 transition-colors">
-                            <td class="py-2.5 px-4 font-bold text-foreground">
-                              <div>{{ sol.materiaNombre }} <span class="text-xs text-muted-foreground">({{ sol.grupo }})</span></div>
-                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</div>
-                            </td>
-                            <td class="py-2.5 px-4">
-                              <div class="font-medium text-foreground">{{ sol.solicitanteNombre }}</div>
-                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</div>
-                            </td>
-                            <td class="py-2.5 px-4">
-                              <div class="text-foreground font-mono text-[11px]">{{ sol.fechaOriginal }}</div>
-                              <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
-                            </td>
-                            <td class="py-2.5 px-4 bg-emerald-50/40 dark:bg-emerald-950/20">
-                              <div class="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-[11px]">{{ sol.fechaPropuesta }}</div>
-                              <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
-                            </td>
-                            <td class="py-2.5 px-4 max-w-[200px]">
-                              <p class="text-[11px] text-foreground truncate" [title]="sol.motivo">{{ sol.motivo }}</p>
-                            </td>
-                            <td class="py-2.5 px-4 text-right">
-                              <div class="inline-flex items-center gap-1.5">
-                                <button 
-                                  (click)="aprobarSolicitud(sol)"
-                                  [disabled]="procesandoSolicitudId() === sol.id"
-                                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
-                                  @if (procesandoSolicitudId() === sol.id) {
-                                    <i class="pi pi-spin pi-spinner text-xs"></i>
-                                  } @else {
-                                    <i class="pi pi-check text-xs"></i>
-                                  }
-                                  <span>Aprobar</span>
-                                </button>
-                                <button 
-                                  (click)="abrirModalRechazo(sol)"
-                                  [disabled]="procesandoSolicitudId() === sol.id"
-                                  class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
-                                  <i class="pi pi-times text-xs"></i>
-                                  <span>Rechazar</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
                   </div>
                 }
               </div>
@@ -1386,105 +1293,6 @@ export interface ParcialConfig {
                   </div>
                 }
               </div>
-
-              <!-- Bandeja de Aprobación de Modificaciones de Exámenes (Vicerrectorado) -->
-              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
-                  <div class="flex items-center gap-2">
-                    <i class="pi pi-calendar-times text-amber-600 text-base"></i>
-                    <div>
-                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Bandeja de Aprobación de Modificaciones de Examen</h4>
-                      <p class="text-[10px] text-muted-foreground">Solicitudes de reprogramación de fecha, horario o modalidad emitidas por Directores de Carrera pendientes de autorización.</p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1 text-[10px] font-mono font-bold">
-                      {{ solicitudesPendientes().length }} Pendientes
-                    </span>
-                    <button 
-                      (click)="cargarSolicitudesPendientes()" 
-                      [disabled]="cargandoSolicitudes()"
-                      class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                      title="Refrescar solicitudes">
-                      <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoSolicitudes()"></i>
-                    </button>
-                  </div>
-                </div>
-
-                @if (cargandoSolicitudes()) {
-                  <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                    <i class="pi pi-spin pi-spinner text-amber-600"></i>
-                    <span>Cargando solicitudes de reprogramación...</span>
-                  </div>
-                } @else if (solicitudesPendientes().length === 0) {
-                  <div class="py-6 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
-                    <i class="pi pi-check-circle text-emerald-500 text-lg mb-1 block"></i>
-                    No hay solicitudes de modificación pendientes en tus sedes asignadas.
-                  </div>
-                } @else {
-                  <div class="overflow-x-auto border border-border rounded-xl">
-                    <table class="w-full text-left text-xs">
-                      <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
-                        <tr>
-                          <th class="py-2.5 px-4">Materia / Carrera</th>
-                          <th class="py-2.5 px-4">Solicitante</th>
-                          <th class="py-2.5 px-4">Horario Original</th>
-                          <th class="py-2.5 px-4">Horario Propuesto</th>
-                          <th class="py-2.5 px-4">Motivo Académico</th>
-                          <th class="py-2.5 px-4 text-right">Decisión</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-border">
-                        @for (sol of solicitudesPendientes(); track sol.id) {
-                          <tr class="hover:bg-muted/20 transition-colors">
-                            <td class="py-2.5 px-4 font-bold text-foreground">
-                              <div>{{ sol.materiaNombre }} <span class="text-xs text-muted-foreground">({{ sol.grupo }})</span></div>
-                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</div>
-                            </td>
-                            <td class="py-2.5 px-4">
-                              <div class="font-medium text-foreground">{{ sol.solicitanteNombre }}</div>
-                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</div>
-                            </td>
-                            <td class="py-2.5 px-4">
-                              <div class="text-foreground font-mono text-[11px]">{{ sol.fechaOriginal }}</div>
-                              <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
-                            </td>
-                            <td class="py-2.5 px-4 bg-emerald-50/40 dark:bg-emerald-950/20">
-                              <div class="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-[11px]">{{ sol.fechaPropuesta }}</div>
-                              <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
-                            </td>
-                            <td class="py-2.5 px-4 max-w-[200px]">
-                              <p class="text-[11px] text-foreground truncate" [title]="sol.motivo">{{ sol.motivo }}</p>
-                            </td>
-                            <td class="py-2.5 px-4 text-right">
-                              <div class="inline-flex items-center gap-1.5">
-                                <button 
-                                  (click)="aprobarSolicitud(sol)"
-                                  [disabled]="procesandoSolicitudId() === sol.id"
-                                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
-                                  @if (procesandoSolicitudId() === sol.id) {
-                                    <i class="pi pi-spin pi-spinner text-xs"></i>
-                                  } @else {
-                                    <i class="pi pi-check text-xs"></i>
-                                  }
-                                  <span>Aprobar</span>
-                                </button>
-                                <button 
-                                  (click)="abrirModalRechazo(sol)"
-                                  [disabled]="procesandoSolicitudId() === sol.id"
-                                  class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
-                                  <i class="pi pi-times text-xs"></i>
-                                  <span>Rechazar</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-              </div>
             </div>
 
             <div class="flex justify-end gap-2 pt-2">
@@ -1599,6 +1407,8 @@ export class AdministracionEvaluacionesComponent {
   private readonly _solicitudesService = inject(SolicitudModificacionService);
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _campusCarreras = inject(CampusCarrerasService);
+  private readonly _route = inject(ActivatedRoute);
+  public readonly authService = inject(AuthService);
   public readonly Math = Math;
 
   public ratioEstudiantesPorVariante: number = 5;
@@ -1661,6 +1471,27 @@ export class AdministracionEvaluacionesComponent {
     this.cargarConfiguracionVerificacion();
     this.cargarVicerrectoresEdicion();
     this.cargarSolicitudesPendientes();
+
+    // Soporte para apertura directa desde notificaciones (?tab=3 o ?tab=configuracion)
+    this._route.queryParams.subscribe(params => {
+      const tab = params['tab'];
+      if (tab === '3' || tab === 'configuracion') {
+        this.tabActual.set('configuracion');
+      } else if (tab === 'campus' || tab === 'carreras' || tab === 'usuarios' || tab === 'tiempos') {
+        this.tabActual.set(tab);
+      } else if (this.esSoloVicerrector()) {
+        this.tabActual.set('configuracion');
+      }
+    });
+
+    if (this.esSoloVicerrector()) {
+      this.tabActual.set('configuracion');
+    }
+  }
+
+  public esSoloVicerrector(): boolean {
+    return this.authService.tieneRol(['VICERRECTOR']) && 
+           !this.authService.tieneRol(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES']);
   }
 
   public inicialesNombre(nombre: string): string {

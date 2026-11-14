@@ -45,7 +45,7 @@ export const routes: Routes = [
       { path: 'calificacion-omr', component: CalificacionOmrComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Calificación OMR - Sistema de Evaluaciones' },
       { path: 'test-vocacional', component: TestVocacionalComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'EVALUADOR_VOCACIONAL'])], title: 'Test Vocacional - Sistema de Evaluaciones' },
       { path: 'banco-preguntas', component: BancoPreguntasComponent, canActivate: [roleGuard(['DOCENTE'])], title: 'Validador de Banco de Preguntas - Sistema de Evaluaciones' },
-      { path: 'administracion-evaluaciones', component: AdministracionEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES'])], title: 'Administración - Sistema de Evaluaciones' },
+      { path: 'administracion-evaluaciones', component: AdministracionEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'VICERRECTOR'])], title: 'Administración - Sistema de Evaluaciones' },
       { path: 'reporte-evaluaciones', component: ReporteEvaluacionesComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VICERRECTOR', 'DIRECTOR_CARRERA', 'VERIFICADOR'])], title: 'Reporte Evaluaciones - Sistema de Evaluaciones' },
       { path: 'rol-examenes', component: RolExamenesComponent, canActivate: [roleGuard(['DIRECTOR_CARRERA', 'VICERRECTOR'])], title: 'Rol de Exámenes - Sistema de Evaluaciones' },
       { path: 'auditoria', component: AuditoriaComponent, canActivate: [roleGuard(['ADMINISTRADOR_SISTEMA'])], title: 'Auditoría & Bitácora - Sistema de Evaluaciones' },

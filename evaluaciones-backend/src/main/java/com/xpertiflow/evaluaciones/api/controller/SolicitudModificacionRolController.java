@@ -34,7 +34,7 @@ public class SolicitudModificacionRolController {
     }
 
     @GetMapping("/pendientes")
-    @PreAuthorize("hasAnyRole('VICERRECTOR', 'ADMINISTRADOR_SISTEMA')")
+    @PreAuthorize("hasAnyRole('VICERRECTOR', 'ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Listar solicitudes pendientes de vicerrectorado")
     public ResponseEntity<List<SolicitudModificacionResponseDto>> listarPendientes(Authentication authentication) {
         return ResponseEntity.ok(service.listarPendientesVicerrector(authentication));
@@ -58,7 +58,7 @@ public class SolicitudModificacionRolController {
     }
 
     @PutMapping("/{id}/resolver")
-    @PreAuthorize("hasAnyRole('VICERRECTOR', 'ADMINISTRADOR_SISTEMA')")
+    @PreAuthorize("hasAnyRole('VICERRECTOR', 'ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES')")
     @Operation(summary = "Aprobar o rechazar solicitud de modificación (Vicerrectorado)")
     public ResponseEntity<SolicitudModificacionResponseDto> resolver(
             @PathVariable String id,
