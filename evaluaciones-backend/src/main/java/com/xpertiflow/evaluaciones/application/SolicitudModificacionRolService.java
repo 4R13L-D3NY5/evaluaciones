@@ -110,6 +110,9 @@ public class SolicitudModificacionRolService {
         }
 
         if (esRol(usuario, "VICERRECTOR")) {
+            if (!usuario.isPuedeAprobarSolicitudesRol()) {
+                return List.of();
+            }
             Set<String> sedes = usuario.getSedes().stream()
                     .map(AlcanceSede::getCodigo)
                     .collect(Collectors.toSet());
@@ -156,8 +159,11 @@ public class SolicitudModificacionRolService {
             throw new IllegalStateException("La solicitud ya fue procesada anteriormente y está en estado: " + solicitud.getEstado().getValor());
         }
 
-        // Si es vicerrector, verificar su alcance territorial
+        // Si es vicerrector, verificar permiso expreso y alcance territorial
         if (esVicerrector && !esAdmin) {
+            if (!resolutor.isPuedeAprobarSolicitudesRol()) {
+                throw new AccessDeniedException("No cuenta con autorización para resolver solicitudes de modificación de exámenes.");
+            }
             boolean tieneSede = resolutor.getSedes().stream()
                     .anyMatch(s -> s.getCodigo().equalsIgnoreCase(solicitud.getSedeCodigo()));
             if (!tieneSede) {

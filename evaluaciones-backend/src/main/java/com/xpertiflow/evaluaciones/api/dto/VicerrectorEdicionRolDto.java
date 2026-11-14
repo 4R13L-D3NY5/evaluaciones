@@ -18,4 +18,5 @@ public class VicerrectorEdicionRolDto {
     private String nombreCompleto;
     private List<String> sedesAsignadas;
     private boolean puedeEditarRolesExamen;
+    private boolean puedeAprobarSolicitudesRol;
 }

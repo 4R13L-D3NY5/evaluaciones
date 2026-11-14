@@ -65,6 +65,9 @@ public class UsuarioSistema {
     @Column(name = "puede_editar_roles_examen", nullable = false)
     private boolean puedeEditarRolesExamen = false;
 
+    @Column(name = "puede_aprobar_solicitudes_rol", nullable = false)
+    private boolean puedeAprobarSolicitudesRol = false;
+
     @Column(name = "ultimo_ingreso")
     private LocalDateTime ultimoIngreso;
 

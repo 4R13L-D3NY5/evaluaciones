@@ -43,6 +43,7 @@ export interface VicerrectorEdicionRol {
   nombreCompleto: string;
   sedesAsignadas: string[];
   puedeEditarRolesExamen: boolean;
+  puedeAprobarSolicitudesRol: boolean;
 }
 
 @Injectable({
@@ -187,6 +188,12 @@ export class ConfiguracionEvaluacionesService {
   public actualizarPermisoVicerrector(usuarioId: number, puedeEditarRolesExamen: boolean): Observable<VicerrectorEdicionRol> {
     return this._http.put<VicerrectorEdicionRol>(`${this._baseUrl}/vicerrectores-edicion/${usuarioId}`, {
       puedeEditarRolesExamen
+    });
+  }
+
+  public actualizarPermisoAprobacionVicerrector(usuarioId: number, puedeAprobarSolicitudesRol: boolean): Observable<VicerrectorEdicionRol> {
+    return this._http.put<VicerrectorEdicionRol>(`${this._baseUrl}/vicerrectores-aprobacion/${usuarioId}`, {
+      puedeAprobarSolicitudesRol
     });
   }
 }

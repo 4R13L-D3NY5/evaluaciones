@@ -126,6 +126,7 @@ public class ConfiguracionEvaluacionesService {
                             .nombreCompleto(u.getNombreCompleto())
                             .sedesAsignadas(sedes)
                             .puedeEditarRolesExamen(u.isPuedeEditarRolesExamen())
+                            .puedeAprobarSolicitudesRol(u.isPuedeAprobarSolicitudesRol())
                             .build();
                 })
                 .toList();
@@ -174,6 +175,54 @@ public class ConfiguracionEvaluacionesService {
                 .nombreCompleto(usuario.getNombreCompleto())
                 .sedesAsignadas(sedes)
                 .puedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen())
+                .puedeAprobarSolicitudesRol(usuario.isPuedeAprobarSolicitudesRol())
+                .build();
+    }
+
+    @Transactional
+    public com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto actualizarPermisoAprobacionVicerrector(
+            Long usuarioId, boolean puedeAprobar, String actor, String ipOrigen) {
+        com.xpertiflow.evaluaciones.domain.entity.UsuarioSistema usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con ID: " + usuarioId));
+        if (!"VICERRECTOR".equals(usuario.getRolCodigo())) {
+            throw new IllegalArgumentException("El usuario especificado no tiene rol de VICERRECTOR");
+        }
+        usuario.setPuedeAprobarSolicitudesRol(puedeAprobar);
+        usuario.setActualizadoEn(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+
+        AuditoriaUsuario auditoria = new AuditoriaUsuario();
+        auditoria.setUsuarioObjetivoId(usuario.getId());
+        auditoria.setUsuarioObjetivoCi(usuario.getCi());
+        auditoria.setAccion("PERMISO_APROBACION_ROLES_ACTUALIZADO");
+        auditoria.setRealizadoPor(actor != null ? actor : "SISTEMA");
+        auditoria.setDetalle("Se " + (puedeAprobar ? "AUTORIZO" : "DESAUTORIZO") + " la aprobacion/rechazo de solicitudes de examen para el Vicerrector " + usuario.getUsuario() + " (" + usuario.getNombreCompleto() + ")");
+        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
+        auditoria.setFechaEvento(LocalDateTime.now());
+        auditoriaUsuarioRepository.save(auditoria);
+
+        List<String> sedes = new java.util.ArrayList<>();
+        if (usuario.getSedesAsignadas() != null && !usuario.getSedesAsignadas().isBlank()) {
+            sedes.addAll(java.util.Arrays.stream(usuario.getSedesAsignadas().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .toList());
+        }
+        usuario.getSedes().forEach(s -> {
+            String cod = s.getCodigo().trim();
+            if (!cod.isBlank() && !sedes.contains(cod)) {
+                sedes.add(cod);
+            }
+        });
+
+        return com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto.builder()
+                .id(usuario.getId())
+                .usuario(usuario.getUsuario())
+                .ci(usuario.getCi())
+                .nombreCompleto(usuario.getNombreCompleto())
+                .sedesAsignadas(sedes)
+                .puedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen())
+                .puedeAprobarSolicitudesRol(usuario.isPuedeAprobarSolicitudesRol())
                 .build();
     }
 

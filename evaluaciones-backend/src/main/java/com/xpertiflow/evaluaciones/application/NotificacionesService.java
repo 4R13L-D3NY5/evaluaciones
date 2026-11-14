@@ -323,7 +323,7 @@ public class NotificacionesService {
 
     private List<NotificacionItemDto> obtenerNotificacionesVicerrector(Authentication authentication) {
         UsuarioSistema usuario = usuarioRepository.findByUsuarioIgnoreCase(authentication.getName()).orElse(null);
-        if (usuario == null) return List.of();
+        if (usuario == null || !usuario.isPuedeAprobarSolicitudesRol()) return List.of();
 
         Set<String> sedes = usuario.getSedes().stream()
                 .map(AlcanceSede::getCodigo)

@@ -203,6 +203,7 @@ class SolicitudModificacionRolTest {
         vicerrector.setUsuario(username);
         vicerrector.setNombreCompleto("Dr. Vicerrector CBA");
         vicerrector.setRolCodigo("VICERRECTOR");
+        vicerrector.setPuedeAprobarSolicitudesRol(true);
         vicerrector.setSedes(Set.of(sedeCba));
 
         when(usuarioRepository.findByUsuarioIgnoreCase(username)).thenReturn(Optional.of(vicerrector));
@@ -264,6 +265,7 @@ class SolicitudModificacionRolTest {
         vicerrector.setId(21L);
         vicerrector.setUsuario(username);
         vicerrector.setRolCodigo("VICERRECTOR");
+        vicerrector.setPuedeAprobarSolicitudesRol(true);
         vicerrector.setSedes(Set.of(sedeLpz));
 
         when(usuarioRepository.findByUsuarioIgnoreCase(username)).thenReturn(Optional.of(vicerrector));
@@ -284,6 +286,43 @@ class SolicitudModificacionRolTest {
                 () -> service.resolverSolicitud("SOL-CBA", dto, auth));
 
         assertTrue(ex.getMessage().contains("No tiene asignada la sede CBA"));
+        verify(rolExamenRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Vicerrector de la sede pero sin permiso expreso de aprobación es bloqueado")
+    void vicerrectorSinPermisoAprobacionEsBloqueado() {
+        String username = "vicerrector_sin_permiso";
+        Authentication auth = crearAuth(username, "VICERRECTOR");
+
+        AlcanceSede sedeCba = new AlcanceSede();
+        sedeCba.setCodigo("CBA");
+
+        UsuarioSistema vicerrector = new UsuarioSistema();
+        vicerrector.setId(22L);
+        vicerrector.setUsuario(username);
+        vicerrector.setRolCodigo("VICERRECTOR");
+        vicerrector.setPuedeAprobarSolicitudesRol(false); // NO AUTORIZADO
+        vicerrector.setSedes(Set.of(sedeCba));
+
+        when(usuarioRepository.findByUsuarioIgnoreCase(username)).thenReturn(Optional.of(vicerrector));
+
+        SolicitudModificacionRol solicitud = SolicitudModificacionRol.builder()
+                .id("SOL-CBA-2")
+                .sedeCodigo("CBA")
+                .estado(EstadoSolicitudModificacion.PENDIENTE)
+                .build();
+
+        when(repository.findById("SOL-CBA-2")).thenReturn(Optional.of(solicitud));
+
+        ResolverSolicitudModificacionRequestDto dto = ResolverSolicitudModificacionRequestDto.builder()
+                .aprobado(true)
+                .build();
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> service.resolverSolicitud("SOL-CBA-2", dto, auth));
+
+        assertTrue(ex.getMessage().contains("No cuenta con autorización"));
         verify(rolExamenRepository, never()).save(any());
     }
 }
