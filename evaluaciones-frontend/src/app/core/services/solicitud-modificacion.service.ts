@@ -27,6 +27,10 @@ export class SolicitudModificacionService {
     return this.http.get<SolicitudModificacionResponse[]>(`${this.baseUrl}/pendientes`);
   }
 
+  obtenerHistorialVicerrector(): Observable<SolicitudModificacionResponse[]> {
+    return this.http.get<SolicitudModificacionResponse[]>(`${this.baseUrl}/historial`);
+  }
+
   obtenerMisSolicitudes(): Observable<SolicitudModificacionResponse[]> {
     return this.http.get<SolicitudModificacionResponse[]>(`${this.baseUrl}/mis-solicitudes`);
   }

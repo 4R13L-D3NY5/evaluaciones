@@ -40,6 +40,13 @@ public class SolicitudModificacionRolController {
         return ResponseEntity.ok(service.listarPendientesVicerrector(authentication));
     }
 
+    @GetMapping("/historial")
+    @PreAuthorize("hasAnyRole('VICERRECTOR', 'ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Listar solicitudes procesadas (historial de aprobadas y rechazadas)")
+    public ResponseEntity<List<SolicitudModificacionResponseDto>> listarHistorial(Authentication authentication) {
+        return ResponseEntity.ok(service.listarHistorialVicerrector(authentication));
+    }
+
     @GetMapping("/mis-solicitudes")
     @PreAuthorize("hasAnyRole('DIRECTOR_CARRERA', 'ADMINISTRADOR_SISTEMA')")
     @Operation(summary = "Listar solicitudes emitidas por el usuario actual")

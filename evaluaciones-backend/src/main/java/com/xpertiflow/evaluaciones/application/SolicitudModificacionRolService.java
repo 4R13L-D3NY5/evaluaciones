@@ -138,6 +138,48 @@ public class SolicitudModificacionRolService {
     }
 
     @Transactional(readOnly = true)
+    public List<SolicitudModificacionResponseDto> listarHistorialVicerrector(Authentication authentication) {
+        UsuarioSistema usuario = obtenerUsuarioAutenticado(authentication);
+
+        if (esRol(usuario, "ADMINISTRADOR_SISTEMA") || esRol(usuario, "RESPONSABLE_EVALUACIONES")) {
+            return repository.findAll().stream()
+                    .filter(s -> s.getEstado() != EstadoSolicitudModificacion.PENDIENTE)
+                    .sorted((a, b) -> {
+                        LocalDateTime fa = a.getFechaResolucion() != null ? a.getFechaResolucion() : a.getCreadoEn();
+                        LocalDateTime fb = b.getFechaResolucion() != null ? b.getFechaResolucion() : b.getCreadoEn();
+                        if (fa == null && fb == null) return 0;
+                        if (fa == null) return 1;
+                        if (fb == null) return -1;
+                        return fb.compareTo(fa);
+                    })
+                    .map(this::mapearADto)
+                    .toList();
+        }
+
+        if (esRol(usuario, "VICERRECTOR")) {
+            Set<String> sedes = obtenerCodigosSedesUsuario(usuario);
+            if (sedes.isEmpty()) {
+                return List.of();
+            }
+
+            return repository.findBySedeCodigoInOrderByCreadoEnDesc(sedes).stream()
+                    .filter(s -> s.getEstado() != EstadoSolicitudModificacion.PENDIENTE)
+                    .sorted((a, b) -> {
+                        LocalDateTime fa = a.getFechaResolucion() != null ? a.getFechaResolucion() : a.getCreadoEn();
+                        LocalDateTime fb = b.getFechaResolucion() != null ? b.getFechaResolucion() : b.getCreadoEn();
+                        if (fa == null && fb == null) return 0;
+                        if (fa == null) return 1;
+                        if (fb == null) return -1;
+                        return fb.compareTo(fa);
+                    })
+                    .map(this::mapearADto)
+                    .toList();
+        }
+
+        throw new AccessDeniedException("No tiene permisos para consultar el historial de solicitudes");
+    }
+
+    @Transactional(readOnly = true)
     public List<SolicitudModificacionResponseDto> listarMisSolicitudes(Authentication authentication) {
         UsuarioSistema usuario = obtenerUsuarioAutenticado(authentication);
         return repository.findBySolicitanteUsuarioOrderByCreadoEnDesc(usuario.getUsuario()).stream()

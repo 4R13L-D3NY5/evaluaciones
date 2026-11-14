@@ -764,95 +764,259 @@ export interface ParcialConfig {
                     <i class="pi pi-calendar-times text-amber-600 text-base"></i>
                     <div>
                       <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Bandeja de Aprobación de Modificaciones de Examen</h4>
-                      <p class="text-[10px] text-muted-foreground">Solicitudes de reprogramación de fecha, horario o modalidad emitidas por Directores de Carrera pendientes de autorización.</p>
+                      <p class="text-[10px] text-muted-foreground">Solicitudes de reprogramación de fecha, horario o modalidad emitidas por Directores de Carrera.</p>
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1 text-[10px] font-mono font-bold">
-                      {{ solicitudesPendientes().length }} Pendientes
-                    </span>
                     <button 
-                      (click)="cargarSolicitudesPendientes()" 
-                      [disabled]="cargandoSolicitudes()"
+                      (click)="refrescarBandeja()" 
+                      [disabled]="cargandoSolicitudes() || cargandoHistorial()"
                       class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                      title="Refrescar solicitudes">
-                      <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoSolicitudes()"></i>
+                      [title]="tabBandeja() === 'pendientes' ? 'Refrescar pendientes' : 'Refrescar historial'">
+                      <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoSolicitudes() || cargandoHistorial()"></i>
                     </button>
                   </div>
                 </div>
 
-                @if (cargandoSolicitudes()) {
-                  <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                    <i class="pi pi-spin pi-spinner text-amber-600"></i>
-                    <span>Cargando solicitudes de reprogramación...</span>
+                <!-- Subpestañas: Pendientes vs Historial de Procesados -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-2.5">
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      (click)="tabBandeja.set('pendientes')"
+                      [class]="tabBandeja() === 'pendientes' 
+                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-bold' 
+                        : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/30'"
+                      class="px-3 py-1.5 rounded-lg text-xs border transition-colors inline-flex items-center gap-1.5 cursor-pointer">
+                      <i class="pi pi-clock text-[11px]"></i>
+                      <span>Pendientes</span>
+                      <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300">
+                        {{ solicitudesPendientes().length }}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="tabBandeja.set('historial')"
+                      [class]="tabBandeja() === 'historial' 
+                        ? 'bg-primary/10 text-primary border-primary/30 font-bold' 
+                        : 'text-muted-foreground hover:text-foreground border-transparent hover:bg-muted/30'"
+                      class="px-3 py-1.5 rounded-lg text-xs border transition-colors inline-flex items-center gap-1.5 cursor-pointer">
+                      <i class="pi pi-history text-[11px]"></i>
+                      <span>Historial de Procesadas</span>
+                      <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-muted text-foreground">
+                        {{ solicitudesHistorial().length }}
+                      </span>
+                    </button>
                   </div>
-                } @else if (solicitudesPendientes().length === 0) {
-                  <div class="py-6 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
-                    <i class="pi pi-check-circle text-emerald-500 text-lg mb-1 block"></i>
-                    No hay solicitudes de modificación pendientes en tus sedes asignadas.
-                  </div>
-                } @else {
-                  <div class="overflow-x-auto border border-border rounded-xl">
-                    <table class="w-full text-left text-xs">
-                      <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
-                        <tr>
-                          <th class="py-2.5 px-4">Materia / Carrera</th>
-                          <th class="py-2.5 px-4">Solicitante</th>
-                          <th class="py-2.5 px-4">Horario Original</th>
-                          <th class="py-2.5 px-4">Horario Propuesto</th>
-                          <th class="py-2.5 px-4">Motivo Académico</th>
-                          <th class="py-2.5 px-4 text-right">Decisión</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-border">
-                        @for (sol of solicitudesPendientes(); track sol.id) {
-                          <tr class="hover:bg-muted/20 transition-colors">
-                            <td class="py-2.5 px-4 font-bold text-foreground">
-                              <div>{{ sol.materiaNombre }} <span class="text-xs text-muted-foreground">({{ sol.grupo }})</span></div>
-                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</div>
-                            </td>
-                            <td class="py-2.5 px-4">
-                              <div class="font-medium text-foreground">{{ sol.solicitanteNombre }}</div>
-                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</div>
-                            </td>
-                            <td class="py-2.5 px-4">
-                              <div class="text-foreground font-mono text-[11px]">{{ sol.fechaOriginal }}</div>
-                              <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
-                            </td>
-                            <td class="py-2.5 px-4 bg-emerald-50/40 dark:bg-emerald-950/20">
-                              <div class="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-[11px]">{{ sol.fechaPropuesta }}</div>
-                              <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
-                            </td>
-                            <td class="py-2.5 px-4 max-w-[200px]">
-                              <p class="text-[11px] text-foreground truncate" [title]="sol.motivo">{{ sol.motivo }}</p>
-                            </td>
-                            <td class="py-2.5 px-4 text-right">
-                              <div class="inline-flex items-center gap-1.5">
-                                <button 
-                                  (click)="abrirModalAprobacion(sol)"
-                                  [disabled]="procesandoSolicitudId() === sol.id"
-                                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
-                                  @if (procesandoSolicitudId() === sol.id) {
-                                    <i class="pi pi-spin pi-spinner text-xs"></i>
-                                  } @else {
-                                    <i class="pi pi-check text-xs"></i>
-                                  }
-                                  <span>Aprobar</span>
-                                </button>
-                                <button 
-                                  (click)="abrirModalRechazo(sol)"
-                                  [disabled]="procesandoSolicitudId() === sol.id"
-                                  class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
-                                  <i class="pi pi-times text-xs"></i>
-                                  <span>Rechazar</span>
-                                </button>
-                              </div>
-                            </td>
+
+                  @if (tabBandeja() === 'historial') {
+                    <!-- Filtros rápidos para el historial -->
+                    <div class="inline-flex items-center bg-muted/40 p-0.5 rounded-lg border border-border text-[11px] self-start sm:self-auto">
+                      <button
+                        type="button"
+                        (click)="filtroEstadoHistorial.set('TODOS')"
+                        [class]="filtroEstadoHistorial() === 'TODOS' ? 'bg-background shadow-xs text-foreground font-bold' : 'text-muted-foreground hover:text-foreground'"
+                        class="px-2.5 py-1 rounded-md transition-all cursor-pointer">
+                        Todas ({{ solicitudesHistorial().length }})
+                      </button>
+                      <button
+                        type="button"
+                        (click)="filtroEstadoHistorial.set('APROBADA')"
+                        [class]="filtroEstadoHistorial() === 'APROBADA' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-muted-foreground hover:text-emerald-600'"
+                        class="px-2.5 py-1 rounded-md transition-all cursor-pointer inline-flex items-center gap-1">
+                        <i class="pi pi-check text-[9px]"></i>
+                        <span>Aprobadas ({{ totalAprobadasHistorial() }})</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="filtroEstadoHistorial.set('RECHAZADA')"
+                        [class]="filtroEstadoHistorial() === 'RECHAZADA' ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 font-bold border border-rose-500/30' : 'text-muted-foreground hover:text-rose-600'"
+                        class="px-2.5 py-1 rounded-md transition-all cursor-pointer inline-flex items-center gap-1">
+                        <i class="pi pi-times text-[9px]"></i>
+                        <span>Rechazadas ({{ totalRechazadasHistorial() }})</span>
+                      </button>
+                    </div>
+                  }
+                </div>
+
+                <!-- CONTENIDO: TAB PENDIENTES -->
+                @if (tabBandeja() === 'pendientes') {
+                  @if (cargandoSolicitudes()) {
+                    <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                      <i class="pi pi-spin pi-spinner text-amber-600"></i>
+                      <span>Cargando solicitudes de reprogramación...</span>
+                    </div>
+                  } @else if (solicitudesPendientes().length === 0) {
+                    <div class="py-6 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
+                      <i class="pi pi-check-circle text-emerald-500 text-lg mb-1 block"></i>
+                      No hay solicitudes de modificación pendientes en tus sedes asignadas.
+                    </div>
+                  } @else {
+                    <div class="overflow-x-auto border border-border rounded-xl">
+                      <table class="w-full text-left text-xs">
+                        <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                          <tr>
+                            <th class="py-2.5 px-4">Materia / Carrera</th>
+                            <th class="py-2.5 px-4">Solicitante</th>
+                            <th class="py-2.5 px-4">Horario Original</th>
+                            <th class="py-2.5 px-4">Horario Propuesto</th>
+                            <th class="py-2.5 px-4">Motivo Académico</th>
+                            <th class="py-2.5 px-4 text-right">Decisión</th>
                           </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                          @for (sol of solicitudesPendientes(); track sol.id) {
+                            <tr class="hover:bg-muted/20 transition-colors">
+                              <td class="py-2.5 px-4 font-bold text-foreground">
+                                <div>{{ sol.materiaNombre }} <span class="text-xs text-muted-foreground">({{ sol.grupo }})</span></div>
+                                <div class="text-[10px] text-muted-foreground font-mono">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</div>
+                              </td>
+                              <td class="py-2.5 px-4">
+                                <div class="font-medium text-foreground">{{ sol.solicitanteNombre }}</div>
+                                <div class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</div>
+                              </td>
+                              <td class="py-2.5 px-4">
+                                <div class="text-foreground font-mono text-[11px]">{{ sol.fechaOriginal }}</div>
+                                <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
+                              </td>
+                              <td class="py-2.5 px-4 bg-emerald-50/40 dark:bg-emerald-950/20">
+                                <div class="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-[11px]">{{ sol.fechaPropuesta }}</div>
+                                <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
+                              </td>
+                              <td class="py-2.5 px-4 max-w-[200px]">
+                                <p class="text-[11px] text-foreground truncate" [title]="sol.motivo">{{ sol.motivo }}</p>
+                              </td>
+                              <td class="py-2.5 px-4 text-right">
+                                <div class="inline-flex items-center gap-1.5">
+                                  <button 
+                                    (click)="abrirModalAprobacion(sol)"
+                                    [disabled]="procesandoSolicitudId() === sol.id"
+                                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
+                                    @if (procesandoSolicitudId() === sol.id) {
+                                      <i class="pi pi-spin pi-spinner text-xs"></i>
+                                    } @else {
+                                      <i class="pi pi-check text-xs"></i>
+                                    }
+                                    <span>Aprobar</span>
+                                  </button>
+                                  <button 
+                                    (click)="abrirModalRechazo(sol)"
+                                    [disabled]="procesandoSolicitudId() === sol.id"
+                                    class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
+                                    <i class="pi pi-times text-xs"></i>
+                                    <span>Rechazar</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                }
+
+                <!-- CONTENIDO: TAB HISTORIAL DE PROCESADAS -->
+                @if (tabBandeja() === 'historial') {
+                  @if (cargandoHistorial()) {
+                    <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                      <i class="pi pi-spin pi-spinner text-primary"></i>
+                      <span>Cargando historial de solicitudes procesadas...</span>
+                    </div>
+                  } @else if (solicitudesHistorialFiltradas().length === 0) {
+                    <div class="py-8 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border space-y-1">
+                      <i class="pi pi-inbox text-muted-foreground/60 text-2xl mb-1 block"></i>
+                      <p class="font-bold text-foreground">No hay solicitudes procesadas</p>
+                      <p class="text-[11px]">
+                        @if (filtroEstadoHistorial() !== 'TODOS') {
+                          No se encontraron solicitudes con estado {{ filtroEstadoHistorial() | lowercase }}.
+                        } @else {
+                          Aún no se han procesado solicitudes de modificación de exámenes en tus sedes asignadas.
                         }
-                      </tbody>
-                    </table>
-                  </div>
+                      </p>
+                    </div>
+                  } @else {
+                    <div class="overflow-x-auto border border-border rounded-xl">
+                      <table class="w-full text-left text-xs">
+                        <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                          <tr>
+                            <th class="py-2.5 px-4">Materia / Carrera</th>
+                            <th class="py-2.5 px-4">Solicitante</th>
+                            <th class="py-2.5 px-4">Horario Original</th>
+                            <th class="py-2.5 px-4">Horario Propuesto</th>
+                            <th class="py-2.5 px-4">Resolución</th>
+                            <th class="py-2.5 px-4">Motivo / Obs.</th>
+                            <th class="py-2.5 px-4 text-center">Detalle</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                          @for (sol of solicitudesHistorialFiltradas(); track sol.id) {
+                            <tr class="hover:bg-muted/20 transition-colors">
+                              <td class="py-2.5 px-4 font-bold text-foreground">
+                                <div>{{ sol.materiaNombre }} <span class="text-xs text-muted-foreground">({{ sol.grupo }})</span></div>
+                                <div class="text-[10px] text-muted-foreground font-mono">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</div>
+                              </td>
+                              <td class="py-2.5 px-4">
+                                <div class="font-medium text-foreground">{{ sol.solicitanteNombre }}</div>
+                                <div class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</div>
+                              </td>
+                              <td class="py-2.5 px-4">
+                                <div class="text-foreground font-mono text-[11px]">{{ sol.fechaOriginal }}</div>
+                                <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
+                              </td>
+                              <td class="py-2.5 px-4">
+                                <div class="font-mono font-bold text-[11px] text-foreground">{{ sol.fechaPropuesta }}</div>
+                                <div class="text-[10px] text-muted-foreground font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
+                              </td>
+                              <td class="py-2.5 px-4">
+                                @if (sol.estado === 'APROBADA') {
+                                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                    <i class="pi pi-check text-[9px]"></i> Aprobada
+                                  </span>
+                                } @else if (sol.estado === 'RECHAZADA') {
+                                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                                    <i class="pi pi-times text-[9px]"></i> Rechazada
+                                  </span>
+                                } @else {
+                                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground border border-border">
+                                    {{ sol.estado }}
+                                  </span>
+                                }
+                                <div class="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[140px]" [title]="sol.resolutorNombre || sol.resolutorUsuario || 'Sistema'">
+                                  Por: {{ sol.resolutorNombre || sol.resolutorUsuario || 'Sistema' }}
+                                </div>
+                                @if (sol.fechaResolucion) {
+                                  <div class="text-[9px] text-muted-foreground font-mono">
+                                    {{ sol.fechaResolucion | date: 'dd/MM/yyyy HH:mm' }}
+                                  </div>
+                                }
+                              </td>
+                              <td class="py-2.5 px-4 max-w-[180px]">
+                                <div class="text-[11px] text-foreground truncate" [title]="'Motivo: ' + sol.motivo">
+                                  <span class="font-semibold text-muted-foreground">Motivo:</span> {{ sol.motivo }}
+                                </div>
+                                @if (sol.observacionResolucion) {
+                                  <div class="text-[10px] text-muted-foreground italic truncate" [title]="'Obs: ' + sol.observacionResolucion">
+                                    <span class="font-semibold">Obs:</span> {{ sol.observacionResolucion }}
+                                  </div>
+                                }
+                              </td>
+                              <td class="py-2.5 px-4 text-center">
+                                <button
+                                  type="button"
+                                  (click)="verDetalleHistorial(sol)"
+                                  class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer inline-flex items-center justify-center"
+                                  title="Ver detalle completo de la solicitud">
+                                  <i class="pi pi-eye text-xs"></i>
+                                </button>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
                 }
               </div>
 
@@ -1492,6 +1656,141 @@ export interface ParcialConfig {
         </div>
       }
 
+      <!-- Modal Detalle Solicitud Historial (Lectura) -->
+      @if (modalDetalleHistorialAbierta() && solicitudDetalleHistorial(); as sol) {
+        <div class="fixed inset-0 bg-background/80 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-scale-in">
+            <div class="flex items-center justify-between border-b border-border px-5 py-3.5 bg-muted/20">
+              <div class="flex items-center gap-2">
+                @if (sol.estado === 'APROBADA') {
+                  <span class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm border border-emerald-500/20">
+                    <i class="pi pi-check"></i>
+                  </span>
+                } @else {
+                  <span class="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center text-sm border border-rose-500/20">
+                    <i class="pi pi-times"></i>
+                  </span>
+                }
+                <div>
+                  <h3 class="text-xs font-bold text-foreground">Detalle de Solicitud Procesada</h3>
+                  <p class="text-[10px] text-muted-foreground font-mono">ID: {{ sol.id }}</p>
+                </div>
+              </div>
+              <button (click)="cerrarModalDetalleHistorial()" class="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted cursor-pointer">
+                <i class="pi pi-times text-xs"></i>
+              </button>
+            </div>
+            
+            <div class="p-5 space-y-3.5 text-xs">
+              <!-- Estado y fecha de resolución -->
+              <div class="flex items-center justify-between p-3 rounded-xl border"
+                [class]="sol.estado === 'APROBADA' 
+                  ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' 
+                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800'">
+                <div>
+                  <span class="text-[10px] font-bold uppercase tracking-wider block"
+                    [class]="sol.estado === 'APROBADA' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'">
+                    Estado de la solicitud
+                  </span>
+                  <span class="text-sm font-black"
+                    [class]="sol.estado === 'APROBADA' ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'">
+                    {{ sol.estado }}
+                  </span>
+                </div>
+                <div class="text-right">
+                  <span class="text-[10px] text-muted-foreground block">Fecha de resolución</span>
+                  <span class="text-xs font-mono font-bold text-foreground">
+                    {{ sol.fechaResolucion ? (sol.fechaResolucion | date: 'dd/MM/yyyy HH:mm') : 'No registrada' }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Contexto Académico -->
+              <div class="bg-muted/20 border border-border rounded-xl p-3 space-y-1.5">
+                <div class="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Contexto Académico</div>
+                <div class="grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <span class="text-muted-foreground">Materia:</span>
+                    <p class="font-bold text-foreground">{{ sol.materiaNombre }} ({{ sol.grupo }})</p>
+                  </div>
+                  <div>
+                    <span class="text-muted-foreground">Carrera / Sede:</span>
+                    <p class="font-bold text-foreground">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</p>
+                  </div>
+                  <div>
+                    <span class="text-muted-foreground">Solicitado por:</span>
+                    <p class="font-bold text-foreground">{{ sol.solicitanteNombre }}</p>
+                    <span class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</span>
+                  </div>
+                  <div>
+                    <span class="text-muted-foreground">Fecha de solicitud:</span>
+                    <p class="font-bold text-foreground font-mono">{{ sol.creadoEn | date: 'dd/MM/yyyy HH:mm' }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Comparación Original vs Propuesto -->
+              <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <div class="p-3 bg-muted/30 border border-border rounded-xl space-y-1">
+                  <span class="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Horario Original</span>
+                  <div class="font-mono text-foreground font-bold">{{ sol.fechaOriginal }}</div>
+                  <div class="text-muted-foreground">{{ sol.horarioOriginal }}</div>
+                  <div class="text-muted-foreground font-medium text-[10px]">{{ sol.modalidadOriginal }}</div>
+                </div>
+                <div class="p-3 rounded-xl border space-y-1"
+                  [class]="sol.estado === 'APROBADA' 
+                    ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-700' 
+                    : 'bg-muted/30 border-border'">
+                  <span class="text-[10px] font-black uppercase tracking-wider block"
+                    [class]="sol.estado === 'APROBADA' ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'">
+                    Horario Propuesto
+                  </span>
+                  <div class="font-mono font-bold"
+                    [class]="sol.estado === 'APROBADA' ? 'text-emerald-800 dark:text-emerald-300' : 'text-foreground'">
+                    {{ sol.fechaPropuesta }}
+                  </div>
+                  <div [class]="sol.estado === 'APROBADA' ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'">
+                    {{ sol.horarioPropuesto }}
+                  </div>
+                  <div class="text-[10px] font-medium"
+                    [class]="sol.estado === 'APROBADA' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'">
+                    {{ sol.modalidadPropuesta }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Motivo Académico del Director -->
+              <div class="p-3 bg-muted/20 border border-border rounded-xl text-[11px] space-y-1">
+                <span class="font-bold text-muted-foreground block">Motivo académico del director:</span>
+                <p class="text-foreground italic">"{{ sol.motivo }}"</p>
+              </div>
+
+              <!-- Información de Resolución -->
+              <div class="p-3 bg-muted/20 border border-border rounded-xl text-[11px] space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-muted-foreground">Resuelto por:</span>
+                  <span class="font-semibold text-foreground">{{ sol.resolutorNombre || sol.resolutorUsuario || 'Sistema' }}</span>
+                </div>
+                @if (sol.observacionResolucion) {
+                  <div>
+                    <span class="font-bold text-muted-foreground block">Observación registrada:</span>
+                    <p class="text-foreground mt-0.5">"{{ sol.observacionResolucion }}"</p>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-3 bg-muted/10">
+              <button 
+                (click)="cerrarModalDetalleHistorial()" 
+                class="px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold cursor-pointer transition-colors">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
@@ -1546,6 +1845,27 @@ export class AdministracionEvaluacionesComponent {
   public solicitudParaAprobar = signal<SolicitudModificacionResponse | null>(null);
   public observacionAprobacion = '';
 
+  // Historial de solicitudes procesadas
+  public tabBandeja = signal<'pendientes' | 'historial'>('pendientes');
+  public solicitudesHistorial = signal<SolicitudModificacionResponse[]>([]);
+  public cargandoHistorial = signal<boolean>(false);
+  public filtroEstadoHistorial = signal<'TODOS' | 'APROBADA' | 'RECHAZADA'>('TODOS');
+  public solicitudDetalleHistorial = signal<SolicitudModificacionResponse | null>(null);
+  public modalDetalleHistorialAbierta = signal<boolean>(false);
+
+  public readonly solicitudesHistorialFiltradas = computed(() => {
+    const filtro = this.filtroEstadoHistorial();
+    const lista = this.solicitudesHistorial();
+    if (filtro === 'TODOS') return lista;
+    return lista.filter(s => s.estado === filtro);
+  });
+  public readonly totalAprobadasHistorial = computed(() =>
+    this.solicitudesHistorial().filter(s => s.estado === 'APROBADA').length
+  );
+  public readonly totalRechazadasHistorial = computed(() =>
+    this.solicitudesHistorial().filter(s => s.estado === 'RECHAZADA').length
+  );
+
   public readonly totalVicerrectoresHabilitados = computed(() => {
     return this.vicerrectores().filter(v => v.puedeEditarRolesExamen).length;
   });
@@ -1582,6 +1902,7 @@ export class AdministracionEvaluacionesComponent {
       this.cargarVicerrectoresEdicion();
     }
     this.cargarSolicitudesPendientes();
+    this.cargarHistorialSolicitudes();
 
     // Soporte para apertura directa desde notificaciones (?tab=3 o ?tab=configuracion)
     this._route.queryParams.subscribe(params => {
@@ -1672,6 +1993,38 @@ export class AdministracionEvaluacionesComponent {
     });
   }
 
+  public cargarHistorialSolicitudes(): void {
+    this.cargandoHistorial.set(true);
+    this._solicitudesService.obtenerHistorialVicerrector().subscribe({
+      next: lista => {
+        this.solicitudesHistorial.set(lista || []);
+        this.cargandoHistorial.set(false);
+      },
+      error: () => {
+        this.cargandoHistorial.set(false);
+        this._mostrarToast('No se pudo cargar el historial de solicitudes procesadas.');
+      }
+    });
+  }
+
+  public refrescarBandeja(): void {
+    if (this.tabBandeja() === 'pendientes') {
+      this.cargarSolicitudesPendientes();
+    } else {
+      this.cargarHistorialSolicitudes();
+    }
+  }
+
+  public verDetalleHistorial(sol: SolicitudModificacionResponse): void {
+    this.solicitudDetalleHistorial.set(sol);
+    this.modalDetalleHistorialAbierta.set(true);
+  }
+
+  public cerrarModalDetalleHistorial(): void {
+    this.modalDetalleHistorialAbierta.set(false);
+    this.solicitudDetalleHistorial.set(null);
+  }
+
   public abrirModalAprobacion(sol: SolicitudModificacionResponse): void {
     this.solicitudParaAprobar.set(sol);
     this.observacionAprobacion = '';
@@ -1696,6 +2049,7 @@ export class AdministracionEvaluacionesComponent {
       next: () => {
         this.procesandoSolicitudId.set(null);
         this.solicitudesPendientes.update(list => list.filter(item => item.id !== sol.id));
+        this.cargarHistorialSolicitudes();
         this.cerrarModalAprobacion();
         this._mostrarToast(`Solicitud APROBADA con éxito para ${sol.materiaNombre}. El rol de examen fue actualizado.`);
       },
@@ -1731,6 +2085,7 @@ export class AdministracionEvaluacionesComponent {
       next: () => {
         this.procesandoSolicitudId.set(null);
         this.solicitudesPendientes.update(list => list.filter(item => item.id !== sol.id));
+        this.cargarHistorialSolicitudes();
         this.cerrarModalRechazo();
         this._mostrarToast(`Solicitud RECHAZADA para ${sol.materiaNombre}.`);
       },
