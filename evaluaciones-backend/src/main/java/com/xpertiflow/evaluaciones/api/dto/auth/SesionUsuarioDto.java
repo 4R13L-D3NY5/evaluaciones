@@ -15,6 +15,7 @@ public class SesionUsuarioDto {
     private boolean debeCambiarContrasena;
     private List<String> sedesAsignadas;
     private List<String> carrerasAsignadas;
+    private boolean puedeEditarRolesExamen;
     /** Momento estimado de expiración de la sesión HTTP, expresado en milisegundos. */
     private Long sesionExpiraEn;
     /** Duración de inactividad configurada para la sesión, en segundos. */

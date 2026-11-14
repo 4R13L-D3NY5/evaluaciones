@@ -169,6 +169,7 @@ public class AutenticacionService {
                 .filter(carrera -> !carrera.isBlank())
                 .forEach(carreras::add);
         dto.setCarrerasAsignadas(carreras.stream().sorted(Comparator.naturalOrder()).toList());
+        dto.setPuedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen());
         return dto;
     }
 

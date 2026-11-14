@@ -263,8 +263,23 @@ export class SidebarComponent implements OnInit {
   public readonly visibleMenuItems = computed(() => {
     const usuario = this.authService.usuario();
     if (!usuario) return [];
-    if (usuario.rol === 'ADMINISTRADOR_SISTEMA') return this.menuItems.filter(item => !item.soloRoles);
-    return this.menuItems.filter(item => item.roles.includes(usuario.rol));
+    const items = usuario.rol === 'ADMINISTRADOR_SISTEMA' 
+      ? this.menuItems.filter(item => !item.soloRoles) 
+      : this.menuItems.filter(item => item.roles.includes(usuario.rol));
+
+    if (usuario.rol === 'VICERRECTOR') {
+      return items.map(item => {
+        if (item.route === '/administracion-evaluaciones') {
+          return {
+            ...item,
+            label: 'Aprobaciones de Examen',
+            description: 'Bandeja de solicitudes de reprogramación y configuración'
+          };
+        }
+        return item;
+      });
+    }
+    return items;
   });
 
   public readonly menuItems: MenuItem[] = [
@@ -359,7 +374,7 @@ export class SidebarComponent implements OnInit {
       route: '/administracion-evaluaciones',
       icon: 'pi pi-sliders-h',
       description: 'Parámetros institucionales, cuotas de dificultad y tiempos',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'VICERRECTOR']
     },
     {
       label: 'Auditoría & Trazabilidad',

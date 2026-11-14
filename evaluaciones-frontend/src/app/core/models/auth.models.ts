@@ -17,6 +17,7 @@ export interface UsuarioSesion {
   debeCambiarContrasena: boolean;
   sedesAsignadas: string[];
   carrerasAsignadas: string[];
+  puedeEditarRolesExamen?: boolean;
   sesionExpiraEn?: number;
   sesionDuracionSegundos?: number;
 }

@@ -11,6 +11,10 @@ import com.xpertiflow.evaluaciones.domain.repository.UsuarioSistemaRepository;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
+import com.xpertiflow.evaluaciones.domain.repository.SolicitudModificacionRolRepository;
+import com.xpertiflow.evaluaciones.domain.entity.SolicitudModificacionRol;
+import com.xpertiflow.evaluaciones.domain.entity.AlcanceSede;
+import com.xpertiflow.evaluaciones.domain.enums.EstadoSolicitudModificacion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +43,7 @@ public class NotificacionesService {
     private final UsuarioSistemaRepository usuarioRepository;
     private final AccesoAcademicoService accesoAcademicoService;
     private final AuditoriaEvaluacionRepository auditoriaEvaluacionRepository;
+    private final SolicitudModificacionRolRepository solicitudRepository;
     private final ObjectMapper objectMapper;
 
     public List<NotificacionItemDto> obtenerResumen(Authentication authentication) {
@@ -57,6 +62,10 @@ public class NotificacionesService {
 
         if (tieneRol(authentication, "DIRECTOR_CARRERA")) {
             return obtenerNotificacionesDirector(authentication);
+        }
+
+        if (tieneRol(authentication, "VICERRECTOR")) {
+            return obtenerNotificacionesVicerrector(authentication);
         }
 
         if (tieneRol(authentication, "PERSONAL_EVALUACIONES") || tieneRol(authentication, "RESPONSABLE_EVALUACIONES")) {
@@ -271,8 +280,101 @@ public class NotificacionesService {
             }
         }
 
+        // 3. Solicitudes de modificación resueltas recientemente (últimos 7 días)
+        try {
+            List<SolicitudModificacionRol> misSolicitudes = solicitudRepository.findBySolicitanteUsuarioOrderByCreadoEnDesc(authentication.getName());
+            LocalDateTime limiteResolucion = ahora.minusDays(7);
+            for (SolicitudModificacionRol sol : misSolicitudes) {
+                if (sol.getEstado() == EstadoSolicitudModificacion.PENDIENTE) continue;
+                if (sol.getFechaResolucion() == null || sol.getFechaResolucion().isBefore(limiteResolucion)) continue;
+
+                boolean aprobada = sol.getEstado() == EstadoSolicitudModificacion.APROBADA;
+                String fechaStr = sol.getFechaResolucion().format(DateTimeFormatter.ISO_DATE_TIME);
+                String obs = sol.getObservacionResolucion() != null && !sol.getObservacionResolucion().isBlank()
+                        ? " Obs: " + sol.getObservacionResolucion() : "";
+
+                lista.add(NotificacionItemDto.builder()
+                        .id("sol-res-" + sol.getId())
+                        .tipo(aprobada ? "SOLICITUD_MODIFICACION_APROBADA" : "SOLICITUD_MODIFICACION_RECHAZADA")
+                        .titulo(aprobada ? "Solicitud de reprogramación APROBADA" : "Solicitud de reprogramación RECHAZADA")
+                        .materiaCodigo(sol.getMateriaCodigo())
+                        .materiaNombre(sol.getMateriaNombre())
+                        .grupo(sol.getGrupo())
+                        .parcial(sol.getTipoParcial())
+                        .mensaje(aprobada
+                                ? String.format("Vicerrectorado aprobó el traslado de %s (%s) al %s a las %s.%s",
+                                sol.getMateriaNombre(), sol.getGrupo(), sol.getFechaPropuesta(), sol.getHorarioPropuesto(), obs)
+                                : String.format("Vicerrectorado rechazó la solicitud de reprogramación para %s (%s).%s",
+                                sol.getMateriaNombre(), sol.getGrupo(), obs))
+                        .fecha(fechaStr)
+                        .ruta("/rol-examenes")
+                        .queryParams(Map.of("busqueda", sol.getMateriaCodigo()))
+                        .textoAccion("Ver examen")
+                        .nivel(aprobada ? "success" : "error")
+                        .build());
+            }
+        } catch (Exception ex) {
+            log.warn("Error consultando resoluciones de solicitudes para director: {}", ex.getMessage());
+        }
+
         lista.sort(Comparator.comparingInt(n -> n.getHorasRestantes() != null ? n.getHorasRestantes() : 999));
         return lista;
+    }
+
+    private List<NotificacionItemDto> obtenerNotificacionesVicerrector(Authentication authentication) {
+        UsuarioSistema usuario = usuarioRepository.findByUsuarioIgnoreCase(authentication.getName()).orElse(null);
+        if (usuario == null || !usuario.isPuedeAprobarSolicitudesRol()) return List.of();
+
+        Set<String> sedes = obtenerCodigosSedesUsuario(usuario);
+        if (sedes.isEmpty()) return List.of();
+
+        List<SolicitudModificacionRol> pendientes = solicitudRepository.findBySedeCodigoInAndEstadoOrderByCreadoEnDesc(
+                sedes, EstadoSolicitudModificacion.PENDIENTE);
+
+        List<NotificacionItemDto> lista = new ArrayList<>();
+        for (SolicitudModificacionRol sol : pendientes) {
+            String fechaStr = sol.getCreadoEn() != null
+                    ? sol.getCreadoEn().format(DateTimeFormatter.ISO_DATE_TIME)
+                    : null;
+
+            lista.add(NotificacionItemDto.builder()
+                    .id("sol-pend-" + sol.getId())
+                    .tipo("SOLICITUD_MODIFICACION_PENDIENTE")
+                    .titulo("Solicitud de reprogramación pendiente")
+                    .materiaCodigo(sol.getMateriaCodigo())
+                    .materiaNombre(sol.getMateriaNombre())
+                    .grupo(sol.getGrupo())
+                    .parcial(sol.getTipoParcial())
+                    .docenteNombre(sol.getSolicitanteNombre())
+                    .mensaje(String.format("El Director %s (%s) solicita reprogramar %s (%s) para el %s %s. Motivo: %s",
+                            sol.getSolicitanteNombre(), sol.getSedeCodigo(), sol.getMateriaNombre(), sol.getGrupo(),
+                            sol.getFechaPropuesta(), sol.getHorarioPropuesto(), sol.getMotivo()))
+                    .fecha(fechaStr)
+                    .ruta("/administracion-evaluaciones")
+                    .queryParams(Map.of("tab", "3", "solicitudId", sol.getId()))
+                    .textoAccion("Revisar solicitud")
+                    .nivel("warning")
+                    .build());
+        }
+        return lista;
+    }
+
+    private Set<String> obtenerCodigosSedesUsuario(UsuarioSistema usuario) {
+        Set<String> codigos = new HashSet<>();
+        if (usuario.getSedesAsignadas() != null && !usuario.getSedesAsignadas().isBlank()) {
+            Arrays.stream(usuario.getSedesAsignadas().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .forEach(s -> codigos.add(s.toUpperCase()));
+        }
+        if (usuario.getSedes() != null) {
+            usuario.getSedes().forEach(s -> {
+                if (s.getCodigo() != null && !s.getCodigo().isBlank()) {
+                    codigos.add(s.getCodigo().trim().toUpperCase());
+                }
+            });
+        }
+        return codigos;
     }
 
     private LocalDateTime parseFechaHoraExamen(LocalDate fecha, String horario) {
@@ -294,7 +396,7 @@ public class NotificacionesService {
     private List<NotificacionItemDto> obtenerNotificacionesPersonalEvaluaciones(Authentication authentication) {
         LocalDateTime sieteDiasAtras = LocalDateTime.now().minusDays(7);
         List<AuditoriaEvaluacion> eventos = auditoriaEvaluacionRepository.findReprogramacionesRecientes(
-                List.of("REPROGRAMACION_FECHA_ROL", "REPROGRAMACION_FECHA_ADMINISTRADOR"),
+                List.of("REPROGRAMACION_FECHA_ROL", "REPROGRAMACION_FECHA_ADMINISTRADOR", "REPROGRAMACION_APROBADA_VICERRECTOR"),
                 sieteDiasAtras
         );
 
@@ -313,23 +415,70 @@ public class NotificacionesService {
             if (!rolesProcesados.add(rol.getId())) continue;
 
             String motivo = "Fecha de examen reprogramada";
+            String horarioOriginal = null;
+            String horarioPropuesto = null;
+            String observacion = null;
+
             if (audit.getDetallesJson() != null && !audit.getDetallesJson().isBlank()) {
                 try {
                     JsonNode node = objectMapper.readTree(audit.getDetallesJson());
                     if (node.has("motivo") && !node.get("motivo").asText().isBlank()) {
                         motivo = node.get("motivo").asText();
                     }
+                    if (node.has("de") && !node.get("de").asText().isBlank()) {
+                        horarioOriginal = node.get("de").asText();
+                    }
+                    if (node.has("a") && !node.get("a").asText().isBlank()) {
+                        horarioPropuesto = node.get("a").asText();
+                    }
+                    if (node.has("observacion") && !node.get("observacion").asText().isBlank()) {
+                        observacion = node.get("observacion").asText();
+                    }
                 } catch (Exception ignored) {
+                    motivo = audit.getDetallesJson();
                 }
+            }
+
+            if (horarioPropuesto == null && rol.getFechaDisplay() != null) {
+                horarioPropuesto = rol.getFechaDisplay() + " " + (rol.getHorario() != null ? rol.getHorario() : "")
+                        + (rol.getModalidad() != null ? " (" + rol.getModalidad() + ")" : "");
             }
 
             String usuarioActor = audit.getUsuario() != null && !audit.getUsuario().isBlank()
                     ? audit.getUsuario().trim()
                     : "Dirección Académica / Vicerrectorado";
 
+            if (usuarioActor != null && !usuarioActor.isBlank()) {
+                try {
+                    final String actorQuery = usuarioActor;
+                    var uOpt = usuarioRepository.findByUsuarioIgnoreCase(actorQuery)
+                            .or(() -> usuarioRepository.findByCi(actorQuery));
+                    if (uOpt.isPresent() && uOpt.get().getNombreCompleto() != null && !uOpt.get().getNombreCompleto().isBlank()) {
+                        usuarioActor = uOpt.get().getNombreCompleto() + (uOpt.get().getRolCodigo() != null ? " (" + uOpt.get().getRolCodigo() + ")" : "");
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
             String fechaStr = audit.getFechaEvento() != null
                     ? audit.getFechaEvento().format(DateTimeFormatter.ISO_DATE_TIME)
                     : null;
+
+            Map<String, Object> queryParams = new HashMap<>();
+            queryParams.put("materiaCodigo", rol.getMateriaCodigo());
+            queryParams.put("materiaNombre", rol.getMateriaNombre());
+            queryParams.put("grupo", rol.getGrupo());
+            queryParams.put("docenteNombre", rol.getDocenteNombre());
+            queryParams.put("parcial", rol.getTipoParcial() != null ? rol.getTipoParcial().name() : null);
+            queryParams.put("sede", rol.getSedeNombre() != null ? rol.getSedeNombre() : rol.getSedeCodigo());
+            queryParams.put("carrera", rol.getCarreraNombre());
+            if (horarioOriginal != null) queryParams.put("horarioOriginal", horarioOriginal);
+            if (horarioPropuesto != null) queryParams.put("horarioPropuesto", horarioPropuesto);
+            queryParams.put("motivo", motivo);
+            if (observacion != null && !observacion.isBlank()) queryParams.put("observacion", observacion);
+            queryParams.put("usuarioActor", usuarioActor);
+            queryParams.put("accion", audit.getAccion());
+            if (fechaStr != null) queryParams.put("fechaEvento", fechaStr);
 
             lista.add(NotificacionItemDto.builder()
                     .id("reprog-" + audit.getId())
@@ -340,12 +489,12 @@ public class NotificacionesService {
                     .grupo(rol.getGrupo())
                     .parcial(rol.getTipoParcial() != null ? rol.getTipoParcial().name() : null)
                     .docenteNombre(rol.getDocenteNombre())
-                    .mensaje(String.format("El examen de %s (%s) fue reprogramado por %s. %s.",
+                    .mensaje(String.format("El examen de %s (%s) fue reprogramado por %s. Motivo: %s.",
                             rol.getMateriaNombre(), rol.getGrupo(), usuarioActor, motivo))
                     .fecha(fechaStr)
-                    .ruta("/rol-examenes")
-                    .queryParams(Map.of("busqueda", rol.getMateriaCodigo() != null ? rol.getMateriaCodigo() : rol.getMateriaNombre()))
-                    .textoAccion("Ver en cronograma")
+                    .ruta(null)
+                    .queryParams(queryParams)
+                    .textoAccion("Ver detalle")
                     .nivel("warning")
                     .build());
         }
