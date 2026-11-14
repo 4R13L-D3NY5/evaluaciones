@@ -415,23 +415,70 @@ public class NotificacionesService {
             if (!rolesProcesados.add(rol.getId())) continue;
 
             String motivo = "Fecha de examen reprogramada";
+            String horarioOriginal = null;
+            String horarioPropuesto = null;
+            String observacion = null;
+
             if (audit.getDetallesJson() != null && !audit.getDetallesJson().isBlank()) {
                 try {
                     JsonNode node = objectMapper.readTree(audit.getDetallesJson());
                     if (node.has("motivo") && !node.get("motivo").asText().isBlank()) {
                         motivo = node.get("motivo").asText();
                     }
+                    if (node.has("de") && !node.get("de").asText().isBlank()) {
+                        horarioOriginal = node.get("de").asText();
+                    }
+                    if (node.has("a") && !node.get("a").asText().isBlank()) {
+                        horarioPropuesto = node.get("a").asText();
+                    }
+                    if (node.has("observacion") && !node.get("observacion").asText().isBlank()) {
+                        observacion = node.get("observacion").asText();
+                    }
                 } catch (Exception ignored) {
+                    motivo = audit.getDetallesJson();
                 }
+            }
+
+            if (horarioPropuesto == null && rol.getFechaDisplay() != null) {
+                horarioPropuesto = rol.getFechaDisplay() + " " + (rol.getHorario() != null ? rol.getHorario() : "")
+                        + (rol.getModalidad() != null ? " (" + rol.getModalidad() + ")" : "");
             }
 
             String usuarioActor = audit.getUsuario() != null && !audit.getUsuario().isBlank()
                     ? audit.getUsuario().trim()
                     : "Dirección Académica / Vicerrectorado";
 
+            if (usuarioActor != null && !usuarioActor.isBlank()) {
+                try {
+                    final String actorQuery = usuarioActor;
+                    var uOpt = usuarioRepository.findByUsuarioIgnoreCase(actorQuery)
+                            .or(() -> usuarioRepository.findByCi(actorQuery));
+                    if (uOpt.isPresent() && uOpt.get().getNombreCompleto() != null && !uOpt.get().getNombreCompleto().isBlank()) {
+                        usuarioActor = uOpt.get().getNombreCompleto() + (uOpt.get().getRolCodigo() != null ? " (" + uOpt.get().getRolCodigo() + ")" : "");
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
             String fechaStr = audit.getFechaEvento() != null
                     ? audit.getFechaEvento().format(DateTimeFormatter.ISO_DATE_TIME)
                     : null;
+
+            Map<String, Object> queryParams = new HashMap<>();
+            queryParams.put("materiaCodigo", rol.getMateriaCodigo());
+            queryParams.put("materiaNombre", rol.getMateriaNombre());
+            queryParams.put("grupo", rol.getGrupo());
+            queryParams.put("docenteNombre", rol.getDocenteNombre());
+            queryParams.put("parcial", rol.getTipoParcial() != null ? rol.getTipoParcial().name() : null);
+            queryParams.put("sede", rol.getSedeNombre() != null ? rol.getSedeNombre() : rol.getSedeCodigo());
+            queryParams.put("carrera", rol.getCarreraNombre());
+            if (horarioOriginal != null) queryParams.put("horarioOriginal", horarioOriginal);
+            if (horarioPropuesto != null) queryParams.put("horarioPropuesto", horarioPropuesto);
+            queryParams.put("motivo", motivo);
+            if (observacion != null && !observacion.isBlank()) queryParams.put("observacion", observacion);
+            queryParams.put("usuarioActor", usuarioActor);
+            queryParams.put("accion", audit.getAccion());
+            if (fechaStr != null) queryParams.put("fechaEvento", fechaStr);
 
             lista.add(NotificacionItemDto.builder()
                     .id("reprog-" + audit.getId())
@@ -442,12 +489,12 @@ public class NotificacionesService {
                     .grupo(rol.getGrupo())
                     .parcial(rol.getTipoParcial() != null ? rol.getTipoParcial().name() : null)
                     .docenteNombre(rol.getDocenteNombre())
-                    .mensaje(String.format("El examen de %s (%s) fue reprogramado por %s. %s.",
+                    .mensaje(String.format("El examen de %s (%s) fue reprogramado por %s. Motivo: %s.",
                             rol.getMateriaNombre(), rol.getGrupo(), usuarioActor, motivo))
                     .fecha(fechaStr)
-                    .ruta("/rol-examenes")
-                    .queryParams(Map.of("busqueda", rol.getMateriaCodigo() != null ? rol.getMateriaCodigo() : rol.getMateriaNombre()))
-                    .textoAccion("Ver en cronograma")
+                    .ruta(null)
+                    .queryParams(queryParams)
+                    .textoAccion("Ver detalle")
                     .nivel("warning")
                     .build());
         }

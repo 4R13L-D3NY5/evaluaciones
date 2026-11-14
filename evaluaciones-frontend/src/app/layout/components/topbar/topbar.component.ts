@@ -218,6 +218,90 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
         </div>
 
       </div>
+
+      <!-- Modal Detalle de Modificación de Examen (Personal de Evaluaciones) -->
+      @if (modalDetalleAbierta() && notificacionSeleccionada(); as notif) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
+            <div class="flex items-center justify-between border-b border-border px-5 py-4 bg-muted/20">
+              <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-black text-sm">
+                <i class="pi pi-calendar-plus"></i>
+                <span>Detalle de Reprogramación de Examen</span>
+              </div>
+              <button (click)="cerrarModalDetalle()" class="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            
+            <div class="p-5 space-y-4 text-xs">
+              <div class="p-3 bg-muted/30 rounded-xl space-y-2">
+                <div class="font-bold text-foreground text-sm">
+                  {{ notif.queryParams?.['materiaNombre'] || notif.materiaNombre }}
+                  <span class="text-xs font-mono text-muted-foreground">({{ notif.queryParams?.['grupo'] || notif.grupo }})</span>
+                </div>
+                @if (notif.queryParams?.['docenteNombre'] || notif.docenteNombre) {
+                  <div class="text-[11px] text-muted-foreground font-mono">
+                    Docente: <span class="text-foreground font-medium">{{ notif.queryParams?.['docenteNombre'] || notif.docenteNombre }}</span>
+                  </div>
+                }
+                @if (notif.queryParams?.['carrera'] || notif.queryParams?.['sede']) {
+                  <div class="text-[10px] text-muted-foreground">
+                    {{ notif.queryParams?.['carrera'] }} @if (notif.queryParams?.['sede']) { · Sede {{ notif.queryParams?.['sede'] }} }
+                  </div>
+                }
+                @if (notif.queryParams?.['parcial'] || notif.parcial) {
+                  <div class="pt-1">
+                    <span class="inline-block px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                      {{ notif.queryParams?.['parcial'] || notif.parcial }}
+                    </span>
+                  </div>
+                }
+
+                @if (notif.queryParams?.['horarioOriginal'] || notif.queryParams?.['horarioPropuesto']) {
+                  <div class="grid grid-cols-2 gap-2 pt-2 border-t border-border/50 text-[11px]">
+                    <div class="p-2.5 rounded-xl bg-background border border-border/60">
+                      <span class="text-[10px] uppercase font-bold text-muted-foreground block mb-1">Horario Original</span>
+                      <div class="font-mono text-foreground font-medium">{{ notif.queryParams?.['horarioOriginal'] || 'Horario inicial' }}</div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                      <span class="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block mb-1">Nuevo Horario</span>
+                      <div class="font-mono font-bold text-emerald-700 dark:text-emerald-300">{{ notif.queryParams?.['horarioPropuesto'] || 'Horario reprogramado' }}</div>
+                    </div>
+                  </div>
+                }
+
+                <div class="pt-2 text-[11px]">
+                  <span class="font-bold text-muted-foreground block mb-0.5">Motivo académico:</span>
+                  <p class="text-foreground italic leading-relaxed">"{{ notif.queryParams?.['motivo'] || notif.mensaje }}"</p>
+                </div>
+
+                @if (notif.queryParams?.['observacion']) {
+                  <div class="p-2.5 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-[11px]">
+                    <span class="font-bold text-amber-800 dark:text-amber-400 block mb-0.5">Observación de Autorización:</span>
+                    <p class="text-foreground leading-relaxed">{{ notif.queryParams?.['observacion'] }}</p>
+                  </div>
+                }
+              </div>
+
+              <div class="text-[11px] text-muted-foreground flex items-center justify-between px-1">
+                <span>Autorizado por: <strong class="text-foreground">{{ notif.queryParams?.['usuarioActor'] || 'Vicerrectorado' }}</strong></span>
+                @if (notif.fecha) {
+                  <span class="text-[10px] font-mono">{{ notif.fecha | date:'dd/MM/yyyy HH:mm' }}</span>
+                }
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end border-t border-border px-5 py-3 bg-muted/10">
+              <button 
+                type="button"
+                (click)="cerrarModalDetalle()" 
+                class="px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold cursor-pointer transition-colors shadow-xs">
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </header>
   `
 })
@@ -229,6 +313,8 @@ export class TopbarComponent implements OnInit {
   public readonly notificacionesService = inject(NotificacionesService);
   public readonly menuVistaAbierto = signal(false);
   public readonly menuNotificacionesAbierto = signal(false);
+  public readonly notificacionSeleccionada = signal<NotificacionUsuario | null>(null);
+  public readonly modalDetalleAbierta = signal<boolean>(false);
 
   public ngOnInit(): void {
     if (this.puedeVerNotificaciones()) {
@@ -252,7 +338,25 @@ export class TopbarComponent implements OnInit {
 
   public abrirNotificacion(notif: NotificacionUsuario): void {
     this.menuNotificacionesAbierto.set(false);
-    this.notificacionesService.abrirNotificacion(notif);
+    this.notificacionesService.marcarComoLeida(notif.id);
+
+    const rol = this._authService.usuario()?.rol;
+    const esPersonalEvaluaciones = rol === 'PERSONAL_EVALUACIONES' || rol === 'RESPONSABLE_EVALUACIONES';
+
+    if (notif.tipo === 'REPROGRAMACION_FECHA_ROL' || !notif.ruta || esPersonalEvaluaciones) {
+      this.notificacionSeleccionada.set(notif);
+      this.modalDetalleAbierta.set(true);
+      return;
+    }
+
+    if (notif.ruta) {
+      this._router.navigate([notif.ruta], { queryParams: notif.queryParams });
+    }
+  }
+
+  public cerrarModalDetalle(): void {
+    this.modalDetalleAbierta.set(false);
+    this.notificacionSeleccionada.set(null);
   }
 
   public puedeParametrizar(): boolean {
