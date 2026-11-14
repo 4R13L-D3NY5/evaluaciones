@@ -829,7 +829,7 @@ export interface ParcialConfig {
                             <td class="py-2.5 px-4 text-right">
                               <div class="inline-flex items-center gap-1.5">
                                 <button 
-                                  (click)="aprobarSolicitud(sol)"
+                                  (click)="abrirModalAprobacion(sol)"
                                   [disabled]="procesandoSolicitudId() === sol.id"
                                   class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
                                   @if (procesandoSolicitudId() === sol.id) {
@@ -1426,6 +1426,72 @@ export interface ParcialConfig {
         </div>
       }
 
+      <!-- Modal para Aprobar Solicitud de Modificación con Observación Opcional -->
+      @if (modalAprobacionAbierta() && solicitudParaAprobar(); as sol) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div class="bg-card border border-border rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="flex items-center justify-between border-b border-border px-5 py-4 bg-muted/20">
+              <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                <i class="pi pi-check-circle"></i>
+                <span>Aprobar Reprogramación de Examen</span>
+              </div>
+              <button (click)="cerrarModalAprobacion()" class="text-muted-foreground hover:text-foreground cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+              <div class="p-3 bg-muted/30 rounded-xl space-y-2">
+                <div class="font-bold text-foreground text-sm">{{ sol.materiaNombre }} <span class="text-xs font-mono text-muted-foreground">({{ sol.grupo }})</span></div>
+                <div class="text-[11px] text-muted-foreground font-mono">Solicitante: <span class="text-foreground font-medium">{{ sol.solicitanteNombre }}</span></div>
+                
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-border/50 text-[11px]">
+                  <div class="p-2 rounded-lg bg-background border border-border/60">
+                    <span class="text-[10px] uppercase font-bold text-muted-foreground block mb-0.5">Horario Original</span>
+                    <div class="font-mono text-foreground">{{ sol.fechaOriginal }}</div>
+                    <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
+                  </div>
+                  <div class="p-2 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                    <span class="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block mb-0.5">Nuevo Horario</span>
+                    <div class="font-mono font-bold text-emerald-700 dark:text-emerald-300">{{ sol.fechaPropuesta }}</div>
+                    <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
+                  </div>
+                </div>
+
+                <div class="pt-2 text-[11px]">
+                  <span class="font-bold text-muted-foreground">Motivo académico:</span>
+                  <p class="text-foreground italic mt-0.5">"{{ sol.motivo }}"</p>
+                </div>
+              </div>
+
+              <div>
+                <label class="block font-bold text-foreground mb-1">Observación o visto bueno (opcional):</label>
+                <textarea 
+                  [(ngModel)]="observacionAprobacion" 
+                  rows="2" 
+                  class="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  placeholder="Nota u observación de Vicerrectorado (opcional)..."></textarea>
+              </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-3 bg-muted/10">
+              <button (click)="cerrarModalAprobacion()" class="px-3 py-1.5 rounded-xl border border-border text-xs font-bold hover:bg-muted text-muted-foreground cursor-pointer">
+                Cancelar
+              </button>
+              <button 
+                (click)="confirmarAprobacion()" 
+                [disabled]="procesandoSolicitudId() !== null"
+                class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50">
+                @if (procesandoSolicitudId() !== null) {
+                  <i class="pi pi-spin pi-spinner text-xs"></i>
+                } @else {
+                  <i class="pi pi-check text-xs"></i>
+                }
+                <span>Confirmar Aprobación</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
@@ -1475,6 +1541,10 @@ export class AdministracionEvaluacionesComponent {
   public modalRechazoAbierta = signal<boolean>(false);
   public solicitudParaRechazar = signal<SolicitudModificacionResponse | null>(null);
   public observacionRechazo = '';
+
+  public modalAprobacionAbierta = signal<boolean>(false);
+  public solicitudParaAprobar = signal<SolicitudModificacionResponse | null>(null);
+  public observacionAprobacion = '';
 
   public readonly totalVicerrectoresHabilitados = computed(() => {
     return this.vicerrectores().filter(v => v.puedeEditarRolesExamen).length;
@@ -1602,15 +1672,31 @@ export class AdministracionEvaluacionesComponent {
     });
   }
 
-  public aprobarSolicitud(sol: SolicitudModificacionResponse): void {
-    if (!confirm(`¿Confirmas la APROBACIÓN de la reprogramación para ${sol.materiaNombre} (${sol.grupo}) al ${sol.fechaPropuesta} a las ${sol.horarioPropuesto}?`)) {
-      return;
-    }
+  public abrirModalAprobacion(sol: SolicitudModificacionResponse): void {
+    this.solicitudParaAprobar.set(sol);
+    this.observacionAprobacion = '';
+    this.modalAprobacionAbierta.set(true);
+  }
+
+  public cerrarModalAprobacion(): void {
+    this.modalAprobacionAbierta.set(false);
+    this.solicitudParaAprobar.set(null);
+    this.observacionAprobacion = '';
+  }
+
+  public confirmarAprobacion(): void {
+    const sol = this.solicitudParaAprobar();
+    if (!sol) return;
+
     this.procesandoSolicitudId.set(sol.id);
-    this._solicitudesService.resolverSolicitud(sol.id, { aprobado: true }).subscribe({
+    this._solicitudesService.resolverSolicitud(sol.id, {
+      aprobado: true,
+      observacion: this.observacionAprobacion.trim() || undefined
+    }).subscribe({
       next: () => {
         this.procesandoSolicitudId.set(null);
         this.solicitudesPendientes.update(list => list.filter(item => item.id !== sol.id));
+        this.cerrarModalAprobacion();
         this._mostrarToast(`Solicitud APROBADA con éxito para ${sol.materiaNombre}. El rol de examen fue actualizado.`);
       },
       error: (err) => {
