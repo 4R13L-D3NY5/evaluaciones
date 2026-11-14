@@ -9,6 +9,8 @@ import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.servi
 import { CampusCarrerasService } from '../../core/services/campus-carreras.service';
 import { BranchOffice, Campus, Career } from '../../core/models/unitepc-gateway.models';
 import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { SolicitudModificacionService } from '../../core/services/solicitud-modificacion.service';
+import { SolicitudModificacionResponse } from '../../core/models/solicitud-modificacion.models';
 
 export interface CampusItem {
   id: number;
@@ -477,6 +479,105 @@ export interface ParcialConfig {
                 }
               </div>
 
+              <!-- Bandeja de Aprobación de Modificaciones de Exámenes (Vicerrectorado) -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-calendar-times text-amber-600 text-base"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Bandeja de Aprobación de Modificaciones de Examen</h4>
+                      <p class="text-[10px] text-muted-foreground">Solicitudes de reprogramación de fecha, horario o modalidad emitidas por Directores de Carrera pendientes de autorización.</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1 text-[10px] font-mono font-bold">
+                      {{ solicitudesPendientes().length }} Pendientes
+                    </span>
+                    <button 
+                      (click)="cargarSolicitudesPendientes()" 
+                      [disabled]="cargandoSolicitudes()"
+                      class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Refrescar solicitudes">
+                      <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoSolicitudes()"></i>
+                    </button>
+                  </div>
+                </div>
+
+                @if (cargandoSolicitudes()) {
+                  <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                    <i class="pi pi-spin pi-spinner text-amber-600"></i>
+                    <span>Cargando solicitudes de reprogramación...</span>
+                  </div>
+                } @else if (solicitudesPendientes().length === 0) {
+                  <div class="py-6 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
+                    <i class="pi pi-check-circle text-emerald-500 text-lg mb-1 block"></i>
+                    No hay solicitudes de modificación pendientes en tus sedes asignadas.
+                  </div>
+                } @else {
+                  <div class="overflow-x-auto border border-border rounded-xl">
+                    <table class="w-full text-left text-xs">
+                      <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                        <tr>
+                          <th class="py-2.5 px-4">Materia / Carrera</th>
+                          <th class="py-2.5 px-4">Solicitante</th>
+                          <th class="py-2.5 px-4">Horario Original</th>
+                          <th class="py-2.5 px-4">Horario Propuesto</th>
+                          <th class="py-2.5 px-4">Motivo Académico</th>
+                          <th class="py-2.5 px-4 text-right">Decisión</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-border">
+                        @for (sol of solicitudesPendientes(); track sol.id) {
+                          <tr class="hover:bg-muted/20 transition-colors">
+                            <td class="py-2.5 px-4 font-bold text-foreground">
+                              <div>{{ sol.materiaNombre }} <span class="text-xs text-muted-foreground">({{ sol.grupo }})</span></div>
+                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</div>
+                            </td>
+                            <td class="py-2.5 px-4">
+                              <div class="font-medium text-foreground">{{ sol.solicitanteNombre }}</div>
+                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</div>
+                            </td>
+                            <td class="py-2.5 px-4">
+                              <div class="text-foreground font-mono text-[11px]">{{ sol.fechaOriginal }}</div>
+                              <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
+                            </td>
+                            <td class="py-2.5 px-4 bg-emerald-50/40 dark:bg-emerald-950/20">
+                              <div class="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-[11px]">{{ sol.fechaPropuesta }}</div>
+                              <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
+                            </td>
+                            <td class="py-2.5 px-4 max-w-[200px]">
+                              <p class="text-[11px] text-foreground truncate" [title]="sol.motivo">{{ sol.motivo }}</p>
+                            </td>
+                            <td class="py-2.5 px-4 text-right">
+                              <div class="inline-flex items-center gap-1.5">
+                                <button 
+                                  (click)="aprobarSolicitud(sol)"
+                                  [disabled]="procesandoSolicitudId() === sol.id"
+                                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
+                                  @if (procesandoSolicitudId() === sol.id) {
+                                    <i class="pi pi-spin pi-spinner text-xs"></i>
+                                  } @else {
+                                    <i class="pi pi-check text-xs"></i>
+                                  }
+                                  <span>Aprobar</span>
+                                </button>
+                                <button 
+                                  (click)="abrirModalRechazo(sol)"
+                                  [disabled]="procesandoSolicitudId() === sol.id"
+                                  class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
+                                  <i class="pi pi-times text-xs"></i>
+                                  <span>Rechazar</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+
               <!-- Parámetro de Variantes por Estudiantes -->
               <div class="bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl p-5 shadow-xs space-y-3">
                 <div class="flex items-center justify-between border-b border-purple-200 pb-3">
@@ -706,6 +807,105 @@ export interface ParcialConfig {
                                 }
                                 <span>{{ vr.puedeEditarRolesExamen ? 'Inhabilitar Edición' : 'Habilitar Edición' }}</span>
                               </button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+
+              <!-- Bandeja de Aprobación de Modificaciones de Exámenes (Vicerrectorado) -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-calendar-times text-amber-600 text-base"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Bandeja de Aprobación de Modificaciones de Examen</h4>
+                      <p class="text-[10px] text-muted-foreground">Solicitudes de reprogramación de fecha, horario o modalidad emitidas por Directores de Carrera pendientes de autorización.</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1 text-[10px] font-mono font-bold">
+                      {{ solicitudesPendientes().length }} Pendientes
+                    </span>
+                    <button 
+                      (click)="cargarSolicitudesPendientes()" 
+                      [disabled]="cargandoSolicitudes()"
+                      class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Refrescar solicitudes">
+                      <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoSolicitudes()"></i>
+                    </button>
+                  </div>
+                </div>
+
+                @if (cargandoSolicitudes()) {
+                  <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                    <i class="pi pi-spin pi-spinner text-amber-600"></i>
+                    <span>Cargando solicitudes de reprogramación...</span>
+                  </div>
+                } @else if (solicitudesPendientes().length === 0) {
+                  <div class="py-6 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
+                    <i class="pi pi-check-circle text-emerald-500 text-lg mb-1 block"></i>
+                    No hay solicitudes de modificación pendientes en tus sedes asignadas.
+                  </div>
+                } @else {
+                  <div class="overflow-x-auto border border-border rounded-xl">
+                    <table class="w-full text-left text-xs">
+                      <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                        <tr>
+                          <th class="py-2.5 px-4">Materia / Carrera</th>
+                          <th class="py-2.5 px-4">Solicitante</th>
+                          <th class="py-2.5 px-4">Horario Original</th>
+                          <th class="py-2.5 px-4">Horario Propuesto</th>
+                          <th class="py-2.5 px-4">Motivo Académico</th>
+                          <th class="py-2.5 px-4 text-right">Decisión</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-border">
+                        @for (sol of solicitudesPendientes(); track sol.id) {
+                          <tr class="hover:bg-muted/20 transition-colors">
+                            <td class="py-2.5 px-4 font-bold text-foreground">
+                              <div>{{ sol.materiaNombre }} <span class="text-xs text-muted-foreground">({{ sol.grupo }})</span></div>
+                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</div>
+                            </td>
+                            <td class="py-2.5 px-4">
+                              <div class="font-medium text-foreground">{{ sol.solicitanteNombre }}</div>
+                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</div>
+                            </td>
+                            <td class="py-2.5 px-4">
+                              <div class="text-foreground font-mono text-[11px]">{{ sol.fechaOriginal }}</div>
+                              <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
+                            </td>
+                            <td class="py-2.5 px-4 bg-emerald-50/40 dark:bg-emerald-950/20">
+                              <div class="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-[11px]">{{ sol.fechaPropuesta }}</div>
+                              <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
+                            </td>
+                            <td class="py-2.5 px-4 max-w-[200px]">
+                              <p class="text-[11px] text-foreground truncate" [title]="sol.motivo">{{ sol.motivo }}</p>
+                            </td>
+                            <td class="py-2.5 px-4 text-right">
+                              <div class="inline-flex items-center gap-1.5">
+                                <button 
+                                  (click)="aprobarSolicitud(sol)"
+                                  [disabled]="procesandoSolicitudId() === sol.id"
+                                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
+                                  @if (procesandoSolicitudId() === sol.id) {
+                                    <i class="pi pi-spin pi-spinner text-xs"></i>
+                                  } @else {
+                                    <i class="pi pi-check text-xs"></i>
+                                  }
+                                  <span>Aprobar</span>
+                                </button>
+                                <button 
+                                  (click)="abrirModalRechazo(sol)"
+                                  [disabled]="procesandoSolicitudId() === sol.id"
+                                  class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
+                                  <i class="pi pi-times text-xs"></i>
+                                  <span>Rechazar</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         }
@@ -1186,6 +1386,105 @@ export interface ParcialConfig {
                   </div>
                 }
               </div>
+
+              <!-- Bandeja de Aprobación de Modificaciones de Exámenes (Vicerrectorado) -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-calendar-times text-amber-600 text-base"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Bandeja de Aprobación de Modificaciones de Examen</h4>
+                      <p class="text-[10px] text-muted-foreground">Solicitudes de reprogramación de fecha, horario o modalidad emitidas por Directores de Carrera pendientes de autorización.</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1 text-[10px] font-mono font-bold">
+                      {{ solicitudesPendientes().length }} Pendientes
+                    </span>
+                    <button 
+                      (click)="cargarSolicitudesPendientes()" 
+                      [disabled]="cargandoSolicitudes()"
+                      class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Refrescar solicitudes">
+                      <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoSolicitudes()"></i>
+                    </button>
+                  </div>
+                </div>
+
+                @if (cargandoSolicitudes()) {
+                  <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                    <i class="pi pi-spin pi-spinner text-amber-600"></i>
+                    <span>Cargando solicitudes de reprogramación...</span>
+                  </div>
+                } @else if (solicitudesPendientes().length === 0) {
+                  <div class="py-6 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
+                    <i class="pi pi-check-circle text-emerald-500 text-lg mb-1 block"></i>
+                    No hay solicitudes de modificación pendientes en tus sedes asignadas.
+                  </div>
+                } @else {
+                  <div class="overflow-x-auto border border-border rounded-xl">
+                    <table class="w-full text-left text-xs">
+                      <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                        <tr>
+                          <th class="py-2.5 px-4">Materia / Carrera</th>
+                          <th class="py-2.5 px-4">Solicitante</th>
+                          <th class="py-2.5 px-4">Horario Original</th>
+                          <th class="py-2.5 px-4">Horario Propuesto</th>
+                          <th class="py-2.5 px-4">Motivo Académico</th>
+                          <th class="py-2.5 px-4 text-right">Decisión</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-border">
+                        @for (sol of solicitudesPendientes(); track sol.id) {
+                          <tr class="hover:bg-muted/20 transition-colors">
+                            <td class="py-2.5 px-4 font-bold text-foreground">
+                              <div>{{ sol.materiaNombre }} <span class="text-xs text-muted-foreground">({{ sol.grupo }})</span></div>
+                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.carreraCodigo }} · Sede {{ sol.sedeCodigo }}</div>
+                            </td>
+                            <td class="py-2.5 px-4">
+                              <div class="font-medium text-foreground">{{ sol.solicitanteNombre }}</div>
+                              <div class="text-[10px] text-muted-foreground font-mono">{{ sol.solicitanteRol }}</div>
+                            </td>
+                            <td class="py-2.5 px-4">
+                              <div class="text-foreground font-mono text-[11px]">{{ sol.fechaOriginal }}</div>
+                              <div class="text-[10px] text-muted-foreground">{{ sol.horarioOriginal }} · {{ sol.modalidadOriginal }}</div>
+                            </td>
+                            <td class="py-2.5 px-4 bg-emerald-50/40 dark:bg-emerald-950/20">
+                              <div class="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-[11px]">{{ sol.fechaPropuesta }}</div>
+                              <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{{ sol.horarioPropuesto }} · {{ sol.modalidadPropuesta }}</div>
+                            </td>
+                            <td class="py-2.5 px-4 max-w-[200px]">
+                              <p class="text-[11px] text-foreground truncate" [title]="sol.motivo">{{ sol.motivo }}</p>
+                            </td>
+                            <td class="py-2.5 px-4 text-right">
+                              <div class="inline-flex items-center gap-1.5">
+                                <button 
+                                  (click)="aprobarSolicitud(sol)"
+                                  [disabled]="procesandoSolicitudId() === sol.id"
+                                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
+                                  @if (procesandoSolicitudId() === sol.id) {
+                                    <i class="pi pi-spin pi-spinner text-xs"></i>
+                                  } @else {
+                                    <i class="pi pi-check text-xs"></i>
+                                  }
+                                  <span>Aprobar</span>
+                                </button>
+                                <button 
+                                  (click)="abrirModalRechazo(sol)"
+                                  [disabled]="procesandoSolicitudId() === sol.id"
+                                  class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50">
+                                  <i class="pi pi-times text-xs"></i>
+                                  <span>Rechazar</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
             </div>
 
             <div class="flex justify-end gap-2 pt-2">
@@ -1237,6 +1536,52 @@ export interface ParcialConfig {
         </div>
       }
 
+      <!-- Modal para Rechazar Solicitud de Modificación con Observación -->
+      @if (modalRechazoAbierta() && solicitudParaRechazar()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div class="bg-card border border-border rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="flex items-center justify-between border-b border-border px-5 py-4 bg-muted/20">
+              <div class="flex items-center gap-2 text-rose-600 font-black text-sm">
+                <i class="pi pi-exclamation-triangle"></i>
+                <span>Rechazar Solicitud de Reprogramación</span>
+              </div>
+              <button (click)="cerrarModalRechazo()" class="text-muted-foreground hover:text-foreground cursor-pointer">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+              <div class="p-3 bg-muted/30 rounded-xl space-y-1">
+                <div class="font-bold text-foreground">{{ solicitudParaRechazar()?.materiaNombre }} ({{ solicitudParaRechazar()?.grupo }})</div>
+                <div class="text-[10px] text-muted-foreground font-mono">Solicitado por: {{ solicitudParaRechazar()?.solicitanteNombre }}</div>
+                <div class="text-[11px] text-muted-foreground italic">"{{ solicitudParaRechazar()?.motivo }}"</div>
+              </div>
+              <div>
+                <label class="block font-bold text-foreground mb-1">Observación o motivo de rechazo (opcional):</label>
+                <textarea 
+                  [(ngModel)]="observacionRechazo" 
+                  rows="3" 
+                  class="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  placeholder="Explica al director por qué se rechaza la solicitud..."></textarea>
+              </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-3 bg-muted/10">
+              <button (click)="cerrarModalRechazo()" class="px-3 py-1.5 rounded-xl border border-border text-xs font-bold hover:bg-muted text-muted-foreground cursor-pointer">
+                Cancelar
+              </button>
+              <button 
+                (click)="confirmarRechazo()" 
+                [disabled]="procesandoSolicitudId() !== null"
+                class="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50">
+                @if (procesandoSolicitudId() !== null) {
+                  <i class="pi pi-spin pi-spinner text-xs"></i>
+                }
+                <span>Confirmar Rechazo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
@@ -1251,6 +1596,7 @@ export interface ParcialConfig {
 export class AdministracionEvaluacionesComponent {
   public readonly storage = inject(EvaluacionesStorageService);
   private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
+  private readonly _solicitudesService = inject(SolicitudModificacionService);
   private readonly _gateway = inject(UnitepcGatewayService);
   private readonly _campusCarreras = inject(CampusCarrerasService);
   public readonly Math = Math;
@@ -1275,6 +1621,14 @@ export class AdministracionEvaluacionesComponent {
   public vicerrectores = signal<VicerrectorEdicionRol[]>([]);
   public cargandoVicerrectores = signal<boolean>(false);
   public actualizandoVicerrectorId = signal<number | null>(null);
+
+  // Bandeja de solicitudes de modificación de exámenes
+  public solicitudesPendientes = signal<SolicitudModificacionResponse[]>([]);
+  public cargandoSolicitudes = signal<boolean>(false);
+  public procesandoSolicitudId = signal<string | null>(null);
+  public modalRechazoAbierta = signal<boolean>(false);
+  public solicitudParaRechazar = signal<SolicitudModificacionResponse | null>(null);
+  public observacionRechazo = '';
 
   public readonly totalVicerrectoresHabilitados = computed(() => {
     return this.vicerrectores().filter(v => v.puedeEditarRolesExamen).length;
@@ -1306,6 +1660,7 @@ export class AdministracionEvaluacionesComponent {
     this.cargarCatalogoAdministrativo();
     this.cargarConfiguracionVerificacion();
     this.cargarVicerrectoresEdicion();
+    this.cargarSolicitudesPendientes();
   }
 
   public inicialesNombre(nombre: string): string {
@@ -1341,6 +1696,74 @@ export class AdministracionEvaluacionesComponent {
       error: () => {
         this.actualizandoVicerrectorId.set(null);
         this._mostrarToast('Error al actualizar el permiso del vicerrector.');
+      }
+    });
+  }
+
+  public cargarSolicitudesPendientes(): void {
+    this.cargandoSolicitudes.set(true);
+    this._solicitudesService.obtenerPendientesVicerrector().subscribe({
+      next: lista => {
+        this.solicitudesPendientes.set(lista || []);
+        this.cargandoSolicitudes.set(false);
+      },
+      error: () => {
+        this.cargandoSolicitudes.set(false);
+        this._mostrarToast('No se pudieron cargar las solicitudes pendientes.');
+      }
+    });
+  }
+
+  public aprobarSolicitud(sol: SolicitudModificacionResponse): void {
+    if (!confirm(`¿Confirmas la APROBACIÓN de la reprogramación para ${sol.materiaNombre} (${sol.grupo}) al ${sol.fechaPropuesta} a las ${sol.horarioPropuesto}?`)) {
+      return;
+    }
+    this.procesandoSolicitudId.set(sol.id);
+    this._solicitudesService.resolverSolicitud(sol.id, { aprobado: true }).subscribe({
+      next: () => {
+        this.procesandoSolicitudId.set(null);
+        this.solicitudesPendientes.update(list => list.filter(item => item.id !== sol.id));
+        this._mostrarToast(`Solicitud APROBADA con éxito para ${sol.materiaNombre}. El rol de examen fue actualizado.`);
+      },
+      error: (err) => {
+        this.procesandoSolicitudId.set(null);
+        const msg = err?.error?.message || 'Error al aprobar la solicitud.';
+        this._mostrarToast(msg);
+      }
+    });
+  }
+
+  public abrirModalRechazo(sol: SolicitudModificacionResponse): void {
+    this.solicitudParaRechazar.set(sol);
+    this.observacionRechazo = '';
+    this.modalRechazoAbierta.set(true);
+  }
+
+  public cerrarModalRechazo(): void {
+    this.modalRechazoAbierta.set(false);
+    this.solicitudParaRechazar.set(null);
+    this.observacionRechazo = '';
+  }
+
+  public confirmarRechazo(): void {
+    const sol = this.solicitudParaRechazar();
+    if (!sol) return;
+
+    this.procesandoSolicitudId.set(sol.id);
+    this._solicitudesService.resolverSolicitud(sol.id, {
+      aprobado: false,
+      observacion: this.observacionRechazo.trim() || undefined
+    }).subscribe({
+      next: () => {
+        this.procesandoSolicitudId.set(null);
+        this.solicitudesPendientes.update(list => list.filter(item => item.id !== sol.id));
+        this.cerrarModalRechazo();
+        this._mostrarToast(`Solicitud RECHAZADA para ${sol.materiaNombre}.`);
+      },
+      error: (err) => {
+        this.procesandoSolicitudId.set(null);
+        const msg = err?.error?.message || 'Error al rechazar la solicitud.';
+        this._mostrarToast(msg);
       }
     });
   }

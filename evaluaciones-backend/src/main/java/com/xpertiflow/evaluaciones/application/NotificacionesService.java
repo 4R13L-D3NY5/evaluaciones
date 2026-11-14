@@ -11,6 +11,10 @@ import com.xpertiflow.evaluaciones.domain.repository.UsuarioSistemaRepository;
 import com.xpertiflow.evaluaciones.domain.repository.VerificacionExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
+import com.xpertiflow.evaluaciones.domain.repository.SolicitudModificacionRolRepository;
+import com.xpertiflow.evaluaciones.domain.entity.SolicitudModificacionRol;
+import com.xpertiflow.evaluaciones.domain.entity.AlcanceSede;
+import com.xpertiflow.evaluaciones.domain.enums.EstadoSolicitudModificacion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +43,7 @@ public class NotificacionesService {
     private final UsuarioSistemaRepository usuarioRepository;
     private final AccesoAcademicoService accesoAcademicoService;
     private final AuditoriaEvaluacionRepository auditoriaEvaluacionRepository;
+    private final SolicitudModificacionRolRepository solicitudRepository;
     private final ObjectMapper objectMapper;
 
     public List<NotificacionItemDto> obtenerResumen(Authentication authentication) {
@@ -57,6 +62,10 @@ public class NotificacionesService {
 
         if (tieneRol(authentication, "DIRECTOR_CARRERA")) {
             return obtenerNotificacionesDirector(authentication);
+        }
+
+        if (tieneRol(authentication, "VICERRECTOR")) {
+            return obtenerNotificacionesVicerrector(authentication);
         }
 
         if (tieneRol(authentication, "PERSONAL_EVALUACIONES") || tieneRol(authentication, "RESPONSABLE_EVALUACIONES")) {
@@ -271,7 +280,85 @@ public class NotificacionesService {
             }
         }
 
+        // 3. Solicitudes de modificación resueltas recientemente (últimos 7 días)
+        try {
+            List<SolicitudModificacionRol> misSolicitudes = solicitudRepository.findBySolicitanteUsuarioOrderByCreadoEnDesc(authentication.getName());
+            LocalDateTime limiteResolucion = ahora.minusDays(7);
+            for (SolicitudModificacionRol sol : misSolicitudes) {
+                if (sol.getEstado() == EstadoSolicitudModificacion.PENDIENTE) continue;
+                if (sol.getFechaResolucion() == null || sol.getFechaResolucion().isBefore(limiteResolucion)) continue;
+
+                boolean aprobada = sol.getEstado() == EstadoSolicitudModificacion.APROBADA;
+                String fechaStr = sol.getFechaResolucion().format(DateTimeFormatter.ISO_DATE_TIME);
+                String obs = sol.getObservacionResolucion() != null && !sol.getObservacionResolucion().isBlank()
+                        ? " Obs: " + sol.getObservacionResolucion() : "";
+
+                lista.add(NotificacionItemDto.builder()
+                        .id("sol-res-" + sol.getId())
+                        .tipo(aprobada ? "SOLICITUD_MODIFICACION_APROBADA" : "SOLICITUD_MODIFICACION_RECHAZADA")
+                        .titulo(aprobada ? "Solicitud de reprogramación APROBADA" : "Solicitud de reprogramación RECHAZADA")
+                        .materiaCodigo(sol.getMateriaCodigo())
+                        .materiaNombre(sol.getMateriaNombre())
+                        .grupo(sol.getGrupo())
+                        .parcial(sol.getTipoParcial())
+                        .mensaje(aprobada
+                                ? String.format("Vicerrectorado aprobó el traslado de %s (%s) al %s a las %s.%s",
+                                sol.getMateriaNombre(), sol.getGrupo(), sol.getFechaPropuesta(), sol.getHorarioPropuesto(), obs)
+                                : String.format("Vicerrectorado rechazó la solicitud de reprogramación para %s (%s).%s",
+                                sol.getMateriaNombre(), sol.getGrupo(), obs))
+                        .fecha(fechaStr)
+                        .ruta("/rol-examenes")
+                        .queryParams(Map.of("busqueda", sol.getMateriaCodigo()))
+                        .textoAccion("Ver examen")
+                        .nivel(aprobada ? "success" : "error")
+                        .build());
+            }
+        } catch (Exception ex) {
+            log.warn("Error consultando resoluciones de solicitudes para director: {}", ex.getMessage());
+        }
+
         lista.sort(Comparator.comparingInt(n -> n.getHorasRestantes() != null ? n.getHorasRestantes() : 999));
+        return lista;
+    }
+
+    private List<NotificacionItemDto> obtenerNotificacionesVicerrector(Authentication authentication) {
+        UsuarioSistema usuario = usuarioRepository.findByUsuarioIgnoreCase(authentication.getName()).orElse(null);
+        if (usuario == null) return List.of();
+
+        Set<String> sedes = usuario.getSedes().stream()
+                .map(AlcanceSede::getCodigo)
+                .collect(Collectors.toSet());
+
+        if (sedes.isEmpty()) return List.of();
+
+        List<SolicitudModificacionRol> pendientes = solicitudRepository.findBySedeCodigoInAndEstadoOrderByCreadoEnDesc(
+                sedes, EstadoSolicitudModificacion.PENDIENTE);
+
+        List<NotificacionItemDto> lista = new ArrayList<>();
+        for (SolicitudModificacionRol sol : pendientes) {
+            String fechaStr = sol.getCreadoEn() != null
+                    ? sol.getCreadoEn().format(DateTimeFormatter.ISO_DATE_TIME)
+                    : null;
+
+            lista.add(NotificacionItemDto.builder()
+                    .id("sol-pend-" + sol.getId())
+                    .tipo("SOLICITUD_MODIFICACION_PENDIENTE")
+                    .titulo("Solicitud de reprogramación pendiente")
+                    .materiaCodigo(sol.getMateriaCodigo())
+                    .materiaNombre(sol.getMateriaNombre())
+                    .grupo(sol.getGrupo())
+                    .parcial(sol.getTipoParcial())
+                    .docenteNombre(sol.getSolicitanteNombre())
+                    .mensaje(String.format("El Director %s (%s) solicita reprogramar %s (%s) para el %s %s. Motivo: %s",
+                            sol.getSolicitanteNombre(), sol.getSedeCodigo(), sol.getMateriaNombre(), sol.getGrupo(),
+                            sol.getFechaPropuesta(), sol.getHorarioPropuesto(), sol.getMotivo()))
+                    .fecha(fechaStr)
+                    .ruta("/administracion-evaluaciones")
+                    .queryParams(Map.of("tab", "3", "solicitudId", sol.getId()))
+                    .textoAccion("Revisar solicitud")
+                    .nivel("warning")
+                    .build());
+        }
         return lista;
     }
 
@@ -294,7 +381,7 @@ public class NotificacionesService {
     private List<NotificacionItemDto> obtenerNotificacionesPersonalEvaluaciones(Authentication authentication) {
         LocalDateTime sieteDiasAtras = LocalDateTime.now().minusDays(7);
         List<AuditoriaEvaluacion> eventos = auditoriaEvaluacionRepository.findReprogramacionesRecientes(
-                List.of("REPROGRAMACION_FECHA_ROL", "REPROGRAMACION_FECHA_ADMINISTRADOR"),
+                List.of("REPROGRAMACION_FECHA_ROL", "REPROGRAMACION_FECHA_ADMINISTRADOR", "REPROGRAMACION_APROBADA_VICERRECTOR"),
                 sieteDiasAtras
         );
 
