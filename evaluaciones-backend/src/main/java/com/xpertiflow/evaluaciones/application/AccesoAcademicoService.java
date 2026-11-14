@@ -33,6 +33,7 @@ public class AccesoAcademicoService {
     private final UsuarioSistemaRepository usuarioRepository;
     private final RolExamenRepository rolExamenRepository;
     private final UnitepcGatewayClient unitepcGatewayClient;
+    private final com.xpertiflow.evaluaciones.domain.repository.ConfiguracionEvaluacionesRepository configuracionRepository;
 
     private static final String GESTION_ACTIVA = "2-2026";
     private static final long CACHE_SEA_MILLIS = 600_000L; // 10 minutos
@@ -266,6 +267,35 @@ public class AccesoAcademicoService {
         if (!puedeAcceder(rol, authentication)) {
             throw new AccessDeniedException("El docente no tiene acceso a esta asignatura o grupo");
         }
+    }
+
+    public boolean puedeModificarRolesExamen(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) return false;
+        if (tieneRol(authentication, "ADMINISTRADOR_SISTEMA")
+                || tieneRol(authentication, "RESPONSABLE_EVALUACIONES")) return true;
+
+        UsuarioSistema usuario = usuarioRepository.findByUsuarioIgnoreCase(authentication.getName()).orElse(null);
+        if (usuario == null || !usuario.isActivo()) return false;
+        String rolUsuario = usuario.getRolCodigo();
+
+        if ("DIRECTOR_CARRERA".equals(rolUsuario)) {
+            return configuracionRepository.findById((short) 1)
+                    .map(com.xpertiflow.evaluaciones.domain.entity.ConfiguracionEvaluaciones::getPermitirDirectorEdicionRoles)
+                    .orElse(true);
+        }
+
+        if ("VICERRECTOR".equals(rolUsuario)) {
+            return usuario.isPuedeEditarRolesExamen();
+        }
+
+        return false;
+    }
+
+    public boolean puedeModificarRol(String rolExamenId, Authentication authentication) {
+        if (!puedeModificarRolesExamen(authentication)) {
+            return false;
+        }
+        return puedeAccederRol(rolExamenId, authentication);
     }
 
     public boolean puedeAccederRol(String rolExamenId, Authentication authentication) {

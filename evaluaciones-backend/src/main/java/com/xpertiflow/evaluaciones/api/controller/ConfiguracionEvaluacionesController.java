@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -63,5 +64,25 @@ public class ConfiguracionEvaluacionesController {
             @Valid @RequestBody ConfiguracionVerificacionDto request,
             Authentication authentication) {
         return ResponseEntity.ok(configuracionVerificacionService.guardar(request, authentication.getName()));
+    }
+
+    @GetMapping("/vicerrectores-edicion")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Listar usuarios vicerrectores con su estado de autorización para modificar roles de examen")
+    public ResponseEntity<List<com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto>> listarVicerrectoresEdicion() {
+        return ResponseEntity.ok(service.listarVicerrectoresEdicion());
+    }
+
+    @PutMapping("/vicerrectores-edicion/{usuarioId}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Actualizar permiso de edición de roles de examen para un vicerrector")
+    public ResponseEntity<com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto> actualizarPermisoVicerrector(
+            @PathVariable Long usuarioId,
+            @RequestBody com.xpertiflow.evaluaciones.api.dto.ActualizarPermisoVicerrectorRequestDto request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        String actor = authentication != null ? authentication.getName() : "ADMIN_EVALUACIONES";
+        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
+        return ResponseEntity.ok(service.actualizarPermisoVicerrector(usuarioId, request.isPuedeEditarRolesExamen(), actor, ipOrigen));
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -40,6 +41,7 @@ public class ConfiguracionEvaluacionesService {
     private final ConfiguracionEvaluacionesRepository repository;
     private final ObjectMapper objectMapper;
     private final AuditoriaUsuarioRepository auditoriaUsuarioRepository;
+    private final com.xpertiflow.evaluaciones.domain.repository.UsuarioSistemaRepository usuarioRepository;
 
     @Transactional(readOnly = true)
     public ConfiguracionEvaluacionesDto obtener() {
@@ -98,6 +100,81 @@ public class ConfiguracionEvaluacionesService {
         auditoriaUsuarioRepository.save(auditoria);
 
         return mapear(guardado);
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto> listarVicerrectoresEdicion() {
+        return usuarioRepository.findByRolCodigoOrderByNombreCompletoAsc("VICERRECTOR").stream()
+                .map(u -> {
+                    List<String> sedes = new java.util.ArrayList<>();
+                    if (u.getSedesAsignadas() != null && !u.getSedesAsignadas().isBlank()) {
+                        sedes.addAll(java.util.Arrays.stream(u.getSedesAsignadas().split(","))
+                                .map(String::trim)
+                                .filter(s -> !s.isBlank())
+                                .toList());
+                    }
+                    u.getSedes().forEach(s -> {
+                        String cod = s.getCodigo().trim();
+                        if (!cod.isBlank() && !sedes.contains(cod)) {
+                            sedes.add(cod);
+                        }
+                    });
+                    return com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto.builder()
+                            .id(u.getId())
+                            .usuario(u.getUsuario())
+                            .ci(u.getCi())
+                            .nombreCompleto(u.getNombreCompleto())
+                            .sedesAsignadas(sedes)
+                            .puedeEditarRolesExamen(u.isPuedeEditarRolesExamen())
+                            .build();
+                })
+                .toList();
+    }
+
+    @Transactional
+    public com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto actualizarPermisoVicerrector(
+            Long usuarioId, boolean puedeEditarRoles, String actor, String ipOrigen) {
+        com.xpertiflow.evaluaciones.domain.entity.UsuarioSistema usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con ID: " + usuarioId));
+        if (!"VICERRECTOR".equals(usuario.getRolCodigo())) {
+            throw new IllegalArgumentException("El usuario especificado no tiene rol de VICERRECTOR");
+        }
+        usuario.setPuedeEditarRolesExamen(puedeEditarRoles);
+        usuario.setActualizadoEn(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+
+        AuditoriaUsuario auditoria = new AuditoriaUsuario();
+        auditoria.setUsuarioObjetivoId(usuario.getId());
+        auditoria.setUsuarioObjetivoCi(usuario.getCi());
+        auditoria.setAccion("PERMISO_EDICION_ROLES_ACTUALIZADO");
+        auditoria.setRealizadoPor(actor != null ? actor : "SISTEMA");
+        auditoria.setDetalle("Se " + (puedeEditarRoles ? "HABILITO" : "DESHABILITO") + " la edicion de roles de examen para el Vicerrector " + usuario.getUsuario() + " (" + usuario.getNombreCompleto() + ")");
+        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
+        auditoria.setFechaEvento(LocalDateTime.now());
+        auditoriaUsuarioRepository.save(auditoria);
+
+        List<String> sedes = new java.util.ArrayList<>();
+        if (usuario.getSedesAsignadas() != null && !usuario.getSedesAsignadas().isBlank()) {
+            sedes.addAll(java.util.Arrays.stream(usuario.getSedesAsignadas().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .toList());
+        }
+        usuario.getSedes().forEach(s -> {
+            String cod = s.getCodigo().trim();
+            if (!cod.isBlank() && !sedes.contains(cod)) {
+                sedes.add(cod);
+            }
+        });
+
+        return com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto.builder()
+                .id(usuario.getId())
+                .usuario(usuario.getUsuario())
+                .ci(usuario.getCi())
+                .nombreCompleto(usuario.getNombreCompleto())
+                .sedesAsignadas(sedes)
+                .puedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen())
+                .build();
     }
 
     private ConfiguracionEvaluaciones configuracionDefecto() {

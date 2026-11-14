@@ -47,7 +47,7 @@ public class RolExamenController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR') and @accesoAcademicoService.puedeModificarRolesExamen(authentication)")
     @Operation(summary = "Crear un nuevo rol de examen")
     public ResponseEntity<RolExamenResponseDto> crear(@Valid @RequestBody RolExamenRequestDto dto,
                                                        Authentication authentication) {
@@ -64,7 +64,7 @@ public class RolExamenController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR') and @accesoAcademicoService.puedeModificarRol(#id, authentication)")
     @Operation(summary = "Actualizar un rol de examen programado o validado")
     public ResponseEntity<RolExamenResponseDto> actualizar(
             @PathVariable String id,
@@ -74,7 +74,7 @@ public class RolExamenController {
     }
 
     @PutMapping("/{id}/modalidad")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR') and @accesoAcademicoService.puedeModificarRol(#id, authentication)")
     @Operation(summary = "Cambiar el tipo de examen programado o validado")
     public ResponseEntity<RolExamenResponseDto> cambiarModalidad(
             @PathVariable String id,
@@ -84,7 +84,7 @@ public class RolExamenController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR') and @accesoAcademicoService.puedeAccederRol(#id, authentication)")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR') and @accesoAcademicoService.puedeModificarRol(#id, authentication)")
     @Operation(summary = "Eliminar un rol de examen programado o validado")
     public ResponseEntity<Void> eliminar(@PathVariable String id, Authentication authentication) {
         rolExamenService.eliminar(id, authentication);

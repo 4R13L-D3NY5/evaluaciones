@@ -36,6 +36,15 @@ export interface ConfiguracionVerificacion {
   actualizadoPor?: string;
 }
 
+export interface VicerrectorEdicionRol {
+  id: number;
+  usuario: string;
+  ci: string;
+  nombreCompleto: string;
+  sedesAsignadas: string[];
+  puedeEditarRolesExamen: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -169,5 +178,15 @@ export class ConfiguracionEvaluacionesService {
 
   public guardarVerificacion(configuracion: ConfiguracionVerificacion): Observable<ConfiguracionVerificacion[]> {
     return this._http.put<ConfiguracionVerificacion[]>(`${this._baseUrl}/verificacion`, configuracion);
+  }
+
+  public listarVicerrectoresEdicion(): Observable<VicerrectorEdicionRol[]> {
+    return this._http.get<VicerrectorEdicionRol[]>(`${this._baseUrl}/vicerrectores-edicion`);
+  }
+
+  public actualizarPermisoVicerrector(usuarioId: number, puedeEditarRolesExamen: boolean): Observable<VicerrectorEdicionRol> {
+    return this._http.put<VicerrectorEdicionRol>(`${this._baseUrl}/vicerrectores-edicion/${usuarioId}`, {
+      puedeEditarRolesExamen
+    });
   }
 }

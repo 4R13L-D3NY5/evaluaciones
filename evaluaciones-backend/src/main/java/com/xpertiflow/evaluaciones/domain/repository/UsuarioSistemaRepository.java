@@ -14,5 +14,7 @@ public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, 
 
     boolean existsByCi(String ci);
 
+    List<UsuarioSistema> findByRolCodigoOrderByNombreCompletoAsc(String rolCodigo);
+
     List<UsuarioSistema> findAllByOrderByNombreCompletoAsc();
 }

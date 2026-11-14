@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import { EvaluacionesStorageService } from '../../core/services/evaluaciones-storage.service';
-import { ConfiguracionEvaluaciones, ConfiguracionEvaluacionesService, ConfiguracionVerificacion } from '../../core/services/configuracion-evaluaciones.service';
+import { ConfiguracionEvaluaciones, ConfiguracionEvaluacionesService, ConfiguracionVerificacion, VicerrectorEdicionRol } from '../../core/services/configuracion-evaluaciones.service';
 import { UsuariosSistemaComponent } from '../usuarios-sistema/usuarios-sistema.component';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { CampusCarrerasService } from '../../core/services/campus-carreras.service';
@@ -609,6 +609,112 @@ export interface ParcialConfig {
                 </div>
               </div>
 
+              <!-- Autorización de Edición de Rol de Exámenes para Vicerrectores -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-shield text-indigo-600 text-base"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Autorización de Edición de Exámenes para Vicerrectorado</h4>
+                      <p class="text-[10px] text-muted-foreground">Define qué usuarios con rol Vicerrector pueden modificar el Rol de Exámenes en sus sedes asignadas. Los no autorizados operan en solo lectura.</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-full px-3 py-1 text-[10px] font-mono font-bold">
+                      {{ totalVicerrectoresHabilitados() }} / {{ vicerrectores().length }} Habilitados
+                    </span>
+                    <button 
+                      (click)="cargarVicerrectoresEdicion()" 
+                      [disabled]="cargandoVicerrectores()"
+                      class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Refrescar lista de vicerrectores">
+                      <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoVicerrectores()"></i>
+                    </button>
+                  </div>
+                </div>
+
+                @if (cargandoVicerrectores()) {
+                  <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                    <i class="pi pi-spin pi-spinner text-purple-600"></i>
+                    <span>Cargando vicerrectores institucionales...</span>
+                  </div>
+                } @else if (vicerrectores().length === 0) {
+                  <div class="py-6 text-center text-xs text-muted-foreground">
+                    No se encontraron usuarios con rol Vicerrector registrados en el sistema.
+                  </div>
+                } @else {
+                  <div class="overflow-x-auto border border-border rounded-xl">
+                    <table class="w-full text-left text-xs">
+                      <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                        <tr>
+                          <th class="py-2.5 px-4">Vicerrector</th>
+                          <th class="py-2.5 px-4">C.I. / Usuario</th>
+                          <th class="py-2.5 px-4">Sedes Asignadas</th>
+                          <th class="py-2.5 px-4 text-center">Permiso de Edición</th>
+                          <th class="py-2.5 px-4 text-right">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-border">
+                        @for (vr of vicerrectores(); track vr.id) {
+                          <tr class="hover:bg-muted/20 transition-colors">
+                            <td class="py-2.5 px-4 font-bold text-foreground">
+                              <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-black text-[10px] flex items-center justify-center">
+                                  {{ inicialesNombre(vr.nombreCompleto) }}
+                                </div>
+                                <div>
+                                  <span class="block leading-tight">{{ vr.nombreCompleto }}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td class="py-2.5 px-4 font-mono text-[11px] text-muted-foreground">
+                              {{ vr.ci || vr.usuario }}
+                            </td>
+                            <td class="py-2.5 px-4">
+                              <div class="flex flex-wrap gap-1">
+                                @for (sede of vr.sedesAsignadas; track sede) {
+                                  <span class="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono font-bold text-foreground border border-border">
+                                    {{ sede }}
+                                  </span>
+                                }
+                                @if (vr.sedesAsignadas.length === 0) {
+                                  <span class="text-[10px] text-muted-foreground italic">Sin sedes</span>
+                                }
+                              </div>
+                            </td>
+                            <td class="py-2.5 px-4 text-center">
+                              @if (vr.puedeEditarRolesExamen) {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 px-2.5 py-0.5 text-[10px] font-bold">
+                                  <i class="pi pi-check text-[9px]"></i> Habilitado
+                                </span>
+                              } @else {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 px-2.5 py-0.5 text-[10px] font-bold">
+                                  <i class="pi pi-lock text-[9px]"></i> Solo Lectura
+                                </span>
+                              }
+                            </td>
+                            <td class="py-2.5 px-4 text-right">
+                              <button 
+                                (click)="togglePermisoVicerrector(vr)"
+                                [disabled]="actualizandoVicerrectorId() === vr.id"
+                                [class]="vr.puedeEditarRolesExamen ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'"
+                                class="border font-bold text-[11px] px-3 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-wait">
+                                @if (actualizandoVicerrectorId() === vr.id) {
+                                  <i class="pi pi-spin pi-spinner text-xs"></i>
+                                } @else {
+                                  <i [class]="vr.puedeEditarRolesExamen ? 'pi pi-times' : 'pi pi-check'" class="text-xs"></i>
+                                }
+                                <span>{{ vr.puedeEditarRolesExamen ? 'Inhabilitar Edición' : 'Habilitar Edición' }}</span>
+                              </button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+
               <!-- Validación de Cuotas por Grupos Tipológicos (15/30/15) -->
               <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
                 <div class="flex items-center justify-between border-b border-border pb-3">
@@ -1166,6 +1272,13 @@ export class AdministracionEvaluacionesComponent {
   public toastMessage = signal<string | null>(null);
   public sedesCatalogo: BranchOffice[] = [];
   public readonly configuracionesVerificacion = signal<ConfiguracionVerificacion[]>([]);
+  public vicerrectores = signal<VicerrectorEdicionRol[]>([]);
+  public cargandoVicerrectores = signal<boolean>(false);
+  public actualizandoVicerrectorId = signal<number | null>(null);
+
+  public readonly totalVicerrectoresHabilitados = computed(() => {
+    return this.vicerrectores().filter(v => v.puedeEditarRolesExamen).length;
+  });
   public verificacionSedeCodigo = ''; public verificacionSedeNombre = ''; public verificacionCarreraCodigo = ''; public verificacionCarreraNombre = ''; public verificacionHabilitada = false;
   public carrerasVerificacion: Career[] = [];
   public cargandoCarrerasVerificacion = false;
@@ -1192,6 +1305,44 @@ export class AdministracionEvaluacionesComponent {
     this.listaUsuariosEvaluadores = [];
     this.cargarCatalogoAdministrativo();
     this.cargarConfiguracionVerificacion();
+    this.cargarVicerrectoresEdicion();
+  }
+
+  public inicialesNombre(nombre: string): string {
+    if (!nombre) return 'VR';
+    const partes = nombre.trim().split(/\s+/);
+    if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+    return (partes[0][0] + partes[1][0]).toUpperCase();
+  }
+
+  public cargarVicerrectoresEdicion(): void {
+    this.cargandoVicerrectores.set(true);
+    this._configuracionService.listarVicerrectoresEdicion().subscribe({
+      next: lista => {
+        this.vicerrectores.set(lista || []);
+        this.cargandoVicerrectores.set(false);
+      },
+      error: () => {
+        this.cargandoVicerrectores.set(false);
+        this._mostrarToast('No se pudo cargar la lista de vicerrectores.');
+      }
+    });
+  }
+
+  public togglePermisoVicerrector(vr: VicerrectorEdicionRol): void {
+    const nuevoEstado = !vr.puedeEditarRolesExamen;
+    this.actualizandoVicerrectorId.set(vr.id);
+    this._configuracionService.actualizarPermisoVicerrector(vr.id, nuevoEstado).subscribe({
+      next: actualizado => {
+        this.actualizandoVicerrectorId.set(null);
+        this.vicerrectores.update(list => list.map(item => item.id === vr.id ? actualizado : item));
+        this._mostrarToast(`Permiso de edición ${nuevoEstado ? 'HABILITADO' : 'DESHABILITADO'} para ${vr.nombreCompleto}`);
+      },
+      error: () => {
+        this.actualizandoVicerrectorId.set(null);
+        this._mostrarToast('Error al actualizar el permiso del vicerrector.');
+      }
+    });
   }
 
   private cargarConfiguracionVerificacion(): void {

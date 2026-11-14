@@ -73,9 +73,15 @@ interface InstanciaImportacionItem {
 
         <div class="flex items-center justify-end gap-2.5 flex-wrap">
           @if (esVicerrector()) {
-            <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
-              <i class="pi pi-shield"></i> Gestión Vicerrectorado
-            </span>
+            @if (puedeEditarRolesVicerrector()) {
+              <span class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-indigo-800">
+                <i class="pi pi-shield"></i> Gestión Vicerrectorado (Edición Habilitada)
+              </span>
+            } @else {
+              <span class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                <i class="pi pi-lock"></i> Vicerrectorado (Solo Lectura)
+              </span>
+            }
           }
           @if (esAdministrador()) {
               <!-- Acciones de gestión reservadas exclusivamente al Administrador del Sistema -->
@@ -1165,6 +1171,9 @@ export class RolExamenesComponent implements OnInit {
     });
   });
   public readonly esVicerrector = computed(() => this._auth.usuario()?.rol === 'VICERRECTOR');
+  public readonly puedeEditarRolesVicerrector = computed(() => {
+    return this._auth.usuario()?.puedeEditarRolesExamen ?? false;
+  });
   public readonly esAdministrador = computed(() => this._auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA');
   public readonly esResponsable = computed(() => this._auth.usuario()?.rol === 'RESPONSABLE_EVALUACIONES');
   public readonly puedeListarTodasLasCarreras = computed(() => this.esAdministrador() || this.esResponsable());
@@ -1178,7 +1187,10 @@ export class RolExamenesComponent implements OnInit {
   });
 
   public puedeVerBotonEditar(row?: RolExamenItem): boolean {
-    if (this.esAdministrador() || this.esResponsable() || this.esVicerrector()) return true;
+    if (this.esAdministrador() || this.esResponsable()) return true;
+    if (this.esVicerrector()) {
+      return this.puedeEditarRolesVicerrector();
+    }
     if (this.esDirectorCarrera()) {
       return this.permitirDirectorEdicionRoles();
     }
@@ -1186,7 +1198,10 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public readonly puedeVerBotonAnadirExamen = computed(() => {
-    if (this.esAdministrador() || this.esResponsable() || this.esVicerrector()) return true;
+    if (this.esAdministrador() || this.esResponsable()) return true;
+    if (this.esVicerrector()) {
+      return this.puedeEditarRolesVicerrector();
+    }
     if (!this.esDirectorCarrera()) return false;
     if (!this.permitirDirectorEdicionRoles()) return false;
 
@@ -2329,6 +2344,10 @@ export class RolExamenesComponent implements OnInit {
       this._mostrarToast('No tienes permiso para registrar exámenes en el rol de examen.');
       return;
     }
+    if (this.esVicerrector() && !this.puedeEditarRolesVicerrector()) {
+      this._mostrarToast('Tu cuenta de Vicerrectorado está en modo Solo Lectura. No tienes permiso para registrar exámenes.');
+      return;
+    }
     this.itemEditando.set(null);
     const mats = this.materias();
     if (mats.length > 0) {
@@ -2548,6 +2567,7 @@ export class RolExamenesComponent implements OnInit {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     if (this.esVicerrector()) {
+      if (!this.puedeEditarRolesVicerrector()) return false;
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
@@ -2563,6 +2583,7 @@ export class RolExamenesComponent implements OnInit {
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     if (this.esVicerrector()) {
+      if (!this.puedeEditarRolesVicerrector()) return false;
       return item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO';
     }
     return (item.estado === 'PROGRAMADO' || item.estado === 'VALIDADO')
@@ -2570,6 +2591,9 @@ export class RolExamenesComponent implements OnInit {
   }
 
   public getTooltipEditar(item: RolExamenItem): string {
+    if (this.esVicerrector() && !this.puedeEditarRolesVicerrector()) {
+      return 'Tu cuenta de Vicerrectorado está en modo Solo Lectura. No tienes permiso para editar exámenes.';
+    }
     if (this.esDirectorCarrera() && !this.permitirDirectorEdicionRoles()) {
       return 'La edición y registro de exámenes está deshabilitada para Directores de Carrera por política institucional.';
     }
