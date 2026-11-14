@@ -69,14 +69,16 @@ export interface ParcialConfig {
         <div>
           <div class="flex items-center gap-2.5">
             <div class="h-9 w-9 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center">
-              <i class="pi pi-cog text-lg"></i>
+              <i [class]="esSoloVicerrector() ? 'pi pi-check-circle text-lg' : 'pi pi-cog text-lg'"></i>
             </div>
             <div>
-              <h2 class="text-2xl font-black tracking-tight text-foreground">Administración de Evaluaciones</h2>
+              <h2 class="text-2xl font-black tracking-tight text-foreground">
+                {{ esSoloVicerrector() ? 'Aprobación de Modificaciones de Examen' : 'Administración de Evaluaciones' }}
+              </h2>
             </div>
           </div>
           <p class="text-xs text-muted-foreground mt-1">
-            Gestión de campus, carreras, usuarios y configuración de exámenes a nivel nacional.
+            {{ esSoloVicerrector() ? 'Bandeja de solicitudes de cambio de fecha, horario o modalidad emitidas por Directores de Carrera.' : 'Gestión de campus, carreras, usuarios y configuración de exámenes a nivel nacional.' }}
           </p>
         </div>
       </div>
@@ -85,8 +87,8 @@ export interface ParcialConfig {
       <div class="bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
         
         <!-- Pestañas Horizontales Oficiales -->
-        <div class="flex items-center border-b border-border bg-muted/20 px-6 pt-3 gap-2 overflow-x-auto">
-          @if (!esSoloVicerrector()) {
+        @if (!esSoloVicerrector()) {
+          <div class="flex items-center border-b border-border bg-muted/20 px-6 pt-3 gap-2 overflow-x-auto">
             <button 
               (click)="tabActual.set('campus')"
               [class]="tabActual() === 'campus' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
@@ -110,17 +112,15 @@ export interface ParcialConfig {
               <i class="pi pi-users text-xs"></i>
               <span>Usuarios y accesos</span>
             </button>
-          }
 
-          <button 
-            (click)="tabActual.set('configuracion')"
-            [class]="tabActual() === 'configuracion' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
-            class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
-            <i [class]="esSoloVicerrector() ? 'pi pi-check-circle text-xs' : 'pi pi-sliders-h text-xs'"></i>
-            <span>{{ esSoloVicerrector() ? 'Bandeja de Aprobación de Exámenes' : 'Configuración de Exámenes' }}</span>
-          </button>
+            <button 
+              (click)="tabActual.set('configuracion')"
+              [class]="tabActual() === 'configuracion' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
+              class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
+              <i class="pi pi-sliders-h text-xs"></i>
+              <span>Configuración de Exámenes</span>
+            </button>
 
-          @if (!esSoloVicerrector()) {
             <button 
               (click)="tabActual.set('tiempos')"
               [class]="tabActual() === 'tiempos' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
@@ -128,8 +128,8 @@ export interface ParcialConfig {
               <i class="pi pi-clock text-xs"></i>
               <span>Configuración de Tiempos</span>
             </button>
-          }
-        </div>
+          </div>
+        }
 
         <div class="p-6">
           
@@ -755,14 +755,6 @@ export interface ParcialConfig {
                   </div>
                 }
               </div>
-              } @else {
-                <!-- Cabecera exclusiva para Vicerrector -->
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
-                  <div>
-                    <h3 class="text-base font-black text-foreground">Aprobación de Modificaciones al Rol de Exámenes</h3>
-                    <p class="text-xs text-muted-foreground">Revisa y autoriza las solicitudes de reprogramación emitidas por Directores de Carrera en tus sedes asignadas.</p>
-                  </div>
-                </div>
               }
 
               <!-- Bandeja de Aprobación de Modificaciones de Exámenes (Vicerrectorado) -->
@@ -864,6 +856,7 @@ export interface ParcialConfig {
                 }
               </div>
 
+              @if (!esSoloVicerrector()) {
               <!-- Validación de Cuotas por Grupos Tipológicos (15/30/15) -->
               <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
                 <div class="flex items-center justify-between border-b border-border pb-3">
@@ -988,6 +981,7 @@ export interface ParcialConfig {
                 <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-[10px] text-muted-foreground">Al activar una regla, los exámenes validados y aún no generados pasarán a revisión pendiente.</p><button type="button" (click)="guardarReglaVerificacion()" [disabled]="guardandoVerificacion() || !verificacionSedeCodigo" class="rounded-xl bg-purple-700 px-4 py-2 text-xs font-black text-white disabled:opacity-50"><i class="pi pi-save mr-1"></i>{{ guardandoVerificacion() ? 'Guardando...' : 'Guardar regla' }}</button></div>
                 @if (configuracionesVerificacion().length) {<div class="overflow-x-auto rounded-lg border border-border bg-card"><table class="w-full text-left text-[11px]"><thead class="bg-muted/50 font-extrabold uppercase text-muted-foreground"><tr><th class="p-2">Sede</th><th class="p-2">Carrera</th><th class="p-2">Estado</th><th class="p-2">Actualizado</th><th class="p-2 text-right">Acción</th></tr></thead><tbody class="divide-y divide-border">@for (regla of configuracionesVerificacion(); track regla.id || regla.sedeCodigo + regla.carreraCodigo) {<tr><td class="p-2 font-bold">{{ regla.sedeNombre }} ({{ regla.sedeCodigo }})</td><td class="p-2">{{ regla.carreraNombre || 'Todas las carreras' }}<span class="block text-muted-foreground">{{ regla.carreraCodigo || 'GENERAL' }}</span></td><td class="p-2"><span [class]="regla.habilitada ? 'text-emerald-700' : 'text-slate-500'" class="font-black">{{ regla.habilitada ? 'HABILITADA' : 'DESHABILITADA' }}</span></td><td class="p-2 text-muted-foreground">{{ regla.actualizadoEn | date:'dd/MM/yyyy HH:mm' }}</td><td class="p-2 text-right"><button type="button" (click)="cambiarEstadoReglaVerificacion(regla)" [disabled]="guardandoVerificacion()" [class]="regla.habilitada ? 'border-rose-200 text-rose-700 hover:bg-rose-50' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'" class="rounded-lg border bg-card px-3 py-1.5 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-50"><i [class]="regla.habilitada ? 'pi pi-ban mr-1' : 'pi pi-check-circle mr-1'"></i>{{ guardandoVerificacion() ? 'Guardando...' : regla.habilitada ? 'Inactivar regla' : 'Reactivar regla' }}</button></td></tr>}</tbody></table></div>}
               </div>
+              }
 
             </div>
           }

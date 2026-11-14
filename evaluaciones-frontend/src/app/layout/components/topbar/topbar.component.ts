@@ -195,12 +195,12 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
           @if (puedeParametrizar()) {
             <button
               type="button"
-              [title]="esVicerrector() ? 'Aprobaciones de Examen' : 'Parametrizar evaluaciones'"
-              [attr.aria-label]="esVicerrector() ? 'Aprobaciones de Examen' : 'Parametrizar evaluaciones'"
+              title="Parametrizar evaluaciones"
+              aria-label="Parametrizar evaluaciones"
               (click)="irAParametrizacion()"
               class="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-xs font-bold text-primary hover:bg-primary/5 transition-colors sm:px-3.5">
-              <i [class]="esVicerrector() ? 'pi pi-check-circle text-xs' : 'pi pi-sliders-h text-xs'"></i>
-              <span class="hidden sm:inline">{{ esVicerrector() ? 'Aprobaciones' : 'Parametrizar' }}</span>
+              <i class="pi pi-sliders-h text-xs"></i>
+              <span class="hidden sm:inline">Parametrizar</span>
             </button>
           }
           <div class="flex min-w-0 items-center gap-1.5 bg-muted/70 border border-border rounded-xl px-2 sm:gap-2 sm:px-3.5 py-1.5 shadow-2xs">
@@ -256,11 +256,7 @@ export class TopbarComponent implements OnInit {
   }
 
   public puedeParametrizar(): boolean {
-    return this._authService.tieneRol(['RESPONSABLE_EVALUACIONES', 'VICERRECTOR']);
-  }
-
-  public esVicerrector(): boolean {
-    return this._authService.tieneRol(['VICERRECTOR']);
+    return this._authService.tieneRol(['RESPONSABLE_EVALUACIONES']);
   }
 
   public irAParametrizacion(): void {
