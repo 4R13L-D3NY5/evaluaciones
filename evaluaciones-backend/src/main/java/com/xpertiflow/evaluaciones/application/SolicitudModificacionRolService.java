@@ -113,9 +113,7 @@ public class SolicitudModificacionRolService {
             if (!usuario.isPuedeAprobarSolicitudesRol()) {
                 return List.of();
             }
-            Set<String> sedes = usuario.getSedes().stream()
-                    .map(AlcanceSede::getCodigo)
-                    .collect(Collectors.toSet());
+            Set<String> sedes = obtenerCodigosSedesUsuario(usuario);
 
             if (sedes.isEmpty()) {
                 return List.of();
@@ -164,8 +162,9 @@ public class SolicitudModificacionRolService {
             if (!resolutor.isPuedeAprobarSolicitudesRol()) {
                 throw new AccessDeniedException("No cuenta con autorización para resolver solicitudes de modificación de exámenes.");
             }
-            boolean tieneSede = resolutor.getSedes().stream()
-                    .anyMatch(s -> s.getCodigo().equalsIgnoreCase(solicitud.getSedeCodigo()));
+            Set<String> sedesResolutor = obtenerCodigosSedesUsuario(resolutor);
+            boolean tieneSede = sedesResolutor.stream()
+                    .anyMatch(s -> s.equalsIgnoreCase(solicitud.getSedeCodigo()));
             if (!tieneSede) {
                 throw new AccessDeniedException("No tiene asignada la sede " + solicitud.getSedeCodigo() + " de esta solicitud");
             }
@@ -266,5 +265,23 @@ public class SolicitudModificacionRolService {
                 .creadoEn(entidad.getCreadoEn())
                 .actualizadoEn(entidad.getActualizadoEn())
                 .build();
+    }
+
+    private Set<String> obtenerCodigosSedesUsuario(UsuarioSistema usuario) {
+        Set<String> codigos = new HashSet<>();
+        if (usuario.getSedesAsignadas() != null && !usuario.getSedesAsignadas().isBlank()) {
+            Arrays.stream(usuario.getSedesAsignadas().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .forEach(s -> codigos.add(s.toUpperCase()));
+        }
+        if (usuario.getSedes() != null) {
+            usuario.getSedes().forEach(s -> {
+                if (s.getCodigo() != null && !s.getCodigo().isBlank()) {
+                    codigos.add(s.getCodigo().trim().toUpperCase());
+                }
+            });
+        }
+        return codigos;
     }
 }

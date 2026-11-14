@@ -325,10 +325,7 @@ public class NotificacionesService {
         UsuarioSistema usuario = usuarioRepository.findByUsuarioIgnoreCase(authentication.getName()).orElse(null);
         if (usuario == null || !usuario.isPuedeAprobarSolicitudesRol()) return List.of();
 
-        Set<String> sedes = usuario.getSedes().stream()
-                .map(AlcanceSede::getCodigo)
-                .collect(Collectors.toSet());
-
+        Set<String> sedes = obtenerCodigosSedesUsuario(usuario);
         if (sedes.isEmpty()) return List.of();
 
         List<SolicitudModificacionRol> pendientes = solicitudRepository.findBySedeCodigoInAndEstadoOrderByCreadoEnDesc(
@@ -360,6 +357,24 @@ public class NotificacionesService {
                     .build());
         }
         return lista;
+    }
+
+    private Set<String> obtenerCodigosSedesUsuario(UsuarioSistema usuario) {
+        Set<String> codigos = new HashSet<>();
+        if (usuario.getSedesAsignadas() != null && !usuario.getSedesAsignadas().isBlank()) {
+            Arrays.stream(usuario.getSedesAsignadas().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .forEach(s -> codigos.add(s.toUpperCase()));
+        }
+        if (usuario.getSedes() != null) {
+            usuario.getSedes().forEach(s -> {
+                if (s.getCodigo() != null && !s.getCodigo().isBlank()) {
+                    codigos.add(s.getCodigo().trim().toUpperCase());
+                }
+            });
+        }
+        return codigos;
     }
 
     private LocalDateTime parseFechaHoraExamen(LocalDate fecha, String horario) {

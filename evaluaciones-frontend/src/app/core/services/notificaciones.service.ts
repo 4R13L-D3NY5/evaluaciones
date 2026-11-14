@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from './auth.service';
 import { Router } from '@angular/router';
 
-export type TipoNotificacion = 'OBSERVACION_BANCO' | 'BANCO_VERIFICADO' | 'VERIFICACION_PENDIENTE' | 'EXAMEN_SIN_BANCO_72H' | 'NOTAS_SIN_CARTILLA_PENDIENTES' | 'SISTEMA' | 'INFO';
+export type TipoNotificacion = 'OBSERVACION_BANCO' | 'BANCO_VERIFICADO' | 'VERIFICACION_PENDIENTE' | 'EXAMEN_SIN_BANCO_72H' | 'NOTAS_SIN_CARTILLA_PENDIENTES' | 'SOLICITUD_MODIFICACION_PENDIENTE' | 'SOLICITUD_MODIFICACION_APROBADA' | 'SOLICITUD_MODIFICACION_RECHAZADA' | 'REPROGRAMACION_FECHA_ROL' | 'SISTEMA' | 'INFO';
 
 export interface NotificacionUsuario {
   id: string;
@@ -43,7 +43,7 @@ export class NotificacionesService {
    * representan acciones obligatorias y permanecen visibles como alerta hasta su subsanación.
    */
   public readonly totalAlertasCount = computed(() =>
-    this.notificaciones().filter(n => n.tipo === 'OBSERVACION_BANCO' || n.tipo === 'NOTAS_SIN_CARTILLA_PENDIENTES' || !n.leida).length
+    this.notificaciones().filter(n => n.tipo === 'OBSERVACION_BANCO' || n.tipo === 'NOTAS_SIN_CARTILLA_PENDIENTES' || n.tipo === 'SOLICITUD_MODIFICACION_PENDIENTE' || !n.leida).length
   );
 
   public readonly noLeidasCount = computed(() =>
@@ -91,10 +91,8 @@ export class NotificacionesService {
       return;
     }
 
-    const esDocente = usuario.rol === 'DOCENTE';
-    const esDirector = usuario.rol === 'DIRECTOR_CARRERA';
-
-    if (!esDocente && !esDirector) {
+    const rolesConNotificaciones = ['DOCENTE', 'DIRECTOR_CARRERA', 'VICERRECTOR', 'PERSONAL_EVALUACIONES', 'RESPONSABLE_EVALUACIONES'];
+    if (!rolesConNotificaciones.includes(usuario.rol)) {
       this.notificaciones.set([]);
       return;
     }
