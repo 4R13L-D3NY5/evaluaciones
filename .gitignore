@@ -17,6 +17,7 @@
 
 # Herramientas locales descargadas (JDK, Maven y utilidades de desarrollo)
 .tools/
+.m2/
 
 # Ejecutables y Binarios pesados
 typst.exe
