@@ -199,7 +199,7 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
               [attr.aria-label]="esVicerrector() ? 'Aprobaciones de Examen' : 'Parametrizar evaluaciones'"
               (click)="irAParametrizacion()"
               class="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-xs font-bold text-primary hover:bg-primary/5 transition-colors sm:px-3.5">
-              <i class="pi pi-sliders-h text-xs"></i>
+              <i [class]="esVicerrector() ? 'pi pi-check-circle text-xs' : 'pi pi-sliders-h text-xs'"></i>
               <span class="hidden sm:inline">{{ esVicerrector() ? 'Aprobaciones' : 'Parametrizar' }}</span>
             </button>
           }

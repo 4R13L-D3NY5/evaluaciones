@@ -116,8 +116,8 @@ export interface ParcialConfig {
             (click)="tabActual.set('configuracion')"
             [class]="tabActual() === 'configuracion' ? 'border-purple-700 text-purple-800 bg-card font-black shadow-xs' : 'border-transparent text-muted-foreground hover:text-foreground font-bold'"
             class="px-4 py-2.5 border-b-2 text-xs flex items-center gap-2 rounded-t-xl transition-all cursor-pointer">
-            <i class="pi pi-sliders-h text-xs"></i>
-            <span>{{ esSoloVicerrector() ? 'Aprobación y Configuración de Exámenes' : 'Configuración de Exámenes' }}</span>
+            <i [class]="esSoloVicerrector() ? 'pi pi-check-circle text-xs' : 'pi pi-sliders-h text-xs'"></i>
+            <span>{{ esSoloVicerrector() ? 'Bandeja de Aprobación de Exámenes' : 'Configuración de Exámenes' }}</span>
           </button>
 
           @if (!esSoloVicerrector()) {
@@ -359,6 +359,7 @@ export interface ParcialConfig {
           @if (tabActual() === 'configuracion') {
             <div class="space-y-6 animate-fade-in">
               
+              @if (!esSoloVicerrector()) {
               <!-- Sub-Cabecera de Configuración -->
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -754,6 +755,15 @@ export interface ParcialConfig {
                   </div>
                 }
               </div>
+              } @else {
+                <!-- Cabecera exclusiva para Vicerrector -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                  <div>
+                    <h3 class="text-base font-black text-foreground">Aprobación de Modificaciones al Rol de Exámenes</h3>
+                    <p class="text-xs text-muted-foreground">Revisa y autoriza las solicitudes de reprogramación emitidas por Directores de Carrera en tus sedes asignadas.</p>
+                  </div>
+                </div>
+              }
 
               <!-- Bandeja de Aprobación de Modificaciones de Exámenes (Vicerrectorado) -->
               <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
@@ -1492,20 +1502,21 @@ export class AdministracionEvaluacionesComponent {
   private catalogoVersion = signal(0);
 
   constructor() {
-    this._configuracionService.cargar().subscribe({
-      next: configuracion => {
-        this.aplicarConfiguracion(configuracion);
-      },
-      error: () => this._mostrarToast('No se pudo cargar la configuración de evaluaciones. Se utilizará el valor por defecto.')
-    });
-    // El catálogo operativo debe llegar desde SEA. No mostrar catálogos
-    // históricos o de demostración embebidos en el frontend.
     this.listaCampus = [];
     this.listaCarrerasCampus = [];
     this.listaUsuariosEvaluadores = [];
-    this.cargarCatalogoAdministrativo();
-    this.cargarConfiguracionVerificacion();
-    this.cargarVicerrectoresEdicion();
+
+    if (!this.esSoloVicerrector()) {
+      this._configuracionService.cargar().subscribe({
+        next: configuracion => {
+          this.aplicarConfiguracion(configuracion);
+        },
+        error: () => this._mostrarToast('No se pudo cargar la configuración de evaluaciones. Se utilizará el valor por defecto.')
+      });
+      this.cargarCatalogoAdministrativo();
+      this.cargarConfiguracionVerificacion();
+      this.cargarVicerrectoresEdicion();
+    }
     this.cargarSolicitudesPendientes();
 
     // Soporte para apertura directa desde notificaciones (?tab=3 o ?tab=configuracion)
