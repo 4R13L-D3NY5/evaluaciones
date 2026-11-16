@@ -3556,11 +3556,11 @@ export class BancoPreguntasComponent implements OnInit {
 
   public examenSeleccionadoModal = signal<ExamenDocenteCronograma | null>(null);
 
-  public parcialEnVigencia = computed(() => this._configuracionService.resolverParcialDisplay());
+  public parcialEnVigencia = computed(() => this._configuracionService.resolverListaParcialesDisplayTexto());
   public parcialActivo = signal<'1er Parcial' | '2do Parcial' | 'Examen Final' | '2da Instancia'>(this._configuracionService.resolverParcialDisplay());
 
   public esParcialVigente(parcial: string): boolean {
-    return this.parcialEnVigencia() === parcial;
+    return this._configuracionService.esParcialHabilitado(parcial);
   }
   public nombreArchivoCargado = signal<string | null>(null);
   public imagenBase64Generada = signal<string | null>(null);
