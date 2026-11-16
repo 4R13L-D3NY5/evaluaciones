@@ -25,6 +25,9 @@ export interface ReporteCalidadItem {
   materiaCodigo: string;
   materiaNombre: string;
   grupo: string;
+  semestre?: number;
+  modalidad?: string;
+  aula?: string;
   carreraCodigo: string;
   carreraNombre: string;
   sedeCodigo: string;
@@ -149,6 +152,8 @@ export class ReportesService {
     sedeCodigo?: string;
     carreraCodigo?: string;
     tipoParcial?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
     estadoCalidad?: string;
     busqueda?: string;
   }): Observable<ReporteCalidadResumen> {
@@ -162,6 +167,12 @@ export class ReportesService {
     if (filtros?.tipoParcial && filtros.tipoParcial !== 'Todos') {
       params = params.set('tipoParcial', filtros.tipoParcial);
     }
+    if (filtros?.fechaDesde) {
+      params = params.set('fechaDesde', filtros.fechaDesde);
+    }
+    if (filtros?.fechaHasta) {
+      params = params.set('fechaHasta', filtros.fechaHasta);
+    }
     if (filtros?.estadoCalidad && filtros.estadoCalidad !== 'TODOS') {
       params = params.set('estadoCalidad', filtros.estadoCalidad);
     }
@@ -170,6 +181,41 @@ export class ReportesService {
     }
 
     return this._http.get<ReporteCalidadResumen>(`${this._baseUrl}/calidad-verificacion`, { params });
+  }
+
+  public obtenerMonitorVerificacion(filtros?: {
+    sedeCodigo?: string;
+    carreraCodigo?: string;
+    tipoParcial?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    estadoCalidad?: string;
+    busqueda?: string;
+  }): Observable<ReporteCalidadResumen> {
+    let params = new HttpParams();
+    if (filtros?.sedeCodigo && filtros.sedeCodigo !== 'Todos') {
+      params = params.set('sedeCodigo', filtros.sedeCodigo);
+    }
+    if (filtros?.carreraCodigo && filtros.carreraCodigo !== 'Todos') {
+      params = params.set('carreraCodigo', filtros.carreraCodigo);
+    }
+    if (filtros?.tipoParcial && filtros.tipoParcial !== 'Todos') {
+      params = params.set('tipoParcial', filtros.tipoParcial);
+    }
+    if (filtros?.fechaDesde) {
+      params = params.set('fechaDesde', filtros.fechaDesde);
+    }
+    if (filtros?.fechaHasta) {
+      params = params.set('fechaHasta', filtros.fechaHasta);
+    }
+    if (filtros?.estadoCalidad && filtros.estadoCalidad !== 'TODOS') {
+      params = params.set('estadoCalidad', filtros.estadoCalidad);
+    }
+    if (filtros?.busqueda && filtros.busqueda.trim()) {
+      params = params.set('busqueda', filtros.busqueda.trim());
+    }
+
+    return this._http.get<ReporteCalidadResumen>(`${this._baseUrl}/monitor-verificacion`, { params });
   }
 
   public obtenerCoberturaBancos(filtros?: {

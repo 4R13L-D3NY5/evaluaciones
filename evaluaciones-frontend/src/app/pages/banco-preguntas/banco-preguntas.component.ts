@@ -3986,7 +3986,7 @@ export class BancoPreguntasComponent implements OnInit {
     const p2 = (this.rolExamenActivo()?.tipoParcial || '').toString().trim().toUpperCase();
     if (p1.includes('FINAL') || p1 === 'EF' || p2.includes('FINAL') || p2 === 'EF') return 'FINAL';
     if (p1.includes('2DA') || p1.includes('INSTANCIA') || p2.includes('2DA') || p2.includes('INSTANCIA')) return '2DA_INSTANCIA';
-    if (p1.includes('2') || p2.includes('2')) return '2P';
+    if (p1.includes('2') || p2.includes('2') || p1.includes('SEGUNDO') || p2.includes('SEGUNDO')) return '2P';
     return '1P';
   });
 

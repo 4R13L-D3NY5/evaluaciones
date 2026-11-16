@@ -9,11 +9,13 @@ import com.xpertiflow.evaluaciones.application.ReportesService;
 import com.xpertiflow.evaluaciones.application.VerificacionExamenService;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -30,11 +32,28 @@ public class ReportesController {
             @RequestParam(required = false) String sedeCodigo,
             @RequestParam(required = false) String carreraCodigo,
             @RequestParam(required = false) String tipoParcial,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
             @RequestParam(required = false, defaultValue = "TODOS") String estadoCalidad,
             @RequestParam(required = false) String busqueda,
             Authentication authentication) {
         return ResponseEntity.ok(reportesService.obtenerReporteCalidad(
-                sedeCodigo, carreraCodigo, tipoParcial, estadoCalidad, busqueda, authentication));
+                sedeCodigo, carreraCodigo, tipoParcial, fechaDesde, fechaHasta, estadoCalidad, busqueda, authentication));
+    }
+
+    @GetMapping("/monitor-verificacion")
+    @Operation(summary = "Monitor en tiempo real del estado de verificación de exámenes por fecha y turno")
+    public ResponseEntity<ReporteCalidadResumenDto> obtenerMonitorVerificacion(
+            @RequestParam(required = false) String sedeCodigo,
+            @RequestParam(required = false) String carreraCodigo,
+            @RequestParam(required = false) String tipoParcial,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+            @RequestParam(required = false, defaultValue = "TODOS") String estadoCalidad,
+            @RequestParam(required = false) String busqueda,
+            Authentication authentication) {
+        return ResponseEntity.ok(reportesService.obtenerReporteCalidad(
+                sedeCodigo, carreraCodigo, tipoParcial, fechaDesde, fechaHasta, estadoCalidad, busqueda, authentication));
     }
 
     @GetMapping("/cobertura-bancos")

@@ -19,6 +19,9 @@ public class ReporteCalidadItemDto {
     private String materiaCodigo;
     private String materiaNombre;
     private String grupo;
+    private Integer semestre;
+    private String modalidad;
+    private String aula;
     private String carreraCodigo;
     private String carreraNombre;
     private String sedeCodigo;

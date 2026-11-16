@@ -37,15 +37,37 @@ class ReportesControllerTest {
                 .aprobadosDirectos(5)
                 .build();
 
-        when(reportesService.obtenerReporteCalidad("CBBA", "MED", "1er Parcial", "TODOS", "Anatomia", authentication))
+        when(reportesService.obtenerReporteCalidad("CBBA", "MED", "1er Parcial", null, null, "TODOS", "Anatomia", authentication))
                 .thenReturn(mockDto);
 
         ResponseEntity<ReporteCalidadResumenDto> response = controller.obtenerReporteCalidad(
-                "CBBA", "MED", "1er Parcial", "TODOS", "Anatomia", authentication);
+                "CBBA", "MED", "1er Parcial", null, null, "TODOS", "Anatomia", authentication);
 
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).isSameAs(mockDto);
-        verify(reportesService).obtenerReporteCalidad("CBBA", "MED", "1er Parcial", "TODOS", "Anatomia", authentication);
+        verify(reportesService).obtenerReporteCalidad("CBBA", "MED", "1er Parcial", null, null, "TODOS", "Anatomia", authentication);
+    }
+
+    @Test
+    @DisplayName("Controlador: delega monitor de verificación con fechas al servicio")
+    void testObtenerMonitorVerificacion() {
+        ReporteCalidadResumenDto mockDto = ReporteCalidadResumenDto.builder()
+                .totalExamenes(15)
+                .aprobadosDirectos(8)
+                .build();
+
+        java.time.LocalDate desde = java.time.LocalDate.of(2026, 11, 16);
+        java.time.LocalDate hasta = java.time.LocalDate.of(2026, 11, 20);
+
+        when(reportesService.obtenerReporteCalidad("CBBA", "MED", "1er Parcial", desde, hasta, "TODOS", "Anatomia", authentication))
+                .thenReturn(mockDto);
+
+        ResponseEntity<ReporteCalidadResumenDto> response = controller.obtenerMonitorVerificacion(
+                "CBBA", "MED", "1er Parcial", desde, hasta, "TODOS", "Anatomia", authentication);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).isSameAs(mockDto);
+        verify(reportesService).obtenerReporteCalidad("CBBA", "MED", "1er Parcial", desde, hasta, "TODOS", "Anatomia", authentication);
     }
 
     @Test
