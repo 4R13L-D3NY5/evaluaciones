@@ -269,7 +269,7 @@ public class BancoPreguntasService {
 
             int totalPreguntas = contarPreguntasContables(reactivos);
             boolean cuotasGruposAplicadas = resolverValidarCuotasGrupos();
-            validarCuotas(faciles, medias, dificiles, g1, g2, g3, totalPreguntas, cuotasGruposAplicadas, errores);
+            validarCuotas(rol.getTipoParcial(), faciles, medias, dificiles, g1, g2, g3, totalPreguntas, cuotasGruposAplicadas, errores);
 
             if (!errores.isEmpty()) {
                 return CargaBancoResponseDto.builder()
@@ -1027,29 +1027,38 @@ public class BancoPreguntasService {
         return true;
     }
 
-    private void validarCuotas(int faciles, int medias, int dificiles, int g1, int g2, int g3, int total, boolean validarGrupos, List<String> errores) {
-        if (total < TOTAL_REQUERIDO) {
-            errores.add("El banco debe tener como mínimo " + TOTAL_REQUERIDO + " preguntas; se encontraron " + total);
+    private void validarCuotas(TipoParcial tipoParcial, int faciles, int medias, int dificiles, int g1, int g2, int g3, int total, boolean validarGrupos, List<String> errores) {
+        boolean esFinal = tipoParcial == TipoParcial.FINAL;
+        int totalReq = esFinal ? 120 : TOTAL_REQUERIDO;
+        int facilesReq = esFinal ? 30 : CUOTA_FACILES;
+        int mediasReq = esFinal ? 60 : CUOTA_MEDIAS;
+        int dificilesReq = esFinal ? 30 : CUOTA_DIFICILES;
+        int g1Req = esFinal ? 30 : CUOTA_GRUPO_1;
+        int g2Req = esFinal ? 60 : CUOTA_GRUPO_2;
+        int g3Req = esFinal ? 30 : CUOTA_GRUPO_3;
+
+        if (total < totalReq) {
+            errores.add("El banco debe tener como mínimo " + totalReq + " preguntas; se encontraron " + total);
         }
-        if (faciles < CUOTA_FACILES) {
-            errores.add("Debe haber como mínimo " + CUOTA_FACILES + " preguntas fáciles; se encontraron " + faciles);
+        if (faciles < facilesReq) {
+            errores.add("Debe haber como mínimo " + facilesReq + " preguntas fáciles; se encontraron " + faciles);
         }
-        if (medias < CUOTA_MEDIAS) {
-            errores.add("Debe haber como mínimo " + CUOTA_MEDIAS + " preguntas medias; se encontraron " + medias);
+        if (medias < mediasReq) {
+            errores.add("Debe haber como mínimo " + mediasReq + " preguntas medias; se encontraron " + medias);
         }
-        if (dificiles < CUOTA_DIFICILES) {
-            errores.add("Debe haber como mínimo " + CUOTA_DIFICILES + " preguntas difíciles; se encontraron " + dificiles);
+        if (dificiles < dificilesReq) {
+            errores.add("Debe haber como mínimo " + dificilesReq + " preguntas difíciles; se encontraron " + dificiles);
         }
 
         if (validarGrupos) {
-            if (g1 < CUOTA_GRUPO_1) {
-                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_1 + " preguntas del Grupo 1 (Falso y Verdadero / Premisas); se encontraron " + g1);
+            if (g1 < g1Req) {
+                errores.add("Debe haber como mínimo " + g1Req + " preguntas del Grupo 1 (Falso y Verdadero / Premisas); se encontraron " + g1);
             }
-            if (g2 < CUOTA_GRUPO_2) {
-                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_2 + " preguntas del Grupo 2 (Selección de la mejor respuesta); se encontraron " + g2);
+            if (g2 < g2Req) {
+                errores.add("Debe haber como mínimo " + g2Req + " preguntas del Grupo 2 (Selección de la mejor respuesta); se encontraron " + g2);
             }
-            if (g3 < CUOTA_GRUPO_3) {
-                errores.add("Debe haber como mínimo " + CUOTA_GRUPO_3 + " preguntas del Grupo 3 (Emparejamiento y Casos o Problemas); se encontraron " + g3);
+            if (g3 < g3Req) {
+                errores.add("Debe haber como mínimo " + g3Req + " preguntas del Grupo 3 (Emparejamiento y Casos o Problemas); se encontraron " + g3);
             }
         }
     }
@@ -1091,7 +1100,7 @@ public class BancoPreguntasService {
             case "RESPUESTA_COMPUESTA", "RESPUESTA_PREMISAS_ABCD",
                     "RESPUESTA_A_B_AMBAS_NINGUNA" -> "RESPUESTA_PREMISAS_ABCD";
             case "ITEMS_AGRUPADOS_POR_CASO_CLINICO_O_PROBLEMA", "CASO_CLINICO_TRONCO", "CASO_CLINICO" -> "CASO_CLINICO_TRONCO";
-            case "PROBLEMA", "SUBPROBLEMA", "SUBITEM_CASO", "SUBITEM_DE_CASO_O_PROBLEMA" -> "SUBITEM_CASO";
+            case "PROBLEMA", "SUBPROBLEMA", "SUBITEM_CASO", "SUBITEM_DE_CASO", "SUBITEM_DE_CASO_O_PROBLEMA" -> "SUBITEM_CASO";
             case "EMPAREJAMIENTO_AMPLIADO", "EMPAREJAMIENTO_DE_CONCEPTOS", "EMPAREJAMIENTO_TRONCO" -> "EMPAREJAMIENTO_TRONCO";
             case "EMPAREJAMIENTO", "OPCION_EMPAREJAMIENTO" -> "OPCION_EMPAREJAMIENTO";
             case "OPCION_DE_EMPAREJAMIENTO_AMPLIADO" -> "OPCION_EMPAREJAMIENTO";
@@ -1124,6 +1133,19 @@ public class BancoPreguntasService {
         DataFormatter formatter = new DataFormatter(Locale.ROOT);
         formatter.setUseCachedValuesForFormulaCells(true);
 
+        if (evaluador != null) {
+            try {
+                String val = formatter.formatCellValue(cell, evaluador);
+                if (val != null) {
+                    String trimmed = val.trim();
+                    if (!ERRORES_FORMULA.contains(trimmed)) {
+                        return trimmed;
+                    }
+                }
+            } catch (Throwable t) {
+            }
+        }
+
         if (cell.getCellType() == CellType.FORMULA) {
             try {
                 return switch (cell.getCachedFormulaResultType()) {
@@ -1136,17 +1158,6 @@ public class BancoPreguntasService {
             } catch (Throwable tCached) {
                 // Fallback si la celda de formula presenta inconsistencia de cache
             }
-        }
-
-        try {
-            String val = formatter.formatCellValue(cell, evaluador);
-            if (val != null) {
-                String trimmed = val.trim();
-                if (!ERRORES_FORMULA.contains(trimmed)) {
-                    return trimmed;
-                }
-            }
-        } catch (Throwable t) {
         }
 
         if (cell.getCellType() == CellType.FORMULA) {

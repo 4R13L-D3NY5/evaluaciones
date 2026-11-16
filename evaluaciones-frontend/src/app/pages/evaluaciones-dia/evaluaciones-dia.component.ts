@@ -914,7 +914,7 @@ interface CampusDisponible extends Campus {
                     <span>{{ evaluacionSeleccionadaParaParametrizar()?.modalidad === 'VIRTUAL' ? 'Parámetros del examen virtual' : 'Parámetros de Diagramación' }}</span>
                   </div>
                   <span class="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-200">
-                    30 Preguntas (7 Fáciles, 16 Medias, 7 Difíciles)
+                    {{ configuracionParcialActual().totalPreguntas }} Preguntas ({{ configuracionParcialActual().facil }} Fáciles, {{ configuracionParcialActual().medio }} Medias, {{ configuracionParcialActual().dificil }} Difíciles)
                   </span>
                 </div>
 
@@ -1743,20 +1743,20 @@ interface CampusDisponible extends Campus {
 
                         <div class="text-center space-y-1 pt-2">
                           <h2 class="text-sm font-black uppercase text-slate-950 tracking-wide">
-                            CUESTIONARIO DE PREGUNTAS (30 PREGUNTAS)
+                            CUESTIONARIO DE PREGUNTAS ({{ varComp.todasLasPreguntas.length }} PREGUNTAS)
                           </h2>
                           <hr class="border-t-2 border-slate-900 mt-2" />
                         </div>
 
-                        <!-- Cuestionario de 30 Preguntas -->
+                        <!-- Cuestionario de Preguntas -->
                         <div class="space-y-4">
                           <div>
-                            <h3 class="font-black text-xs uppercase text-slate-950">SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a 30)</h3>
+                            <h3 class="font-black text-xs uppercase text-slate-950">SELECCIÓN DE LA MEJOR RESPUESTA (Preguntas 1 a {{ varComp.todasLasPreguntas.length }})</h3>
                             <p class="text-[11px] italic text-slate-600">Lea cuidadosamente cada enunciado y elija una sola respuesta entre las opciones disponibles.</p>
                           </div>
 
                           <div class="space-y-3">
-                            @for (preg of varComp.todasLasPreguntas.slice(0, 30); track preg.numero) {
+                            @for (preg of varComp.todasLasPreguntas; track preg.numero) {
                               <div class="space-y-1 p-2 bg-slate-50/50 rounded border border-slate-100">
                                 <div class="font-bold text-slate-950 text-xs leading-snug">
                                   {{ preg.numero }}. {{ preg.enunciado }}
@@ -1775,10 +1775,10 @@ interface CampusDisponible extends Campus {
 
                         <div class="mt-8 p-3 border-2 border-dashed border-slate-400 rounded-lg text-center bg-slate-50 space-y-1">
                           <div class="font-black text-xs uppercase text-slate-900">
-                            *** FIN DE LA EVALUACIÓN OFICIAL (30 PREGUNTAS) ***
+                            *** FIN DE LA EVALUACIÓN OFICIAL ({{ varComp.todasLasPreguntas.length }} PREGUNTAS) ***
                           </div>
                           <p class="text-[10px] text-slate-600">
-                            Verifique que todas sus 30 respuestas se encuentren registradas en la <strong>hoja individual de respuestas</strong> entregada por separado.
+                            Verifique que todas sus {{ varComp.todasLasPreguntas.length }} respuestas se encuentren registradas en la <strong>hoja individual de respuestas</strong> entregada por separado.
                           </p>
                         </div>
                       </div>
@@ -1800,7 +1800,7 @@ interface CampusDisponible extends Campus {
                     <div class="flex items-center justify-between border-b-4 border-purple-900 pb-2 mb-3">
                       <div>
                         <h1 class="text-sm font-black uppercase text-purple-950">UNIVERSIDAD TÉCNICA PRIVADA COSMOS</h1>
-                        <h2 class="text-xs font-bold text-slate-800">PATRÓN OFICIAL DE RESPUESTAS (30 PREGUNTAS) · {{ evaluacionActivaVisor()?.tipo }}</h2>
+                        <h2 class="text-xs font-bold text-slate-800">PATRÓN OFICIAL DE RESPUESTAS ({{ patronItem.todasLasPreguntas?.length || 30 }} PREGUNTAS) · {{ evaluacionActivaVisor()?.tipo }}</h2>
                       </div>
                     </div>
 

@@ -11,6 +11,9 @@ public class VarianteResultadoDto {
     private String ordenReactivosIdsJson;
     private String contenidoVirtualJson;
     private Integer totalPreguntas;
+    private Integer cuotaFaciles;
+    private Integer cuotaMedias;
+    private Integer cuotaDificiles;
     private String contenidoCifrado;
     private String contenidoNonce;
     private String contenidoDekEnvuelta;

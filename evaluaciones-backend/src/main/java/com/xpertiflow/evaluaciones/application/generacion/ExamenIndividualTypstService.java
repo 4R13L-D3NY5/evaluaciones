@@ -219,11 +219,16 @@ public class ExamenIndividualTypstService {
             nuevaVariante.setRolExamenId(rolExamenId);
             nuevaVariante.setLetraVariante(letra);
             nuevaVariante.setNombreVariante("TIPO " + letra);
+            boolean esFinal = rol.getTipoParcial() == com.xpertiflow.evaluaciones.domain.enums.TipoParcial.FINAL;
+            int defTotal = esFinal ? 60 : 30;
+            int defFacil = esFinal ? 15 : 7;
+            int defMedio = esFinal ? 30 : 16;
+            int defDificil = esFinal ? 15 : 7;
             nuevaVariante.setSemillaPermutacion(refVariante != null && refVariante.getSemillaPermutacion() != null ? refVariante.getSemillaPermutacion() + 1 : 1);
-            nuevaVariante.setTotalPreguntas(refVariante != null && refVariante.getTotalPreguntas() != null ? refVariante.getTotalPreguntas() : 30);
-            nuevaVariante.setCuotaFaciles(refVariante != null && refVariante.getCuotaFaciles() != null ? refVariante.getCuotaFaciles() : 7);
-            nuevaVariante.setCuotaMedias(refVariante != null && refVariante.getCuotaMedias() != null ? refVariante.getCuotaMedias() : 16);
-            nuevaVariante.setCuotaDificiles(refVariante != null && refVariante.getCuotaDificiles() != null ? refVariante.getCuotaDificiles() : 7);
+            nuevaVariante.setTotalPreguntas(refVariante != null && refVariante.getTotalPreguntas() != null ? refVariante.getTotalPreguntas() : defTotal);
+            nuevaVariante.setCuotaFaciles(refVariante != null && refVariante.getCuotaFaciles() != null ? refVariante.getCuotaFaciles() : defFacil);
+            nuevaVariante.setCuotaMedias(refVariante != null && refVariante.getCuotaMedias() != null ? refVariante.getCuotaMedias() : defMedio);
+            nuevaVariante.setCuotaDificiles(refVariante != null && refVariante.getCuotaDificiles() != null ? refVariante.getCuotaDificiles() : defDificil);
 
             if (refVariante != null && refVariante.getContenidoSeguroCifrado() != null && !refVariante.getContenidoSeguroCifrado().isBlank() && cifradoService != null) {
                 try {

@@ -646,7 +646,7 @@ export interface DiaCalendario {
                     [class]="esBancoTotalmenteValido() && !pdfPrevisualizadoYConforme() ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg ring-4 ring-blue-400/30 animate-pulse font-black' : 'bg-blue-600 hover:bg-blue-700 text-white font-bold'"
                     class="text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all hover:scale-105 cursor-pointer">
                     <i class="pi pi-file-pdf text-sm"></i>
-                    <span>{{ esBancoTotalmenteValido() ? (pdfPrevisualizadoYConforme() ? 'Volver a Previsualizar PDF' : 'Previsualizar Examen (Paso 1 Obligatorio)') : 'Previsualizar Avance Parcial (' + totalPreguntasValidas() + '/60)' }}</span>
+                    <span>{{ esBancoTotalmenteValido() ? (pdfPrevisualizadoYConforme() ? 'Volver a Previsualizar PDF' : 'Previsualizar Examen (Paso 1 Obligatorio)') : 'Previsualizar Avance Parcial (' + totalPreguntasValidas() + '/' + totalPreguntasRequeridas() + ')' }}</span>
                     @if (pdfPrevisualizadoYConforme()) {
                       <i class="pi pi-check text-[10px] text-emerald-300 font-bold"></i>
                     }
@@ -667,14 +667,14 @@ export interface DiaCalendario {
                 <div class="space-y-1 flex-1">
                   <div class="flex items-center justify-between">
                     <h5 class="text-xs font-black text-blue-950 dark:text-blue-200 uppercase tracking-tight">
-                      Modo de Verificación Parcial ({{ totalPreguntasValidas() }}/60 preguntas)
+                      Modo de Verificación Parcial ({{ totalPreguntasValidas() }}/{{ totalPreguntasRequeridas() }} preguntas)
                     </h5>
                     <span class="bg-blue-200 dark:bg-blue-900/80 text-blue-900 dark:text-blue-200 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
                       Avance Habilitado
                     </span>
                   </div>
                   <p class="text-xs text-blue-900/90 dark:text-blue-300/90 font-medium leading-relaxed">
-                    Puedes previsualizar el PDF oficial en cualquier momento con las preguntas redactadas hasta ahora para verificar su formato, diagramación y fórmulas. Para oficializar y aprobar el examen en el sistema, debes completar las 60 preguntas cumpliendo todas las cuotas mínimas.
+                    Puedes previsualizar el PDF oficial en cualquier momento con las preguntas redactadas hasta ahora para verificar su formato, diagramación y fórmulas. Para oficializar y aprobar el examen en el sistema, debes completar las {{ totalPreguntasRequeridas() }} preguntas cumpliendo todas las cuotas mínimas.
                   </p>
                 </div>
               </div>
@@ -933,7 +933,7 @@ export interface DiaCalendario {
                 @if (esBancoTotalmenteValido()) {
                   <div class="bg-emerald-50 border border-emerald-300 p-3 rounded-xl text-center space-y-1">
                     <span class="text-emerald-800 font-black text-xs flex items-center justify-center gap-1">
-                      <i class="pi pi-shield text-emerald-600"></i> EXAMEN APROBADO
+                      <i class="pi pi-shield text-emerald-600"></i> ACEPTADO PARA SUBIDA
                     </span>
                     <p class="text-[10px] text-emerald-700">Cuotas mínimas cumplidas y preguntas conformes</p>
                   </div>
@@ -1039,7 +1039,7 @@ export interface DiaCalendario {
 
               <div [class]="cuotaGruposCumplida() ? 'text-emerald-700' : 'text-amber-700'" class="text-[10px] font-extrabold flex items-center gap-1 pt-1">
                 <i [class]="cuotaGruposCumplida() ? 'pi pi-check-circle text-xs' : 'pi pi-exclamation-circle text-xs'"></i>
-                <span>{{ validarCuotasGrupos() ? (cuotaGruposCumplida() ? 'Cuotas mínimas de tipos alcanzadas (15/30/15)' : 'Faltan preguntas para completar las cuotas de tipos (15/30/15)') : 'Validación institucional de grupos tipológicos desactivada' }}</span>
+                <span>{{ validarCuotasGrupos() ? (cuotaGruposCumplida() ? ('Cuotas mínimas de tipos alcanzadas (' + cuotasGrupos().g1 + '/' + cuotasGrupos().g2 + '/' + cuotasGrupos().g3 + ')') : ('Faltan preguntas para completar las cuotas de tipos (' + cuotasGrupos().g1 + '/' + cuotasGrupos().g2 + '/' + cuotasGrupos().g3 + ')')) : 'Validación institucional de grupos tipológicos desactivada' }}</span>
               </div>
             </div>
 
@@ -2242,7 +2242,7 @@ export interface DiaCalendario {
 
                 @if (!esBancoTotalmenteValido()) {
                   <span class="text-[10px] text-amber-700 dark:text-amber-300 font-bold hidden sm:inline bg-amber-50 dark:bg-amber-950/40 border border-amber-200 px-2 py-1 rounded-lg">
-                    Avance parcial ({{ totalPreguntasValidas() }}/60 preguntas). Complete las 60 preguntas para habilitar la aprobación final.
+                    Avance parcial ({{ totalPreguntasValidas() }}/{{ totalPreguntasRequeridas() }} preguntas). Complete las {{ totalPreguntasRequeridas() }} preguntas para habilitar la aprobación final.
                   </span>
                 }
 
@@ -3323,7 +3323,7 @@ export class BancoPreguntasComponent implements OnInit {
     this._rolService.obtenerPorId(rolId).subscribe({
       next: rol => {
         this.tabActiva.set('validador');
-        const tipoParcialDisplay = rol.tipoParcial === 'Final' ? 'Examen Final' : rol.tipoParcial;
+        const tipoParcialDisplay = this._configuracionService.resolverParcialDisplay(rol.tipoParcial);
         this.parcialActivo.set(tipoParcialDisplay as any);
         this.examenRolSeleccionadoId.set(rol.id);
 
@@ -3952,7 +3952,7 @@ export class BancoPreguntasComponent implements OnInit {
   }
 
   private _mapearRolACronograma(rol: RolExamenResponse): ExamenDocenteCronograma {
-    const tipo = rol.tipoParcial === 'Final' ? 'Examen Final' : rol.tipoParcial;
+    const tipo = this._configuracionService.resolverParcialDisplay(rol.tipoParcial);
     const esVerificado = rol.estadoVerificacion === 'VERIFICADO';
     const estado = esVerificado && rol.estadoFlujo === 'VALIDADO'
       ? 'Validado y Verificado'
@@ -3975,8 +3975,17 @@ export class BancoPreguntasComponent implements OnInit {
     };
   }
 
+  public esExamenFinal = computed(() => {
+    const p1 = (this.parcialActivo() || '').toString().trim().toUpperCase();
+    const p2 = (this.rolExamenActivo()?.tipoParcial || '').toString().trim().toUpperCase();
+    return p1.includes('FINAL') || p1 === 'EF' || p2.includes('FINAL') || p2 === 'EF';
+  });
+
   // Cuotas Oficiales según parcial
   public cuotasDificultad = computed(() => {
+    if (this.esExamenFinal()) {
+      return { facil: 30, medio: 60, dificil: 30, total: 120 };
+    }
     return { facil: 15, medio: 30, dificil: 15, total: 60 };
   });
 
@@ -3985,6 +3994,9 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public cuotasGrupos = computed(() => {
+    if (this.esExamenFinal()) {
+      return { g1: 30, g2: 60, g3: 30 };
+    }
     return { g1: 15, g2: 30, g3: 15 };
   });
 
@@ -4412,7 +4424,8 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public getResumenCuota(parcial: string): string {
-    return '60 preguntas';
+    const p = (parcial || '').trim().toUpperCase();
+    return (p.includes('FINAL') || p === 'EF') ? '120 preguntas' : '60 preguntas';
   }
 
   public cambiarParcial(parcial: string): void {
@@ -6351,13 +6364,14 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
   }
 
   private _mapParcialBackend(parcial: string): string {
-    if (parcial === 'Examen Final') return 'Final';
+    const p = (parcial || '').trim().toUpperCase();
+    if (p.includes('FINAL') || p === 'EF') return 'Final';
     return parcial;
   }
 
   public iniciarAprobacionDocente(): void {
     if (!this.esBancoTotalmenteValido()) {
-      this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas.', 'error');
+      this._mostrarToast(`El banco todavía no cumple el mínimo de ${this.totalPreguntasRequeridas()} preguntas y las cuotas mínimas.`, 'error');
       return;
     }
     if (!this.pdfPrevisualizadoYConforme() || !this.documentoRecorridoCompleto() || this.pdfPreviewPages().length === 0) {
@@ -6397,7 +6411,7 @@ ${this.observacionesDocenteEnvio ? this.observacionesDocenteEnvio : 'Sin observa
       return;
     }
     if (!this.esBancoTotalmenteValido()) {
-      this._mostrarToast('El banco todavía no cumple el mínimo de 60 preguntas y las cuotas mínimas requeridas.', 'error');
+      this._mostrarToast(`El banco todavía no cumple el mínimo de ${this.totalPreguntasRequeridas()} preguntas y las cuotas mínimas requeridas.`, 'error');
       return;
     }
     if (!this.pdfPrevisualizadoYConforme() || !this.documentoRecorridoCompleto() || this.pdfPreviewPages().length === 0) {
