@@ -55,6 +55,9 @@ export interface ParcialConfig {
   nombre: string;
   totalPreguntas: number;
   distribucion: { facil: number; medio: number; dificil: number };
+  bancoTotal: number;
+  bancoDistribucion: { facil: number; medio: number; dificil: number };
+  bancoGrupos: { g1: number; g2: number; g3: number };
 }
 
 @Component({
@@ -1070,7 +1073,7 @@ export interface ParcialConfig {
                     </div>
                   </div>
                   <span [class]="validarCuotasGrupos ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : 'bg-muted text-muted-foreground border-border'" class="border rounded-full px-3 py-1 text-[10px] font-mono font-black uppercase">
-                    {{ validarCuotasGrupos ? 'ACTIVA (15/30/15)' : 'DESACTIVADA' }}
+                    {{ validarCuotasGrupos ? 'ACTIVA' : 'DESACTIVADA' }}
                   </span>
                 </div>
 
@@ -1082,20 +1085,20 @@ export interface ParcialConfig {
                         [(ngModel)]="validarCuotasGrupos"
                         class="w-4 h-4 text-purple-600 rounded border-border focus:ring-purple-500 cursor-pointer">
                       <span class="text-xs font-bold text-foreground">
-                        Activar validación obligatoria de cuotas por grupo tipológico (15 / 30 / 15)
+                        Activar validación obligatoria de cuotas por grupo tipológico
                       </span>
                     </label>
                     <p class="text-[10px] text-muted-foreground">
-                      Cuando está activado, ningún docente puede aprobar o registrar un banco sin cumplir estrictamente con los 3 grupos tipológicos requeridos.
+                      Cuando está activado, el docente debe cumplir las cuotas mínimas de cada grupo tipológico configurado abajo para aprobar o registrar su banco de preguntas.
                     </p>
                   </div>
 
                   <div class="p-3 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-xl space-y-1">
-                    <span class="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 block uppercase">Regla de Distribución:</span>
+                    <span class="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 block uppercase">Regla de Distribución Tipológica:</span>
                     <p class="text-[11px] text-muted-foreground leading-snug">
-                      • <strong>Grupo 1:</strong> mín. 15 preguntas (V/F Simple, V/F Complejas, Premisas ABCD)<br>
-                      • <strong>Grupo 2:</strong> mín. 30 preguntas (Selección de la mejor respuesta)<br>
-                      • <strong>Grupo 3:</strong> mín. 15 subítems (Casos clínicos, problemas o emparejamiento)
+                      • <strong>Grupo 1:</strong> Falso y Verdadero (Simple / Complejas) y Premisas ABCD<br>
+                      • <strong>Grupo 2:</strong> Selección de la mejor respuesta<br>
+                      • <strong>Grupo 3:</strong> Casos clínicos, problemas o subítems de emparejamiento
                     </p>
                   </div>
                 </div>
@@ -1108,62 +1111,183 @@ export interface ParcialConfig {
                   <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Estructura de Preguntas por Parcial</h4>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                   @for (parcial of parcialesConfig(); track parcial.nombre) {
-                    <div class="bg-muted/20 border border-border/80 rounded-xl p-4 space-y-3">
-                      <div class="flex items-center justify-between">
-                        <span class="font-black text-xs text-foreground">{{ parcial.nombre }}</span>
-                        <span class="text-[10px] text-muted-foreground font-mono">Requerido por examen</span>
+                    <div class="bg-muted/20 border border-border/80 rounded-xl p-4 space-y-3.5 flex flex-col justify-between">
+                      <div class="space-y-3">
+                        <!-- Cabecera Parcial -->
+                        <div class="flex items-center justify-between border-b border-border/60 pb-2">
+                          <span class="font-black text-xs text-foreground">{{ parcial.nombre }}</span>
+                          <span class="text-[10px] text-muted-foreground font-mono">Configuración</span>
+                        </div>
+
+                        <!-- 1. SECCIÓN EXAMEN OFICIAL -->
+                        <div class="space-y-2">
+                          <div class="flex items-center justify-between">
+                            <label class="block text-[9px] font-black uppercase text-purple-900 tracking-wide">
+                              <i class="pi pi-file mr-1"></i>Examen (Cuadernillo)
+                            </label>
+                            <span class="text-[9px] text-muted-foreground">Requerido por examen</span>
+                          </div>
+
+                          <!-- Total Preguntas Examen -->
+                          <div>
+                            <label class="block text-[9px] font-extrabold uppercase text-muted-foreground mb-1">Total de Preguntas</label>
+                            <div class="flex items-center gap-2">
+                              <input 
+                                type="number" 
+                                [(ngModel)]="parcial.totalPreguntas" 
+                                class="w-20 bg-card border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold">
+                              <span class="text-xs text-muted-foreground">preguntas</span>
+                            </div>
+                          </div>
+
+                          <!-- Distribución por Dificultad Examen -->
+                          <div class="grid grid-cols-3 gap-1.5 text-xs">
+                            <div>
+                              <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1">
+                                Fácil
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.distribucion.facil" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+
+                            <div>
+                              <span class="bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1">
+                                Medio
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.distribucion.medio" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+
+                            <div>
+                              <span class="bg-rose-50 text-rose-700 border border-rose-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1">
+                                Difícil
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.distribucion.dificil" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+                          </div>
+
+                          <!-- Banner de Validación de Suma Examen -->
+                          @let sumaExamen = parcial.distribucion.facil + parcial.distribucion.medio + parcial.distribucion.dificil;
+                          <div [class]="sumaExamen === parcial.totalPreguntas ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'" class="border rounded-lg p-1.5 text-[10px] font-bold flex items-center justify-between">
+                            <div class="flex items-center gap-1">
+                              <i [class]="sumaExamen === parcial.totalPreguntas ? 'pi pi-check text-emerald-600' : 'pi pi-exclamation-triangle text-amber-600'"></i>
+                              <span>Total examen: {{ sumaExamen }}</span>
+                            </div>
+                            @if (sumaExamen !== parcial.totalPreguntas) {
+                              <span class="text-[9px] text-amber-700 font-normal">(debe sumar {{ parcial.totalPreguntas }})</span>
+                            }
+                          </div>
+                        </div>
+
+                        <hr class="border-t border-border/80" />
+
+                        <!-- 2. SECCIÓN BANCO EXCEL: DIFICULTAD -->
+                        <div class="space-y-2">
+                          <div class="flex items-center justify-between">
+                            <label class="block text-[9px] font-black uppercase text-emerald-800 tracking-wide flex items-center gap-1">
+                              <i class="pi pi-file-excel text-emerald-600"></i>Banco Excel: Dificultad
+                            </label>
+                            <span class="text-[9px] text-muted-foreground">Mínimos requeridos</span>
+                          </div>
+
+                          <!-- Total Mínimo Banco -->
+                          <div>
+                            <label class="block text-[9px] font-extrabold uppercase text-muted-foreground mb-1">Total Mínimo Banco</label>
+                            <div class="flex items-center gap-2">
+                              <input 
+                                type="number" 
+                                [(ngModel)]="parcial.bancoTotal" 
+                                class="w-20 bg-card border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold">
+                              <span class="text-xs text-muted-foreground">preguntas mín.</span>
+                            </div>
+                          </div>
+
+                          <!-- Distribución Dificultad Banco -->
+                          <div class="grid grid-cols-3 gap-1.5 text-xs">
+                            <div>
+                              <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1">
+                                Fácil mín.
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.bancoDistribucion.facil" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+
+                            <div>
+                              <span class="bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1">
+                                Medio mín.
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.bancoDistribucion.medio" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+
+                            <div>
+                              <span class="bg-rose-50 text-rose-700 border border-rose-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1">
+                                Difícil mín.
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.bancoDistribucion.dificil" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+                          </div>
+
+                          <!-- Banner Suma Banco Dificultad -->
+                          @let sumaBancoDif = parcial.bancoDistribucion.facil + parcial.bancoDistribucion.medio + parcial.bancoDistribucion.dificil;
+                          <div [class]="sumaBancoDif >= parcial.bancoTotal ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'" class="border rounded-lg p-1.5 text-[10px] font-bold flex items-center justify-between">
+                            <div class="flex items-center gap-1">
+                              <i [class]="sumaBancoDif >= parcial.bancoTotal ? 'pi pi-check text-emerald-600' : 'pi pi-info-circle text-amber-600'"></i>
+                              <span>Suma mínimos: {{ sumaBancoDif }}</span>
+                            </div>
+                            @if (sumaBancoDif !== parcial.bancoTotal) {
+                              <span class="text-[9px] text-amber-700 font-normal">(banco exige {{ parcial.bancoTotal }})</span>
+                            }
+                          </div>
+                        </div>
+
+                        <hr class="border-t border-border/80" />
+
+                        <!-- 3. SECCIÓN BANCO EXCEL: GRUPOS TIPOLÓGICOS -->
+                        <div class="space-y-2" [class.opacity-60]="!validarCuotasGrupos">
+                          <div class="flex items-center justify-between">
+                            <label class="block text-[9px] font-black uppercase text-indigo-900 tracking-wide flex items-center gap-1">
+                              <i class="pi pi-list text-indigo-600"></i>Banco Excel: Grupos
+                            </label>
+                            @if (validarCuotasGrupos) {
+                              <span class="bg-indigo-100 text-indigo-800 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">Habilitado</span>
+                            } @else {
+                              <span class="bg-slate-200 text-slate-700 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">Desactivado</span>
+                            }
+                          </div>
+
+                          <!-- Cuotas por Grupo (G1, G2, G3) -->
+                          <div class="grid grid-cols-3 gap-1.5 text-xs">
+                            <div>
+                              <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1" title="Falso y Verdadero / Premisas ABCD">
+                                G1 mín.
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.bancoGrupos.g1" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+
+                            <div>
+                              <span class="bg-sky-50 text-sky-700 border border-sky-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1" title="Selección de la Mejor Respuesta">
+                                G2 mín.
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.bancoGrupos.g2" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+
+                            <div>
+                              <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[9px] font-black px-1 py-0.5 rounded block text-center mb-1" title="Casos Clínicos y Emparejamiento">
+                                G3 mín.
+                              </span>
+                              <input type="number" [(ngModel)]="parcial.bancoGrupos.g3" class="w-full bg-card border border-border rounded-lg p-1 text-xs font-mono font-bold text-center">
+                            </div>
+                          </div>
+
+                          <div class="text-[9px] leading-tight">
+                            @if (!validarCuotasGrupos) {
+                              <span class="text-amber-800 font-medium">Validación tipológica desactivada arriba. No bloqueará la subida del Excel.</span>
+                            } @else {
+                              <span class="text-muted-foreground">Mínimos requeridos para G1 (F/V, Premisas), G2 (Selección) y G3 (Casos/Emparej.).</span>
+                            }
+                          </div>
+                        </div>
+
                       </div>
-
-                      <!-- Total Preguntas -->
-                      <div>
-                        <label class="block text-[9px] font-extrabold uppercase text-muted-foreground mb-1">Total de Preguntas</label>
-                        <div class="flex items-center gap-2">
-                          <input 
-                            type="number" 
-                            [(ngModel)]="parcial.totalPreguntas" 
-                            class="w-24 bg-card border border-border rounded-lg px-2.5 py-1 text-xs font-mono font-bold">
-                          <span class="text-xs text-muted-foreground">preguntas</span>
-                        </div>
-                      </div>
-
-                      <!-- Distribución por Dificultad -->
-                      <div class="grid grid-cols-3 gap-2 text-xs">
-                        <div>
-                          <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded block text-center mb-1">
-                            Fácil
-                          </span>
-                          <input type="number" [(ngModel)]="parcial.distribucion.facil" class="w-full bg-card border border-border rounded-lg p-1.5 text-xs font-mono font-bold text-center">
-                        </div>
-
-                        <div>
-                          <span class="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded block text-center mb-1">
-                            Medio
-                          </span>
-                          <input type="number" [(ngModel)]="parcial.distribucion.medio" class="w-full bg-card border border-border rounded-lg p-1.5 text-xs font-mono font-bold text-center">
-                        </div>
-
-                        <div>
-                          <span class="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black px-2 py-0.5 rounded block text-center mb-1">
-                            Difícil
-                          </span>
-                          <input type="number" [(ngModel)]="parcial.distribucion.dificil" class="w-full bg-card border border-border rounded-lg p-1.5 text-xs font-mono font-bold text-center">
-                        </div>
-                      </div>
-
-                      <!-- Banner de Validación de Suma -->
-                      @let suma = parcial.distribucion.facil + parcial.distribucion.medio + parcial.distribucion.dificil;
-                      <div [class]="suma === parcial.totalPreguntas ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'" class="border rounded-lg p-2 text-xs font-bold flex items-center justify-between">
-                        <div class="flex items-center gap-1.5">
-                          <i [class]="suma === parcial.totalPreguntas ? 'pi pi-check text-emerald-600' : 'pi pi-exclamation-triangle text-amber-600'"></i>
-                          <span>Total distribución: {{ suma }}</span>
-                        </div>
-                        @if (suma !== parcial.totalPreguntas) {
-                          <span class="text-[10px] text-amber-700 font-normal">(debe sumar {{ parcial.totalPreguntas }})</span>
-                        }
-                      </div>
-
                     </div>
                   }
                 </div>
@@ -2362,10 +2486,38 @@ export class AdministracionEvaluacionesComponent {
   public typstLeading = '0.8em (línea) · 1.2em (pregunta)';
 
   public parcialesConfig = signal<ParcialConfig[]>([
-    { nombre: '1º Parcial', totalPreguntas: 30, distribucion: { facil: 7, medio: 16, dificil: 7 } },
-    { nombre: '2º Parcial', totalPreguntas: 30, distribucion: { facil: 7, medio: 16, dificil: 7 } },
-    { nombre: 'Examen Final', totalPreguntas: 60, distribucion: { facil: 15, medio: 30, dificil: 15 } },
-    { nombre: '2da Instancia', totalPreguntas: 50, distribucion: { facil: 10, medio: 25, dificil: 15 } }
+    {
+      nombre: '1º Parcial',
+      totalPreguntas: 30,
+      distribucion: { facil: 7, medio: 16, dificil: 7 },
+      bancoTotal: 60,
+      bancoDistribucion: { facil: 15, medio: 30, dificil: 15 },
+      bancoGrupos: { g1: 15, g2: 30, g3: 15 }
+    },
+    {
+      nombre: '2º Parcial',
+      totalPreguntas: 30,
+      distribucion: { facil: 7, medio: 16, dificil: 7 },
+      bancoTotal: 60,
+      bancoDistribucion: { facil: 15, medio: 30, dificil: 15 },
+      bancoGrupos: { g1: 15, g2: 30, g3: 15 }
+    },
+    {
+      nombre: 'Examen Final',
+      totalPreguntas: 60,
+      distribucion: { facil: 15, medio: 30, dificil: 15 },
+      bancoTotal: 120,
+      bancoDistribucion: { facil: 30, medio: 60, dificil: 30 },
+      bancoGrupos: { g1: 30, g2: 60, g3: 30 }
+    },
+    {
+      nombre: '2da Instancia',
+      totalPreguntas: 50,
+      distribucion: { facil: 10, medio: 25, dificil: 15 },
+      bancoTotal: 100,
+      bancoDistribucion: { facil: 20, medio: 50, dificil: 30 },
+      bancoGrupos: { g1: 25, g2: 50, g3: 25 }
+    }
   ]);
 
   public gestionTiempos = '2/2026';
@@ -2401,17 +2553,44 @@ export class AdministracionEvaluacionesComponent {
     const claves = ['1P', '2P', 'FINAL', '2DA_INSTANCIA'];
     this.parcialesConfig.update(actuales => actuales.map((actual, indice) => {
       const valor = estructura[claves[indice]];
-      return valor ? { ...actual, ...valor, distribucion: { facil: valor.facil, medio: valor.medio, dificil: valor.dificil } } : actual;
+      if (!valor) return actual;
+      return {
+        ...actual,
+        totalPreguntas: valor.totalPreguntas ?? actual.totalPreguntas,
+        distribucion: {
+          facil: valor.facil ?? actual.distribucion.facil,
+          medio: valor.medio ?? actual.distribucion.medio,
+          dificil: valor.dificil ?? actual.distribucion.dificil
+        },
+        bancoTotal: valor.bancoTotal ?? actual.bancoTotal,
+        bancoDistribucion: {
+          facil: valor.bancoFacil ?? actual.bancoDistribucion.facil,
+          medio: valor.bancoMedio ?? actual.bancoDistribucion.medio,
+          dificil: valor.bancoDificil ?? actual.bancoDistribucion.dificil
+        },
+        bancoGrupos: {
+          g1: valor.bancoG1 ?? actual.bancoGrupos.g1,
+          g2: valor.bancoG2 ?? actual.bancoGrupos.g2,
+          g3: valor.bancoG3 ?? actual.bancoGrupos.g3
+        }
+      };
     }));
   }
 
-  private estructuraParaGuardar(): Record<string, { totalPreguntas: number; facil: number; medio: number; dificil: number }> {
+  private estructuraParaGuardar(): Record<string, any> {
     const claves = ['1P', '2P', 'FINAL', '2DA_INSTANCIA'];
     return Object.fromEntries(this.parcialesConfig().map((parcial, indice) => [claves[indice], {
       totalPreguntas: Number(parcial.totalPreguntas) || 0,
       facil: Number(parcial.distribucion.facil) || 0,
       medio: Number(parcial.distribucion.medio) || 0,
-      dificil: Number(parcial.distribucion.dificil) || 0
+      dificil: Number(parcial.distribucion.dificil) || 0,
+      bancoTotal: Number(parcial.bancoTotal) || 0,
+      bancoFacil: Number(parcial.bancoDistribucion.facil) || 0,
+      bancoMedio: Number(parcial.bancoDistribucion.medio) || 0,
+      bancoDificil: Number(parcial.bancoDistribucion.dificil) || 0,
+      bancoG1: Number(parcial.bancoGrupos.g1) || 0,
+      bancoG2: Number(parcial.bancoGrupos.g2) || 0,
+      bancoG3: Number(parcial.bancoGrupos.g3) || 0
     }]));
   }
 

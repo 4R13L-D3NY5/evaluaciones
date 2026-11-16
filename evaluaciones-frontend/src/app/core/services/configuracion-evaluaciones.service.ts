@@ -3,6 +3,20 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 
+export interface ConfiguracionParcial {
+  totalPreguntas: number;
+  facil: number;
+  medio: number;
+  dificil: number;
+  bancoTotal?: number;
+  bancoFacil?: number;
+  bancoMedio?: number;
+  bancoDificil?: number;
+  bancoG1?: number;
+  bancoG2?: number;
+  bancoG3?: number;
+}
+
 export interface ConfiguracionEvaluaciones {
   ratioEstudiantesPorVariante: number;
   duracionExamenVirtualMinutos: number;
@@ -11,7 +25,7 @@ export interface ConfiguracionEvaluaciones {
   tipoLetra: string;
   tamanoLetraPt: number;
   espaciadoLeading: string;
-  estructuraPreguntas: Record<string, { totalPreguntas: number; facil: number; medio: number; dificil: number }>;
+  estructuraPreguntas: Record<string, ConfiguracionParcial>;
   minutosAntesEntrega: number;
   horasAntesGeneracion: number;
   horasPostPatron: number;

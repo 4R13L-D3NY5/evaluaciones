@@ -28,6 +28,17 @@ public class ConfiguracionParcialDto {
     @Max(1000)
     private Integer dificil;
 
+    // Cuotas Mínimas para Carga del Banco Excel por Dificultad
+    private Integer bancoTotal;
+    private Integer bancoFacil;
+    private Integer bancoMedio;
+    private Integer bancoDificil;
+
+    // Cuotas Mínimas para Carga del Banco Excel por Grupos Tipológicos
+    private Integer bancoG1;
+    private Integer bancoG2;
+    private Integer bancoG3;
+
     public Integer getCantidadPreguntas() {
         return totalPreguntas;
     }
