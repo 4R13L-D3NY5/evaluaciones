@@ -539,17 +539,17 @@ class BancoPreguntasServiceTest {
                 crearFila(sheet, i, "Verdadero o Falso Simple", "G1", "Pregunta VF " + i, "Verdadero", "Falso", "", "", "", "A", "1");
             }
 
-            // G2: 30 preguntas de Selecci?n de la mejor respuesta (dificultad 2)
+            // G2: 30 preguntas de Selección de la mejor respuesta (dificultad 2)
             for (int i = 16; i <= 45; i++) {
-                crearFila(sheet, i, "Selecci?n de la mejor respuesta", "G2", "Pregunta SM " + i, "A", "B", "C", "D", "E", "A", "2");
+                crearFila(sheet, i, "Selección de la mejor respuesta", "G2", "Pregunta SM " + i, "A", "B", "C", "D", "E", "A", "2");
             }
 
-            // G3: 15 preguntas de Casos o Problemas (1 tronco + 15 sub?tems dificultad 3, en grupos de 5)
+            // G3: 15 preguntas de Casos o Problemas (1 tronco + 15 subítemes dificultad 3, en grupos de 5)
             for (int caso = 1; caso <= 3; caso++) {
                 int base = 46 + (caso - 1) * 6;
-                crearFila(sheet, base, "Caso Cl?nico", "CASO-" + caso, "Descripci?n de caso " + caso, "", "", "", "", "", "", "");
+                crearFila(sheet, base, "Caso Clínico", "CASO-" + caso, "Descripción de caso " + caso, "", "", "", "", "", "", "");
                 for (int sub = 1; sub <= 5; sub++) {
-                    crearFila(sheet, base + sub, "Sub?tem de Caso", "CASO-" + caso, "Subpregunta " + sub, "A", "B", "C", "D", "E", "A", "3");
+                    crearFila(sheet, base + sub, "Subítem de Caso", "CASO-" + caso, "Subpregunta " + sub, "A", "B", "C", "D", "E", "A", "3");
                 }
             }
 
@@ -615,6 +615,72 @@ class BancoPreguntasServiceTest {
             CargaBancoResponseDto respuesta = service.cargarDesdeExcel(rol.getId(), archivo, "Docente Oficial");
             assertThat(respuesta.isExito()).isTrue();
             assertThat(respuesta.getTotalReactivos()).isEqualTo(60);
+        }
+    }
+
+    @Test
+    void examenFinalRequiereCientoVeintePreguntasYRechazaSesenta() throws Exception {
+        rol.setTipoParcial(TipoParcial.FINAL);
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        MockMultipartFile archivoSesenta = crearExcel(60);
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(rol.getId(), archivoSesenta, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isFalse();
+        assertThat(respuesta.getErroresValidacion())
+                .anyMatch(err -> err.contains("120 preguntas"))
+                .anyMatch(err -> err.contains("30 preguntas fáciles"))
+                .anyMatch(err -> err.contains("60 preguntas medias"))
+                .anyMatch(err -> err.contains("30 preguntas difíciles"));
+    }
+
+    @Test
+    void examenFinalAceptaCientoVeintePreguntasConCuotasTreintaSesentaTreinta() throws Exception {
+        rol.setTipoParcial(TipoParcial.FINAL);
+        when(rolRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
+
+        MockMultipartFile archivoCientoVeinte = crearExcelFinal(120);
+        CargaBancoResponseDto respuesta = service.cargarDesdeExcel(rol.getId(), archivoCientoVeinte, "Docente Oficial");
+
+        assertThat(respuesta.isExito()).isTrue();
+        assertThat(respuesta.getTotalReactivos()).isEqualTo(120);
+    }
+
+    private MockMultipartFile crearExcelFinal(int totalFilas) throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Banco");
+            String[] columnas = {
+                    "tipo", "grupo", "enunciado", "A", "B", "C", "D", "E",
+                    "respuesta", "dificultad", "parcial"
+            };
+            Row header = sheet.createRow(0);
+            for (int columna = 0; columna < columnas.length; columna++) {
+                header.createCell(columna).setCellValue(columnas[columna]);
+            }
+
+            for (int indice = 1; indice <= totalFilas; indice++) {
+                Row row = sheet.createRow(indice);
+                row.createCell(0).setCellValue("Selección simple");
+                row.createCell(1).setCellValue("Unidad " + indice);
+                row.createCell(2).setCellValue("Pregunta examen final " + indice);
+                row.createCell(3).setCellValue("Respuesta A");
+                row.createCell(4).setCellValue("Respuesta B");
+                row.createCell(5).setCellValue("Respuesta C");
+                row.createCell(6).setCellValue("Respuesta D");
+                row.createCell(7).setCellValue("Respuesta E");
+                row.createCell(8).setCellValue("A");
+                int dificultad = indice <= 30 ? 1 : (indice <= 90 ? 2 : 3);
+                row.createCell(9).setCellValue(dificultad);
+                row.createCell(10).setCellValue("EF");
+            }
+
+            workbook.write(output);
+            return new MockMultipartFile(
+                    "file",
+                    "banco-final-120.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    output.toByteArray());
         }
     }
 }

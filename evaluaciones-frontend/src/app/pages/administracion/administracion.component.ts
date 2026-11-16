@@ -536,42 +536,80 @@ export interface ParcialConfig {
                 </div>
               </div>
 
-              <!-- Examen en Curso Institucional (Periodo Activo) -->
-              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
-                <div class="flex items-center justify-between border-b border-border pb-3">
+              <!-- Examen en Curso Institucional (Periodos Activos Habilitados) -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
                   <div class="flex items-center gap-2">
-                    <i class="pi pi-calendar-check text-purple-700"></i>
+                    <i class="pi pi-calendar-check text-purple-700 text-base"></i>
                     <div>
                       <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Examen en Curso Institucional</h4>
-                      <p class="text-[10px] text-muted-foreground">Define el periodo evaluativo oficial activo para todo el sistema institucional.</p>
+                      <p class="text-[10px] text-muted-foreground">Define los periodos evaluativos oficiales habilitados para todo el sistema institucional.</p>
                     </div>
                   </div>
-                  <span class="bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700 rounded-full px-3 py-1 text-[10px] font-mono font-black uppercase">
-                    {{ examenEnCurso }}
-                  </span>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    @for (ex of examenesEnCursoSeleccionados(); track ex) {
+                      <span class="bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-black uppercase">
+                        {{ ex }}
+                      </span>
+                    }
+                    <span class="text-[10px] font-bold text-muted-foreground">({{ examenesEnCursoSeleccionados().length }} activo{{ examenesEnCursoSeleccionados().length > 1 ? 's' : '' }})</span>
+                  </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
                   <div>
-                    <label class="block text-[10px] font-extrabold uppercase text-muted-foreground mb-1">
-                      Periodo Evaluativo Activo
-                    </label>
-                    <select 
-                      [(ngModel)]="examenEnCurso" 
-                      class="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:ring-2 focus:ring-purple-500">
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="block text-[10px] font-extrabold uppercase text-muted-foreground">
+                        Periodos Evaluativos Habilitados (Selección múltiple)
+                      </label>
+                      <span class="text-[10px] font-semibold text-purple-700 dark:text-purple-300">
+                        Clic para activar o desactivar
+                      </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       @for (op of opcionesExamenEnCurso; track op.valor) {
-                        <option [value]="op.valor">{{ op.etiqueta }}</option>
+                        <button 
+                          type="button" 
+                          (click)="toggleExamenEnCurso(op.valor)"
+                          [class]="esExamenSeleccionado(op.valor)
+                            ? 'bg-purple-50/90 dark:bg-purple-950/40 border-purple-400 dark:border-purple-600 shadow-xs'
+                            : 'bg-card border-border hover:bg-muted/40 opacity-70 hover:opacity-100'"
+                          class="p-2.5 border rounded-xl flex items-center justify-between text-left transition-all cursor-pointer">
+                          <div class="flex items-center gap-2.5">
+                            <div [class]="esExamenSeleccionado(op.valor) ? 'bg-purple-600 text-white border-purple-600' : 'border border-border bg-muted/40 text-transparent'"
+                              class="w-5 h-5 rounded-md border flex items-center justify-center text-xs transition-colors shrink-0">
+                              <i class="pi pi-check text-[10px]"></i>
+                            </div>
+                            <div>
+                              <div class="text-xs font-bold text-foreground leading-tight">{{ op.etiqueta }}</div>
+                              <div class="text-[10px] text-muted-foreground font-mono">{{ op.valor }}</div>
+                            </div>
+                          </div>
+                          <span [class]="esExamenSeleccionado(op.valor)
+                            ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                            : 'bg-muted text-muted-foreground border-border'"
+                            class="text-[9px] font-extrabold px-2 py-0.5 rounded-full border uppercase shrink-0">
+                            {{ esExamenSeleccionado(op.valor) ? 'Habilitado' : 'Inactivo' }}
+                          </span>
+                        </button>
                       }
-                    </select>
-                    <p class="text-[10px] text-muted-foreground mt-1">
-                      Configura el examen que se encuentra activo en curso para los módulos de roles, bancos de preguntas y entrega de notas.
+                    </div>
+                    <p class="text-[10px] text-muted-foreground mt-2">
+                      Podés seleccionar uno o varios exámenes simultáneamente. Los exámenes activos permitirán el registro y validación de bancos de preguntas, roles y entrega de notas.
                     </p>
                   </div>
 
-                  <div class="p-3 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl space-y-1">
-                    <span class="text-[10px] font-bold text-purple-700 dark:text-purple-300 block uppercase">Periodo Vigente:</span>
+                  <div class="p-4 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl space-y-2 flex flex-col justify-center">
+                    <div class="flex items-center gap-2">
+                      <i class="pi pi-info-circle text-purple-700 dark:text-purple-300 text-sm"></i>
+                      <span class="text-[11px] font-black text-purple-700 dark:text-purple-300 uppercase">Periodos Vigentes en el Sistema:</span>
+                    </div>
+                    <p class="text-xs text-foreground font-medium leading-relaxed">
+                      Actualmente activos: <strong class="text-purple-700 dark:text-purple-300">{{ textoExamenesHabilitados() }}</strong>.
+                    </p>
                     <p class="text-[11px] text-muted-foreground leading-snug">
-                      Al cambiar entre <strong>1er Parcial</strong>, <strong>2do Parcial</strong>, <strong>Final</strong> o <strong>2da Instancia</strong>, se orientan las acciones prioritarias de calendarización y carga para todo el personal docente.
+                      Al mantener múltiples periodos habilitados, los docentes y directores de carrera podrán gestionar reactivos y cronogramas de cualquiera de ellos sin bloqueos institucionales.
                     </p>
                   </div>
                 </div>
@@ -1814,14 +1852,46 @@ export class AdministracionEvaluacionesComponent {
 
   public ratioEstudiantesPorVariante: number = 5;
   public examenEnCurso: string = '1ER_PARCIAL';
+  public examenesEnCursoSeleccionados = signal<string[]>(['1ER_PARCIAL']);
   public validarCuotasGrupos: boolean = true;
   public permitirDirectorEdicionRoles: boolean = true;
   public readonly opcionesExamenEnCurso = [
-    { valor: '1ER_PARCIAL', etiqueta: 'Primer Parcial (1er Parcial)' },
-    { valor: '2DO_PARCIAL', etiqueta: 'Segundo Parcial (2do Parcial)' },
-    { valor: 'FINAL', etiqueta: 'Examen Final' },
-    { valor: '2DA_INSTANCIA', etiqueta: 'Segunda Instancia (2da Instancia)' }
+    { valor: '1ER_PARCIAL', etiqueta: 'Primer Parcial (1er Parcial)', claveCorta: '1P' },
+    { valor: '2DO_PARCIAL', etiqueta: 'Segundo Parcial (2do Parcial)', claveCorta: '2P' },
+    { valor: 'FINAL', etiqueta: 'Examen Final', claveCorta: 'FINAL' },
+    { valor: '2DA_INSTANCIA', etiqueta: 'Segunda Instancia (2da Instancia)', claveCorta: '2DA_INSTANCIA' }
   ];
+
+  public readonly textoExamenesHabilitados = computed(() => {
+    const sel = this.examenesEnCursoSeleccionados();
+    const nombres = sel.map(val => {
+      const op = this.opcionesExamenEnCurso.find(o => o.valor === val);
+      return op ? op.etiqueta : val;
+    });
+    return nombres.length > 0 ? nombres.join(', ') : 'Ninguno';
+  });
+
+  public esExamenSeleccionado(valor: string): boolean {
+    return this.examenesEnCursoSeleccionados().includes(valor);
+  }
+
+  public toggleExamenEnCurso(valor: string): void {
+    const actuales = this.examenesEnCursoSeleccionados();
+    if (actuales.includes(valor)) {
+      if (actuales.length <= 1) {
+        this._mostrarToast('Debe existir al menos un periodo evaluativo institucional activo.');
+        return;
+      }
+      const nuevo = actuales.filter(v => v !== valor);
+      this.examenesEnCursoSeleccionados.set(nuevo);
+      this.examenEnCurso = nuevo.join(',');
+    } else {
+      const orden = ['1ER_PARCIAL', '2DO_PARCIAL', 'FINAL', '2DA_INSTANCIA'];
+      const nuevo = [...actuales, valor].sort((a, b) => orden.indexOf(a) - orden.indexOf(b));
+      this.examenesEnCursoSeleccionados.set(nuevo);
+      this.examenEnCurso = nuevo.join(',');
+    }
+  }
   public guardandoConfiguracion = signal<boolean>(false);
   public guardandoAsignacionCarrera = signal<boolean>(false);
 
@@ -2311,6 +2381,8 @@ export class AdministracionEvaluacionesComponent {
   private aplicarConfiguracion(configuracion: ConfiguracionEvaluaciones): void {
     this.ratioEstudiantesPorVariante = configuracion.ratioEstudiantesPorVariante;
     this.examenEnCurso = configuracion.examenEnCurso || '1ER_PARCIAL';
+    const lista = this._configuracionService.obtenerExamenesEnCurso(this.examenEnCurso);
+    this.examenesEnCursoSeleccionados.set(lista);
     this.validarCuotasGrupos = configuracion.validarCuotasGrupos ?? true;
     this.permitirDirectorEdicionRoles = configuracion.permitirDirectorEdicionRoles ?? true;
     this.duracionExamenVirtualMinutos = configuracion.duracionExamenVirtualMinutos || 45;
@@ -2839,6 +2911,7 @@ export class AdministracionEvaluacionesComponent {
   // Acciones Configuración
   public guardarConfiguracion(): void {
     this.normalizarRatioConfiguracion();
+    this.examenEnCurso = this.examenesEnCursoSeleccionados().join(',');
     this.guardandoConfiguracion.set(true);
     this._configuracionService.guardar({
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
@@ -2881,6 +2954,7 @@ export class AdministracionEvaluacionesComponent {
   public guardarTiempos(): void {
     this.duracionExamenVirtualMinutos = this.normalizarDuracionVirtual();
     this.cuentaRegresivaInicioVirtualSegundos = this.normalizarCuentaRegresivaVirtual();
+    this.examenEnCurso = this.examenesEnCursoSeleccionados().join(',');
     this._configuracionService.guardar({
       ratioEstudiantesPorVariante: this.ratioEstudiantesPorVariante,
       examenEnCurso: this.examenEnCurso,

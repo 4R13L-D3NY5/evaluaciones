@@ -62,7 +62,7 @@ public class ConfiguracionEvaluaciones {
     @Column(name = "minutos_minimos_devolucion", nullable = false)
     private Integer minutosMinimosDevolucion;
 
-    @Column(name = "examen_en_curso", nullable = false, length = 50)
+    @Column(name = "examen_en_curso", nullable = false, length = 255)
     private String examenEnCurso = "1ER_PARCIAL";
 
     @Column(name = "validar_cuotas_grupos", nullable = false)

@@ -17,6 +17,7 @@ import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.TimeFrameDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionParcialDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
 import com.xpertiflow.evaluaciones.application.OrdenEstudiantes;
@@ -28,6 +29,7 @@ import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
 import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
+import com.xpertiflow.evaluaciones.domain.enums.TipoParcial;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.GeneracionTypstJobRepository;
@@ -512,6 +514,29 @@ public class GeneracionTypstService {
         mapeoRepository.deleteByRolExamenId(rolExamenId);
         varianteRepository.deleteByRolExamenId(rolExamenId);
 
+        RolExamen rol = rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
+
+        ConfiguracionEvaluacionesDto configGlobal = configuracionEvaluacionesService.obtener();
+        ConfiguracionParcialDto configParcial = null;
+        if (configGlobal != null && configGlobal.getEstructuraPreguntas() != null) {
+            String clave = rol.getTipoParcial() == null ? "1P" : rol.getTipoParcial().name();
+            if (clave.contains("FINAL")) clave = "FINAL";
+            else if (clave.contains("SEGUNDA") || clave.contains("2DA")) clave = "2DA_INSTANCIA";
+            else if (clave.contains("SEGUNDO") || clave.contains("2P")) clave = "2P";
+            else clave = "1P";
+            configParcial = configGlobal.getEstructuraPreguntas().get(clave);
+        }
+        boolean esFinal = rol.getTipoParcial() == TipoParcial.FINAL;
+        int defTotal = esFinal ? 60 : 30;
+        int defFacil = esFinal ? 15 : 7;
+        int defMedio = esFinal ? 30 : 16;
+        int defDificil = esFinal ? 15 : 7;
+        int cuotaFacilDefecto = configParcial != null && configParcial.getFacil() != null ? configParcial.getFacil() : defFacil;
+        int cuotaMedioDefecto = configParcial != null && configParcial.getMedio() != null ? configParcial.getMedio() : defMedio;
+        int cuotaDificilDefecto = configParcial != null && configParcial.getDificil() != null ? configParcial.getDificil() : defDificil;
+        int totalEsperadoDefecto = configParcial != null && configParcial.getTotalPreguntas() != null ? configParcial.getTotalPreguntas() : defTotal;
+
         // 2. Insertar nuevas variantes
         List<VarianteResultadoDto> variantesDto = resultado.getVariantes() != null ? resultado.getVariantes() : List.of();
         for (VarianteResultadoDto dto : variantesDto) {
@@ -523,10 +548,10 @@ public class GeneracionTypstService {
             variante.setLetraVariante(letra);
             variante.setNombreVariante("TIPO " + letra);
             variante.setSemillaPermutacion(dto.getSemilla() != null ? dto.getSemilla() : 0);
-            variante.setTotalPreguntas(dto.getTotalPreguntas() != null ? dto.getTotalPreguntas() : 30);
-            variante.setCuotaFaciles(7);
-            variante.setCuotaMedias(16);
-            variante.setCuotaDificiles(7);
+            variante.setTotalPreguntas(dto.getTotalPreguntas() != null ? dto.getTotalPreguntas() : totalEsperadoDefecto);
+            variante.setCuotaFaciles(dto.getCuotaFaciles() != null ? dto.getCuotaFaciles() : cuotaFacilDefecto);
+            variante.setCuotaMedias(dto.getCuotaMedias() != null ? dto.getCuotaMedias() : cuotaMedioDefecto);
+            variante.setCuotaDificiles(dto.getCuotaDificiles() != null ? dto.getCuotaDificiles() : cuotaDificilDefecto);
             variante.setPatronClavesJson(null);
             variante.setOrdenReactivosIdsJson(null);
             variante.setContenidoVirtualJson(null);
@@ -543,8 +568,6 @@ public class GeneracionTypstService {
         }
 
         // 3. Insertar nuevos mapeos estudiante-variante
-        RolExamen rol = rolRepository.findById(rolExamenId)
-                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
 
         String groupIdOficial = rol.getSeaGroupId() != null && !rol.getSeaGroupId().isBlank()
                 ? rol.getSeaGroupId() : rol.getGrupo();

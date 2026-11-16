@@ -206,6 +206,9 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
               class="font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors">
               <i class="pi pi-flag text-xs"></i>
               <span>1er Parcial</span>
+              @if (esParcialHabilitado('1P')) {
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Periodo evaluativo oficial en curso"></span>
+              }
             </button>
 
             <button 
@@ -214,6 +217,9 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
               class="font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors">
               <i class="pi pi-check-circle text-xs"></i>
               <span>2do Parcial</span>
+              @if (esParcialHabilitado('2P')) {
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Periodo evaluativo oficial en curso"></span>
+              }
             </button>
 
             <button 
@@ -222,6 +228,9 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
               class="font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors">
               <i class="pi pi-star text-xs"></i>
               <span>Examen Final</span>
+              @if (esParcialHabilitado('FINAL')) {
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Periodo evaluativo oficial en curso"></span>
+              }
             </button>
 
             <button 
@@ -230,6 +239,9 @@ type PlanTipoGrupo = 'todos' | 'teorico' | 'practico';
               class="font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors">
               <i class="pi pi-refresh text-xs"></i>
               <span>2da Instancia</span>
+              @if (esParcialHabilitado('2DA_INSTANCIA')) {
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Periodo evaluativo oficial en curso"></span>
+              }
             </button>
           </div>
 
@@ -628,6 +640,9 @@ export class PlanEstudiosComponent implements OnInit {
 
     private readonly _configuracionService = inject(ConfiguracionEvaluacionesService);
   public parcialActivo = signal<'1P' | '2P' | 'FINAL' | '2DA_INSTANCIA'>(this._configuracionService.resolverParcialClavePlan());
+  public esParcialHabilitado(clave: string): boolean {
+    return this._configuracionService.esParcialHabilitado(clave);
+  }
     public toastMessage = signal<string | null>(null);
     public itemSeleccionadoParaCambio = signal<PlanEstudioItem | null>(null);
     public modalidadParaCambio = signal<'PRESENCIAL_CARTILLA' | 'PRESENCIAL_SIN_CARTILLA' | 'VIRTUAL' | null>(null);

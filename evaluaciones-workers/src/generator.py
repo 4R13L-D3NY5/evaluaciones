@@ -59,15 +59,50 @@ INSTRUCCIONES_POR_TIPO = {
 def normalizar_configuracion_generacion(raw: dict[str, Any] | None, rol: dict[str, Any] | None = None) -> dict[str, Any]:
     """Convierte la configuración persistida en parámetros seguros para Typst."""
     raw = raw or {}
-    tipo_parcial = str(raw.get("tipoParcial") or (rol or {}).get("tipo_parcial") or "1P").upper()
+
+    # Si ya es una configuración normalizada con cuotas, preservarla (evita degradación en llamadas encadenadas)
+    if "totalPreguntas" in raw and "cuotaFaciles" in raw and "cuotaMedias" in raw and "cuotaDificiles" in raw:
+        return {
+            "totalPreguntas": raw["totalPreguntas"],
+            "cuotaFaciles": raw["cuotaFaciles"],
+            "cuotaMedias": raw["cuotaMedias"],
+            "cuotaDificiles": raw["cuotaDificiles"],
+            "tipoLetra": str(raw.get("tipoLetra") or config.TIPOGRAFIA).strip(),
+            "tamanoLetraPt": raw.get("tamanoLetraPt") or config.TAMANO_FUENTE_PT,
+            "leading": raw.get("leading") or config.LEADING,
+            "separacionPreguntas": raw.get("separacionPreguntas") or config.SEPARACION_PREGUNTAS,
+            "anchoPagina": raw.get("anchoPagina") or "21.59cm",
+            "altoPagina": raw.get("altoPagina") or "33.02cm",
+            "estructuraPreguntas": raw.get("estructuraPreguntas"),
+            "tipoParcial": raw.get("tipoParcial"),
+        }
+
+    rol_tipo = (rol.get("tipo_parcial") if isinstance(rol, dict) else getattr(rol, "tipo_parcial", None)) if rol else None
+    tipo_parcial = str(raw.get("tipoParcial") or rol_tipo or "1P").upper()
     if "FINAL" in tipo_parcial:
         clave_parcial = "FINAL"
+        def_facil = 15
+        def_medio = 30
+        def_dificil = 15
+        def_total = 60
     elif "2DA" in tipo_parcial or "INSTANCIA" in tipo_parcial:
         clave_parcial = "2DA_INSTANCIA"
+        def_facil = 10
+        def_medio = 25
+        def_dificil = 15
+        def_total = 50
     elif "2" in tipo_parcial:
         clave_parcial = "2P"
+        def_facil = config.CUOTA_FACILES
+        def_medio = config.CUOTA_MEDIAS
+        def_dificil = config.CUOTA_DIFICILES
+        def_total = config.TOTAL_PREGUNTAS
     else:
         clave_parcial = "1P"
+        def_facil = config.CUOTA_FACILES
+        def_medio = config.CUOTA_MEDIAS
+        def_dificil = config.CUOTA_DIFICILES
+        def_total = config.TOTAL_PREGUNTAS
 
     estructura = raw.get("estructuraPreguntas") or {}
     parcial = estructura.get(clave_parcial) or {}
@@ -78,9 +113,9 @@ def normalizar_configuracion_generacion(raw: dict[str, Any] | None, rol: dict[st
         except (TypeError, ValueError):
             return defecto
 
-    facil = entero(parcial.get("facil"), config.CUOTA_FACILES, 0, 1000)
-    medio = entero(parcial.get("medio"), config.CUOTA_MEDIAS, 0, 1000)
-    dificil = entero(parcial.get("dificil"), config.CUOTA_DIFICILES, 0, 1000)
+    facil = entero(parcial.get("facil"), def_facil, 0, 1000)
+    medio = entero(parcial.get("medio"), def_medio, 0, 1000)
+    dificil = entero(parcial.get("dificil"), def_dificil, 0, 1000)
     total = entero(parcial.get("totalPreguntas"), facil + medio + dificil, 1, 1000)
     if facil + medio + dificil != total:
         total = facil + medio + dificil
