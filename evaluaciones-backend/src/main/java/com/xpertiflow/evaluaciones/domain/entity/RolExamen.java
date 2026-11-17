@@ -127,6 +127,12 @@ public class RolExamen {
     @Column(name = "sincronizacion_sea_resultado", columnDefinition = "TEXT")
     private String sincronizacionSeaResultado;
 
+    @Column(name = "snapshot_entrega_estudiantes_json", columnDefinition = "TEXT")
+    private String snapshotEntregaEstudiantesJson;
+
+    @Column(name = "conciliacion_devolucion_json", columnDefinition = "TEXT")
+    private String conciliacionDevolucionJson;
+
     @CreationTimestamp
     @Column(name = "creado_en", updatable = false)
     private LocalDateTime creadoEn;

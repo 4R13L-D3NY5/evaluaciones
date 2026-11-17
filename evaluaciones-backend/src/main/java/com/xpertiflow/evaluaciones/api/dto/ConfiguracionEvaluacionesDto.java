@@ -66,6 +66,8 @@ public class ConfiguracionEvaluacionesDto {
 
     private Boolean validarCuotasGrupos;
 
+    private Boolean validarHabilitacionAlumnos;
+
     private Boolean permitirDirectorEdicionRoles;
 
     private LocalDateTime actualizadoEn;

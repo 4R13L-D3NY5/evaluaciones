@@ -3,7 +3,7 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { forkJoin, Observable, of, throwError, Subscription } from 'rxjs';
+import { forkJoin, Observable, of, throwError, Subscription, firstValueFrom } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -15,14 +15,15 @@ import {
   EstudiantesGatewayService, 
   EstudianteInscrito 
 } from '../../core/services/estudiantes-gateway.service';
-import { BranchOffice, Campus, Career, Course } from '../../core/models/unitepc-gateway.models';
+import { BranchOffice, Campus, Career, Course, GroupStudentItem } from '../../core/models/unitepc-gateway.models';
 import { VarianteCompilada } from '../../core/services/examen-macro-generator.service';
 import { GeneracionTypstService } from '../../core/services/generacion-typst.service';
 import { BancoPreguntasService, BancoPreguntasResponse } from '../../core/services/banco-preguntas.service';
 import {
   RolExamenService,
   RolExamenResponse,
-  AuditoriaRolExamen
+  AuditoriaRolExamen,
+  ConciliacionEntregaResponse
 } from '../../core/services/rol-examen.service';
 import { CartillasOmrService, PreparacionCartillasOmr, CartillaOmr } from '../../core/services/cartillas-omr.service';
 import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
@@ -100,6 +101,8 @@ export interface EvaluacionItemUI extends RolExamenPersistedItem {
   fechaSincronizacionSea?: string;
   sincronizadoSeaPor?: string;
   sincronizacionSeaResultado?: string;
+  snapshotEntregaEstudiantesJson?: string;
+  conciliacionDevolucionJson?: string;
 }
 
 type ColumnaOrdenEvaluaciones = 'materia' | 'docente' | 'parcial' | 'fechaHora' | 'modalidad' | 'etapa';
@@ -200,6 +203,19 @@ interface CampusDisponible extends Campus {
             class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer">
             <i class="pi pi-print"></i>
             <span>Generar reporte PDF (diario)</span>
+          </button>
+
+          <button 
+            (click)="generarActaConsolidadaMateriasConRegularizaciones()"
+            class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center gap-2 shadow-xs transition-transform hover:scale-102 cursor-pointer"
+            title="Generar Acta Oficial con las materias que tuvieron cambios en el número de habilitados al devolver">
+            <i class="pi pi-file-check"></i>
+            <span>Acta de Regularizaciones (Devolución)</span>
+            @if (totalMateriasConRegularizaciones() > 0) {
+              <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-900 text-white font-mono font-bold">
+                {{ totalMateriasConRegularizaciones() }}
+              </span>
+            }
           </button>
         </div>
       </div>
@@ -648,7 +664,43 @@ interface CampusDisponible extends Campus {
                             </div>
                           </div>
                         }
-                        @if (!puedeMostrarDocumento(item) && !puedeMostrarPatronCalificado(item)) {
+                        @if (puedeImprimirListaEntrega(item)) {
+                          <!-- Planilla Oficial de Entrega y Control de Habilitación en DOCUMENTOS -->
+                          <div class="relative inline-flex group/listaEntregaDoc">
+                            <button
+                              (click)="abrirListaEntregaDocente(item)"
+                              title="Planilla Oficial de Entrega y Control de Habilitación (Oficio)"
+                              aria-label="Planilla Oficial de Entrega y Control de Habilitación (Oficio)"
+                              class="h-7 w-7 rounded-lg text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 flex items-center justify-center transition-colors cursor-pointer">
+                              <i class="pi pi-list-check text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/listaEntregaDoc:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                                Planilla Control de Habilitados (Oficio)
+                              </span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+                        @if (tieneConciliacionConRegularizados(item)) {
+                          <!-- Acta de Regularizaciones en Devolución (Con Marcas) -->
+                          <div class="relative inline-flex group/actaConciliacion">
+                            <button
+                              (click)="abrirActaConciliacionIndividual(item)"
+                              title="Acta Oficial de Regularizaciones en Devolución (Con Marcas de quienes rindieron)"
+                              aria-label="Acta Oficial de Regularizaciones en Devolución"
+                              class="h-7 w-7 rounded-lg text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 flex items-center justify-center transition-colors cursor-pointer shadow-xs">
+                              <i class="pi pi-file-check text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/actaConciliacion:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                                Acta de Regularizaciones (Con Marcas)
+                              </span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+                        @if (!puedeMostrarDocumento(item) && !puedeMostrarPatronCalificado(item) && !puedeImprimirListaEntrega(item) && !tieneConciliacionConRegularizados(item)) {
                           <span class="text-muted-foreground/50">—</span>
                         }
                       </div>
@@ -672,6 +724,25 @@ interface CampusDisponible extends Campus {
                             <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                           </div>
                         </div>
+
+                        <!-- Conciliación de Pagos en Devolución -->
+                        @if (item.etapa === 'Entregado' || item.etapa === 'Devuelto') {
+                          <div class="relative group/conciliacionBtn">
+                            <button
+                              (click)="abrirModalConciliacionManual(item)"
+                              title="Verificar y conciliar regularizaciones de pago"
+                              aria-label="Verificar y conciliar regularizaciones de pago"
+                              class="h-7 w-7 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex items-center justify-center cursor-pointer transition-colors">
+                              <i class="pi pi-file-edit text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/conciliacionBtn:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                                Conciliación de Pagos en Caja
+                              </span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
 
                         <!-- 2. Variantes, patrones y asignaciones persistidas -->
                         @if (puedeMostrarConfiguracion(item)) {
@@ -4026,6 +4097,214 @@ interface CampusDisponible extends Campus {
         </div>
       }
 
+      <!-- MODAL CONCILIACIÓN DE PAGOS EN DEVOLUCIÓN (PAGOS DE ÚLTIMO MOMENTO) -->
+      @if (dialogConciliacionDevolucion()) {
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl w-full max-w-3xl shadow-2xl p-5 space-y-4 animate-scale-in">
+            <div class="flex items-center justify-between border-b border-border pb-3">
+              <div class="flex items-center gap-2.5">
+                <div class="h-9 w-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-lg font-bold">
+                  <i class="pi pi-check-square"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-black text-foreground">Conciliación de Pagos y Control de Quienes Rindieron</h3>
+                    @if (esEntornoLocal) {
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[9px] font-black uppercase tracking-wide">
+                        <i class="pi pi-bolt text-[8px]"></i> Simulación Local
+                      </span>
+                    }
+                  </div>
+                  <p class="text-xs text-muted-foreground">Control de cancelaciones de colegiatura de último momento</p>
+                </div>
+              </div>
+              <button (click)="cerrarModalConciliacion()" class="text-muted-foreground hover:text-foreground text-sm cursor-pointer p-1">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            @if (conciliacionDevolucionActual()?.estudiantesRegularizados && conciliacionDevolucionActual()!.estudiantesRegularizados.length > 0) {
+              <div class="p-3 bg-amber-500/10 border border-amber-300 dark:border-amber-700 rounded-xl space-y-1.5 text-xs">
+                <p class="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  <i class="pi pi-info-circle text-amber-700"></i>
+                  Se detectaron {{ conciliacionDevolucionActual()!.estudiantesRegularizados.length }} estudiante(s) que regularizaron pagos en caja durante la evaluación:
+                </p>
+                <p class="text-[11px] text-amber-800 dark:text-amber-300">
+                  Compara con la <strong>lista física tachada con [X] devuelta por el docente</strong> y marca únicamente a los estudiantes que alcanzaron a rendir la prueba.
+                </p>
+              </div>
+
+              <div class="flex items-center justify-between text-xs px-1">
+                <span class="text-muted-foreground font-medium text-[11px]">Estudiantes regularizados en caja:</span>
+                <div class="flex items-center gap-2 text-[11px]">
+                  <button (click)="seleccionarTodosRegularizados(true)" class="text-teal-700 hover:underline font-bold cursor-pointer">Marcar todos</button>
+                  <span class="text-muted-foreground">·</span>
+                  <button (click)="seleccionarTodosRegularizados(false)" class="text-slate-500 hover:underline font-bold cursor-pointer">Desmarcar todos</button>
+                </div>
+              </div>
+
+              <!-- Tabla de Regularizados con Checkbox de Rindió Examen -->
+              <div class="overflow-x-auto rounded-xl border border-border">
+                <table class="w-full text-xs text-left">
+                  <thead class="bg-muted font-black text-muted-foreground uppercase text-[10px]">
+                    <tr>
+                      <th class="p-2.5">Código SEA</th>
+                      <th class="p-2.5">Estudiante</th>
+                      <th class="p-2.5 text-center">Cuotas al Entregar</th>
+                      <th class="p-2.5 text-center">Cuotas Actuales</th>
+                      <th class="p-2.5 text-center">¿Rindió Examen? (Docente [X])</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    @for (est of conciliacionDevolucionActual()?.estudiantesRegularizados; track est.studentCode) {
+                      <tr class="hover:bg-muted/30">
+                        <td class="p-2.5 font-mono font-bold">{{ est.studentCode }}</td>
+                        <td class="p-2.5 font-bold text-foreground">{{ est.fullName }}</td>
+                        <td class="p-2.5 text-center">
+                          <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]">
+                            {{ est.cuotasPrevias }} / 5 (Inhabilitado)
+                          </span>
+                        </td>
+                        <td class="p-2.5 text-center">
+                          <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                            {{ est.cuotasActuales }} / 5 (Habilitado)
+                          </span>
+                        </td>
+                        <td class="p-2.5 text-center">
+                          <label class="inline-flex items-center gap-1.5 cursor-pointer px-2.5 py-1 rounded-lg border transition-all select-none"
+                                 [class]="esEstudianteRindio(est.studentCode) ? 'bg-teal-50 border-teal-300 text-teal-800' : 'bg-slate-50 border-slate-200 text-slate-500'">
+                            <input
+                              type="checkbox"
+                              [checked]="esEstudianteRindio(est.studentCode)"
+                              (change)="toggleEstudianteRindio(est.studentCode)"
+                              class="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer" />
+                            <span class="text-[11px] font-black">
+                              {{ esEstudianteRindio(est.studentCode) ? 'Rindió examen [ X ]' : 'No rindió' }}
+                            </span>
+                          </label>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <!-- Estado sin regularizaciones -->
+              <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 text-center space-y-2">
+                <i class="pi pi-check-circle text-emerald-600 text-2xl"></i>
+                <h4 class="font-bold text-emerald-950 text-sm">Sin Pagos de Último Momento Registrados</h4>
+                <p class="text-xs text-emerald-800 max-w-md mx-auto">
+                  La nómina de pagos en SEA se mantiene idéntica a la que se registró al momento de la entrega al docente.
+                  No se detectaron nuevas cancelaciones de colegiatura durante el examen.
+                </p>
+                <div class="pt-2 text-[11px] text-muted-foreground">
+                  Habilitados iniciales: <strong>{{ conciliacionDevolucionActual()?.totalHabilitadosInicial || 0 }}</strong> · Habilitados actuales: <strong>{{ conciliacionDevolucionActual()?.totalHabilitadosActual || 0 }}</strong>
+                </div>
+              </div>
+            }
+
+            <!-- Acciones -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border">
+              <div>
+                @if (conciliacionDevolucionActual()?.estudiantesRegularizados && conciliacionDevolucionActual()!.estudiantesRegularizados.length > 0) {
+                  <button
+                    (click)="reimprimirListaActualizada()"
+                    class="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-2 shadow-xs cursor-pointer">
+                    <i class="pi pi-print"></i>
+                    <span>Imprimir Lista de Habilitados Actualizada</span>
+                  </button>
+                }
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button
+                  (click)="cerrarModalConciliacion()"
+                  class="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-muted cursor-pointer">
+                  Cerrar
+                </button>
+                <button
+                  (click)="confirmarDevolucionConRegularizados()"
+                  class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black text-xs flex items-center gap-2 shadow-xs cursor-pointer">
+                  <i class="pi pi-check"></i>
+                  <span>{{ evaluacionParaDevolucion()?.etapa === 'Devuelto' ? 'Guardar Cambios de Conciliación' : 'Confirmar Devolución del Examen' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL PREVISUALIZACIÓN PLANILLA DE ENTREGA DOCENTE (OFICIO 8.5x13) -->
+      @if (previewListaEntrega(); as prev) {
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl w-full max-w-4xl shadow-2xl p-5 space-y-4 animate-scale-in">
+            <!-- Header Modal -->
+            <div class="flex items-center justify-between border-b border-border pb-3">
+              <div class="flex items-center gap-2.5">
+                <div class="h-9 w-9 rounded-xl flex items-center justify-center text-lg font-bold"
+                  [class]="prev.esActaRegularizaciones ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'">
+                  <i [class]="prev.esActaRegularizaciones ? 'pi pi-file-check' : 'pi pi-list-check'"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-black text-foreground">{{ prev.titulo || 'Planilla Oficial de Entrega Docente (Hoja Oficio 8.5" x 13")' }}</h3>
+                  <p class="text-xs text-muted-foreground">{{ prev.subtitulo || 'Control de habilitación de estudiantes por pago de colegiatura' }}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                @if (prev.esActaRegularizaciones) {
+                  <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-xs">
+                    {{ prev.totalRegularizados ?? prev.totalHabilitados }} Regularizados en Caja
+                  </span>
+                } @else {
+                  <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+                    {{ prev.totalHabilitados }} Habilitados
+                  </span>
+                  <span class="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-bold text-xs">
+                    {{ prev.totalNoHabilitados }} No Habilitados
+                  </span>
+                }
+                <button
+                  (click)="cerrarPreviewListaEntrega()"
+                  class="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground flex items-center justify-center cursor-pointer transition-colors">
+                  <i class="pi pi-times text-sm"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- PDF Viewer Iframe -->
+            <div class="relative w-full h-[68vh] bg-slate-100 rounded-xl overflow-hidden border border-border">
+              <iframe
+                [src]="prev.segura"
+                title="Planilla de Entrega Docente"
+                class="w-full h-full border-0">
+              </iframe>
+            </div>
+
+            <!-- Actions Footer -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border">
+              <p class="text-[11px] text-muted-foreground">
+                <i class="pi pi-info-circle mr-1 text-teal-600"></i>
+                Imprima esta planilla en hoja Folio/Oficio para entregar los exámenes solo a estudiantes habilitados.
+              </p>
+              <div class="flex items-center gap-2">
+                <button
+                  (click)="descargarPdfListaEntrega()"
+                  class="px-3.5 py-2 rounded-xl border border-border text-xs font-bold text-foreground hover:bg-muted flex items-center gap-1.5 cursor-pointer">
+                  <i class="pi pi-download"></i>
+                  <span>Descargar PDF</span>
+                </button>
+                <button
+                  (click)="imprimirIframeEntrega()"
+                  class="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-2 shadow-xs cursor-pointer">
+                  <i class="pi pi-print"></i>
+                  <span>Imprimir Planilla</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="app-toast fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-[20000] animate-bounce" role="status" aria-live="polite">
@@ -4239,6 +4518,29 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public generandoExamenIndividual = signal<boolean>(false);
   public simulandoRezagado = signal<boolean>(false);
   public readonly esEntornoLocal: boolean = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  // Conciliación de colegiaturas y pagos de último momento en entrega/devolución
+  public dialogConciliacionDevolucion = signal<boolean>(false);
+  public conciliacionDevolucionActual = signal<ConciliacionEntregaResponse | null>(null);
+  public evaluacionParaDevolucion = signal<EvaluacionItemUI | null>(null);
+  public procesandoConciliacionDevolucion = signal<boolean>(false);
+  public regularizadosMarcadosRindieron = signal<Set<string>>(new Set<string>());
+  public previewListaEntrega = signal<{
+    url: string;
+    segura: SafeResourceUrl;
+    nombre: string;
+    totalEstudiantes: number;
+    totalHabilitados: number;
+    totalNoHabilitados: number;
+    titulo?: string;
+    subtitulo?: string;
+    esActaRegularizaciones?: boolean;
+    totalRegularizados?: number;
+  } | null>(null);
+
+  public totalMateriasConRegularizaciones = computed(() => {
+    return this.evaluaciones().filter(item => this.tieneConciliacionConRegularizados(item)).length;
+  });
 
   // Confirmación explícita antes de llevar un examen sin cartilla a Impreso.
   public dialogImpresionSinCartilla = signal<boolean>(false);
@@ -4897,7 +5199,9 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
       fueRestablecido: rol.fueRestablecido,
       estadoPrevioRestablecimiento: rol.estadoPrevioRestablecimiento as EtapaEvaluacion,
       motivoRestablecimiento: rol.motivoRestablecimiento,
-      fechaRestablecimiento: rol.fechaRestablecimiento
+      fechaRestablecimiento: rol.fechaRestablecimiento,
+      snapshotEntregaEstudiantesJson: rol.snapshotEntregaEstudiantesJson,
+      conciliacionDevolucionJson: rol.conciliacionDevolucionJson
     };
   }
 
@@ -5755,6 +6059,15 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }
 
     if (pasoIdx === currentIdx + 1) {
+      if (pasoKey === 'Entregado') {
+        this.procesarTransicionAEntregado(item);
+        return;
+      }
+      if (pasoKey === 'Devuelto') {
+        this.procesarTransicionADevuelto(item);
+        return;
+      }
+
       const nuevoEstado = this.estadoBackendParaEtapa(pasoKey);
       this._rolService.transicionarEstado(item.id, {
         nuevoEstado
@@ -9191,6 +9504,1048 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public cambiarBusqueda(valor: string): void {
     this.busquedaTexto = valor || '';
     this.actualizarFiltros();
+  }
+
+  // =========================================================================
+  // CONTROL DE ENTREGA DOCENTE Y HABILITACIÓN POR COLEGIATURA (HOJA OFICIO 8.5x13)
+  // =========================================================================
+
+  public resolverClaveParcial(parcial: string): '1P' | '2P' | 'FINAL' | '2DA_INSTANCIA' {
+    const tipo = (parcial || '').toLowerCase();
+    if (tipo.includes('final')) return 'FINAL';
+    if (tipo.includes('2da') || tipo.includes('instancia')) return '2DA_INSTANCIA';
+    if (tipo.includes('2do') || tipo.includes('2p') || tipo.includes('segundo')) return '2P';
+    return '1P';
+  }
+
+  public resolverCuotaHabilitacionParcial(parcial: string): number {
+    const cfg = this._configuracionEvaluaciones.configuracion();
+    if (cfg?.validarHabilitacionAlumnos === false) {
+      return 0;
+    }
+    const clave = this.resolverClaveParcial(parcial);
+    return cfg?.estructuraPreguntas?.[clave]?.cuotaHabilitacion ?? 0;
+  }
+
+  public puedeImprimirListaEntrega(item: EvaluacionItemUI): boolean {
+    if (!item) return false;
+    const etapasValidas: EtapaEvaluacion[] = [
+      'Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado', 'Confirmado'
+    ];
+    const esEtapaValida = etapasValidas.includes(item.etapa);
+    const esPresencial = !item.modalidad || item.modalidad === 'PRESENCIAL_CARTILLA' || item.modalidad === 'PRESENCIAL_SIN_CARTILLA';
+    return Boolean(esEtapaValida && esPresencial);
+  }
+
+  public async abrirListaEntregaDocente(item: EvaluacionItemUI): Promise<void> {
+    try {
+      this._mostrarToast('Generando Planilla Oficial de Entrega y Control...', 'info');
+      const cuotaRequerida = this.resolverCuotaHabilitacionParcial(item.tipo);
+      let groupId: string | undefined = item.seaGroupId;
+      if (!groupId) {
+        groupId = await firstValueFrom(this._resolverGrupoSEA(item));
+      }
+
+      let estudiantes: GroupStudentItem[] = [];
+      if (groupId) {
+        try {
+          const res = await firstValueFrom(this._gateway.getStudentsByGroup(groupId).pipe(catchError(() => of([]))));
+          if (res && res.length > 0) {
+            estudiantes = res;
+          }
+        } catch (e) {
+          console.warn('[abrirListaEntregaDocente] No se pudo consultar gateway por groupId:', e);
+        }
+      }
+
+      if (!estudiantes || estudiantes.length === 0) {
+        if (this.estudiantesInscritos().length > 0) {
+          estudiantes = this.estudiantesInscritos().map(e => ({
+            studentCode: e.codigo,
+            fullName: this._studentService.getNombreCompleto(e),
+            courseState: e.courseState || 'CURSANDO',
+            groupId: groupId || '',
+            syllabusCourseId: '',
+            paidInstallments: 5,
+            totalInstallments: 5
+          }));
+        } else if (item.mapeoEstudiantes && item.mapeoEstudiantes.length > 0) {
+          estudiantes = item.mapeoEstudiantes.map(m => ({
+            studentCode: m.codigoEstudiante,
+            fullName: `${m.apellido1 || ''} ${m.apellido2 || ''} ${m.nombres || ''}`.trim() || m.codigoEstudiante,
+            courseState: 'CURSANDO',
+            groupId: groupId || '',
+            syllabusCourseId: '',
+            paidInstallments: 5,
+            totalInstallments: 5
+          }));
+        }
+      }
+
+      if (!estudiantes || estudiantes.length === 0) {
+        this._mostrarToast('No se encontraron estudiantes para generar la planilla de entrega.', 'error');
+        return;
+      }
+
+      this.generarPdfListaEntregaDocente(item, estudiantes, cuotaRequerida, false);
+    } catch (err: any) {
+      console.error('Error generando lista de entrega:', err);
+      this._mostrarToast('No se pudo generar la planilla de entrega docente: ' + (err?.message || 'Error desconocido'), 'error');
+    }
+  }
+
+  public generarPdfListaEntregaDocente(
+    item: EvaluacionItemUI,
+    estudiantes: GroupStudentItem[],
+    cuotaRequerida: number,
+    isReimpresionActualizada = false
+  ): void {
+    // Formato American Folio / Legal (8.5 x 13 pulgadas = 215.9 x 330.2 mm)
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215.9, 330.2] });
+    const pageWidth = 215.9;
+    const pageHeight = 330.2;
+    const margin = 8;
+    const contentWidth = pageWidth - margin * 2; // 199.9 mm
+
+    // Diseño 100% monocromático / blanco y negro para máxima nitidez en impresión oficial
+    const black = { r: 0, g: 0, b: 0 };
+    const grayHeaderBg = { r: 238, g: 238, b: 238 };
+    const grayZebra = { r: 247, g: 247, b: 247 };
+
+    const ordenar = (a: GroupStudentItem, b: GroupStudentItem) => (a.fullName || '').localeCompare(b.fullName || '');
+    const habilitados = estudiantes.filter(e => (e.paidInstallments ?? 0) >= cuotaRequerida).sort(ordenar);
+    const noHabilitados = estudiantes.filter(e => (e.paidInstallments ?? 0) < cuotaRequerida).sort(ordenar);
+
+    // Ajuste dinámico de fila para garantizar hasta 50-60 estudiantes en UNA sola cara
+    const totalEstudiantes = estudiantes.length;
+    const rowHeight = totalEstudiantes <= 15 ? 5.8 : (totalEstudiantes <= 30 ? 5.2 : (totalEstudiantes <= 45 ? 4.5 : 4.0));
+    const fontSizeRows = totalEstudiantes <= 15 ? 8.0 : (totalEstudiantes <= 30 ? 7.5 : (totalEstudiantes <= 45 ? 7.0 : 6.5));
+
+    let y = margin;
+
+    // 1. HEADER INSTITUCIONAL (Monocromático)
+    pdf.setDrawColor(black.r, black.g, black.b);
+    pdf.setLineWidth(0.8);
+    pdf.line(margin, y, margin + contentWidth, y);
+    y += 4;
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10.5);
+    pdf.setTextColor(black.r, black.g, black.b);
+    pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC', margin, y);
+
+    pdf.setFontSize(7.5);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('DIRECCIÓN DE EVALUACIONES Y GESTIÓN ACADÉMICA', pageWidth - margin, y, { align: 'right' });
+    y += 4.5;
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    const tituloDoc = isReimpresionActualizada
+      ? 'PLANILLA DE ENTREGA Y CONTROL (ACTUALIZADA - POST CONCILIACIÓN DE PAGOS)'
+      : 'PLANILLA OFICIAL DE ENTREGA Y CONTROL DE HABILITACIÓN DE EXÁMENES';
+    pdf.text(tituloDoc, margin, y);
+
+    const etiquetaFecha = `Fecha de emisión: ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(etiquetaFecha, pageWidth - margin, y, { align: 'right' });
+    y += 2.5;
+
+    // 2. CAJA DE METADATOS BIEN DISTRIBUIDA (Estructura de 2 columnas balanceadas)
+    const boxY = y;
+    const boxHeight = 21;
+    pdf.setDrawColor(black.r, black.g, black.b);
+    pdf.setLineWidth(0.35);
+    pdf.rect(margin, boxY, contentWidth, boxHeight, 'S');
+
+    // Líneas divisorias horizontales internas
+    pdf.setLineWidth(0.2);
+    pdf.line(margin, boxY + 5.2, margin + contentWidth, boxY + 5.2);
+    pdf.line(margin, boxY + 10.4, margin + contentWidth, boxY + 10.4);
+    pdf.line(margin, boxY + 15.6, margin + contentWidth, boxY + 15.6);
+
+    // Divisor vertical central entre Columna Izquierda y Derecha (sólo filas 1 a 3)
+    const colMid = margin + 105; // Columna Izquierda: 105 mm | Columna Derecha: 94.9 mm
+    pdf.line(colMid, boxY, colMid, boxY + 15.6);
+
+    // Fila 1
+    // Columna Izquierda: Materia
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    pdf.text('MATERIA:', margin + 2.5, boxY + 3.7);
+    pdf.setFont('helvetica', 'normal');
+    const materiaTxt = `${item.codigo || ''} - ${item.materia || ''}`.toUpperCase();
+    pdf.text(pdf.splitTextToSize(materiaTxt, 86)[0] || materiaTxt, margin + 17, boxY + 3.7);
+
+    // Columna Derecha: Docente
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DOCENTE:', colMid + 2.5, boxY + 3.7);
+    pdf.setFont('helvetica', 'normal');
+    const docenteTxt = `${item.docenteNombre || '-'}${item.docenteCI ? ' (CI: ' + item.docenteCI + ')' : ''}`.toUpperCase();
+    pdf.text(pdf.splitTextToSize(docenteTxt, 75)[0] || docenteTxt, colMid + 17, boxY + 3.7);
+
+    // Fila 2
+    // Columna Izquierda: Carrera
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('CARRERA:', margin + 2.5, boxY + 8.9);
+    pdf.setFont('helvetica', 'normal');
+    const carreraTxt = (item.carreraNombre || item.careerCode || 'Todas las carreras').toUpperCase();
+    pdf.text(pdf.splitTextToSize(carreraTxt, 86)[0] || carreraTxt, margin + 17, boxY + 8.9);
+
+    // Columna Derecha: Fecha/Hora y Grupo
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('FECHA/HORA:', colMid + 2.5, boxY + 8.9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`${item.fecha || ''} ${item.hora || ''}`, colMid + 22, boxY + 8.9);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('GRUPO:', colMid + 56, boxY + 8.9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(item.grupo || '-', colMid + 68, boxY + 8.9);
+
+    // Fila 3
+    // Columna Izquierda: Evaluación y Modalidad
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('EVALUACIÓN:', margin + 2.5, boxY + 14.1);
+    pdf.setFont('helvetica', 'normal');
+    const modalidadTxt = item.modalidad ? item.modalidad.replace('PRESENCIAL_', '') : 'CARTILLA';
+    pdf.text(`${item.tipo || '-'} (${modalidadTxt})`, margin + 21, boxY + 14.1);
+
+    // Columna Derecha: Requisito de habilitación
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('REQUISITO:', colMid + 2.5, boxY + 14.1);
+    pdf.setFont('helvetica', 'normal');
+    const reglaTxt = cuotaRequerida === 0
+      ? 'Sin cuota mínima exigida (Todos habilitados)'
+      : `Cancelado hasta la ${cuotaRequerida}ª Cuota de colegiatura`;
+    pdf.text(reglaTxt, colMid + 19, boxY + 14.1);
+
+    // Fila 4: Franja de resumen institucional
+    pdf.setFillColor(grayHeaderBg.r, grayHeaderBg.g, grayHeaderBg.b);
+    pdf.rect(margin, boxY + 15.6, contentWidth, 5.4, 'FD');
+    pdf.setDrawColor(black.r, black.g, black.b);
+    pdf.rect(margin, boxY + 15.6, contentWidth, 5.4, 'S');
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.2);
+    const summaryTxt = `TOTAL INSCRITOS: ${totalEstudiantes} ESTUDIANTES     |     HABILITADOS: ${habilitados.length}     |     NO HABILITADOS (PENDIENTES): ${noHabilitados.length}`;
+    pdf.text(summaryTxt, margin + contentWidth / 2, boxY + 19.3, { align: 'center' });
+
+    y = boxY + boxHeight + 4;
+
+    // Helper para variante asignada
+    const obtenerVarianteEstudiante = (codigo: string): string => {
+      if (item.mapeoEstudiantes && item.mapeoEstudiantes.length > 0) {
+        const mapeo = item.mapeoEstudiantes.find(m => m.codigoEstudiante === codigo);
+        return mapeo?.letraVariante || '-';
+      }
+      return '-';
+    };
+
+    // 3. TABLA 1: ESTUDIANTES HABILITADOS
+    // Cuadrícula 100% simétrica y alineada entre ambas tablas:
+    // [N°: 8, CÓDIGO SEA: 24, APELLIDOS Y NOMBRES: 84, VAR.: 12, CUOTAS: 20, FIRMA/CASILLA: 51.9] = 199.9 mm
+    const colTable = [8, 24, 84, 12, 20, 51.9];
+    const encabezadosH = ['N°', 'CÓDIGO SEA', 'APELLIDOS Y NOMBRES', 'VAR.', 'CUOTAS', 'FIRMA DEL ESTUDIANTE / RECEPCIÓN'];
+
+    // Título Sección Habilitados
+    pdf.setFillColor(grayHeaderBg.r, grayHeaderBg.g, grayHeaderBg.b);
+    pdf.setDrawColor(black.r, black.g, black.b);
+    pdf.setLineWidth(0.35);
+    pdf.rect(margin, y, contentWidth, 5, 'FD');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.text(`1. ESTUDIANTES HABILITADOS (${habilitados.length}) — ENTREGAR CUADERNILLO Y CARTILLA OMR`, margin + 3, y + 3.6);
+    y += 5;
+
+    // Encabezados Tabla Habilitados
+    pdf.setDrawColor(black.r, black.g, black.b);
+    pdf.setLineWidth(0.25);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.8);
+
+    let curX = margin;
+    encabezadosH.forEach((enc, idx) => {
+      const align = [0, 1, 3, 4, 5].includes(idx) ? 'center' : 'left';
+      const posX = align === 'center' ? curX + colTable[idx] / 2 : curX + 2;
+      pdf.rect(curX, y, colTable[idx], 4.5, 'S');
+      pdf.text(enc, posX, y + 3.2, { align });
+      curX += colTable[idx];
+    });
+    y += 4.5;
+
+    if (habilitados.length === 0) {
+      pdf.setDrawColor(black.r, black.g, black.b);
+      pdf.rect(margin, y, contentWidth, 6, 'S');
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(7.2);
+      pdf.text('Ningún estudiante habilitado según el criterio de cuotas actual.', margin + contentWidth / 2, y + 4.2, { align: 'center' });
+      y += 8;
+    } else {
+      // Filas Habilitados
+      habilitados.forEach((est, index) => {
+        if (index % 2 === 1) {
+          pdf.setFillColor(grayZebra.r, grayZebra.g, grayZebra.b);
+          pdf.rect(margin, y, contentWidth, rowHeight, 'F');
+        }
+
+        curX = margin;
+        // N°
+        pdf.setDrawColor(black.r, black.g, black.b);
+        pdf.rect(curX, y, colTable[0], rowHeight, 'S');
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(fontSizeRows);
+        pdf.text(String(index + 1), curX + colTable[0] / 2, y + rowHeight * 0.7, { align: 'center' });
+        curX += colTable[0];
+
+        // Código SEA
+        pdf.rect(curX, y, colTable[1], rowHeight, 'S');
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(est.studentCode || '', curX + colTable[1] / 2, y + rowHeight * 0.7, { align: 'center' });
+        curX += colTable[1];
+
+        // Nombres
+        pdf.rect(curX, y, colTable[2], rowHeight, 'S');
+        pdf.setFont('helvetica', 'normal');
+        const nombreLimpio = (est.fullName || '').trim().toUpperCase();
+        pdf.text(pdf.splitTextToSize(nombreLimpio, colTable[2] - 3)[0] || nombreLimpio, curX + 2, y + rowHeight * 0.7);
+        curX += colTable[2];
+
+        // Variante
+        pdf.rect(curX, y, colTable[3], rowHeight, 'S');
+        pdf.setFont('helvetica', 'bold');
+        const varAsig = obtenerVarianteEstudiante(est.studentCode);
+        pdf.text(varAsig, curX + colTable[3] / 2, y + rowHeight * 0.7, { align: 'center' });
+        curX += colTable[3];
+
+        // Cuotas
+        pdf.rect(curX, y, colTable[4], rowHeight, 'S');
+        pdf.setFont('helvetica', 'bold');
+        const cuotasTxt = `${est.paidInstallments ?? 0} / ${est.totalInstallments ?? 5}`;
+        pdf.text(cuotasTxt, curX + colTable[4] / 2, y + rowHeight * 0.7, { align: 'center' });
+        curX += colTable[4];
+
+        // Firma
+        pdf.rect(curX, y, colTable[5], rowHeight, 'S');
+        curX += colTable[5];
+
+        y += rowHeight;
+      });
+    }
+
+    y += 4;
+
+    // 4. TABLA 2: ESTUDIANTES NO HABILITADOS
+    // Utiliza exactamente las mismas columnas y anchos para alineación vertical perfecta
+    const encabezadosNH = ['N°', 'CÓDIGO SEA', 'APELLIDOS Y NOMBRES', 'VAR.', 'CUOTAS', '[ X ] REGULARIZÓ EN CAJA'];
+
+    // Título Sección No Habilitados
+    pdf.setFillColor(grayHeaderBg.r, grayHeaderBg.g, grayHeaderBg.b);
+    pdf.setDrawColor(black.r, black.g, black.b);
+    pdf.setLineWidth(0.35);
+    pdf.rect(margin, y, contentWidth, 5, 'FD');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    pdf.text(
+      `2. ESTUDIANTES NO HABILITADOS (${noHabilitados.length}) — NO ENTREGAR EXAMEN (SALVO PAGO EN CAJA CON RECIBO)`,
+      margin + 3,
+      y + 3.6
+    );
+    y += 5;
+
+    if (noHabilitados.length === 0) {
+      pdf.setDrawColor(black.r, black.g, black.b);
+      pdf.rect(margin, y, contentWidth, 6, 'S');
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(7.2);
+      pdf.text('Ningún estudiante inhabilitado. La totalidad del grupo cumple con los requisitos de cuotas.', margin + contentWidth / 2, y + 4.2, { align: 'center' });
+      y += 8;
+    } else {
+      // Encabezados Tabla No Habilitados
+      pdf.setDrawColor(black.r, black.g, black.b);
+      pdf.setLineWidth(0.25);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.8);
+
+      curX = margin;
+      encabezadosNH.forEach((enc, idx) => {
+        const align = [0, 1, 3, 4, 5].includes(idx) ? 'center' : 'left';
+        const posX = align === 'center' ? curX + colTable[idx] / 2 : curX + 2;
+        pdf.rect(curX, y, colTable[idx], 4.5, 'S');
+        pdf.text(enc, posX, y + 3.2, { align });
+        curX += colTable[idx];
+      });
+      y += 4.5;
+
+      noHabilitados.forEach((est, index) => {
+        if (index % 2 === 1) {
+          pdf.setFillColor(grayZebra.r, grayZebra.g, grayZebra.b);
+          pdf.rect(margin, y, contentWidth, rowHeight, 'F');
+        }
+
+        curX = margin;
+        // N°
+        pdf.setDrawColor(black.r, black.g, black.b);
+        pdf.rect(curX, y, colTable[0], rowHeight, 'S');
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(fontSizeRows);
+        pdf.text(String(index + 1), curX + colTable[0] / 2, y + rowHeight * 0.7, { align: 'center' });
+        curX += colTable[0];
+
+        // Código SEA
+        pdf.rect(curX, y, colTable[1], rowHeight, 'S');
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(est.studentCode || '', curX + colTable[1] / 2, y + rowHeight * 0.7, { align: 'center' });
+        curX += colTable[1];
+
+        // Nombres
+        pdf.rect(curX, y, colTable[2], rowHeight, 'S');
+        pdf.setFont('helvetica', 'normal');
+        const nombreLimpio = (est.fullName || '').trim().toUpperCase();
+        pdf.text(pdf.splitTextToSize(nombreLimpio, colTable[2] - 3)[0] || nombreLimpio, curX + 2, y + rowHeight * 0.7);
+        curX += colTable[2];
+
+        // Variante
+        pdf.rect(curX, y, colTable[3], rowHeight, 'S');
+        pdf.setFont('helvetica', 'bold');
+        const varAsig = obtenerVarianteEstudiante(est.studentCode);
+        pdf.text(varAsig, curX + colTable[3] / 2, y + rowHeight * 0.7, { align: 'center' });
+        curX += colTable[3];
+
+        // Cuotas Pagadas
+        pdf.rect(curX, y, colTable[4], rowHeight, 'S');
+        pdf.setFont('helvetica', 'bold');
+        const cuotasTxt = `${est.paidInstallments ?? 0} / ${est.totalInstallments ?? 5}`;
+        pdf.text(cuotasTxt, curX + colTable[4] / 2, y + rowHeight * 0.7, { align: 'center' });
+        curX += colTable[4];
+
+        // Casilla [ X ] para marcar con lapicero si regularizó pago en caja
+        pdf.rect(curX, y, colTable[5], rowHeight, 'S');
+        const boxSize = Math.min(3.8, rowHeight - 1.2);
+        const boxCheckX = curX + 5;
+        const boxCheckY = y + (rowHeight - boxSize) / 2;
+        pdf.setDrawColor(black.r, black.g, black.b);
+        pdf.setLineWidth(0.4);
+        pdf.rect(boxCheckX, boxCheckY, boxSize, boxSize, 'S');
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(fontSizeRows * 0.92);
+        pdf.text('Pagó en caja (con boleta)', boxCheckX + boxSize + 2.5, y + rowHeight * 0.7);
+        curX += colTable[5];
+
+        y += rowHeight;
+      });
+    }
+
+    // 5. PIE DE PÁGINA SIMPLE Y LIMPIO (Sin recuadros de firmas, según solicitud del usuario)
+    pdf.setDrawColor(black.r, black.g, black.b);
+    pdf.setLineWidth(0.4);
+    pdf.line(margin, pageHeight - margin - 4, margin + contentWidth, pageHeight - margin - 4);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(black.r, black.g, black.b);
+    pdf.text(
+      'SISTEMA DE EVALUACIONES UNITEPC · PLANILLA OFICIAL DE CONTROL · Marcar [X] solo si el estudiante presenta boleta oficial de caja.',
+      margin,
+      pageHeight - margin - 1.5
+    );
+    pdf.text(
+      'Hoja Oficio (8.5" x 13")',
+      pageWidth - margin,
+      pageHeight - margin - 1.5,
+      { align: 'right' }
+    );
+
+    // Guardar blob y preparar modal de previsualización inmediata
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    const segura = this._sanitizer.bypassSecurityTrustResourceUrl(url);
+    const nombre = `Planilla_Entrega_${item.codigo || 'MAT'}_${item.grupo || 'G1'}_Oficio.pdf`;
+
+    this.previewListaEntrega.set({
+      url,
+      segura,
+      nombre,
+      totalEstudiantes,
+      totalHabilitados: habilitados.length,
+      totalNoHabilitados: noHabilitados.length
+    });
+  }
+
+  public async procesarTransicionAEntregado(item: EvaluacionItemUI): Promise<void> {
+    try {
+      this._mostrarToast('Consultando nómina para snapshot de entrega...', 'info');
+      const cuotaRequerida = this.resolverCuotaHabilitacionParcial(item.tipo);
+      let groupId: string | undefined = item.seaGroupId;
+      if (!groupId) {
+        groupId = await firstValueFrom(this._resolverGrupoSEA(item));
+      }
+
+      let estudiantes: GroupStudentItem[] = [];
+      if (groupId) {
+        try {
+          const res = await firstValueFrom(this._gateway.getStudentsByGroup(groupId).pipe(catchError(() => of([]))));
+          if (res && res.length > 0) estudiantes = res;
+        } catch (e) {
+          console.warn('[procesarTransicionAEntregado] Error consultando gateway:', e);
+        }
+      }
+
+      if (!estudiantes || estudiantes.length === 0) {
+        if (this.estudiantesInscritos().length > 0) {
+          estudiantes = this.estudiantesInscritos().map(e => ({
+            studentCode: e.codigo,
+            fullName: this._studentService.getNombreCompleto(e),
+            courseState: e.courseState || 'CURSANDO',
+            groupId: groupId || '',
+            syllabusCourseId: '',
+            paidInstallments: 5,
+            totalInstallments: 5
+          }));
+        } else if (item.mapeoEstudiantes && item.mapeoEstudiantes.length > 0) {
+          estudiantes = item.mapeoEstudiantes.map(m => ({
+            studentCode: m.codigoEstudiante,
+            fullName: `${m.apellido1 || ''} ${m.apellido2 || ''} ${m.nombres || ''}`.trim() || m.codigoEstudiante,
+            courseState: 'CURSANDO',
+            groupId: groupId || '',
+            syllabusCourseId: '',
+            paidInstallments: 5,
+            totalInstallments: 5
+          }));
+        }
+      }
+
+      const snapshotPayload = {
+        fechaEntrega: new Date().toISOString(),
+        cuotaRequerida,
+        totalEstudiantes: estudiantes.length,
+        estudiantes: estudiantes.map(e => ({
+          studentCode: e.studentCode,
+          fullName: e.fullName,
+          paidInstallments: e.paidInstallments ?? 0,
+          totalInstallments: e.totalInstallments ?? 5,
+          habilitado: (e.paidInstallments ?? 0) >= cuotaRequerida
+        }))
+      };
+      const snapshotJson = JSON.stringify(snapshotPayload);
+
+      this._rolService.transicionarEstado(item.id, {
+        nuevoEstado: 'ENTREGADO',
+        snapshotEntregaEstudiantesJson: snapshotJson
+      }).subscribe({
+        next: rolActualizado => {
+          item.etapa = 'Entregado';
+          item.estado = 'ENTREGADO';
+          item.snapshotEntregaEstudiantesJson = snapshotJson;
+          this.evaluaciones.update(items => [...items]);
+          const habCount = snapshotPayload.estudiantes.filter(s => s.habilitado).length;
+          this._mostrarToast(`Examen entregado al docente. Snapshot registrado (${habCount} habilitados de ${estudiantes.length}).`);
+          // Abrir de inmediato la planilla oficial de entrega docente en pantalla
+          this.generarPdfListaEntregaDocente(item, estudiantes, cuotaRequerida, false);
+        },
+        error: err => {
+          this._mostrarToast('No se pudo registrar la entrega: ' + (err?.error?.message || err?.message), 'error');
+        }
+      });
+    } catch (err: any) {
+      this._mostrarToast('Error procesando entrega: ' + (err?.message || ''), 'error');
+    }
+  }
+
+  public toggleEstudianteRindio(codigo: string): void {
+    this.regularizadosMarcadosRindieron.update(set => {
+      const nuevo = new Set(set);
+      if (nuevo.has(codigo)) {
+        nuevo.delete(codigo);
+      } else {
+        nuevo.add(codigo);
+      }
+      return nuevo;
+    });
+  }
+
+  public esEstudianteRindio(codigo: string): boolean {
+    return this.regularizadosMarcadosRindieron().has(codigo);
+  }
+
+  public seleccionarTodosRegularizados(seleccionar: boolean): void {
+    const conciliacion = this.conciliacionDevolucionActual();
+    if (!conciliacion?.estudiantesRegularizados) return;
+    if (seleccionar) {
+      const todos = new Set(conciliacion.estudiantesRegularizados.map(e => e.studentCode));
+      this.regularizadosMarcadosRindieron.set(todos);
+    } else {
+      this.regularizadosMarcadosRindieron.set(new Set());
+    }
+  }
+
+  public abrirModalConciliacionManual(item: EvaluacionItemUI): void {
+    this.procesarTransicionADevuelto(item, true);
+  }
+
+  public procesarTransicionADevuelto(item: EvaluacionItemUI, forzarApertura = false): void {
+    this.procesandoConciliacionDevolucion.set(true);
+    this._rolService.verificarRegularizaciones(item.id, this.esEntornoLocal).subscribe({
+      next: conciliacion => {
+        this.procesandoConciliacionDevolucion.set(false);
+        const hayRegularizados = !!(conciliacion && conciliacion.hayCambios && conciliacion.estudiantesRegularizados && conciliacion.estudiantesRegularizados.length > 0);
+
+        if (hayRegularizados || forzarApertura) {
+          this.conciliacionDevolucionActual.set(conciliacion);
+          this.evaluacionParaDevolucion.set(item);
+          if (conciliacion?.estudiantesRegularizados && conciliacion.estudiantesRegularizados.length > 0) {
+            const todos = new Set(conciliacion.estudiantesRegularizados.map(e => e.studentCode));
+            this.regularizadosMarcadosRindieron.set(todos);
+          } else {
+            this.regularizadosMarcadosRindieron.set(new Set());
+          }
+          this.dialogConciliacionDevolucion.set(true);
+        } else {
+          this._ejecutarTransicionDevolucion(item);
+        }
+      },
+      error: err => {
+        this.procesandoConciliacionDevolucion.set(false);
+        console.warn('Error verificando conciliación, procediendo con devolución:', err);
+        this._ejecutarTransicionDevolucion(item);
+      }
+    });
+  }
+
+  public _ejecutarTransicionDevolucion(item: EvaluacionItemUI, infoConciliacion?: { totalRegularizados: number; rindieron: string[] }): void {
+    this._rolService.transicionarEstado(item.id, {
+      nuevoEstado: 'DEVUELTO'
+    }).subscribe({
+      next: rolActualizado => {
+        item.etapa = 'Devuelto';
+        item.estado = 'DEVUELTO';
+        this.evaluaciones.update(items => [...items]);
+        if (infoConciliacion && infoConciliacion.totalRegularizados > 0) {
+          this._mostrarToast(`Examen registrado como DEVUELTO. Conciliación: ${infoConciliacion.rindieron.length} de ${infoConciliacion.totalRegularizados} regularizados rindieron prueba.`, 'success');
+        } else {
+          this._mostrarToast(`Examen registrado como DEVUELTO. Control verificado (0 pagos de último momento).`);
+        }
+      },
+      error: err => {
+        this._mostrarToast('No se pudo registrar la devolución: ' + (err?.error?.message || err?.message), 'error');
+      }
+    });
+  }
+
+  public cerrarModalConciliacion(): void {
+    this.dialogConciliacionDevolucion.set(false);
+    this.conciliacionDevolucionActual.set(null);
+    this.evaluacionParaDevolucion.set(null);
+    this.regularizadosMarcadosRindieron.set(new Set());
+  }
+
+  public confirmarDevolucionConRegularizados(): void {
+    const item = this.evaluacionParaDevolucion();
+    const conciliacion = this.conciliacionDevolucionActual();
+    if (!item) return;
+
+    const rindieron = Array.from(this.regularizadosMarcadosRindieron());
+    const totalReg = conciliacion?.estudiantesRegularizados?.length || 0;
+
+    const payload = {
+      fechaDevolucion: new Date().toISOString(),
+      cuotaRequerida: conciliacion?.cuotaRequerida ?? this.resolverCuotaHabilitacionParcial(item.tipo),
+      totalEstudiantes: conciliacion?.totalEstudiantes ?? item.estudiantesInscritosCount ?? 0,
+      totalHabilitadosInicial: conciliacion?.totalHabilitadosInicial ?? 0,
+      totalHabilitadosFinal: conciliacion?.totalHabilitadosActual ?? 0,
+      huboCambioHabilitados: totalReg > 0,
+      estudiantesRegularizados: conciliacion?.estudiantesRegularizados || [],
+      estudiantesRegularizadosQueRindieron: rindieron,
+      usuarioRegistro: this._auth.usuario()?.usuario || 'PERSONAL_EVALUACIONES'
+    };
+    const payloadJson = JSON.stringify(payload);
+    item.conciliacionDevolucionJson = payloadJson;
+
+    this._rolService.guardarConciliacionDevolucion(item.id, payloadJson).subscribe({
+      next: () => {
+        this.cerrarModalConciliacion();
+        if (item.etapa === 'Devuelto') {
+          this._mostrarToast(`Conciliación actualizada: ${rindieron.length} estudiantes marcados que rindieron examen.`, 'success');
+        } else {
+          this._ejecutarTransicionDevolucion(item, { totalRegularizados: totalReg, rindieron });
+        }
+        if (totalReg > 0) {
+          this.generarPdfActaRegularizaciones([item], false);
+        }
+      },
+      error: () => {
+        this.cerrarModalConciliacion();
+        if (item.etapa !== 'Devuelto') {
+          this._ejecutarTransicionDevolucion(item, { totalRegularizados: totalReg, rindieron });
+        }
+        if (totalReg > 0) {
+          this.generarPdfActaRegularizaciones([item], false);
+        }
+      }
+    });
+  }
+
+  public async reimprimirListaActualizada(): Promise<void> {
+    const item = this.evaluacionParaDevolucion();
+    const conciliacion = this.conciliacionDevolucionActual();
+    if (!item) return;
+
+    try {
+      this._mostrarToast('Generando Planilla Actualizada con Pagos Regularizados...', 'info');
+      const cuotaRequerida = conciliacion?.cuotaRequerida ?? this.resolverCuotaHabilitacionParcial(item.tipo);
+
+      let estudiantes: GroupStudentItem[] = [];
+      if (conciliacion?.estudiantesActuales && conciliacion.estudiantesActuales.length > 0) {
+        estudiantes = conciliacion.estudiantesActuales.map(e => ({
+          studentCode: e.studentCode,
+          fullName: e.fullName,
+          courseState: 'CURSANDO',
+          groupId: item.seaGroupId || '',
+          syllabusCourseId: '',
+          paidInstallments: e.paidInstallments,
+          totalInstallments: e.totalInstallments
+        }));
+      } else {
+        let groupId: string | undefined = item.seaGroupId;
+        if (!groupId) {
+          groupId = await firstValueFrom(this._resolverGrupoSEA(item));
+        }
+        if (groupId) {
+          estudiantes = await firstValueFrom(this._gateway.getStudentsByGroup(groupId).pipe(catchError(() => of([])))) || [];
+        }
+      }
+
+      const rindieronSet = this.regularizadosMarcadosRindieron();
+      const estudiantesMarcados = estudiantes.map(e => {
+        if (rindieronSet.has(e.studentCode)) {
+          return {
+            ...e,
+            fullName: `${e.fullName} [REGULARIZADO EN CAJA · RINDIÓ EXAMEN]`
+          };
+        }
+        return e;
+      });
+
+      this.generarPdfListaEntregaDocente(item, estudiantesMarcados, cuotaRequerida, true);
+    } catch (err: any) {
+      console.error('Error al reimprimir lista actualizada:', err);
+      this._mostrarToast('No se pudo reimprimir la lista actualizada: ' + (err?.message || ''), 'error');
+    }
+  }
+
+  public imprimirIframeEntrega(): void {
+    const preview = this.previewListaEntrega();
+    if (!preview) return;
+    const win = window.open(preview.url, '_blank');
+    if (!win) {
+      this.descargarPdfListaEntrega();
+    }
+  }
+
+  public descargarPdfListaEntrega(): void {
+    const preview = this.previewListaEntrega();
+    if (!preview) return;
+    const a = document.createElement('a');
+    a.href = preview.url;
+    a.download = preview.nombre;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  public cerrarPreviewListaEntrega(): void {
+    const prev = this.previewListaEntrega();
+    if (prev?.url) {
+      URL.revokeObjectURL(prev.url);
+    }
+    this.previewListaEntrega.set(null);
+  }
+
+  public tieneConciliacionConRegularizados(item: EvaluacionItemUI): boolean {
+    if (!item?.conciliacionDevolucionJson) return false;
+    try {
+      const data = typeof item.conciliacionDevolucionJson === 'string'
+        ? JSON.parse(item.conciliacionDevolucionJson)
+        : item.conciliacionDevolucionJson;
+      return Boolean(data?.huboCambioHabilitados && data?.estudiantesRegularizados && data.estudiantesRegularizados.length > 0);
+    } catch {
+      return false;
+    }
+  }
+
+  public abrirActaConciliacionIndividual(item: EvaluacionItemUI): void {
+    if (!this.tieneConciliacionConRegularizados(item)) {
+      this._mostrarToast('Esta materia no tiene registro de regularizaciones en devolución.', 'info');
+      return;
+    }
+    this.generarPdfActaRegularizaciones([item], false);
+  }
+
+  public generarActaConsolidadaMateriasConRegularizaciones(): void {
+    const materiasConCambio = this.evaluaciones().filter(item => this.tieneConciliacionConRegularizados(item));
+    if (materiasConCambio.length === 0) {
+      this._mostrarToast('No hay materias con cambios de habilitados (regularizaciones en caja) entre la entrega y devolución en la vista actual.', 'info');
+      return;
+    }
+    this.generarPdfActaRegularizaciones(materiasConCambio, true);
+  }
+
+  public generarPdfActaRegularizaciones(
+    items: EvaluacionItemUI[],
+    esConsolidado = false
+  ): void {
+    if (!items || items.length === 0) {
+      this._mostrarToast('No hay materias con regularizaciones para generar el documento.', 'warning');
+      return;
+    }
+
+    // Formato American Folio / Oficio (8.5 x 13 pulgadas = 215.9 x 330.2 mm)
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215.9, 330.2] });
+    const pageWidth = 215.9;
+    const pageHeight = 330.2;
+    const margin = 8;
+    const contentWidth = pageWidth - margin * 2; // 199.9 mm
+
+    const black = { r: 0, g: 0, b: 0 };
+    const grayBg = { r: 240, g: 240, b: 240 };
+    const grayZebra = { r: 248, g: 248, b: 248 };
+
+    let y = margin;
+
+    const imprimirEncabezado = (paginaNum: number) => {
+      pdf.setDrawColor(black.r, black.g, black.b);
+      pdf.setLineWidth(0.8);
+      pdf.line(margin, y, margin + contentWidth, y);
+      y += 4;
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10.5);
+      pdf.setTextColor(black.r, black.g, black.b);
+      pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC', margin, y);
+
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text('DIRECCIÓN DE EVALUACIONES Y GESTIÓN ACADÉMICA', pageWidth - margin, y, { align: 'right' });
+      y += 4.5;
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      const tituloDoc = esConsolidado
+        ? 'ACTA CONSOLIDADA DE MATERIAS CON REGULARIZACIONES DE CAJA (DEVOLUCIÓN)'
+        : 'ACTA OFICIAL DE CONCILIACIÓN Y REGULARIZACIÓN DE ESTUDIANTES EN CAJA';
+      pdf.text(tituloDoc, margin, y);
+
+      const fechaStr = new Date().toLocaleString('es-BO', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      });
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Emisión: ${fechaStr} | Pág. ${paginaNum}`, pageWidth - margin, y, { align: 'right' });
+      y += 4;
+
+      pdf.setLineWidth(0.4);
+      pdf.line(margin, y, margin + contentWidth, y);
+      y += 4;
+
+      // Banner resumen
+      pdf.setFillColor(grayBg.r, grayBg.g, grayBg.b);
+      pdf.rect(margin, y, contentWidth, 6, 'FD');
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'bold');
+      const sedeNombre = this.sedeSeleccionada()?.name || 'Todas las sedes';
+      pdf.text(`SEDE / CAMPUS: ${sedeNombre} | GESTIÓN: 2-2026 | MATERIAS CON CAMBIO DE HABILITADOS: ${items.length}`, margin + 2, y + 4.2);
+      y += 9;
+    };
+
+    let paginaActual = 1;
+    imprimirEncabezado(paginaActual);
+
+    // Iterar por cada materia con regularizaciones
+    items.forEach((item, index) => {
+      let data: any = {};
+      try {
+        data = typeof item.conciliacionDevolucionJson === 'string'
+          ? JSON.parse(item.conciliacionDevolucionJson)
+          : (item.conciliacionDevolucionJson || {});
+      } catch {
+        data = {};
+      }
+
+      const regularizados: any[] = data.estudiantesRegularizados || [];
+      const rindieronSet = new Set<string>(data.estudiantesRegularizadosQueRindieron || []);
+
+      // Verificar si cabe la tarjeta de materia + tabla en la página actual
+      const alturaEstimada = 24 + (Math.max(1, regularizados.length) * 6) + 8;
+      if (y + alturaEstimada > pageHeight - 32) {
+        pdf.addPage();
+        paginaActual++;
+        y = margin;
+        imprimirEncabezado(paginaActual);
+      }
+
+      // Tarjeta de la materia
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.3);
+      pdf.setFillColor(245, 245, 245);
+      pdf.rect(margin, y, contentWidth, 14, 'FD');
+
+      pdf.setFontSize(8.5);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${index + 1}. MATERIA: [${item.codigo}] ${item.materia}  ·  GRUPO: ${item.grupo}  ·  EVALUACIÓN: ${item.tipo}`, margin + 2, y + 4);
+
+      pdf.setFontSize(7.2);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`DOCENTE: ${item.docenteNombre || '-'} (CI: ${item.docenteCI || '-'})   |   FECHA/HORA: ${item.fechaDisplay || '-'} ${item.horario || '-'}   |   AULA: ${item.aula || '-'}`, margin + 2, y + 8);
+
+      pdf.setFont('helvetica', 'bold');
+      const habInicial = data.totalHabilitadosInicial ?? '-';
+      const habFinal = data.totalHabilitadosFinal ?? '-';
+      const totalEst = data.totalEstudiantes ?? item.estudiantesInscritosCount ?? '-';
+      const habTxt = `ESTADO HABILITACIÓN: Al entregar: ${habInicial}/${totalEst}   -->   Al devolver: ${habFinal}/${totalEst}   (+${regularizados.length} regularizados en caja durante examen)`;
+      pdf.text(habTxt, margin + 2, y + 12);
+      y += 16;
+
+      // Encabezado de tabla de estudiantes regularizados
+      const colW = [10, 26, 82, 34, 47.9]; // suma = 199.9 mm
+      const xCols = [
+        margin,
+        margin + colW[0],
+        margin + colW[0] + colW[1],
+        margin + colW[0] + colW[1] + colW[2],
+        margin + colW[0] + colW[1] + colW[2] + colW[3]
+      ];
+
+      pdf.setFillColor(230, 230, 230);
+      pdf.rect(margin, y, contentWidth, 5.5, 'FD');
+      pdf.setFontSize(7.0);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('N°', xCols[0] + 5, y + 3.8, { align: 'center' });
+      pdf.text('CÓDIGO SEA', xCols[1] + 13, y + 3.8, { align: 'center' });
+      pdf.text('APELLIDOS Y NOMBRES', xCols[2] + 2, y + 3.8);
+      pdf.text('CUOTAS CANCELADAS', xCols[3] + 17, y + 3.8, { align: 'center' });
+      pdf.text('¿ALCANZÓ A RENDIR EXAMEN?', xCols[4] + 24, y + 3.8, { align: 'center' });
+      y += 5.5;
+
+      if (regularizados.length === 0) {
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(7.5);
+        pdf.text('No se registraron regularizaciones en caja durante el examen.', margin + 4, y + 4);
+        y += 6;
+      } else {
+        regularizados.forEach((est, idx) => {
+          if (y + 6 > pageHeight - 32) {
+            pdf.addPage();
+            paginaActual++;
+            y = margin;
+            imprimirEncabezado(paginaActual);
+          }
+
+          const esPar = idx % 2 === 1;
+          if (esPar) {
+            pdf.setFillColor(grayZebra.r, grayZebra.g, grayZebra.b);
+            pdf.rect(margin, y, contentWidth, 5.5, 'F');
+          }
+          pdf.rect(margin, y, contentWidth, 5.5, 'S');
+
+          const rindio = rindieronSet.has(est.studentCode);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(7.0);
+          pdf.text(String(idx + 1), xCols[0] + 5, y + 3.8, { align: 'center' });
+          pdf.text(String(est.studentCode), xCols[1] + 13, y + 3.8, { align: 'center' });
+          pdf.text(String(est.fullName || ''), xCols[2] + 2, y + 3.8);
+          
+          const cuotasVal = est.cuotasActuales ?? est.paidInstallments ?? '-';
+          const reqVal = data.cuotaRequerida ?? 3;
+          const cuotasTxt = `${cuotasVal} / 5 cuotas (Mín. Req: ${reqVal}ª cuota)`;
+          pdf.text(cuotasTxt, xCols[3] + 17, y + 3.8, { align: 'center' });
+
+          // Marca de examen rendido
+          if (rindio) {
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('[ X ] SÍ RINDIÓ EXAMEN (Boleta presentada)', xCols[4] + 3, y + 3.8);
+          } else {
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('[   ] NO RINDIÓ EXAMEN (No se presentó)', xCols[4] + 3, y + 3.8);
+          }
+          y += 5.5;
+        });
+      }
+
+      y += 5; // Espacio entre materias
+    });
+
+    // Sección de Firmas al pie
+    if (y + 30 > pageHeight - margin) {
+      pdf.addPage();
+      y = margin + 12;
+    } else {
+      y += 10;
+    }
+
+    const firmWidth = 55;
+    const yFirma = y + 14;
+    // 1. Personal Evaluaciones
+    pdf.setLineWidth(0.4);
+    pdf.line(margin + 5, yFirma, margin + 5 + firmWidth, yFirma);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    pdf.text('PERSONAL DE EVALUACIONES', margin + 5 + firmWidth / 2, yFirma + 3.5, { align: 'center' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Recepción y Verificación', margin + 5 + firmWidth / 2, yFirma + 6.5, { align: 'center' });
+
+    // 2. Docente Titular
+    const xDoc = margin + (contentWidth - firmWidth) / 2;
+    pdf.line(xDoc, yFirma, xDoc + firmWidth, yFirma);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DOCENTE TITULAR', xDoc + firmWidth / 2, yFirma + 3.5, { align: 'center' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Conformidad de Asistencia', xDoc + firmWidth / 2, yFirma + 6.5, { align: 'center' });
+
+    // 3. Responsable Caja / Cobranzas
+    const xCaja = margin + contentWidth - firmWidth - 5;
+    pdf.line(xCaja, yFirma, xCaja + firmWidth, yFirma);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('CAJA / COBRANZAS', xCaja + firmWidth / 2, yFirma + 3.5, { align: 'center' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Verificación de Boletas', xCaja + firmWidth / 2, yFirma + 6.5, { align: 'center' });
+
+    // Generar Blob y abrir preview
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    const segura = this._sanitizer.bypassSecurityTrustResourceUrl(url);
+
+    const docNombre = esConsolidado
+      ? `Acta_Consolidada_Regularizaciones_${new Date().toISOString().slice(0, 10)}.pdf`
+      : `Acta_Regularizacion_${items[0]?.codigo || 'Materia'}_${items[0]?.grupo || ''}.pdf`;
+
+    const totalReg = items.reduce((acc, it) => {
+      try {
+        const d = typeof it.conciliacionDevolucionJson === 'string'
+          ? JSON.parse(it.conciliacionDevolucionJson)
+          : (it.conciliacionDevolucionJson || {});
+        return acc + (d.estudiantesRegularizados?.length || 0);
+      } catch { return acc; }
+    }, 0);
+
+    this.previewListaEntrega.set({
+      url,
+      segura,
+      nombre: docNombre,
+      totalEstudiantes: items.length,
+      totalHabilitados: items.length,
+      totalNoHabilitados: 0,
+      titulo: esConsolidado
+        ? 'Acta Consolidada de Materias con Regularizaciones (Devolución)'
+        : `Acta de Regularizaciones en Devolución · ${items[0]?.codigo} (${items[0]?.grupo})`,
+      subtitulo: esConsolidado 
+        ? `Consolidado de ${items.length} materia(s) que tuvieron cambios de habilitados al devolver`
+        : `Materia ${items[0]?.codigo} · ${items[0]?.materia} - ${items[0]?.docenteNombre || ''}`,
+      esActaRegularizaciones: true,
+      totalRegularizados: totalReg
+    });
   }
 
   private fechaActualLocal(): string {

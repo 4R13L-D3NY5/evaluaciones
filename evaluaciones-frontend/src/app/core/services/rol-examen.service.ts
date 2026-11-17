@@ -50,6 +50,8 @@ export interface RolExamenResponse {
   estadoPrevioRestablecimiento?: string;
   motivoRestablecimiento?: string;
   fechaRestablecimiento?: string;
+  snapshotEntregaEstudiantesJson?: string;
+  conciliacionDevolucionJson?: string;
 }
 
 export interface RolExamenCreateRequest {
@@ -84,6 +86,34 @@ export interface RolExamenEstadoRequest {
   motivo?: string;
   usuario?: string;
   ipOrigen?: string;
+  snapshotEntregaEstudiantesJson?: string;
+  conciliacionDevolucionJson?: string;
+}
+
+export interface EstudianteRegularizado {
+  studentCode: string;
+  fullName: string;
+  cuotasPrevias: number;
+  cuotasActuales: number;
+}
+
+export interface EstudianteEntregaDetalle {
+  studentCode: string;
+  fullName: string;
+  paidInstallments: number;
+  totalInstallments: number;
+  habilitado: boolean;
+  regularizado: boolean;
+}
+
+export interface ConciliacionEntregaResponse {
+  hayCambios: boolean;
+  cuotaRequerida: number;
+  totalEstudiantes: number;
+  totalHabilitadosInicial: number;
+  totalHabilitadosActual: number;
+  estudiantesRegularizados: EstudianteRegularizado[];
+  estudiantesActuales: EstudianteEntregaDetalle[];
 }
 
 export interface CambiarModalidadRequest {
@@ -260,6 +290,34 @@ export class RolExamenService {
     return this._http.post<ReprogramarRangoResponse>(`${this._baseUrl}/reprogramar-rango`, request).pipe(
       catchError(err => {
         console.error('[RolExamenService] Error al reprogramar rango masivo:', err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public verificarRegularizaciones(id: string, simular = false): Observable<ConciliacionEntregaResponse> {
+    const params = simular ? '?simular=true' : '';
+    return this._http.get<ConciliacionEntregaResponse>(`${this._baseUrl}/${id}/conciliacion-entrega${params}`).pipe(
+      catchError(err => {
+        console.error(`[RolExamenService] Error al verificar regularizaciones para el rol ${id}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public guardarSnapshotEntrega(id: string, snapshotJson: string): Observable<void> {
+    return this._http.put<void>(`${this._baseUrl}/${id}/snapshot-entrega`, { snapshotJson }).pipe(
+      catchError(err => {
+        console.error(`[RolExamenService] Error al guardar snapshot de entrega para el rol ${id}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public guardarConciliacionDevolucion(id: string, conciliacionJson: string): Observable<void> {
+    return this._http.put<void>(`${this._baseUrl}/${id}/conciliacion-devolucion`, { conciliacionJson }).pipe(
+      catchError(err => {
+        console.error(`[RolExamenService] Error al guardar conciliación de devolución para el rol ${id}:`, err);
         return throwError(() => err);
       })
     );

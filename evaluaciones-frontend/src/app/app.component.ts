@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { GlobalLoadingComponent } from './shared/components/global-loading/global-loading.component';
 import { UiFeedbackComponent } from './shared/components/ui-feedback/ui-feedback.component';
 import { SessionExpiryComponent } from './shared/components/session-expiry/session-expiry.component';
+import { ConfiguracionEvaluacionesService } from './core/services/configuracion-evaluaciones.service';
 
 @Component({
   selector: 'sea-root',
@@ -10,11 +11,19 @@ import { SessionExpiryComponent } from './shared/components/session-expiry/sessi
   imports: [RouterModule, GlobalLoadingComponent, UiFeedbackComponent, SessionExpiryComponent],
   template: `<sea-global-loading></sea-global-loading><sea-ui-feedback></sea-ui-feedback><sea-session-expiry></sea-session-expiry><router-outlet></router-outlet>`
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   title = 'sistema-evaluaciones-ui';
+  private readonly _configService = inject(ConfiguracionEvaluacionesService);
 
   constructor() {
     this.limpiarPersistenciaLocalNoOficial();
+  }
+
+  public ngOnInit(): void {
+    this._configService.cargar().subscribe({
+      next: () => {},
+      error: () => {}
+    });
   }
 
   /**

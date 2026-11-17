@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { UnitepcGatewayService } from '../../core/services/unitepc-gateway.service';
 import { SincronizacionSeaService } from '../../core/services/sincronizacion-sea.service';
+import { ConfiguracionEvaluacionesService } from '../../core/services/configuracion-evaluaciones.service';
 import {
   GrupoSincronizacionResumen,
   SincronizacionMasivaReporte,
@@ -1085,6 +1086,7 @@ import { BranchOffice, Career } from '../../core/models/unitepc-gateway.models';
 export class SincronizacionSeaComponent implements OnInit {
   private readonly gateway = inject(UnitepcGatewayService);
   private readonly syncService = inject(SincronizacionSeaService);
+  private readonly configService = inject(ConfiguracionEvaluacionesService);
 
   // Estados de catálogo y filtros
   public readonly sedes = signal<BranchOffice[]>([]);
@@ -1095,7 +1097,9 @@ export class SincronizacionSeaComponent implements OnInit {
 
   public readonly filtroSedeCodigo = signal<string>('');
   public readonly filtroCarreraCodigo = signal<string>('');
-  public readonly filtroTipoParcial = signal<'PRIMER_PARCIAL' | 'SEGUNDO_PARCIAL' | 'FINAL' | 'SEGUNDA_INSTANCIA' | 'TODOS'>('PRIMER_PARCIAL');
+  public readonly filtroTipoParcial = signal<'PRIMER_PARCIAL' | 'SEGUNDO_PARCIAL' | 'FINAL' | 'SEGUNDA_INSTANCIA' | 'TODOS'>(
+    this.configService.resolverParcialClaveSincronizacion()
+  );
   public readonly filtroTipoClase = signal<'TEORICO' | 'PRACTICO' | 'TODOS'>('TEORICO');
   public readonly filtroEstadoSync = signal<'TODOS' | 'PENDIENTE' | 'SINCRONIZADO' | 'NO_CALIFICADO'>('TODOS');
   public readonly filtroBusqueda = signal<string>('');
@@ -1207,7 +1211,18 @@ export class SincronizacionSeaComponent implements OnInit {
   });
 
   public ngOnInit(): void {
-    this.cargarSedes();
+    this.configService.cargar().subscribe({
+      next: config => {
+        if (config?.examenEnCurso) {
+          const parcialDefecto = this.configService.resolverParcialClaveSincronizacion(config.examenEnCurso);
+          this.filtroTipoParcial.set(parcialDefecto);
+        }
+        this.cargarSedes();
+      },
+      error: () => {
+        this.cargarSedes();
+      }
+    });
   }
 
   // Carga inicial de sedes

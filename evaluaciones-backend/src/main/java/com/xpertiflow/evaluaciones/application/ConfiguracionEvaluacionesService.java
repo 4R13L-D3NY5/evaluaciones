@@ -76,6 +76,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setMinutosMinimosDevolucion(valorORango(request.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         configuracion.setExamenEnCurso(valorODefecto(request.getExamenEnCurso(), EXAMEN_EN_CURSO_POR_DEFECTO));
         configuracion.setValidarCuotasGrupos(request.getValidarCuotasGrupos() != null ? request.getValidarCuotasGrupos() : true);
+        configuracion.setValidarHabilitacionAlumnos(request.getValidarHabilitacionAlumnos() != null ? request.getValidarHabilitacionAlumnos() : true);
         configuracion.setPermitirDirectorEdicionRoles(request.getPermitirDirectorEdicionRoles() != null ? request.getPermitirDirectorEdicionRoles() : true);
         configuracion.setActualizadoEn(LocalDateTime.now());
         String actorReal = (actor != null && !actor.isBlank()) ? actor : usuarioValido(request.getActualizadoPor());
@@ -245,6 +246,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setMinutosMinimosDevolucion(MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO);
         configuracion.setExamenEnCurso(EXAMEN_EN_CURSO_POR_DEFECTO);
         configuracion.setValidarCuotasGrupos(true);
+        configuracion.setValidarHabilitacionAlumnos(true);
         configuracion.setPermitirDirectorEdicionRoles(true);
         configuracion.setActualizadoPor("ADMIN_EVALUACIONES");
         configuracion.setActualizadoEn(LocalDateTime.now());
@@ -272,6 +274,7 @@ public class ConfiguracionEvaluacionesService {
         dto.setMinutosMinimosDevolucion(valorORango(configuracion.getMinutosMinimosDevolucion(), MINUTOS_MINIMOS_DEVOLUCION_POR_DEFECTO, 0, 1440));
         dto.setExamenEnCurso(valorODefecto(configuracion.getExamenEnCurso(), EXAMEN_EN_CURSO_POR_DEFECTO));
         dto.setValidarCuotasGrupos(configuracion.getValidarCuotasGrupos() != null ? configuracion.getValidarCuotasGrupos() : true);
+        dto.setValidarHabilitacionAlumnos(configuracion.getValidarHabilitacionAlumnos() != null ? configuracion.getValidarHabilitacionAlumnos() : true);
         dto.setPermitirDirectorEdicionRoles(configuracion.getPermitirDirectorEdicionRoles() != null ? configuracion.getPermitirDirectorEdicionRoles() : true);
         dto.setActualizadoEn(configuracion.getActualizadoEn());
         dto.setActualizadoPor(configuracion.getActualizadoPor());
@@ -293,17 +296,18 @@ public class ConfiguracionEvaluacionesService {
 
     private Map<String, ConfiguracionParcialDto> estructuraDefecto() {
         Map<String, ConfiguracionParcialDto> estructura = new LinkedHashMap<>();
-        // Parámetros: total, facil, medio, dificil, bancoTotal, bancoFacil, bancoMedio, bancoDificil, bancoG1, bancoG2, bancoG3
-        estructura.put("1P", parcial(30, 7, 16, 7, 60, 15, 30, 15, 15, 30, 15));
-        estructura.put("2P", parcial(30, 7, 16, 7, 60, 15, 30, 15, 15, 30, 15));
-        estructura.put("FINAL", parcial(60, 15, 30, 15, 120, 30, 60, 30, 30, 60, 30));
-        estructura.put("2DA_INSTANCIA", parcial(50, 10, 25, 15, 100, 20, 50, 30, 25, 50, 25));
+        // Parámetros: total, facil, medio, dificil, bancoTotal, bancoFacil, bancoMedio, bancoDificil, bancoG1, bancoG2, bancoG3, cuotaHabilitacion
+        estructura.put("1P", parcial(30, 7, 16, 7, 60, 15, 30, 15, 15, 30, 15, 0));
+        estructura.put("2P", parcial(30, 7, 16, 7, 60, 15, 30, 15, 15, 30, 15, 0));
+        estructura.put("FINAL", parcial(60, 15, 30, 15, 120, 30, 60, 30, 30, 60, 30, 0));
+        estructura.put("2DA_INSTANCIA", parcial(50, 10, 25, 15, 100, 20, 50, 30, 25, 50, 25, 0));
         return estructura;
     }
 
     private ConfiguracionParcialDto parcial(int total, int facil, int medio, int dificil,
                                             int bancoTotal, int bancoFacil, int bancoMedio, int bancoDificil,
-                                            int bancoG1, int bancoG2, int bancoG3) {
+                                            int bancoG1, int bancoG2, int bancoG3,
+                                            int cuotaHabilitacion) {
         ConfiguracionParcialDto dto = new ConfiguracionParcialDto();
         dto.setTotalPreguntas(total);
         dto.setFacil(facil);
@@ -316,6 +320,7 @@ public class ConfiguracionEvaluacionesService {
         dto.setBancoG1(bancoG1);
         dto.setBancoG2(bancoG2);
         dto.setBancoG3(bancoG3);
+        dto.setCuotaHabilitacion(cuotaHabilitacion);
         return dto;
     }
 
@@ -345,7 +350,9 @@ public class ConfiguracionEvaluacionesService {
             int bG2 = valorORango(valor.getBancoG2(), def.getBancoG2(), 0, 1000);
             int bG3 = valorORango(valor.getBancoG3(), def.getBancoG3(), 0, 1000);
 
-            resultado.put(clave, parcial(total, facil, medio, dificil, bTotal, bFacil, bMedio, bDificil, bG1, bG2, bG3));
+            int cuotaHab = valorORango(valor.getCuotaHabilitacion(), def.getCuotaHabilitacion() != null ? def.getCuotaHabilitacion() : 0, 0, 5);
+
+            resultado.put(clave, parcial(total, facil, medio, dificil, bTotal, bFacil, bMedio, bDificil, bG1, bG2, bG3, cuotaHab));
         }
         return resultado;
     }

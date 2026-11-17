@@ -19,6 +19,7 @@ import com.xpertiflow.evaluaciones.domain.repository.HistorialVerificacionReposi
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.SalaExamenVirtualRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertiflow.evaluaciones.infrastructure.gateway.UnitepcGatewayClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,12 +72,16 @@ class RolExamenServiceTest {
     private ExamenVarianteRepository varianteRepository;
     @Mock
     private MapeoEstudianteVarianteRepository mapeoRepository;
+    @Mock
+    private ConfiguracionEvaluacionesService configuracionEvaluacionesService;
+    @Mock
+    private ObjectMapper objectMapper;
 
     private RolExamenService service;
 
     @BeforeEach
     void setUp() {
-        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, verificacionExamenRepository, historialVerificacionRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService, salaVirtualRepository, varianteRepository, mapeoRepository);
+        service = new RolExamenService(rolExamenRepository, auditoriaRepository, bancoPreguntasRepository, documentoSinCartillaRepository, verificacionExamenRepository, historialVerificacionRepository, mapper, unitepcGatewayClient, accesoAcademicoService, verificacionPoliticaService, politicaTiempoEvaluacionesService, salaVirtualRepository, varianteRepository, mapeoRepository, configuracionEvaluacionesService, objectMapper);
     }
 
     @Test
@@ -88,6 +93,7 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
         RolExamen resultado = service.validarPorBanco(rol.getId(), "hash-oficial", "Docente Oficial");
 
@@ -128,7 +134,8 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
-        when(mapper.toResponseDto(rol)).thenReturn(null);
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
         service.restablecerAValidado(rol.getId(), RestablecerRolRequestDto.builder()
                 .motivo("Corrección de la parametrización del banco")
@@ -190,6 +197,7 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
         AuditoriaEvaluacion aud = AuditoriaEvaluacion.builder()
                 .id(999L)
@@ -263,6 +271,7 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
         RolExamen resultado = service.revertirPorEliminacionDocumentoSinCartilla(
                 rol.getId(), "DOCENTE-TEST");
@@ -336,7 +345,8 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
-        when(mapper.toResponseDto(rol)).thenReturn(null);
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
         service.transicionarEstado(rol.getId(), TransicionEstadoRequestDto.builder()
                 .nuevoEstado(EstadoFlujo.DEVUELTO)
@@ -364,7 +374,8 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
-        when(mapper.toResponseDto(rol)).thenReturn(null);
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
         service.transicionarEstado(rol.getId(), TransicionEstadoRequestDto.builder()
                 .nuevoEstado(EstadoFlujo.CALIFICADO)
@@ -408,7 +419,8 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
-        when(mapper.toResponseDto(rol)).thenReturn(null);
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
+        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
         when(auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(
                 rol.getId(), "IMPRESION_MARCAS_OMR")).thenReturn(Optional.of(new AuditoriaEvaluacion()));
         when(auditoriaRepository.findFirstByRolExamenIdAndAccionOrderByFechaEventoDesc(
@@ -594,7 +606,7 @@ class RolExamenServiceTest {
 
         service.actualizar(rol.getId(), dto, authAdmin);
 
-        verify(politicaTiempoEvaluacionesService).exigirEdicionPermitida(rol, dto.getFecha(), authAdmin);
+        verify(politicaTiempoEvaluacionesService).exigirEdicionPermitida(rol, dto.getFecha(), dto.getHorario(), authAdmin);
         verify(rolExamenRepository).save(rol);
 
         ArgumentCaptor<AuditoriaEvaluacion> captor = ArgumentCaptor.forClass(AuditoriaEvaluacion.class);

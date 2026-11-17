@@ -63,4 +63,6 @@ public class RolExamenResponseDto {
     private String estadoPrevioRestablecimiento;
     private String motivoRestablecimiento;
     private LocalDateTime fechaRestablecimiento;
+    private String snapshotEntregaEstudiantesJson;
+    private String conciliacionDevolucionJson;
 }

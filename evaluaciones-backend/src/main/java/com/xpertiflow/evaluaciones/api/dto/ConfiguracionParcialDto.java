@@ -39,6 +39,11 @@ public class ConfiguracionParcialDto {
     private Integer bancoG2;
     private Integer bancoG3;
 
+    // Cuota mínima de colegiatura cancelada para habilitación del estudiante (0 = Ninguna, 1..5 = Cuota requerida)
+    @Min(0)
+    @Max(5)
+    private Integer cuotaHabilitacion;
+
     public Integer getCantidadPreguntas() {
         return totalPreguntas;
     }

@@ -9,6 +9,7 @@ import com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.RestablecerRolRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.RestaurarRolRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.TransicionEstadoRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.ConciliacionEntregaResponseDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/roles-examen")
@@ -135,5 +137,34 @@ public class RolExamenController {
     public ResponseEntity<List<AuditoriaResponseDto>> auditoria(@PathVariable String id,
                                                                  Authentication authentication) {
         return ResponseEntity.ok(rolExamenService.listarAuditoria(id, authentication));
+    }
+
+    @GetMapping("/{id}/conciliacion-entrega")
+    @PreAuthorize("@accesoAcademicoService.puedeAccederRol(#id, authentication)")
+    @Operation(summary = "Verificar regularización de pagos entre entrega y devolución")
+    public ResponseEntity<ConciliacionEntregaResponseDto> verificarRegularizaciones(
+            @PathVariable String id,
+            @RequestParam(name = "simular", required = false, defaultValue = "false") boolean simular) {
+        return ResponseEntity.ok(rolExamenService.verificarRegularizaciones(id, simular));
+    }
+
+    @PutMapping("/{id}/snapshot-entrega")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeModificarRol(#id, authentication)")
+    @Operation(summary = "Guardar snapshot de lista de entrega de estudiantes")
+    public ResponseEntity<Void> guardarSnapshotEntrega(
+            @PathVariable String id,
+            @RequestBody Map<String, String> payload) {
+        rolExamenService.guardarSnapshotEntrega(id, payload.get("snapshotJson"));
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}/conciliacion-devolucion")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','PERSONAL_EVALUACIONES') and @accesoAcademicoService.puedeModificarRol(#id, authentication)")
+    @Operation(summary = "Guardar conciliación de devolución con estudiantes regularizados")
+    public ResponseEntity<Void> guardarConciliacionDevolucion(
+            @PathVariable String id,
+            @RequestBody Map<String, String> payload) {
+        rolExamenService.guardarConciliacionDevolucion(id, payload.get("conciliacionJson"));
+        return ResponseEntity.ok().build();
     }
 }
