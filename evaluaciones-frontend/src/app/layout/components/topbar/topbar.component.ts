@@ -226,7 +226,7 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
             <div class="flex items-center justify-between border-b border-border px-5 py-4 bg-muted/20">
               <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-black text-sm">
                 <i class="pi pi-calendar-plus"></i>
-                <span>Detalle de Reprogramación de Examen</span>
+                <span>{{ notif.queryParams?.['accion'] === 'REPROGRAMACION_APROBADA_VICERRECTOR' ? 'Detalle de Reprogramación Autorizada' : 'Detalle de Modificación en Rol de Examen' }}</span>
               </div>
               <button (click)="cerrarModalDetalle()" class="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
                 <i class="pi pi-times"></i>
@@ -284,7 +284,11 @@ import { NotificacionesService, NotificacionUsuario } from '../../../core/servic
               </div>
 
               <div class="text-[11px] text-muted-foreground flex items-center justify-between px-1">
-                <span>Autorizado por: <strong class="text-foreground">{{ notif.queryParams?.['usuarioActor'] || 'Vicerrectorado' }}</strong></span>
+                @if (notif.queryParams?.['accion'] === 'REPROGRAMACION_APROBADA_VICERRECTOR') {
+                  <span>Autorizado por: <strong class="text-foreground">{{ notif.queryParams?.['usuarioActor'] || 'Vicerrectorado' }}</strong></span>
+                } @else {
+                  <span>Modificado directamente por: <strong class="text-foreground">{{ notif.queryParams?.['usuarioActor'] || 'Dirección de Carrera' }}</strong></span>
+                }
                 @if (notif.fecha) {
                   <span class="text-[10px] font-mono">{{ notif.fecha | date:'dd/MM/yyyy HH:mm' }}</span>
                 }
