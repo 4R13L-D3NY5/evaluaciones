@@ -555,7 +555,8 @@ public class ReportesService {
         }
         if (rol.getEstadoFlujo() != null) {
             EstadoFlujo ef = rol.getEstadoFlujo();
-            return ef == EstadoFlujo.GENERADO
+            return ef == EstadoFlujo.VALIDADO
+                    || ef == EstadoFlujo.GENERADO
                     || ef == EstadoFlujo.IMPRESO
                     || ef == EstadoFlujo.ENTREGADO
                     || ef == EstadoFlujo.PENDIENTE_NOTAS

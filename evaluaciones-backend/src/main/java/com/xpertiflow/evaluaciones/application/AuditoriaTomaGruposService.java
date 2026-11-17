@@ -5,6 +5,7 @@ import com.xpertiflow.evaluaciones.api.dto.auditoria.AuditoriaEstudianteGlobalDt
 import com.xpertiflow.evaluaciones.api.dto.auditoria.AuditoriaEvaluacionItemDto;
 import com.xpertiflow.evaluaciones.api.dto.auditoria.AuditoriaTomaGrupoEstudianteDto;
 import com.xpertiflow.evaluaciones.api.dto.auditoria.AuditoriaTomaGrupoReporteDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
@@ -48,6 +49,13 @@ public class AuditoriaTomaGruposService {
 
     private static final ZoneId ZONA_BOLIVIA = ZoneId.of("America/La_Paz");
     private static final DateTimeFormatter FORMATO_FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+
+    private record StudentReassignmentInfo(
+            String grupoDestinoCodigo,
+            String grupoDestinoId,
+            OffsetDateTime enrollCreatedAt,
+            OffsetDateTime enrollUpdatedAt
+    ) {}
 
     @Transactional(readOnly = true)
     public List<AuditoriaEvaluacionItemDto> buscarEvaluaciones(String criterio, String sede, String carrera) {
@@ -221,9 +229,13 @@ public class AuditoriaTomaGruposService {
                 OffsetDateTime enrollCreated = est.getEnrollCreatedAt() != null ? est.getEnrollCreatedAt() : (mapeo != null ? mapeo.getSeaEnrollCreatedAt() : null);
                 OffsetDateTime enrollUpdated = est.getEnrollUpdatedAt() != null ? est.getEnrollUpdatedAt() : (mapeo != null ? mapeo.getSeaEnrollUpdatedAt() : null);
 
+                String gCod = rol != null ? rol.getGrupo() : groupId;
+                String gId = rol != null ? rol.getSeaGroupId() : groupId;
+
                 AuditoriaTomaGrupoEstudianteDto dto = construirEstudianteDto(
                         codigo, est.getFullName(), est.getCourseState(), groupId, rol, rolExamenId,
                         fechaGeneracion, fechaImpresion, enrollCreated, enrollUpdated,
+                        gCod, gId, gCod, gId, false,
                         mapeo, califsPorCodigo.get(codigo.toUpperCase()), notasPorCodigo.get(codigo.toUpperCase()), eventosRol);
 
                 if ("REGULAR".equals(dto.getEstadoForense())) regulares++;
@@ -235,6 +247,39 @@ public class AuditoriaTomaGruposService {
         }
 
         // B. Estudiantes del Mapeo no presentes en Gateway
+        // Si hay estudiantes en el mapeo que no están en el Gateway para este grupo,
+        // rastrear en los otros grupos de la misma asignatura a dónde fueron movidos en el SEA.
+        Map<String, StudentReassignmentInfo> reasignaciones = new HashMap<>();
+        if (rol != null && rol.getSeaSyllabusCourseId() != null && !mapeosPorCodigo.isEmpty()) {
+            boolean hayFaltantes = mapeosPorCodigo.keySet().stream().anyMatch(c -> !codigosProcesados.contains(c));
+            if (hayFaltantes) {
+                try {
+                    List<GroupItemDto> gruposSyllabus = unitepcGatewayClient.getGroups(
+                            "2-2026",
+                            null, null, rol.getSeaSyllabusCourseId());
+                    if (gruposSyllabus != null) {
+                        for (GroupItemDto g : gruposSyllabus) {
+                            if (g.getGroupId() == null || g.getGroupId().equalsIgnoreCase(groupId) || g.getGroupId().equalsIgnoreCase(rol.getSeaGroupId())) continue;
+                            try {
+                                List<StudentItemDto> sts = unitepcGatewayClient.getStudentsByGroup(g.getGroupId());
+                                if (sts != null) {
+                                    for (StudentItemDto s : sts) {
+                                        String sc = s.getStudentCode() != null ? s.getStudentCode().trim().toUpperCase() : "";
+                                        if (mapeosPorCodigo.containsKey(sc) && !codigosProcesados.contains(sc)) {
+                                            reasignaciones.put(sc, new StudentReassignmentInfo(
+                                                    g.getCode(), g.getGroupId(), s.getEnrollCreatedAt(), s.getEnrollUpdatedAt()));
+                                        }
+                                    }
+                                }
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                } catch (Exception ex) {
+                    log.warn("Error buscando reasignaciones en syllabus {}: {}", rol.getSeaSyllabusCourseId(), ex.getMessage());
+                }
+            }
+        }
+
         for (Map.Entry<String, MapeoEstudianteVariante> entry : mapeosPorCodigo.entrySet()) {
             String codigo = entry.getKey();
             if (!codigosProcesados.add(codigo)) continue;
@@ -245,10 +290,22 @@ public class AuditoriaTomaGruposService {
                     (m.getApellidoMaterno() != null ? " " + m.getApellidoMaterno().trim() : "");
             nombreCompleto = nombreCompleto.trim().isEmpty() ? codigo : nombreCompleto.trim();
 
+            StudentReassignmentInfo reasig = reasignaciones.get(codigo);
+            OffsetDateTime enrollCreated = reasig != null && reasig.enrollCreatedAt() != null ? reasig.enrollCreatedAt() : m.getSeaEnrollCreatedAt();
+            OffsetDateTime enrollUpdated = reasig != null && reasig.enrollUpdatedAt() != null ? reasig.enrollUpdatedAt() : m.getSeaEnrollUpdatedAt();
+            String grupoInicialCod = rol != null ? rol.getGrupo() : groupId;
+            String grupoInicialId = rol != null ? rol.getSeaGroupId() : groupId;
+            String grupoActualCod = reasig != null ? reasig.grupoDestinoCodigo() : grupoInicialCod;
+            String grupoActualId = reasig != null ? reasig.grupoDestinoId() : grupoInicialId;
+            boolean esReasig = (reasig != null);
+
             AuditoriaTomaGrupoEstudianteDto dto = construirEstudianteDto(
                     m.getCodigoEstudiante(), nombreCompleto, m.getEstadoAsistencia() != null ? m.getEstadoAsistencia() : "REGULAR",
                     groupId, rol, rolExamenId, fechaGeneracion, fechaImpresion,
-                    m.getSeaEnrollCreatedAt(), m.getSeaEnrollUpdatedAt(),
+                    enrollCreated, enrollUpdated,
+                    grupoInicialCod, grupoInicialId,
+                    grupoActualCod, grupoActualId,
+                    esReasig,
                     m, califsPorCodigo.get(codigo), notasPorCodigo.get(codigo), eventosRol);
 
             if ("REGULAR".equals(dto.getEstadoForense())) regulares++;
@@ -264,10 +321,14 @@ public class AuditoriaTomaGruposService {
             if (!codigosProcesados.add(codigo)) continue;
 
             CalificacionOmr c = entry.getValue();
+            String gCod = rol != null ? rol.getGrupo() : groupId;
+            String gId = rol != null ? rol.getSeaGroupId() : groupId;
+
             AuditoriaTomaGrupoEstudianteDto dto = construirEstudianteDto(
                     c.getCodigoEstudiante(), c.getEstudianteNombreCompleto(), "CALIFICADO",
                     groupId, rol, rolExamenId, fechaGeneracion, fechaImpresion,
                     null, null,
+                    gCod, gId, gCod, gId, false,
                     null, c, notasPorCodigo.get(codigo), eventosRol);
 
             estudiantesDto.add(dto);
@@ -279,10 +340,14 @@ public class AuditoriaTomaGruposService {
             if (!codigosProcesados.add(codigo)) continue;
 
             NotaDocente nd = entry.getValue();
+            String gCod = rol != null ? rol.getGrupo() : groupId;
+            String gId = rol != null ? rol.getSeaGroupId() : groupId;
+
             AuditoriaTomaGrupoEstudianteDto dto = construirEstudianteDto(
                     nd.getCodigoEstudiante(), nd.getEstudianteNombreCompleto(), "NOTA_DOCENTE",
                     groupId, rol, rolExamenId, fechaGeneracion, fechaImpresion,
                     null, null,
+                    gCod, gId, gCod, gId, false,
                     null, null, nd, eventosRol);
 
             estudiantesDto.add(dto);
@@ -349,10 +414,14 @@ public class AuditoriaTomaGruposService {
             String codigo, String fullName, String courseState, String groupId, RolExamen rol, String rolExamenId,
             OffsetDateTime fechaGeneracion, OffsetDateTime fechaImpresion,
             OffsetDateTime enrollCreated, OffsetDateTime enrollUpdated,
+            String grupoInicialCodigo, String grupoInicialId,
+            String grupoActualCodigo, String grupoActualId,
+            Boolean esCambioGrupo,
             MapeoEstudianteVariante mapeo, CalificacionOmr calif, NotaDocente notaDoc,
             List<AuditoriaEvaluacion> eventosRol) {
 
-        DictamenForense dictamen = evaluarDictamenForense(enrollCreated, enrollUpdated, fechaGeneracion, fechaImpresion);
+        DictamenForense dictamen = evaluarDictamenForense(enrollCreated, enrollUpdated, fechaGeneracion, fechaImpresion,
+                grupoInicialCodigo, grupoActualCodigo, esCambioGrupo);
 
         BigDecimal notaSobre100 = null;
         BigDecimal notaSobre60 = null;
@@ -446,6 +515,11 @@ public class AuditoriaTomaGruposService {
                 .docenteNombre(rol != null ? rol.getDocenteNombre() : null)
                 .enrollCreatedAt(enrollCreated)
                 .enrollUpdatedAt(enrollUpdated)
+                .grupoInicialCodigo(grupoInicialCodigo != null ? grupoInicialCodigo : (rol != null ? rol.getGrupo() : groupId))
+                .grupoInicialId(grupoInicialId != null ? grupoInicialId : (rol != null ? rol.getSeaGroupId() : groupId))
+                .grupoActualCodigo(grupoActualCodigo != null ? grupoActualCodigo : (rol != null ? rol.getGrupo() : groupId))
+                .grupoActualId(grupoActualId != null ? grupoActualId : (rol != null ? rol.getSeaGroupId() : groupId))
+                .esCambioGrupo(esCambioGrupo)
                 .rolExamenId(rolExamenId)
                 .estadoExamen(rol != null && rol.getEstadoFlujo() != null ? rol.getEstadoFlujo().name() : "NO_PROGRAMADO")
                 .fechaGeneracionExamen(fechaGeneracion)
@@ -474,9 +548,10 @@ public class AuditoriaTomaGruposService {
 
     private int prioridadForenseEstudiante(AuditoriaTomaGrupoEstudianteDto e) {
         if ("EXTEMPORANEO_POST_IMPRESION".equals(e.getEstadoForense())) return 0;
-        if (Boolean.TRUE.equals(e.getEsReprogramado())) return 1;
-        if (Boolean.TRUE.equals(e.getModificadoManualmente())) return 2;
-        if ("TOMA_TARDIA".equals(e.getEstadoForense())) return 3;
+        if ("REASIGNADO_OTRO_GRUPO".equals(e.getEstadoForense())) return 1;
+        if (Boolean.TRUE.equals(e.getEsReprogramado())) return 2;
+        if (Boolean.TRUE.equals(e.getModificadoManualmente())) return 3;
+        if ("TOMA_TARDIA".equals(e.getEstadoForense())) return 4;
         if ("DANGER".equalsIgnoreCase(e.getNivelAlerta())) return 4;
         if ("WARNING".equalsIgnoreCase(e.getNivelAlerta())) return 5;
         return 6;
@@ -533,20 +608,58 @@ public class AuditoriaTomaGruposService {
             OffsetDateTime enrollCreated = m.getSeaEnrollCreatedAt();
             OffsetDateTime enrollUpdated = m.getSeaEnrollUpdatedAt();
 
-            // Si no estaba persistido en DB histórica, intentar refrescarlo en vivo desde el Gateway
-            if (enrollCreated == null && rol != null && rol.getSeaGroupId() != null) {
+            String grupoInicialCod = rol != null ? rol.getGrupo() : null;
+            String grupoInicialId = rol != null ? rol.getSeaGroupId() : null;
+            String grupoActualCod = grupoInicialCod;
+            String grupoActualId = grupoInicialId;
+            boolean esCambioGrupo = false;
+
+            // Verificar en Gateway para obtener marcas de alta y última modificación en vivo
+            if (rol != null && rol.getSeaGroupId() != null) {
+                boolean encontradoEnGrupoExamen = false;
                 try {
                     List<StudentItemDto> sts = unitepcGatewayClient.getStudentsByGroup(rol.getSeaGroupId());
                     if (sts != null) {
                         for (StudentItemDto s : sts) {
                             if (cleanCode.equalsIgnoreCase(s.getStudentCode())) {
-                                enrollCreated = s.getEnrollCreatedAt();
-                                enrollUpdated = s.getEnrollUpdatedAt();
+                                enrollCreated = s.getEnrollCreatedAt() != null ? s.getEnrollCreatedAt() : enrollCreated;
+                                enrollUpdated = s.getEnrollUpdatedAt() != null ? s.getEnrollUpdatedAt() : enrollUpdated;
+                                encontradoEnGrupoExamen = true;
                                 break;
                             }
                         }
                     }
                 } catch (Exception ignored) {}
+
+                // Si no fue encontrado en el grupo del examen, rastrear en qué otro grupo de la materia está activo
+                if (!encontradoEnGrupoExamen && rol.getSeaSyllabusCourseId() != null) {
+                    try {
+                        List<GroupItemDto> gruposMateria = unitepcGatewayClient.getGroups(
+                                term != null ? term : "2-2026",
+                                null, null, rol.getSeaSyllabusCourseId());
+                        if (gruposMateria != null) {
+                            for (GroupItemDto g : gruposMateria) {
+                                if (g.getGroupId() == null || g.getGroupId().equalsIgnoreCase(rol.getSeaGroupId())) continue;
+                                try {
+                                    List<StudentItemDto> stsOtro = unitepcGatewayClient.getStudentsByGroup(g.getGroupId());
+                                    if (stsOtro != null) {
+                                        for (StudentItemDto so : stsOtro) {
+                                            if (cleanCode.equalsIgnoreCase(so.getStudentCode())) {
+                                                enrollCreated = so.getEnrollCreatedAt() != null ? so.getEnrollCreatedAt() : enrollCreated;
+                                                enrollUpdated = so.getEnrollUpdatedAt() != null ? so.getEnrollUpdatedAt() : enrollUpdated;
+                                                grupoActualCod = g.getCode();
+                                                grupoActualId = g.getGroupId();
+                                                esCambioGrupo = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                } catch (Exception ignored) {}
+                                if (esCambioGrupo) break;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
             }
 
             CalificacionOmr calif = calificacionOmrRepository
@@ -558,6 +671,9 @@ public class AuditoriaTomaGruposService {
                     cleanCode, nombreEstudiante != null ? nombreEstudiante : cleanCode, "CURSANDO",
                     rol != null ? rol.getSeaGroupId() : null, rol, m.getRolExamenId(),
                     fechaGeneracion, fechaImpresion, enrollCreated, enrollUpdated,
+                    grupoInicialCod, grupoInicialId,
+                    grupoActualCod, grupoActualId,
+                    esCambioGrupo,
                     m, calif, notaDoc, eventosRol);
 
             if ("REGULAR".equals(dto.getEstadoForense())) regulares++;
@@ -639,7 +755,7 @@ public class AuditoriaTomaGruposService {
             String[] headers = {
                     "N°", "Código", "Estudiante", "Nota / 100", "Nota / 60", "Estado Calificación",
                     "Origen Nota", "Modificado/Reprogramado Por", "Fecha Modificación", "Motivo/Justificación",
-                    "Variante", "Dictamen Forense SEA", "Toma de Grupo SEA", "Últ. Modif. SEA", "Diagnóstico Pericial"
+                    "Variante", "Dictamen Forense SEA", "Grupo Inicial", "Toma de Grupo SEA", "Últ. Modif. SEA", "Grupo Modificado / Actual", "Diagnóstico Pericial"
             };
             for (int i = 0; i < headers.length; i++) {
                 Cell c = rowHeader.createCell(i);
@@ -707,9 +823,11 @@ public class AuditoriaTomaGruposService {
                     cellDictamen.setCellStyle(styleReprobado);
                 }
 
-                r.createCell(12).setCellValue(e.getEnrollCreatedAt() != null ? e.getEnrollCreatedAt().format(FORMATO_FECHA_HORA) : "SIN FECHA");
-                r.createCell(13).setCellValue(e.getEnrollUpdatedAt() != null ? e.getEnrollUpdatedAt().format(FORMATO_FECHA_HORA) : "SIN MODIF.");
-                r.createCell(14).setCellValue(e.getMensajeForense() != null ? e.getMensajeForense() : "—");
+                r.createCell(12).setCellValue(e.getGrupoInicialCodigo() != null ? e.getGrupoInicialCodigo() : "—");
+                r.createCell(13).setCellValue(e.getEnrollCreatedAt() != null ? e.getEnrollCreatedAt().format(FORMATO_FECHA_HORA) : "SIN FECHA");
+                r.createCell(14).setCellValue(e.getEnrollUpdatedAt() != null ? e.getEnrollUpdatedAt().format(FORMATO_FECHA_HORA) : "SIN MODIF.");
+                r.createCell(15).setCellValue(e.getGrupoActualCodigo() != null ? e.getGrupoActualCodigo() : "—");
+                r.createCell(16).setCellValue(e.getMensajeForense() != null ? e.getMensajeForense() : "—");
             }
 
             for (int i = 0; i < headers.length; i++) {
@@ -729,8 +847,18 @@ public class AuditoriaTomaGruposService {
     }
 
     private DictamenForense evaluarDictamenForense(OffsetDateTime enrollCreated, OffsetDateTime enrollUpdated,
-                                                   OffsetDateTime fechaGeneracion, OffsetDateTime fechaImpresion) {
+                                                   OffsetDateTime fechaGeneracion, OffsetDateTime fechaImpresion,
+                                                   String grupoInicialCodigo, String grupoActualCodigo, Boolean esCambioGrupo) {
         DictamenForense d = new DictamenForense();
+
+        if (Boolean.TRUE.equals(esCambioGrupo)) {
+            d.estado = "REASIGNADO_OTRO_GRUPO";
+            d.nivelAlerta = "WARNING";
+            String modif = enrollUpdated != null ? " el " + enrollUpdated.format(FORMATO_FECHA_HORA) : "";
+            d.mensaje = "⚠️ Reasignado en SEA: Rindió en " + (grupoInicialCodigo != null ? grupoInicialCodigo : "grupo de examen")
+                    + " pero fue cambiado a " + (grupoActualCodigo != null ? grupoActualCodigo : "otro grupo") + modif;
+            return d;
+        }
 
         if (enrollCreated == null) {
             d.estado = "SIN_FECHA_SEA";

@@ -44,10 +44,6 @@ public class UnitepcGatewayClient {
     }
 
     private synchronized String getToken() {
-        if (mockEvaluationsEnabled) {
-            return "mock-sea-bearer-token";
-        }
-
         if (accessToken != null && tokenExpiration != null && Instant.now().isBefore(tokenExpiration.minusSeconds(60))) {
             return accessToken;
         }
@@ -57,21 +53,32 @@ public class UnitepcGatewayClient {
         form.add("client_id", clientId);
         form.add("client_secret", clientSecret);
 
-        TokenResponseDto response = restClient.post()
-                .uri("/auth/token")
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(form)
-                .retrieve()
-                .body(TokenResponseDto.class);
+        try {
+            TokenResponseDto response = restClient.post()
+                    .uri("/auth/token")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(form)
+                    .retrieve()
+                    .body(TokenResponseDto.class);
 
-        if (response == null || response.getAccessToken() == null) {
-            throw new RuntimeException("No se pudo obtener token del gateway UNITEPC");
+            if (response != null && response.getAccessToken() != null) {
+                this.accessToken = response.getAccessToken();
+                this.tokenExpiration = Instant.now().plusSeconds(response.getExpiresIn() != null ? response.getExpiresIn() : 300);
+                log.debug("Token UNITEPC renovado, expira en {} segundos", response.getExpiresIn());
+                return this.accessToken;
+            }
+        } catch (Exception ex) {
+            if (mockEvaluationsEnabled) {
+                log.warn("Fallo al obtener token real del Gateway SEA, usando mock token: {}", ex.getMessage());
+                return "mock-sea-bearer-token";
+            }
+            throw new RuntimeException("No se pudo obtener token del gateway UNITEPC: " + ex.getMessage(), ex);
         }
 
-        this.accessToken = response.getAccessToken();
-        this.tokenExpiration = Instant.now().plusSeconds(response.getExpiresIn() != null ? response.getExpiresIn() : 300);
-        log.debug("Token UNITEPC renovado, expira en {} segundos", response.getExpiresIn());
-        return this.accessToken;
+        if (mockEvaluationsEnabled) {
+            return "mock-sea-bearer-token";
+        }
+        throw new RuntimeException("No se pudo obtener token del gateway UNITEPC");
     }
 
     public List<BranchOfficeDto> getBranchOffices() {
