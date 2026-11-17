@@ -93,7 +93,6 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
-        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
         RolExamen resultado = service.validarPorBanco(rol.getId(), "hash-oficial", "Docente Oficial");
 
@@ -271,7 +270,6 @@ class RolExamenServiceTest {
                 .build();
         when(rolExamenRepository.findById(rol.getId())).thenReturn(Optional.of(rol));
         when(rolExamenRepository.save(rol)).thenReturn(rol);
-        when(mapper.toResponseDto(rol)).thenReturn(new com.xpertiflow.evaluaciones.api.dto.RolExamenResponseDto());
 
         RolExamen resultado = service.revertirPorEliminacionDocumentoSinCartilla(
                 rol.getId(), "DOCENTE-TEST");

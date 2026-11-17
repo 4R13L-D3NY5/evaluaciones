@@ -31,6 +31,14 @@ public class AuditoriaTomaGrupoEstudianteDto {
     private OffsetDateTime enrollCreatedAt;
     private OffsetDateTime enrollUpdatedAt;
 
+    // Trazabilidad y Bitácora de Reasignación de Grupos en el SEA
+    private String grupoInicialCodigo;
+    private String grupoInicialId;
+    private String grupoActualCodigo;
+    private String grupoActualId;
+    private Boolean esCambioGrupo;
+    private String detalleCambioGrupo;
+
     // Datos del examen en nuestro sistema (si existe)
     private String rolExamenId;
     private String estadoExamen;

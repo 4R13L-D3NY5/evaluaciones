@@ -213,7 +213,9 @@ class ExamenVirtualServiceTest {
         sala.setEstado("PREPARADA");
         sala.setDuracionMinutos(60);
         when(salaRepository.findById("SALA-PREP")).thenReturn(Optional.of(sala));
-        when(configuracionEvaluacionesService.obtener()).thenReturn(new com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto());
+        var cfg = new com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto();
+        cfg.setCuentaRegresivaInicioVirtualSegundos(10);
+        when(configuracionEvaluacionesService.obtener()).thenReturn(cfg);
 
         IntentoExamenVirtual intento = new IntentoExamenVirtual();
         intento.setId("INT-1");
@@ -241,7 +243,9 @@ class ExamenVirtualServiceTest {
         sala.setEstado("ABIERTA");
         sala.setDuracionMinutos(45);
         when(salaRepository.findById("SALA-ABIERTA")).thenReturn(Optional.of(sala));
-        when(configuracionEvaluacionesService.obtener()).thenReturn(new com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto());
+        var cfg2 = new com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto();
+        cfg2.setCuentaRegresivaInicioVirtualSegundos(10);
+        when(configuracionEvaluacionesService.obtener()).thenReturn(cfg2);
 
         IntentoExamenVirtual intento = new IntentoExamenVirtual();
         intento.setId("INT-2");

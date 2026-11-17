@@ -982,7 +982,16 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
                           <!-- Grupo & Docente -->
                           <td class="p-3.5">
-                            <div class="font-bold text-foreground">Grupo: {{ mat.groupId }}</div>
+                            <div class="font-bold text-foreground">
+                              {{ mat.groupCode ? 'Grupo: ' + mat.groupCode : (mat.groupId ? 'Grupo: ' + mat.groupId : 'Sin grupo') }}
+                            </div>
+                            @if (mat.esCambioGrupo && mat.grupoActualCodigo && mat.grupoActualCodigo !== mat.groupCode) {
+                              <div class="mt-1">
+                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700 inline-flex items-center gap-1">
+                                  <i class="pi pi-arrow-right text-[8px]"></i> Ahora en: {{ mat.grupoActualCodigo }}
+                                </span>
+                              </div>
+                            }
                             <span class="text-[10px] text-muted-foreground block truncate max-w-[180px]">
                               {{ mat.docenteNombre || 'Sin docente asignado' }}
                             </span>
@@ -1010,17 +1019,43 @@ import { UiFeedbackService } from '../../core/services/ui-feedback.service';
                             </span>
                           </td>
 
-                          <!-- Fecha Registro SEA -->
+                          <!-- Fecha Registro & Modif SEA -->
                           <td class="p-3.5 font-mono text-[11px]">
+                            <!-- Registro Inicial -->
                             @if (mat.enrollCreatedAt) {
-                              <div class="font-bold text-foreground">
-                                {{ formatearSoloFecha(mat.enrollCreatedAt) }}
-                              </div>
-                              <div class="text-[10px] text-muted-foreground">
-                                {{ formatearSoloHora(mat.enrollCreatedAt) }}
+                              <div class="space-y-0.5">
+                                <div class="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Alta Inicial:</div>
+                                <div class="font-bold text-foreground flex items-center gap-1">
+                                  <span>{{ formatearSoloFecha(mat.enrollCreatedAt) }}</span>
+                                  <span class="text-[10px] text-muted-foreground">{{ formatearSoloHora(mat.enrollCreatedAt) }}</span>
+                                </div>
+                                @if (mat.grupoInicialCodigo) {
+                                  <span class="text-[9px] font-sans font-medium text-muted-foreground block">
+                                    Grupo Inicial: <b class="text-foreground">{{ mat.grupoInicialCodigo }}</b>
+                                  </span>
+                                }
                               </div>
                             } @else {
-                              <span class="text-muted-foreground italic text-[10px]">No registrado</span>
+                              <span class="text-muted-foreground italic text-[10px]">Sin alta registrada</span>
+                            }
+
+                            <!-- Última Modificación / Cambio -->
+                            @if (mat.enrollUpdatedAt) {
+                              <div class="mt-2 pt-1.5 border-t border-border/40 space-y-0.5">
+                                <div class="text-[9px] uppercase font-bold text-amber-700 dark:text-amber-400 tracking-wider flex items-center gap-1">
+                                  <i class="pi pi-pencil text-[8px]"></i>
+                                  <span>Últ. Modificación:</span>
+                                </div>
+                                <div class="font-bold text-foreground flex items-center gap-1">
+                                  <span>{{ formatearSoloFecha(mat.enrollUpdatedAt) }}</span>
+                                  <span class="text-[10px] text-muted-foreground">{{ formatearSoloHora(mat.enrollUpdatedAt) }}</span>
+                                </div>
+                                @if (mat.grupoActualCodigo) {
+                                  <span class="text-[9px] font-sans font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 inline-block mt-0.5">
+                                    Grupo Modif: {{ mat.grupoActualCodigo }}
+                                  </span>
+                                }
+                              </div>
                             }
                           </td>
 
@@ -1905,13 +1940,17 @@ export class AuditoriaComponent implements OnInit {
       'Carrera': est.carreraNombre || est.carreraCodigo || '',
       'Sede': est.sedeNombre || '',
       'Materia': m.materiaNombre || m.syllabusCourseId || '',
-      'Grupo ID': m.groupId,
+      'Grupo Examen': m.groupCode || m.groupId,
+      'Grupo Inicial': m.grupoInicialCodigo || m.groupCode || m.groupId,
+      'Grupo Actual / Destino': m.grupoActualCodigo || m.groupCode || m.groupId,
+      'Cambio de Grupo': m.esCambioGrupo ? 'SÍ (REASIGNADO)' : 'NO',
       'Docente': m.docenteNombre || '',
       'Nota / 100': m.notaSobre100 !== null && m.notaSobre100 !== undefined ? m.notaSobre100 : '—',
       'Nota / 60': m.notaSobre60 !== null && m.notaSobre60 !== undefined ? m.notaSobre60 : '—',
       'Estado Calificación': m.estadoCalificacion || 'PENDIENTE',
       'Origen Calificación': this.obtenerTextoOrigen(m.origenCalificacion),
-      'Fecha Registro SEA': this.formatearFechaHora(m.enrollCreatedAt),
+      'Fecha Alta Inicial SEA': this.formatearFechaHora(m.enrollCreatedAt),
+      'Fecha Última Modif SEA': this.formatearFechaHora(m.enrollUpdatedAt),
       'Fecha Generación Examen': this.formatearFechaHora(m.fechaGeneracionExamen),
       'Dictamen Forense': this.obtenerTextoEstadoForense(m.estadoForense),
       'Diagnóstico Pericial': m.mensajeForense,
@@ -2003,6 +2042,8 @@ export class AuditoriaComponent implements OnInit {
     switch (estado) {
       case 'REGULAR':
         return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800';
+      case 'REASIGNADO_OTRO_GRUPO':
+        return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700 font-bold';
       case 'TOMA_TARDIA':
         return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800';
       case 'EXTEMPORANEO_POST_IMPRESION':
@@ -2018,6 +2059,8 @@ export class AuditoriaComponent implements OnInit {
     switch (estado) {
       case 'REGULAR':
         return 'pi pi-check-circle';
+      case 'REASIGNADO_OTRO_GRUPO':
+        return 'pi pi-sync';
       case 'TOMA_TARDIA':
         return 'pi pi-clock';
       case 'EXTEMPORANEO_POST_IMPRESION':
@@ -2033,6 +2076,8 @@ export class AuditoriaComponent implements OnInit {
     switch (estado) {
       case 'REGULAR':
         return 'REGULAR';
+      case 'REASIGNADO_OTRO_GRUPO':
+        return 'REASIGNADO';
       case 'TOMA_TARDIA':
         return 'TOMA TARDÍA';
       case 'EXTEMPORANEO_POST_IMPRESION':
