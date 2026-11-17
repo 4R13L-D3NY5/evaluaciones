@@ -68,6 +68,9 @@ public class ConfiguracionEvaluaciones {
     @Column(name = "validar_cuotas_grupos", nullable = false)
     private Boolean validarCuotasGrupos = true;
 
+    @Column(name = "validar_habilitacion_alumnos", nullable = false)
+    private Boolean validarHabilitacionAlumnos = true;
+
     @Column(name = "permitir_director_edicion_roles", nullable = false)
     private Boolean permitirDirectorEdicionRoles = true;
 

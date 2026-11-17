@@ -117,6 +117,8 @@ public class RolExamenMapper {
                 .fechaSincronizacionSea(entity.getFechaSincronizacionSea())
                 .sincronizadoSeaPor(entity.getSincronizadoSeaPor())
                 .sincronizacionSeaResultado(entity.getSincronizacionSeaResultado())
+                .snapshotEntregaEstudiantesJson(entity.getSnapshotEntregaEstudiantesJson())
+                .conciliacionDevolucionJson(entity.getConciliacionDevolucionJson())
                 .build();
     }
 

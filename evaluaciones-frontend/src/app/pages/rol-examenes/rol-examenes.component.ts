@@ -1156,9 +1156,21 @@ interface InstanciaImportacionItem {
                   Docente: {{ examenParaSolicitud()?.docenteNombre }} · Carrera: {{ examenParaSolicitud()?.carreraNombre || examenParaSolicitud()?.careerCode }} · Sede: {{ examenParaSolicitud()?.sedeCode }}
                 </div>
                 <div class="pt-1.5 border-t border-border flex items-center justify-between text-[11px]">
-                  <span class="text-muted-foreground">Horario Actual:</span>
-                  <span class="font-mono font-bold text-foreground">{{ examenParaSolicitud()?.fecha }} ({{ examenParaSolicitud()?.horario }}) · {{ examenParaSolicitud()?.modalidad }}</span>
+                  <span class="text-muted-foreground">Horario y Estado:</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-bold text-foreground">{{ examenParaSolicitud()?.fecha }} ({{ examenParaSolicitud()?.horario }})</span>
+                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider"
+                      [class]="examenParaSolicitud()?.estado === 'IMPRESO' ? 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : 'bg-muted text-muted-foreground border border-border'">
+                      {{ examenParaSolicitud()?.estado }}
+                    </span>
+                  </div>
                 </div>
+                @if (examenParaSolicitud()?.estado === 'IMPRESO') {
+                  <div class="mt-2 p-2.5 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2 text-[10px] text-blue-800 dark:text-blue-300">
+                    <i class="pi pi-info-circle text-xs text-blue-600 shrink-0"></i>
+                    <span>Este examen ya fue impreso. La aprobación en Vicerrectorado reprogramará la fecha oficial de rendición en el sistema.</span>
+                  </div>
+                }
               </div>
 
               <!-- Formulario de Propuesta -->
@@ -2713,8 +2725,8 @@ export class RolExamenesComponent implements OnInit {
   public puedeSolicitarModificacion(row: RolExamenItem): boolean {
     if (!this.esDirectorCarrera() && !this.esAdministrador()) return false;
     if (this.tieneSolicitudPendiente(row)) return false;
-    const estado = row.estado;
-    return estado === 'PROGRAMADO' || estado === 'VALIDADO' || estado === 'GENERADO';
+    const estado = (row.estado || '').toUpperCase();
+    return estado === 'PROGRAMADO' || estado === 'VALIDADO' || estado === 'GENERADO' || estado === 'IMPRESO';
   }
 
   public fechaMinimaSolicitud(): string {
@@ -3131,6 +3143,9 @@ export class RolExamenesComponent implements OnInit {
     }
     if (this.esDirectorCarrera() && !this.permitirDirectorEdicionRoles()) {
       return 'La edición y registro de exámenes está deshabilitada para Directores de Carrera por política institucional.';
+    }
+    if (this.esDirectorCarrera() && (item.estado === 'GENERADO' || item.estado === 'IMPRESO')) {
+      return `El examen está ${item.estado.toLowerCase()}. Usa el botón "Solicitar Cambio" para pedir la reprogramación a Vicerrectorado.`;
     }
     if (!this.esAdministrador() && !this.esVicerrector() && !this.esDirectorCarrera() && this.estaBloqueadoPorCandado(item)) {
       return `Bloqueado por candado de seguridad: faltan menos de ${this.horasCandado72()}h para el examen.`;

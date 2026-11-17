@@ -7,6 +7,7 @@ import com.xpertiflow.evaluaciones.api.dto.banco.ReactivoResponseDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionParcialDto;
 import com.xpertiflow.evaluaciones.application.HistorialVerificacionService;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
 import com.xpertiflow.evaluaciones.domain.entity.AuditoriaVerificacion;
@@ -1027,6 +1028,16 @@ public class BancoPreguntasService {
         return true;
     }
 
+    private String resolverClaveParcial(TipoParcial tipoParcial) {
+        if (tipoParcial == null) return "1P";
+        return switch (tipoParcial) {
+            case PRIMER_PARCIAL -> "1P";
+            case SEGUNDO_PARCIAL -> "2P";
+            case FINAL -> "FINAL";
+            case SEGUNDA_INSTANCIA -> "2DA_INSTANCIA";
+        };
+    }
+
     private void validarCuotas(TipoParcial tipoParcial, int faciles, int medias, int dificiles, int g1, int g2, int g3, int total, boolean validarGrupos, List<String> errores) {
         boolean esFinal = tipoParcial == TipoParcial.FINAL;
         int totalReq = esFinal ? 120 : TOTAL_REQUERIDO;
@@ -1036,6 +1047,41 @@ public class BancoPreguntasService {
         int g1Req = esFinal ? 30 : CUOTA_GRUPO_1;
         int g2Req = esFinal ? 60 : CUOTA_GRUPO_2;
         int g3Req = esFinal ? 30 : CUOTA_GRUPO_3;
+
+        if (configuracionEvaluacionesService != null) {
+            try {
+                ConfiguracionEvaluacionesDto cfg = configuracionEvaluacionesService.obtener();
+                if (cfg != null && cfg.getEstructuraPreguntas() != null) {
+                    String clave = resolverClaveParcial(tipoParcial);
+                    ConfiguracionParcialDto parcialDto = cfg.getEstructuraPreguntas().get(clave);
+                    if (parcialDto != null) {
+                        if (parcialDto.getBancoTotal() != null && parcialDto.getBancoTotal() > 0) {
+                            totalReq = parcialDto.getBancoTotal();
+                        }
+                        if (parcialDto.getBancoFacil() != null && parcialDto.getBancoFacil() >= 0) {
+                            facilesReq = parcialDto.getBancoFacil();
+                        }
+                        if (parcialDto.getBancoMedio() != null && parcialDto.getBancoMedio() >= 0) {
+                            mediasReq = parcialDto.getBancoMedio();
+                        }
+                        if (parcialDto.getBancoDificil() != null && parcialDto.getBancoDificil() >= 0) {
+                            dificilesReq = parcialDto.getBancoDificil();
+                        }
+                        if (parcialDto.getBancoG1() != null && parcialDto.getBancoG1() >= 0) {
+                            g1Req = parcialDto.getBancoG1();
+                        }
+                        if (parcialDto.getBancoG2() != null && parcialDto.getBancoG2() >= 0) {
+                            g2Req = parcialDto.getBancoG2();
+                        }
+                        if (parcialDto.getBancoG3() != null && parcialDto.getBancoG3() >= 0) {
+                            g3Req = parcialDto.getBancoG3();
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("No se pudo obtener la configuración de estructura de preguntas para validar cuotas: {}", e.getMessage());
+            }
+        }
 
         if (total < totalReq) {
             errores.add("El banco debe tener como mínimo " + totalReq + " preguntas; se encontraron " + total);

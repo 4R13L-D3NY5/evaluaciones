@@ -15,4 +15,5 @@ public class TransicionEstadoRequestDto {
     private String motivo;
     private String usuario;
     private String ipOrigen;
+    private String snapshotEntregaEstudiantesJson;
 }

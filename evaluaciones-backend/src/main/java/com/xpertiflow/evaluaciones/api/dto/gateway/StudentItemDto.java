@@ -12,4 +12,6 @@ public class StudentItemDto {
     private String syllabusCourseId;
     private java.time.OffsetDateTime enrollCreatedAt;
     private java.time.OffsetDateTime enrollUpdatedAt;
+    private Integer paidInstallments;
+    private Integer totalInstallments;
 }

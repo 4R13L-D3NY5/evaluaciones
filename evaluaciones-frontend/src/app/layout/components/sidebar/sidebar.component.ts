@@ -334,6 +334,13 @@ export class SidebarComponent implements OnInit {
       roles: ['DIRECTOR_CARRERA', 'VICERRECTOR']
     },
     {
+      label: 'Monitor de Verificación',
+      route: '/monitor-verificacion',
+      icon: 'pi pi-clock',
+      description: 'Estado en tiempo real de exámenes por fecha y turno (programado, validado, observado, verificado)',
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR', 'VERIFICADOR']
+    },
+    {
       label: 'Servicios académicos',
       route: '/catalogo-academico',
       icon: 'pi pi-building-columns',

@@ -78,4 +78,6 @@ export interface GroupStudentItem {
   courseState: string;
   groupId: string;
   syllabusCourseId: string;
+  paidInstallments?: number;
+  totalInstallments?: number;
 }

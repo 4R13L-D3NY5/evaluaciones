@@ -27,7 +27,14 @@ import com.xpertiflow.evaluaciones.domain.entity.SalaExamenVirtual;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.SalaExamenVirtualRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertiflow.evaluaciones.api.dto.ConciliacionEntregaResponseDto;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
+import com.xpertiflow.evaluaciones.api.dto.ConfiguracionParcialDto;
+import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +50,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RolExamenService {
@@ -64,6 +72,8 @@ public class RolExamenService {
     private final SalaExamenVirtualRepository salaVirtualRepository;
     private final ExamenVarianteRepository varianteRepository;
     private final MapeoEstudianteVarianteRepository mapeoRepository;
+    private final ConfiguracionEvaluacionesService configuracionEvaluacionesService;
+    private final ObjectMapper objectMapper;
 
     private static final long CACHE_GRUPOS_SEA_MILLIS = 600_000L; // 10 minutos para proteger el gateway ante concurrencia
     private volatile List<GroupItemDto> gruposSeaCache = List.of();
@@ -840,6 +850,12 @@ public class RolExamenService {
             rol.setFechaValidacion(LocalDateTime.now());
         } else if (destino == EstadoFlujo.GENERADO) {
             rol.setFechaGeneracion(LocalDateTime.now());
+        } else if (destino == EstadoFlujo.ENTREGADO) {
+            if (dto.getSnapshotEntregaEstudiantesJson() != null && !dto.getSnapshotEntregaEstudiantesJson().isBlank()) {
+                rol.setSnapshotEntregaEstudiantesJson(dto.getSnapshotEntregaEstudiantesJson());
+            } else if (rol.getSnapshotEntregaEstudiantesJson() == null || rol.getSnapshotEntregaEstudiantesJson().isBlank()) {
+                guardarSnapshotEntregaAutomatico(rol);
+            }
         }
 
         rol.setEstadoFlujo(destino);
@@ -1141,5 +1157,193 @@ public class RolExamenService {
             case SATURDAY -> "Sábado";
             case SUNDAY -> "Domingo";
         };
+    }
+
+    @Transactional
+    public void guardarSnapshotEntrega(String id, String snapshotJson) {
+        RolExamen rol = rolExamenRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
+        rol.setSnapshotEntregaEstudiantesJson(snapshotJson);
+        rolExamenRepository.save(rol);
+    }
+
+    @Transactional
+    public void guardarConciliacionDevolucion(String id, String conciliacionJson) {
+        RolExamen rol = rolExamenRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + id));
+        rol.setConciliacionDevolucionJson(conciliacionJson);
+        rolExamenRepository.save(rol);
+    }
+
+    public int resolverCuotaHabilitacion(RolExamen rol) {
+        if (configuracionEvaluacionesService == null || rol == null) return 0;
+        try {
+            ConfiguracionEvaluacionesDto cfg = configuracionEvaluacionesService.obtener();
+            if (cfg == null || Boolean.FALSE.equals(cfg.getValidarHabilitacionAlumnos()) || cfg.getEstructuraPreguntas() == null) return 0;
+            String clave = rol.getTipoParcial() == null ? "1P" : rol.getTipoParcial().name();
+            if (clave.contains("FINAL")) clave = "FINAL";
+            else if (clave.contains("SEGUNDA") || clave.contains("2DA")) clave = "2DA_INSTANCIA";
+            else if (clave.contains("SEGUNDO") || clave.contains("2P")) clave = "2P";
+            else clave = "1P";
+            ConfiguracionParcialDto parcialDto = cfg.getEstructuraPreguntas().get(clave);
+            return (parcialDto != null && parcialDto.getCuotaHabilitacion() != null) ? parcialDto.getCuotaHabilitacion() : 0;
+        } catch (Exception e) {
+            log.warn("Error resolviendo cuota de habilitación para el rol {}: {}", rol.getId(), e.getMessage());
+            return 0;
+        }
+    }
+
+    private void guardarSnapshotEntregaAutomatico(RolExamen rol) {
+        try {
+            int cuotaRequerida = resolverCuotaHabilitacion(rol);
+            String groupId = resolverGrupoOficial(rol);
+            if (groupId == null || groupId.isBlank()) return;
+            List<StudentItemDto> estudiantes = unitepcGatewayClient.getStudentsByGroup(groupId);
+            if (estudiantes == null || estudiantes.isEmpty()) return;
+
+            List<Map<String, Object>> snapshot = new ArrayList<>();
+            for (StudentItemDto est : estudiantes) {
+                int paid = est.getPaidInstallments() != null ? est.getPaidInstallments() : 0;
+                boolean habilitado = cuotaRequerida <= 0 || paid >= cuotaRequerida;
+                Map<String, Object> item = new HashMap<>();
+                item.put("studentCode", est.getStudentCode());
+                item.put("fullName", est.getFullName());
+                item.put("paidInstallments", paid);
+                item.put("totalInstallments", est.getTotalInstallments() != null ? est.getTotalInstallments() : 5);
+                item.put("habilitado", habilitado);
+                snapshot.add(item);
+            }
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("fechaEntrega", LocalDateTime.now().toString());
+            payload.put("cuotaRequerida", cuotaRequerida);
+            payload.put("estudiantes", snapshot);
+            rol.setSnapshotEntregaEstudiantesJson(objectMapper.writeValueAsString(payload));
+        } catch (Exception e) {
+            log.warn("No se pudo generar snapshot automático de entrega para el rol {}: {}", rol.getId(), e.getMessage());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public ConciliacionEntregaResponseDto verificarRegularizaciones(String rolExamenId) {
+        return verificarRegularizaciones(rolExamenId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public ConciliacionEntregaResponseDto verificarRegularizaciones(String rolExamenId, boolean simular) {
+        RolExamen rol = rolExamenRepository.findById(rolExamenId)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
+
+        int cuotaRequerida = resolverCuotaHabilitacion(rol);
+        String groupId = resolverGrupoOficial(rol);
+        List<StudentItemDto> estudiantesActuales = (groupId != null && !groupId.isBlank())
+                ? unitepcGatewayClient.getStudentsByGroup(groupId)
+                : List.of();
+
+        if (estudiantesActuales == null) {
+            estudiantesActuales = List.of();
+        }
+
+        // Mapa de estudiantes previos según snapshot
+        Map<String, Map<String, Object>> snapshotMap = new HashMap<>();
+        String snapshotJson = rol.getSnapshotEntregaEstudiantesJson();
+        if (snapshotJson != null && !snapshotJson.isBlank()) {
+            try {
+                JsonNode root = objectMapper.readTree(snapshotJson);
+                JsonNode estudiantesNode = root.has("estudiantes") ? root.get("estudiantes") : root;
+                if (estudiantesNode.isArray()) {
+                    for (JsonNode nodo : estudiantesNode) {
+                        String codigo = nodo.path("studentCode").asText();
+                        String fullName = nodo.path("fullName").asText(codigo);
+                        int paid = nodo.path("paidInstallments").asInt(0);
+                        boolean habilitado = nodo.has("habilitado")
+                                ? nodo.path("habilitado").asBoolean()
+                                : (cuotaRequerida <= 0 || paid >= cuotaRequerida);
+                        Map<String, Object> data = new HashMap<>();
+                        data.put("fullName", fullName);
+                        data.put("paidInstallments", paid);
+                        data.put("habilitado", habilitado);
+                        snapshotMap.put(codigo, data);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Error parseando snapshot de entrega para rol {}: {}", rolExamenId, e.getMessage());
+            }
+        }
+
+        // Si la consulta externa no devolvió estudiantes o estamos en simulación sin datos, reconstruimos desde el snapshot
+        if (estudiantesActuales.isEmpty() && !snapshotMap.isEmpty()) {
+            estudiantesActuales = new ArrayList<>();
+            for (Map.Entry<String, Map<String, Object>> entry : snapshotMap.entrySet()) {
+                StudentItemDto s = new StudentItemDto();
+                s.setStudentCode(entry.getKey());
+                s.setFullName((String) entry.getValue().getOrDefault("fullName", entry.getKey()));
+                s.setPaidInstallments((Integer) entry.getValue().getOrDefault("paidInstallments", 0));
+                s.setTotalInstallments(5);
+                estudiantesActuales.add(s);
+            }
+        }
+
+        List<ConciliacionEntregaResponseDto.EstudianteRegularizadoDto> regularizados = new ArrayList<>();
+        List<ConciliacionEntregaResponseDto.EstudianteEntregaDetalleDto> detalleActual = new ArrayList<>();
+
+        int habilitadosInicial = 0;
+        int habilitadosActual = 0;
+
+        for (StudentItemDto estudiante : estudiantesActuales) {
+            String codigo = estudiante.getStudentCode();
+            int cuotasActuales = estudiante.getPaidInstallments() != null ? estudiante.getPaidInstallments() : 0;
+
+            boolean estabaHabilitado = true;
+            int cuotasPrevias = cuotasActuales;
+            if (snapshotMap.containsKey(codigo)) {
+                Map<String, Object> prev = snapshotMap.get(codigo);
+                estabaHabilitado = Boolean.TRUE.equals(prev.get("habilitado"));
+                cuotasPrevias = (Integer) prev.getOrDefault("paidInstallments", cuotasActuales);
+                if (estabaHabilitado) {
+                    habilitadosInicial++;
+                }
+            } else if (snapshotMap.isEmpty()) {
+                habilitadosInicial = habilitadosActual;
+            }
+
+            // Simulación en local/sandbox: Si simular está activo y el estudiante no estaba habilitado, simular pago en caja
+            if (simular && !estabaHabilitado) {
+                cuotasActuales = Math.max(cuotaRequerida > 0 ? cuotaRequerida : 3, 3);
+            }
+
+            boolean habilitadoAhora = cuotaRequerida <= 0 || cuotasActuales >= cuotaRequerida;
+            if (habilitadoAhora) {
+                habilitadosActual++;
+            }
+
+            boolean esRegularizado = !estabaHabilitado && habilitadoAhora;
+            if (esRegularizado) {
+                regularizados.add(ConciliacionEntregaResponseDto.EstudianteRegularizadoDto.builder()
+                        .studentCode(codigo)
+                        .fullName(estudiante.getFullName())
+                        .cuotasPrevias(cuotasPrevias)
+                        .cuotasActuales(cuotasActuales)
+                        .build());
+            }
+
+            detalleActual.add(ConciliacionEntregaResponseDto.EstudianteEntregaDetalleDto.builder()
+                    .studentCode(codigo)
+                    .fullName(estudiante.getFullName())
+                    .paidInstallments(cuotasActuales)
+                    .totalInstallments(estudiante.getTotalInstallments() != null ? estudiante.getTotalInstallments() : 5)
+                    .habilitado(habilitadoAhora)
+                    .regularizado(esRegularizado)
+                    .build());
+        }
+
+        return ConciliacionEntregaResponseDto.builder()
+                .hayCambios(!regularizados.isEmpty())
+                .cuotaRequerida(cuotaRequerida)
+                .totalEstudiantes(estudiantesActuales.size())
+                .totalHabilitadosInicial(habilitadosInicial)
+                .totalHabilitadosActual(habilitadosActual)
+                .estudiantesRegularizados(regularizados)
+                .estudiantesActuales(detalleActual)
+                .build();
     }
 }

@@ -356,4 +356,60 @@ class ReportesServiceTest {
         assertThat(item.getPorcentajeAprobacion()).isEqualTo(50.0);
         assertThat(item.getEstadoSincronizacionSea()).isEqualTo("SINCRONIZADO");
     }
+
+    @Test
+    @DisplayName("Reporte Calidad / Monitor: filtra por rango de fechas correctamente")
+    void testObtenerReporteCalidadConRangoFechas() {
+        RolExamen r1 = RolExamen.builder()
+                .id("ROL-F1")
+                .sedeCodigo("CBBA")
+                .carreraCodigo("MED")
+                .materiaCodigo("MED-101")
+                .grupo("1")
+                .fecha(LocalDate.of(2026, 11, 15))
+                .horario("08:00")
+                .tipoParcial(TipoParcial.PRIMER_PARCIAL)
+                .estadoFlujo(EstadoFlujo.PROGRAMADO)
+                .build();
+
+        RolExamen r2 = RolExamen.builder()
+                .id("ROL-F2")
+                .sedeCodigo("CBBA")
+                .carreraCodigo("MED")
+                .materiaCodigo("MED-102")
+                .grupo("1")
+                .fecha(LocalDate.of(2026, 11, 20))
+                .horario("10:00")
+                .tipoParcial(TipoParcial.PRIMER_PARCIAL)
+                .estadoFlujo(EstadoFlujo.PROGRAMADO)
+                .build();
+
+        RolExamen r3 = RolExamen.builder()
+                .id("ROL-F3")
+                .sedeCodigo("CBBA")
+                .carreraCodigo("MED")
+                .materiaCodigo("MED-103")
+                .grupo("1")
+                .fecha(LocalDate.of(2026, 11, 25))
+                .horario("12:00")
+                .tipoParcial(TipoParcial.PRIMER_PARCIAL)
+                .estadoFlujo(EstadoFlujo.PROGRAMADO)
+                .build();
+
+        when(rolExamenRepository.findAll()).thenReturn(List.of(r1, r2, r3));
+        when(verificacionExamenRepository.findByRolExamenIdIn(anyCollection())).thenReturn(Collections.emptyList());
+        when(historialVerificacionRepository.findByRolExamenIdIn(anyCollection())).thenReturn(Collections.emptyList());
+        when(bancoPreguntasRepository.findByRolExamenIdIn(anyCollection())).thenReturn(Collections.emptyList());
+
+        // Filtrar del 18 al 22 de noviembre (solo r2 debe coincidir)
+        LocalDate desde = LocalDate.of(2026, 11, 18);
+        LocalDate hasta = LocalDate.of(2026, 11, 22);
+
+        ReporteCalidadResumenDto resultado = service.obtenerReporteCalidad(
+                "CBBA", "MED", "1er Parcial", desde, hasta, "TODOS", null, null);
+
+        assertThat(resultado).isNotNull();
+        assertThat(resultado.getTotalExamenes()).isEqualTo(1);
+        assertThat(resultado.getItems().get(0).getRolExamenId()).isEqualTo("ROL-F2");
+    }
 }

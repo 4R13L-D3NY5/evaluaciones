@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -49,8 +50,20 @@ public class ReportesService {
             String estadoCalidadFiltro,
             String criterioBusqueda,
             Authentication authentication) {
+        return obtenerReporteCalidad(sedeCodigo, carreraCodigo, tipoParcial, null, null, estadoCalidadFiltro, criterioBusqueda, authentication);
+    }
 
-        List<RolExamen> roles = obtenerRolesFiltrados(sedeCodigo, carreraCodigo, tipoParcial, authentication);
+    public ReporteCalidadResumenDto obtenerReporteCalidad(
+            String sedeCodigo,
+            String carreraCodigo,
+            String tipoParcial,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta,
+            String estadoCalidadFiltro,
+            String criterioBusqueda,
+            Authentication authentication) {
+
+        List<RolExamen> roles = obtenerRolesFiltrados(sedeCodigo, carreraCodigo, tipoParcial, fechaDesde, fechaHasta, authentication);
         if (roles.isEmpty()) {
             return ReporteCalidadResumenDto.builder()
                     .totalExamenes(0)
@@ -160,6 +173,9 @@ public class ReportesService {
                     .materiaCodigo(rol.getMateriaCodigo())
                     .materiaNombre(rol.getMateriaNombre())
                     .grupo(rol.getGrupo())
+                    .semestre(rol.getSemestre())
+                    .modalidad(rol.getModalidad() != null ? rol.getModalidad().name() : null)
+                    .aula(rol.getAula())
                     .carreraCodigo(rol.getCarreraCodigo())
                     .carreraNombre(rol.getCarreraNombre())
                     .sedeCodigo(rol.getSedeCodigo())
@@ -476,6 +492,16 @@ public class ReportesService {
             String carreraCodigo,
             String tipoParcial,
             Authentication authentication) {
+        return obtenerRolesFiltrados(sedeCodigo, carreraCodigo, tipoParcial, null, null, authentication);
+    }
+
+    private List<RolExamen> obtenerRolesFiltrados(
+            String sedeCodigo,
+            String carreraCodigo,
+            String tipoParcial,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta,
+            Authentication authentication) {
 
         List<RolExamen> roles = rolExamenRepository.findAll();
 
@@ -504,9 +530,21 @@ public class ReportesService {
                             return false;
                         }
                     }
+                    if (fechaDesde != null && rol.getFecha() != null) {
+                        if (rol.getFecha().isBefore(fechaDesde)) {
+                            return false;
+                        }
+                    }
+                    if (fechaHasta != null && rol.getFecha() != null) {
+                        if (rol.getFecha().isAfter(fechaHasta)) {
+                            return false;
+                        }
+                    }
                     return true;
                 })
-                .sorted(Comparator.comparing(RolExamen::getMateriaCodigo, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(RolExamen::getFecha, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(RolExamen::getHorario, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(RolExamen::getMateriaCodigo, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
                         .thenComparing(RolExamen::getGrupo, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }

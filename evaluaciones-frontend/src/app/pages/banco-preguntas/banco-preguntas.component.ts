@@ -3981,8 +3981,29 @@ export class BancoPreguntasComponent implements OnInit {
     return p1.includes('FINAL') || p1 === 'EF' || p2.includes('FINAL') || p2 === 'EF';
   });
 
-  // Cuotas Oficiales según parcial
+  public resolverClaveParcial = computed(() => {
+    const p1 = (this.parcialActivo() || '').toString().trim().toUpperCase();
+    const p2 = (this.rolExamenActivo()?.tipoParcial || '').toString().trim().toUpperCase();
+    if (p1.includes('FINAL') || p1 === 'EF' || p2.includes('FINAL') || p2 === 'EF') return 'FINAL';
+    if (p1.includes('2DA') || p1.includes('INSTANCIA') || p2.includes('2DA') || p2.includes('INSTANCIA')) return '2DA_INSTANCIA';
+    if (p1.includes('2') || p2.includes('2') || p1.includes('SEGUNDO') || p2.includes('SEGUNDO')) return '2P';
+    return '1P';
+  });
+
+  // Cuotas Oficiales según parcial y configuración institucional
   public cuotasDificultad = computed(() => {
+    const cfg = this._configuracionService.configuracion();
+    const estructura = cfg?.estructuraPreguntas;
+    const clave = this.resolverClaveParcial();
+    const conf = estructura ? estructura[clave] : null;
+    if (conf && conf.bancoTotal && conf.bancoTotal > 0) {
+      return {
+        facil: conf.bancoFacil ?? (this.esExamenFinal() ? 30 : 15),
+        medio: conf.bancoMedio ?? (this.esExamenFinal() ? 60 : 30),
+        dificil: conf.bancoDificil ?? (this.esExamenFinal() ? 30 : 15),
+        total: conf.bancoTotal
+      };
+    }
     if (this.esExamenFinal()) {
       return { facil: 30, medio: 60, dificil: 30, total: 120 };
     }
@@ -3994,6 +4015,17 @@ export class BancoPreguntasComponent implements OnInit {
   });
 
   public cuotasGrupos = computed(() => {
+    const cfg = this._configuracionService.configuracion();
+    const estructura = cfg?.estructuraPreguntas;
+    const clave = this.resolverClaveParcial();
+    const conf = estructura ? estructura[clave] : null;
+    if (conf && conf.bancoG1 != null && conf.bancoG1 >= 0) {
+      return {
+        g1: conf.bancoG1,
+        g2: conf.bancoG2 ?? (this.esExamenFinal() ? 60 : 30),
+        g3: conf.bancoG3 ?? (this.esExamenFinal() ? 30 : 15)
+      };
+    }
     if (this.esExamenFinal()) {
       return { g1: 30, g2: 60, g3: 30 };
     }

@@ -190,8 +190,8 @@ class SolicitudModificacionRolTest {
     }
 
     @Test
-    @DisplayName("Rechaza creación si el examen ya fue impreso o entregado")
-    void rechazaSolicitudSiExamenYaFueImpreso() {
+    @DisplayName("Director puede solicitar modificacion aunque el examen ya este IMPRESO")
+    void directorPuedeSolicitarExamenYaImpreso() {
         String username = "director_sistemas";
         Authentication auth = crearAuth(username, "DIRECTOR_CARRERA");
 
@@ -205,6 +205,45 @@ class SolicitudModificacionRolTest {
         RolExamen rol = new RolExamen();
         rol.setId("ROL-100");
         rol.setEstadoFlujo(EstadoFlujo.IMPRESO);
+        rol.setFecha(LocalDate.of(2026, 11, 20));
+        rol.setHorario("08:00");
+        rol.setModalidad(ModalidadExamen.PRESENCIAL_CARTILLA);
+
+        when(rolExamenRepository.findById("ROL-100")).thenReturn(Optional.of(rol));
+        when(accesoAcademicoService.puedeAccederRol("ROL-100", auth)).thenReturn(true);
+        when(repository.existsByRolExamenIdAndEstado("ROL-100", EstadoSolicitudModificacion.PENDIENTE)).thenReturn(false);
+        when(repository.save(any(SolicitudModificacionRol.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CrearSolicitudModificacionRequestDto dto = CrearSolicitudModificacionRequestDto.builder()
+                .rolExamenId("ROL-100")
+                .fechaPropuesta(LocalDate.of(2026, 11, 25))
+                .horarioPropuesto("10:00")
+                .modalidadPropuesta(ModalidadExamen.PRESENCIAL_CARTILLA)
+                .motivo("Reprogramacion de examen impreso para fecha posterior")
+                .build();
+
+        SolicitudModificacionResponseDto resp = service.crearSolicitud(dto, auth);
+        assertNotNull(resp);
+        assertEquals("ROL-100", resp.getRolExamenId());
+        assertEquals(LocalDate.of(2026, 11, 25), resp.getFechaPropuesta());
+    }
+
+    @Test
+    @DisplayName("Director no puede solicitar si el examen ya fue entregado o rendido")
+    void directorNoPuedeSolicitarExamenYaEntregado() {
+        String username = "director_sistemas";
+        Authentication auth = crearAuth(username, "DIRECTOR_CARRERA");
+
+        UsuarioSistema usuario = new UsuarioSistema();
+        usuario.setId(10L);
+        usuario.setUsuario(username);
+        usuario.setRolCodigo("DIRECTOR_CARRERA");
+
+        when(usuarioRepository.findByUsuarioIgnoreCase(username)).thenReturn(Optional.of(usuario));
+
+        RolExamen rol = new RolExamen();
+        rol.setId("ROL-100");
+        rol.setEstadoFlujo(EstadoFlujo.ENTREGADO);
 
         when(rolExamenRepository.findById("ROL-100")).thenReturn(Optional.of(rol));
         when(accesoAcademicoService.puedeAccederRol("ROL-100", auth)).thenReturn(true);
@@ -218,7 +257,7 @@ class SolicitudModificacionRolTest {
                 .build();
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.crearSolicitud(dto, auth));
-        assertTrue(ex.getMessage().contains("Las cartillas ya fueron generadas"));
+        assertTrue(ex.getMessage().contains("El examen ya fue entregado, rendido o finalizado"));
     }
 
     @Test

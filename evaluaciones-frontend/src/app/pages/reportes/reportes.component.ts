@@ -418,7 +418,7 @@ interface FilaRemark {
                 <input
                   type="text"
                   [(ngModel)]="busquedaCalidad"
-                  placeholder="Buscar materia, docente, código, grupo..."
+                  placeholder="Buscar materia, docente, verificador, grupo..."
                   class="bg-muted border border-border rounded-xl pl-8 pr-3 py-2 text-xs outline-none w-64 focus:border-primary" />
               </div>
               <button
@@ -1490,7 +1490,7 @@ export class ReporteEvaluacionesComponent implements OnInit, OnDestroy {
     const texto = this.busquedaCalidad.trim().toLowerCase();
     if (texto) {
       items = items.filter(i => {
-        const busq = `${i.materiaCodigo} ${i.materiaNombre} ${i.docenteNombre} ${i.docenteCi} ${i.grupo} ${i.carreraNombre} ${i.sedeNombre}`.toLowerCase();
+        const busq = `${i.materiaCodigo} ${i.materiaNombre} ${i.docenteNombre} ${i.docenteCi} ${i.grupo} ${i.carreraNombre} ${i.sedeNombre} ${i.aprobadoPor || ''} ${i.ultimoVerificador || ''}`.toLowerCase();
         return busq.includes(texto);
       });
     }

@@ -3,6 +3,21 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 
+export interface ConfiguracionParcial {
+  totalPreguntas: number;
+  facil: number;
+  medio: number;
+  dificil: number;
+  bancoTotal?: number;
+  bancoFacil?: number;
+  bancoMedio?: number;
+  bancoDificil?: number;
+  bancoG1?: number;
+  bancoG2?: number;
+  bancoG3?: number;
+  cuotaHabilitacion?: number;
+}
+
 export interface ConfiguracionEvaluaciones {
   ratioEstudiantesPorVariante: number;
   duracionExamenVirtualMinutos: number;
@@ -11,7 +26,7 @@ export interface ConfiguracionEvaluaciones {
   tipoLetra: string;
   tamanoLetraPt: number;
   espaciadoLeading: string;
-  estructuraPreguntas: Record<string, { totalPreguntas: number; facil: number; medio: number; dificil: number }>;
+  estructuraPreguntas: Record<string, ConfiguracionParcial>;
   minutosAntesEntrega: number;
   horasAntesGeneracion: number;
   horasPostPatron: number;
@@ -20,6 +35,7 @@ export interface ConfiguracionEvaluaciones {
   minutosMinimosDevolucion?: number;
   examenEnCurso?: string;
   validarCuotasGrupos?: boolean;
+  validarHabilitacionAlumnos?: boolean;
   permitirDirectorEdicionRoles?: boolean;
   actualizadoEn?: string;
   actualizadoPor?: string;
@@ -94,12 +110,21 @@ export class ConfiguracionEvaluacionesService {
     minutosMinimosDevolucion: 45,
     examenEnCurso: ConfiguracionEvaluacionesService.obtenerExamenEnCursoCache(),
     validarCuotasGrupos: true,
+    validarHabilitacionAlumnos: true,
     permitirDirectorEdicionRoles: ConfiguracionEvaluacionesService.obtenerPermitirDirectorCache()
   });
 
   public obtenerExamenesEnCurso(valor?: string): string[] {
     const raw = valor || this.configuracion().examenEnCurso || '1ER_PARCIAL';
     const lista = raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const normalizar = (token: string): number => {
+      if (token.includes('1ER') || token === '1P' || token.includes('PRIMER')) return 0;
+      if (token.includes('2DO') || token === '2P' || token.includes('SEGUNDO')) return 1;
+      if (token.includes('FINAL')) return 2;
+      if (token.includes('2DA') || token.includes('INSTANCIA')) return 3;
+      return 99;
+    };
+    lista.sort((a, b) => normalizar(a) - normalizar(b));
     return lista.length > 0 ? lista : ['1ER_PARCIAL'];
   }
 
@@ -178,6 +203,21 @@ export class ConfiguracionEvaluacionesService {
     if (display === 'Examen Final') return 'FINAL';
     if (display === '2da Instancia') return '2DA_INSTANCIA';
     return '1P';
+  }
+
+  public resolverParcialClaveSincronizacion(valor?: string): 'PRIMER_PARCIAL' | 'SEGUNDO_PARCIAL' | 'FINAL' | 'SEGUNDA_INSTANCIA' {
+    if (valor && !valor.includes(',')) {
+      const v = valor.toUpperCase();
+      if (v.includes('2DO') || v.includes('2P') || v.includes('SEGUNDO')) return 'SEGUNDO_PARCIAL';
+      if (v.includes('FINAL')) return 'FINAL';
+      if (v.includes('2DA') || v.includes('INSTANCIA')) return 'SEGUNDA_INSTANCIA';
+      return 'PRIMER_PARCIAL';
+    }
+    const display = this.resolverParcialDisplay(valor);
+    if (display === '2do Parcial') return 'SEGUNDO_PARCIAL';
+    if (display === 'Examen Final') return 'FINAL';
+    if (display === '2da Instancia') return 'SEGUNDA_INSTANCIA';
+    return 'PRIMER_PARCIAL';
   }
 
   public cargar(): Observable<ConfiguracionEvaluaciones> {

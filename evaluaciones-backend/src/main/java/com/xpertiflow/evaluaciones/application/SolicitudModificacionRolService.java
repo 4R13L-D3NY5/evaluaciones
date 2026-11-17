@@ -48,15 +48,15 @@ public class SolicitudModificacionRolService {
             throw new AccessDeniedException("No tiene permisos para solicitar modificaciones en este examen");
         }
 
-        // Restricción por estado del examen
+        // Restricción por estado del examen: se permite hasta IMPRESO inclusive
         EstadoFlujo estadoActual = rol.getEstadoFlujo();
-        if (estadoActual == EstadoFlujo.IMPRESO
-                || estadoActual == EstadoFlujo.ENTREGADO
+        if (estadoActual == EstadoFlujo.ENTREGADO
                 || estadoActual == EstadoFlujo.DEVUELTO
                 || estadoActual == EstadoFlujo.PENDIENTE_NOTAS
                 || estadoActual == EstadoFlujo.CALIFICADO
-                || estadoActual == EstadoFlujo.CONFIRMADO) {
-            throw new IllegalStateException("No se puede solicitar modificación para un examen en estado " + (estadoActual != null ? estadoActual.getValor() : "-") + ". Las cartillas ya fueron generadas o el examen ya se rindió.");
+                || estadoActual == EstadoFlujo.CONFIRMADO
+                || estadoActual == EstadoFlujo.SUSPENDIDO) {
+            throw new IllegalStateException("No se puede solicitar modificación para un examen en estado " + (estadoActual != null ? estadoActual.getValor() : "-") + ". El examen ya fue entregado, rendido o finalizado.");
         }
 
         // Validación de fecha propuesta: debe ser hoy o en adelante
