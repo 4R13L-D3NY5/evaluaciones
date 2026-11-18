@@ -51,6 +51,7 @@ export interface MateriaDocenteItem {
   tipoClase: string;
   registroEvaluacion?: EvaluacionDocenteRegistro;
   consolidado?: EvaluacionConsolidadaDocenteMateria;
+  ratificacion?: DocenteRatificacionMateria;
 }
 
 export interface DocenteEvaluacionRow {
@@ -457,6 +458,11 @@ export interface DocenteEvaluacionRow {
                                   <span class="bg-primary/10 text-primary font-mono font-black px-1.5 py-0.2 rounded text-[9px]">
                                     {{ cons.puntajeFinal100 }} pts
                                   </span>
+                                  <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-black text-[9px] uppercase tracking-wide border"
+                                        [class]="obtenerEstadoRatificacion(doc, materia).estado === 'RATIFICADO' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300'">
+                                    <i [class]="obtenerEstadoRatificacion(doc, materia).estado === 'RATIFICADO' ? 'pi pi-check' : 'pi pi-times'" class="text-[8px]"></i>
+                                    <span>{{ obtenerEstadoRatificacion(doc, materia).estado === 'RATIFICADO' ? 'Ratificado' : 'No Ratificado' }}</span>
+                                  </span>
                                   <span class="text-muted-foreground font-mono text-[9px]">
                                     Est: {{ cons.totalEstudiantesEvaluaron }}/{{ cons.totalEstudiantesMatriculados }} ({{ cons.estudiantesPuntos50 }} pts)
                                   </span>
@@ -581,6 +587,32 @@ export interface DocenteEvaluacionRow {
                                     </div>
 
                                     <div class="flex items-center gap-2 self-end sm:self-center">
+                                      @if (obtenerEstadoRatificacion(doc, mat); as estadoRatif) {
+                                        <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-2xs inline-flex items-center gap-1"
+                                              [class]="estadoRatif.estado === 'RATIFICADO' ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : 'bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700'">
+                                          <i [class]="estadoRatif.estado === 'RATIFICADO' ? 'pi pi-check' : 'pi pi-times'" class="text-[9px]"></i>
+                                          <span>{{ estadoRatif.estado === 'RATIFICADO' ? 'RATIFICADO' : 'NO RATIFICADO' }}</span>
+                                        </span>
+
+                                        @if (estadoRatif.modificadoManualmente) {
+                                          <span class="px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 text-[9px] font-bold border border-purple-200 inline-flex items-center gap-1"
+                                                [title]="'Modificado por: ' + (estadoRatif.modificadoPor || 'Administración') + '\nMotivo: ' + (estadoRatif.motivo || 'Sin detalle')">
+                                            <i class="pi pi-pencil text-[8px]"></i> Manual
+                                          </span>
+                                        }
+                                      }
+
+                                      @if (puedeModificarRatificacion()) {
+                                        <button 
+                                          type="button" 
+                                          (click)="abrirModalRatificarDesdeDocente(doc, mat)"
+                                          title="Modificar estado de ratificación de esta materia"
+                                          class="px-2.5 py-1.5 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer">
+                                          <i class="pi pi-sync text-[10px]"></i>
+                                          <span>Cambiar Ratificación</span>
+                                        </button>
+                                      }
+
                                       @if (mat.registroEvaluacion; as reg) {
                                         <button 
                                           type="button" 
@@ -672,10 +704,12 @@ export interface DocenteEvaluacionRow {
                                     <div class="space-y-1 bg-card p-2 rounded-lg border border-border shadow-2xs flex flex-col justify-center">
                                       <div class="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                                         <span>Total Consolidado</span>
-                                        <span [class]="mat.consolidado?.estadoFinal === 'Sobresaliente' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : (mat.consolidado?.estadoFinal === 'Aprobado' ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-amber-700 bg-amber-50 border-amber-200')"
-                                              class="px-1.5 py-0.2 rounded text-[9px] font-bold border">
-                                          {{ mat.consolidado?.estadoFinal || 'Pendiente' }}
-                                        </span>
+                                        @if (obtenerEstadoRatificacion(doc, mat); as ratif) {
+                                          <span [class]="ratif.estado === 'RATIFICADO' ? 'text-emerald-700 bg-emerald-50 border-emerald-300' : 'text-rose-700 bg-rose-50 border-rose-300'"
+                                                class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase border">
+                                            {{ ratif.estado === 'RATIFICADO' ? 'RATIFICADO (>=71)' : 'NO RATIFICADO (<=70)' }}
+                                          </span>
+                                        }
                                       </div>
                                       <div class="flex items-baseline gap-1.5">
                                         <span class="text-lg font-black font-mono text-primary">{{ mat.consolidado?.puntajeFinal100 || 0 }}</span>
@@ -3211,6 +3245,83 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
     });
   }
 
+  public obtenerEstadoRatificacion(doc: DocenteEvaluacionRow, mat: MateriaDocenteItem): {
+    estado: 'RATIFICADO' | 'NO_RATIFICADO';
+    modificadoManualmente: boolean;
+    modificadoPor?: string;
+    motivo?: string;
+  } {
+    if (mat.ratificacion) {
+      return {
+        estado: mat.ratificacion.estadoFinal,
+        modificadoManualmente: mat.ratificacion.modificadoManualmente,
+        modificadoPor: mat.ratificacion.modificadoPorNombre || mat.ratificacion.modificadoPor,
+        motivo: mat.ratificacion.motivoModificacion
+      };
+    }
+    const r = this.ratificaciones().find(item =>
+      item.materiaCodigo.trim().toUpperCase() === mat.materiaCodigo.trim().toUpperCase() &&
+      item.docenteNombre.trim().toUpperCase() === doc.docenteNombre.trim().toUpperCase()
+    );
+    if (r) {
+      mat.ratificacion = r;
+      return {
+        estado: r.estadoFinal,
+        modificadoManualmente: r.modificadoManualmente,
+        modificadoPor: r.modificadoPorNombre || r.modificadoPor,
+        motivo: r.motivoModificacion
+      };
+    }
+    const nota = mat.consolidado?.puntajeFinal100 || 0;
+    return {
+      estado: nota >= 71 ? 'RATIFICADO' : 'NO_RATIFICADO',
+      modificadoManualmente: false
+    };
+  }
+
+  public abrirModalRatificarDesdeDocente(doc: DocenteEvaluacionRow, mat: MateriaDocenteItem): void {
+    if (mat.ratificacion) {
+      this.abrirModalModificarRatificacion(mat.ratificacion);
+      return;
+    }
+
+    const matKey = mat.materiaCodigo.trim().toUpperCase();
+    const docKey = doc.docenteNombre.trim().toUpperCase();
+    const encontrada = this.ratificaciones().find(r =>
+      r.materiaCodigo.trim().toUpperCase() === matKey &&
+      r.docenteNombre.trim().toUpperCase() === docKey
+    );
+
+    if (encontrada) {
+      mat.ratificacion = encontrada;
+      this.abrirModalModificarRatificacion(encontrada);
+      return;
+    }
+
+    const gestion = this.storage.gestionActiva();
+    this.cargandoRatificaciones.set(true);
+    this.evaluacionService.listarReporteRatificados(gestion, this.filtroSedeCodigo, this.filtroCarreraCodigo).subscribe({
+      next: lista => {
+        this.cargandoRatificaciones.set(false);
+        this.ratificaciones.set(lista || []);
+        const rItem = (lista || []).find(r =>
+          r.materiaCodigo.trim().toUpperCase() === matKey &&
+          r.docenteNombre.trim().toUpperCase() === docKey
+        );
+        if (rItem) {
+          mat.ratificacion = rItem;
+          this.abrirModalModificarRatificacion(rItem);
+        } else {
+          this.mostrarToast('No se encontró el registro de ratificación para esta materia.');
+        }
+      },
+      error: () => {
+        this.cargandoRatificaciones.set(false);
+        this.mostrarToast('No se pudo sincronizar la ratificación para esta materia.');
+      }
+    });
+  }
+
   public abrirModalModificarRatificacion(r: DocenteRatificacionMateria): void {
     this.ratificacionParaModificar.set(r);
     this.nuevoEstadoRatificacion.set(r.estadoFinal === 'RATIFICADO' ? 'NO_RATIFICADO' : 'RATIFICADO');
@@ -3238,6 +3349,24 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
       next: actualizado => {
         this.guardandoRatificacion.set(false);
         this.ratificaciones.update(list => list.map(r => r.id === item.id ? actualizado : r));
+
+        // Actualizar reactivamente también en el listado de docentes
+        this.docentesTotales.update(docs => docs.map(doc => {
+          const matIndex = doc.materias.findIndex(m =>
+            m.materiaCodigo.trim().toUpperCase() === actualizado.materiaCodigo.trim().toUpperCase() &&
+            doc.docenteNombre.trim().toUpperCase() === actualizado.docenteNombre.trim().toUpperCase()
+          );
+          if (matIndex >= 0) {
+            const nuevasMaterias = [...doc.materias];
+            nuevasMaterias[matIndex] = {
+              ...nuevasMaterias[matIndex],
+              ratificacion: actualizado
+            };
+            return { ...doc, materias: nuevasMaterias };
+          }
+          return doc;
+        }));
+
         this.cerrarModalModificarRatificacion();
         this.mostrarToast(`Ratificación actualizada con éxito para ${item.docenteNombre}.`);
       },
@@ -3888,9 +4017,14 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
       cursos: carrera ? this.gateway.getCourses(codigoSede, carrera.careerId).pipe(catchError(() => of([] as Course[]))) : of([] as Course[]),
       grupos: grupos$,
       registros: this.evaluacionService.listarRegistros(gestion, codigoSede, codigoCarrera).pipe(catchError(() => of([] as EvaluacionDocenteRegistro[]))),
-      consolidado: this.evaluacionService.listarResumenConsolidado(codigoSede, codigoCarrera, gestion).pipe(catchError(() => of([] as EvaluacionConsolidadaDocenteMateria[])))
+      consolidado: this.evaluacionService.listarResumenConsolidado(codigoSede, codigoCarrera, gestion).pipe(catchError(() => of([] as EvaluacionConsolidadaDocenteMateria[]))),
+      ratificaciones: this.evaluacionService.listarReporteRatificados(gestion, codigoSede, codigoCarrera).pipe(catchError(() => of([] as DocenteRatificacionMateria[])))
     }).subscribe({
-      next: ({ cursos, grupos, registros, consolidado }) => {
+      next: ({ cursos, grupos, registros, consolidado, ratificaciones }) => {
+        if (ratificaciones && ratificaciones.length > 0) {
+          this.ratificaciones.set(ratificaciones);
+        }
+
         // Mapa de cursos por syllabusCourseId
         const cursosMap = new Map<string, Course>();
         cursos.forEach(c => cursosMap.set(c.syllabusCourseId, c));
@@ -3907,6 +4041,13 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
         (consolidado || []).forEach(c => {
           const key = `${c.docenteNombre.trim().toUpperCase()}_${c.materiaCodigo.trim().toUpperCase()}`;
           consMap.set(key, c);
+        });
+
+        // Mapa de ratificaciones por clave: DOCENTE_MATERIA
+        const ratifMap = new Map<string, DocenteRatificacionMateria>();
+        (ratificaciones || []).forEach(r => {
+          const key = `${r.docenteNombre.trim().toUpperCase()}_${r.materiaCodigo.trim().toUpperCase()}`;
+          ratifMap.set(key, r);
         });
 
         // Agrupación por Docente
@@ -3952,6 +4093,7 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
             const regKey = `${docKey}_${matKey}`;
             const reg = regMap.get(regKey);
             const cons = consMap.get(regKey);
+            const ratif = ratifMap.get(regKey);
 
             docEntry.materiasMap.set(matKey, {
               cursoId: g.syllabusCourseId,
@@ -3962,7 +4104,8 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
               grupoCodigo: g.code,
               tipoClase: g.classType || 'TA',
               registroEvaluacion: reg,
-              consolidado: cons
+              consolidado: cons,
+              ratificacion: ratif
             });
           }
         });
