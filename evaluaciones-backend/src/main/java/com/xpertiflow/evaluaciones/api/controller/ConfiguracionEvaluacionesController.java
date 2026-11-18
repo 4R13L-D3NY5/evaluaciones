@@ -98,4 +98,17 @@ public class ConfiguracionEvaluacionesController {
         String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
         return ResponseEntity.ok(service.actualizarPermisoAprobacionVicerrector(usuarioId, request.isPuedeAprobarSolicitudesRol(), actor, ipOrigen));
     }
+
+    @PutMapping("/vicerrectores-ratificacion/{usuarioId}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES')")
+    @Operation(summary = "Actualizar permiso de modificación de ratificaciones de evaluación docente para un usuario")
+    public ResponseEntity<com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto> actualizarPermisoRatificacionVicerrector(
+            @PathVariable Long usuarioId,
+            @RequestBody com.xpertiflow.evaluaciones.api.dto.ActualizarPermisoRatificacionVicerrectorRequestDto request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        String actor = authentication != null ? authentication.getName() : "ADMIN_EVALUACIONES";
+        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
+        return ResponseEntity.ok(service.actualizarPermisoRatificacionVicerrector(usuarioId, request.isPuedeModificarRatificacionDocente(), actor, ipOrigen));
+    }
 }

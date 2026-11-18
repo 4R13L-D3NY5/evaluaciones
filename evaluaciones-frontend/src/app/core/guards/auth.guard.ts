@@ -18,6 +18,7 @@ export const authGuard: CanActivateFn = () => {
 const resolverRutaPorDefecto = (rol: AppRole): string => {
   if (rol === 'EVALUADOR_VOCACIONAL') return '/test-vocacional';
   if (rol === 'VERIFICADOR') return '/verificar-examenes';
+  if (rol === 'TALENTO_HUMANO') return '/evaluacion-docente';
   return '/dashboard';
 };
 

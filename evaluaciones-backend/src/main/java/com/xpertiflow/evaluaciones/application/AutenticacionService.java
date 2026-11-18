@@ -170,6 +170,8 @@ public class AutenticacionService {
                 .forEach(carreras::add);
         dto.setCarrerasAsignadas(carreras.stream().sorted(Comparator.naturalOrder()).toList());
         dto.setPuedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen());
+        dto.setPuedeAprobarSolicitudesRol(usuario.isPuedeAprobarSolicitudesRol());
+        dto.setPuedeModificarRatificacionDocente(usuario.isPuedeModificarRatificacionDocente());
         return dto;
     }
 

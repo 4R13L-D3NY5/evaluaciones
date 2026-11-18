@@ -18,7 +18,11 @@ import {
   EstudianteAvanceEvaluacion,
   EvaluacionConsolidadaDocenteMateria,
   SemestreHabilitacionEstado,
-  HabilitarSemestresRequest
+  HabilitarSemestresRequest,
+  DocenteRatificacionMateria,
+  ModificarRatificacionRequest,
+  CumplimientoEvaluacion,
+  PeriodoEvaluacionDocenteEstado
 } from '../../core/models/evaluacion-docente.models';
 
 export interface FormCriterioItem {
@@ -99,41 +103,66 @@ export interface DocenteEvaluacionRow {
 
         <!-- Selector de Pestañas y Reporte -->
         <div class="flex items-center gap-2">
-          <button 
-            type="button" 
-            (click)="descargarReporteCarreraPdf()"
-            [disabled]="docentesTotales().length === 0"
-            title="Descargar reporte oficial consolidado de evaluación docente en formato PDF con firma del Director de Carrera"
-            class="bg-card hover:bg-muted text-foreground border border-red-200 hover:border-red-300 font-bold text-xs py-2 px-3.5 rounded-xl flex items-center gap-2 shadow-2xs transition-colors cursor-pointer disabled:opacity-50">
-            <i class="pi pi-file-pdf text-red-600 text-sm"></i>
-            <span>Descargar Reporte PDF</span>
-          </button>
+          @if (!esTalentoHumano()) {
+            <button 
+              type="button" 
+              (click)="descargarReporteCarreraPdf()"
+              [disabled]="docentesTotales().length === 0"
+              title="Descargar reporte oficial consolidado de evaluación docente en formato PDF con firma del Director de Carrera"
+              class="bg-card hover:bg-muted text-foreground border border-red-200 hover:border-red-300 font-bold text-xs py-2 px-3.5 rounded-xl flex items-center gap-2 shadow-2xs transition-colors cursor-pointer disabled:opacity-50">
+              <i class="pi pi-file-pdf text-red-600 text-sm"></i>
+              <span>Descargar Reporte PDF</span>
+            </button>
+          }
           <div class="bg-muted p-1 rounded-xl flex items-center gap-1 border border-border">
+            @if (!esTalentoHumano()) {
+              <button 
+                type="button"
+                (click)="vistaActiva.set('evaluaciones')"
+                [class]="vistaActiva() === 'evaluaciones' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+                class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                <i class="pi pi-users text-xs"></i>
+                <span>Evaluación por Docentes</span>
+              </button>
+              <button 
+                type="button"
+                (click)="cambiarASemestres()"
+                [class]="vistaActiva() === 'semestres' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+                class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                <i class="pi pi-clock text-xs"></i>
+                <span>Habilitación por Semestre</span>
+              </button>
+              <button 
+                type="button"
+                (click)="cambiarAEstudiantes()"
+                [class]="vistaActiva() === 'estudiantes' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+                class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                <i class="pi pi-id-card text-xs"></i>
+                <span>Seguimiento Estudiantil</span>
+              </button>
+            }
+
+            <!-- Pestaña Ratificación por Materia -->
             <button 
               type="button"
-              (click)="vistaActiva.set('evaluaciones')"
-              [class]="vistaActiva() === 'evaluaciones' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+              (click)="cambiarARatificaciones()"
+              [class]="vistaActiva() === 'ratificaciones' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
               class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
-              <i class="pi pi-users text-xs"></i>
-              <span>Evaluación por Docentes</span>
+              <i class="pi pi-check-circle text-xs"></i>
+              <span>Ratificación por Materia</span>
             </button>
+
+            <!-- Pestaña Cumplimiento Institucional -->
             <button 
               type="button"
-              (click)="cambiarASemestres()"
-              [class]="vistaActiva() === 'semestres' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
+              (click)="cambiarACumplimiento()"
+              [class]="vistaActiva() === 'cumplimiento' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
               class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
-              <i class="pi pi-clock text-xs"></i>
-              <span>Habilitación por Semestre</span>
+              <i class="pi pi-chart-bar text-xs"></i>
+              <span>Cumplimiento</span>
             </button>
-            <button 
-              type="button"
-              (click)="cambiarAEstudiantes()"
-              [class]="vistaActiva() === 'estudiantes' ? 'bg-card text-primary font-black shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
-              class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
-              <i class="pi pi-id-card text-xs"></i>
-              <span>Seguimiento Estudiantil</span>
-            </button>
-            @if (esAdminOResponsable()) {
+
+            @if (esAdminOResponsable() && !esTalentoHumano()) {
               <button 
                 type="button"
                 (click)="vistaActiva.set('instrumentos')"
@@ -145,6 +174,50 @@ export interface DocenteEvaluacionRow {
             }
           </div>
         </div>
+      </div>
+
+      <!-- Banner de Estado de Período de Evaluación Docente y Cierre Centralizado -->
+      <div class="rounded-xl border p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs"
+           [class]="periodoEvaluacionAbierto() ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30'">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg flex items-center justify-center font-bold shrink-0"
+               [class]="periodoEvaluacionAbierto() ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'">
+            <i [class]="periodoEvaluacionAbierto() ? 'pi pi-lock-open text-base' : 'pi pi-lock text-base'"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-black uppercase tracking-wider"
+                    [class]="periodoEvaluacionAbierto() ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'">
+                {{ periodoEvaluacionAbierto() ? 'Período de Evaluación Docente: ABIERTO' : 'Período de Evaluación Docente: CERRADO' }}
+              </span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                    [class]="periodoEvaluacionAbierto() ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'">
+                {{ periodoEvaluacionAbierto() ? 'Evaluaciones en curso' : 'Evaluaciones bloqueadas' }}
+              </span>
+            </div>
+            <p class="text-[11px] text-muted-foreground mt-0.5 m-0">
+              @if (periodoEvaluacionAbierto()) {
+                Directores de carrera y estudiantes pueden registrar evaluaciones normalmente en las asignaturas vigentes.
+              } @else {
+                El período se encuentra oficialmente cerrado por la Administración Central. No se admiten nuevas evaluaciones ni modificaciones operativas.
+              }
+            </p>
+          </div>
+        </div>
+
+        @if (auth.tieneRol(['ADMINISTRADOR_SISTEMA'])) {
+          <div class="shrink-0 flex items-center gap-2">
+            <button 
+              type="button" 
+              (click)="modalCierrePeriodo.set(true)"
+              [disabled]="conmutandoPeriodo()"
+              [class]="periodoEvaluacionAbierto() ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'"
+              class="font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-50">
+              <i [class]="periodoEvaluacionAbierto() ? 'pi pi-lock' : 'pi pi-lock-open'" class="text-xs"></i>
+              <span>{{ periodoEvaluacionAbierto() ? 'Cerrar Período de Evaluación' : 'Reabrir Período de Evaluación' }}</span>
+            </button>
+          </div>
+        }
       </div>
 
       <!-- =================================================================== -->
@@ -1251,6 +1324,492 @@ export interface DocenteEvaluacionRow {
       }
 
       <!-- =================================================================== -->
+      <!-- VISTA 3: REPORTES DE RATIFICACIÓN DOCENTE POR MATERIA               -->
+      <!-- =================================================================== -->
+      @if (vistaActiva() === 'ratificaciones') {
+        <div class="space-y-5">
+          <!-- Filtros de Ratificación -->
+          <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+              <div>
+                <h3 class="text-base font-black text-foreground flex items-center gap-2">
+                  <i class="pi pi-check-circle text-emerald-600"></i>
+                  <span>Reporte de Docentes Ratificados y No Ratificados por Materia</span>
+                </h3>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                  Regla Institucional: Nota consolidada <strong>&ge; 71 pts</strong> (Estudiantes 50 + Director 50) = <strong>RATIFICADO</strong> en la materia. Nota <strong>&le; 70 pts</strong> = <strong>NO RATIFICADO</strong>.
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  (click)="descargarReporteRatificacionesExcel()"
+                  [disabled]="ratificacionesFiltradas().length === 0"
+                  class="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50">
+                  <i class="pi pi-file-excel text-emerald-600"></i>
+                  <span>Exportar Excel</span>
+                </button>
+                <button 
+                  type="button" 
+                  (click)="descargarReporteRatificacionesPdf()"
+                  [disabled]="ratificacionesFiltradas().length === 0"
+                  class="bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50">
+                  <i class="pi pi-file-pdf text-rose-600"></i>
+                  <span>Descargar PDF</span>
+                </button>
+                <button 
+                  type="button" 
+                  (click)="cargarRatificaciones()"
+                  [disabled]="cargandoRatificaciones()"
+                  class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer">
+                  <i [class]="cargandoRatificaciones() ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" class="text-xs"></i>
+                  <span>Actualizar</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Controles de Filtro -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <!-- Gestión -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Gestión
+                </label>
+                <select 
+                  [ngModel]="storage.gestionActiva()" 
+                  (ngModelChange)="onGestionChange($event)"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-black text-foreground outline-none focus:border-primary">
+                  <option value="II-2026">II-2026 (Activa)</option>
+                  <option value="I-2026">I-2026</option>
+                  <option value="II-2025">II-2025</option>
+                </select>
+              </div>
+
+              <!-- Sede -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Sede
+                </label>
+                <select 
+                  [ngModel]="filtroSedeCodigo" 
+                  (ngModelChange)="onSedeChange($event)"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
+                  <option value="">Todas las Sedes</option>
+                  @for (sede of sedes(); track sede.branchOfficeId) {
+                    <option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Carrera -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Carrera
+                </label>
+                <select 
+                  [ngModel]="filtroCarreraCodigo" 
+                  (ngModelChange)="onCarreraChange($event)"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
+                  <option value="">Todas las Carreras</option>
+                  @for (carrera of carreras(); track carrera.careerId) {
+                    <option [value]="carrera.careerCode">{{ carrera.careerName }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Filtro de Estado Ratificación -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Estado de Ratificación
+                </label>
+                <select 
+                  [ngModel]="filtroRatificacionEstado()" 
+                  (ngModelChange)="filtroRatificacionEstado.set($event)"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
+                  <option value="TODOS">Todos los Estados</option>
+                  <option value="RATIFICADO">Solo Ratificados (&ge; 71 pts)</option>
+                  <option value="NO_RATIFICADO">Solo No Ratificados (&le; 70 pts)</option>
+                  <option value="MODIFICADO">Modificados Manualmente</option>
+                </select>
+              </div>
+
+              <!-- Búsqueda -->
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Búsqueda
+                </label>
+                <div class="relative">
+                  <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
+                  <input 
+                    type="text" 
+                    [ngModel]="busquedaRatificacion()" 
+                    (ngModelChange)="busquedaRatificacion.set($event)"
+                    placeholder="Docente, C.I., Asignatura..." 
+                    class="w-full bg-muted/70 border border-border rounded-xl pl-8 pr-3 py-2 text-xs text-foreground outline-none focus:border-primary" />
+                </div>
+              </div>
+            </div>
+
+            <!-- KPIs de Ratificación -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div class="bg-muted/30 border border-border rounded-xl p-3 text-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Materias Evaluadas</span>
+                <span class="text-xl font-black text-foreground">{{ kpisRatificacion().total }}</span>
+              </div>
+              <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">Docentes Ratificados</span>
+                <span class="text-xl font-black text-emerald-600">{{ kpisRatificacion().ratificados }}</span>
+                <span class="text-[10px] text-emerald-700 font-bold ml-1">({{ kpisRatificacion().pctRatificados }}%)</span>
+              </div>
+              <div class="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-rose-700 dark:text-rose-400 block">No Ratificados</span>
+                <span class="text-xl font-black text-rose-600">{{ kpisRatificacion().noRatificados }}</span>
+                <span class="text-[10px] text-rose-700 font-bold ml-1">({{ kpisRatificacion().pctNoRatificados }}%)</span>
+              </div>
+              <div class="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 text-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 dark:text-purple-400 block">Overrides / Manuales</span>
+                <span class="text-xl font-black text-purple-600">{{ kpisRatificacion().modificados }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Resultados de Ratificación por Materia -->
+          <div class="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+            @if (cargandoRatificaciones()) {
+              <div class="py-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <i class="pi pi-spin pi-spinner text-primary text-base"></i>
+                <span>Cargando resultados de ratificación...</span>
+              </div>
+            } @else if (ratificacionesFiltradas().length === 0) {
+              <div class="py-12 text-center text-xs text-muted-foreground">
+                <i class="pi pi-inbox text-3xl text-muted-foreground/50 block mb-2"></i>
+                No se encontraron registros de ratificación para los filtros seleccionados.
+              </div>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead class="bg-muted/40 border-b border-border text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th class="p-3.5">Docente</th>
+                      <th class="p-3.5">Sede / Carrera</th>
+                      <th class="p-3.5">Asignatura</th>
+                      <th class="p-3.5 text-center">Nota Director<br><span class="text-[9px] font-normal text-muted-foreground">(Máx. 50 pts)</span></th>
+                      <th class="p-3.5 text-center">Nota Estudiantes<br><span class="text-[9px] font-normal text-muted-foreground">(Máx. 50 pts)</span></th>
+                      <th class="p-3.5 text-center">Nota Final<br><span class="text-[9px] font-normal text-muted-foreground">(Máx. 100 pts)</span></th>
+                      <th class="p-3.5 text-center">Estado Ratificación</th>
+                      @if (puedeModificarRatificacion()) {
+                        <th class="p-3.5 text-right">Acción</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    @for (r of ratificacionesFiltradas(); track r.id) {
+                      <tr class="hover:bg-muted/20 transition-colors">
+                        <!-- Docente -->
+                        <td class="p-3.5 font-bold text-foreground">
+                          <div>{{ r.docenteNombre }}</div>
+                          @if (r.docenteCi) {
+                            <div class="text-[10px] font-mono text-muted-foreground font-normal">CI: {{ r.docenteCi }}</div>
+                          }
+                        </td>
+
+                        <!-- Sede / Carrera -->
+                        <td class="p-3.5">
+                          <span class="inline-block px-1.5 py-0.5 rounded bg-muted text-[10px] font-bold text-foreground border border-border mr-1">
+                            {{ r.sedeCodigo }}
+                          </span>
+                          <span class="text-[11px] text-muted-foreground">{{ r.carreraNombre || r.carreraCodigo }}</span>
+                        </td>
+
+                        <!-- Asignatura -->
+                        <td class="p-3.5">
+                          <div class="flex items-center gap-1.5">
+                            <span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono text-[10px] font-black">
+                              {{ r.materiaCodigo }}
+                            </span>
+                            @if (r.grupoCodigo) {
+                              <span class="text-[10px] font-bold text-muted-foreground">G: {{ r.grupoCodigo }}</span>
+                            }
+                          </div>
+                          <div class="text-foreground font-bold mt-0.5">{{ r.materiaNombre }}</div>
+                        </td>
+
+                        <!-- Nota Director -->
+                        <td class="p-3.5 text-center font-mono font-bold text-foreground">
+                          {{ r.notaDirector50 !== null && r.notaDirector50 !== undefined ? (r.notaDirector50 | number:'1.1-1') : '—' }}
+                        </td>
+
+                        <!-- Nota Estudiantes -->
+                        <td class="p-3.5 text-center font-mono font-bold text-foreground">
+                          {{ r.notaEstudiantes50 !== null && r.notaEstudiantes50 !== undefined ? (r.notaEstudiantes50 | number:'1.1-1') : '—' }}
+                        </td>
+
+                        <!-- Nota Final -->
+                        <td class="p-3.5 text-center">
+                          <span class="font-mono font-black text-sm px-2 py-0.5 rounded-lg border"
+                                [class]="r.notaFinal100 >= 71 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200'">
+                            {{ r.notaFinal100 !== null && r.notaFinal100 !== undefined ? (r.notaFinal100 | number:'1.1-1') : '0.0' }}
+                          </span>
+                        </td>
+
+                        <!-- Estado Ratificación -->
+                        <td class="p-3.5 text-center">
+                          <div class="inline-flex flex-col items-center gap-1">
+                            @if (r.estadoFinal === 'RATIFICADO') {
+                              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] font-black uppercase tracking-wider">
+                                <i class="pi pi-check text-[9px]"></i> RATIFICADO
+                              </span>
+                            } @else {
+                              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700 text-[10px] font-black uppercase tracking-wider">
+                                <i class="pi pi-times text-[9px]"></i> NO RATIFICADO
+                              </span>
+                            }
+
+                            @if (r.modificadoManualmente) {
+                              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 text-[9px] font-bold border border-purple-200"
+                                    [title]="'Modificado por: ' + (r.modificadoPorNombre || r.modificadoPor) + '\nMotivo: ' + r.motivoModificacion">
+                                <i class="pi pi-pencil text-[8px]"></i> Modificado Manualmente
+                              </span>
+                            }
+                          </div>
+                        </td>
+
+                        <!-- Acciones -->
+                        @if (puedeModificarRatificacion()) {
+                          <td class="p-3.5 text-right">
+                            <button 
+                              type="button" 
+                              (click)="abrirModalModificarRatificacion(r)"
+                              title="Cambiar estado de ratificación para esta materia"
+                              class="border border-border hover:border-primary/50 bg-card hover:bg-muted text-foreground font-bold text-[10px] px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer">
+                              <i class="pi pi-sync text-primary text-[9px]"></i>
+                              <span>Cambiar Ratificación</span>
+                            </button>
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- =================================================================== -->
+      <!-- VISTA 4: REPORTE DE CUMPLIMIENTO INSTITUCIONAL                      -->
+      <!-- =================================================================== -->
+      @if (vistaActiva() === 'cumplimiento') {
+        <div class="space-y-5">
+          <!-- Filtros de Cumplimiento -->
+          <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+              <div>
+                <h3 class="text-base font-black text-foreground flex items-center gap-2">
+                  <i class="pi pi-chart-bar text-primary"></i>
+                  <span>Reporte de Cumplimiento de Evaluación Docente</span>
+                </h3>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                  Porcentajes de avance y cobertura evaluativa por Sede, Carrera y Materia (Directores de Carrera y Estudiantes).
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  (click)="descargarReporteCumplimientoExcel()"
+                  [disabled]="cumplimientosFiltrados().length === 0"
+                  class="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50">
+                  <i class="pi pi-file-excel text-emerald-600"></i>
+                  <span>Exportar Excel</span>
+                </button>
+                <button 
+                  type="button" 
+                  (click)="descargarReporteCumplimientoPdf()"
+                  [disabled]="cumplimientosFiltrados().length === 0"
+                  class="bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50">
+                  <i class="pi pi-file-pdf text-rose-600"></i>
+                  <span>Descargar PDF</span>
+                </button>
+                <button 
+                  type="button" 
+                  (click)="cargarCumplimiento()"
+                  [disabled]="cargandoCumplimientos()"
+                  class="bg-card border border-border hover:bg-muted text-foreground font-bold text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer">
+                  <i [class]="cargandoCumplimientos() ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" class="text-xs"></i>
+                  <span>Actualizar</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Controles de Filtro -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Gestión
+                </label>
+                <select 
+                  [ngModel]="storage.gestionActiva()" 
+                  (ngModelChange)="onGestionChange($event)"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-black text-foreground outline-none focus:border-primary">
+                  <option value="II-2026">II-2026 (Activa)</option>
+                  <option value="I-2026">I-2026</option>
+                  <option value="II-2025">II-2025</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Sede
+                </label>
+                <select 
+                  [ngModel]="filtroSedeCodigo" 
+                  (ngModelChange)="onSedeChange($event)"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
+                  <option value="">Todas las Sedes</option>
+                  @for (sede of sedes(); track sede.branchOfficeId) {
+                    <option [value]="sede.code">{{ sede.name }} ({{ sede.code }})</option>
+                  }
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Carrera
+                </label>
+                <select 
+                  [ngModel]="filtroCarreraCodigo" 
+                  (ngModelChange)="onCarreraChange($event)"
+                  class="w-full bg-muted/70 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground outline-none focus:border-primary">
+                  <option value="">Todas las Carreras</option>
+                  @for (carrera of carreras(); track carrera.careerId) {
+                    <option [value]="carrera.careerCode">{{ carrera.careerName }}</option>
+                  }
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1">
+                  Búsqueda
+                </label>
+                <div class="relative">
+                  <i class="pi pi-search absolute left-3 top-2.5 text-muted-foreground text-xs"></i>
+                  <input 
+                    type="text" 
+                    [ngModel]="busquedaCumplimiento()" 
+                    (ngModelChange)="busquedaCumplimiento.set($event)"
+                    placeholder="Materia, Carrera, Sede..." 
+                    class="w-full bg-muted/70 border border-border rounded-xl pl-8 pr-3 py-2 text-xs text-foreground outline-none focus:border-primary" />
+                </div>
+              </div>
+            </div>
+
+            <!-- KPIs de Cumplimiento -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 text-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 block">Cumplimiento Directores</span>
+                <span class="text-xl font-black text-indigo-600">{{ kpisCumplimiento().pctDirector }}%</span>
+                <span class="text-[10px] text-muted-foreground block mt-0.5">{{ kpisCumplimiento().materiasEvaluadas }} / {{ kpisCumplimiento().totalMaterias }} materias</span>
+              </div>
+              <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">Participación Estudiantes</span>
+                <span class="text-xl font-black text-emerald-600">{{ kpisCumplimiento().pctEstudiantes }}%</span>
+                <span class="text-[10px] text-muted-foreground block mt-0.5">{{ kpisCumplimiento().estudiantesEvaluaron }} / {{ kpisCumplimiento().totalEstudiantes }} estudiantes</span>
+              </div>
+              <div class="bg-muted/30 border border-border rounded-xl p-3 text-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Total Materias</span>
+                <span class="text-xl font-black text-foreground">{{ kpisCumplimiento().totalMaterias }}</span>
+              </div>
+              <div class="bg-muted/30 border border-border rounded-xl p-3 text-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block">Total Estudiantes</span>
+                <span class="text-xl font-black text-foreground">{{ kpisCumplimiento().totalEstudiantes }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Desglose de Cumplimiento -->
+          <div class="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+            @if (cargandoCumplimientos()) {
+              <div class="py-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <i class="pi pi-spin pi-spinner text-primary text-base"></i>
+                <span>Cargando datos de cumplimiento institucional...</span>
+              </div>
+            } @else if (cumplimientosFiltrados().length === 0) {
+              <div class="py-12 text-center text-xs text-muted-foreground">
+                <i class="pi pi-inbox text-3xl text-muted-foreground/50 block mb-2"></i>
+                No se encontraron registros de cumplimiento para los filtros seleccionados.
+              </div>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead class="bg-muted/40 border-b border-border text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th class="p-3.5">Sede</th>
+                      <th class="p-3.5">Carrera</th>
+                      <th class="p-3.5">Asignatura</th>
+                      <th class="p-3.5">Avance Director</th>
+                      <th class="p-3.5">Avance Estudiantes</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    @for (c of cumplimientosFiltrados(); track (c.sedeCodigo + c.carreraCodigo + (c.materiaCodigo || ''))) {
+                      <tr class="hover:bg-muted/20 transition-colors">
+                        <td class="p-3.5">
+                          <span class="px-2 py-0.5 rounded bg-muted text-[10px] font-mono font-bold text-foreground border border-border">
+                            {{ c.sedeCodigo }}
+                          </span>
+                        </td>
+                        <td class="p-3.5 font-bold text-foreground">
+                          {{ c.carreraNombre || c.carreraCodigo }}
+                        </td>
+                        <td class="p-3.5">
+                          @if (c.materiaCodigo) {
+                            <div class="flex items-center gap-1.5">
+                              <span class="font-mono text-[10px] font-black text-primary px-1.5 py-0.5 rounded bg-primary/10">
+                                {{ c.materiaCodigo }}
+                              </span>
+                              @if (c.grupoCodigo) {
+                                <span class="text-[10px] text-muted-foreground font-bold">G: {{ c.grupoCodigo }}</span>
+                              }
+                            </div>
+                            <div class="text-foreground font-medium mt-0.5">{{ c.materiaNombre }}</div>
+                          } @else {
+                            <span class="text-muted-foreground italic">Todas las materias</span>
+                          }
+                        </td>
+                        <td class="p-3.5">
+                          <div class="flex items-center justify-between text-[11px] mb-1">
+                            <span class="font-bold text-foreground">{{ c.porcentajeCumplimientoDirector }}%</span>
+                            <span class="text-muted-foreground text-[10px]">{{ c.materiasEvaluadasDirector }} / {{ c.totalMateriasAsignadas }}</span>
+                          </div>
+                          <div class="w-36 h-2 bg-muted rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all"
+                                 [class]="c.porcentajeCumplimientoDirector === 100 ? 'bg-emerald-500' : c.porcentajeCumplimientoDirector > 0 ? 'bg-indigo-500' : 'bg-transparent'"
+                                 [style.width.%]="c.porcentajeCumplimientoDirector"></div>
+                          </div>
+                        </td>
+                        <td class="p-3.5">
+                          <div class="flex items-center justify-between text-[11px] mb-1">
+                            <span class="font-bold text-foreground">{{ c.porcentajeCumplimientoEstudiantes }}%</span>
+                            <span class="text-muted-foreground text-[10px]">{{ c.totalEstudiantesEvaluaron }} / {{ c.totalEstudiantesMatriculados }}</span>
+                          </div>
+                          <div class="w-36 h-2 bg-muted rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all"
+                                 [class]="c.porcentajeCumplimientoEstudiantes >= 70 ? 'bg-emerald-500' : c.porcentajeCumplimientoEstudiantes > 0 ? 'bg-amber-500' : 'bg-transparent'"
+                                 [style.width.%]="c.porcentajeCumplimientoEstudiantes"></div>
+                          </div>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- =================================================================== -->
       <!-- MODAL INTERACTIVO: APLICAR EVALUACIÓN DOCENTE                        -->
       <!-- =================================================================== -->
       @if (evaluandoMateria(); as mat) {
@@ -2038,6 +2597,189 @@ export interface DocenteEvaluacionRow {
         </div>
       }
 
+      <!-- =================================================================== -->
+      <!-- MODAL: CAMBIAR ESTADO DE RATIFICACIÓN DOCENTE (TH / VICERRECTORADO) -->
+      <!-- =================================================================== -->
+      @if (ratificacionParaModificar(); as r) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-border bg-muted/40 flex items-start justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded bg-primary/10 text-primary font-black text-[10px] tracking-wide uppercase">
+                    Decisión Administrativa
+                  </span>
+                  <h3 class="text-base font-black text-foreground">Modificar Ratificación</h3>
+                </div>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                  Cambio manual de estado de ratificación con justificación y auditoría obligatoria.
+                </p>
+              </div>
+              <button 
+                type="button" 
+                (click)="cerrarModalModificarRatificacion()"
+                class="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted cursor-pointer transition-colors">
+                <i class="pi pi-times text-base"></i>
+              </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-5 space-y-4 text-xs">
+              <!-- Datos de la Asignatura y Docente -->
+              <div class="bg-muted/40 border border-border rounded-xl p-3.5 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-extrabold uppercase text-muted-foreground">Docente</span>
+                  <strong class="text-foreground">{{ r.docenteNombre }}</strong>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-extrabold uppercase text-muted-foreground">Materia / Grupo</span>
+                  <span class="font-bold text-foreground">{{ r.materiaNombre }} ({{ r.materiaCodigo }}) - G: {{ r.grupoCodigo }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-extrabold uppercase text-muted-foreground">Sede / Carrera</span>
+                  <span class="text-muted-foreground">{{ r.sedeCodigo }} · {{ r.carreraNombre || r.carreraCodigo }}</span>
+                </div>
+                <div class="flex items-center justify-between pt-1 border-t border-border">
+                  <span class="text-[10px] font-extrabold uppercase text-muted-foreground">Nota Final Consolidada</span>
+                  <span class="font-mono font-black text-sm"
+                        [class]="r.notaFinal100 >= 71 ? 'text-emerald-600' : 'text-rose-600'">
+                    {{ r.notaFinal100 | number:'1.1-1' }} / 100 Pts
+                  </span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-extrabold uppercase text-muted-foreground">Estado Calculado por Regla</span>
+                  <span class="font-bold" [class]="r.estadoCalculado === 'RATIFICADO' ? 'text-emerald-700' : 'text-rose-700'">
+                    {{ r.estadoCalculado === 'RATIFICADO' ? 'RATIFICADO (>=71)' : 'NO RATIFICADO (<=70)' }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Selector de Nuevo Estado -->
+              <div>
+                <label class="block text-[11px] font-black uppercase text-foreground mb-2">
+                  Selecciona el Nuevo Estado de Ratificación:
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                  <button 
+                    type="button" 
+                    (click)="nuevoEstadoRatificacion.set('RATIFICADO')"
+                    [class]="nuevoEstadoRatificacion() === 'RATIFICADO' 
+                      ? 'bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 font-black shadow-xs' 
+                      : 'bg-card border-border text-muted-foreground hover:bg-muted'"
+                    class="p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1">
+                    <i class="pi pi-check-circle text-base"></i>
+                    <span class="text-xs">RATIFICADO</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    (click)="nuevoEstadoRatificacion.set('NO_RATIFICADO')"
+                    [class]="nuevoEstadoRatificacion() === 'NO_RATIFICADO' 
+                      ? 'bg-rose-500/15 border-rose-500 text-rose-700 dark:text-rose-300 font-black shadow-xs' 
+                      : 'bg-card border-border text-muted-foreground hover:bg-muted'"
+                    class="p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1">
+                    <i class="pi pi-times-circle text-base"></i>
+                    <span class="text-xs">NO RATIFICADO</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Motivo / Justificación -->
+              <div>
+                <label class="block text-[11px] font-black uppercase text-foreground mb-1">
+                  Motivo / Justificación de la Decisión *
+                </label>
+                <textarea 
+                  [(ngModel)]="motivoModificacionRatificacion"
+                  rows="3" 
+                  placeholder="Detalla de forma obligatoria el motivo, respaldo o resolución administrativa que fundamenta este cambio..."
+                  class="w-full bg-card border border-border rounded-xl p-3 text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground"></textarea>
+                <span class="text-[10px] text-muted-foreground block mt-0.5">
+                  Mínimo 5 caracteres. Se registrará tu usuario y la fecha para auditoría oficial.
+                </span>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-border bg-muted/30 flex items-center justify-end gap-2">
+              <button 
+                type="button" 
+                (click)="cerrarModalModificarRatificacion()"
+                [disabled]="guardandoRatificacion()"
+                class="px-4 py-2 rounded-xl bg-card border border-border hover:bg-muted font-bold text-xs text-foreground cursor-pointer transition-colors">
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                (click)="guardarModificacionRatificacion()"
+                [disabled]="guardandoRatificacion() || motivoModificacionRatificacion.trim().length < 5"
+                class="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs cursor-pointer transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50">
+                @if (guardandoRatificacion()) {
+                  <i class="pi pi-spin pi-spinner text-xs"></i>
+                  <span>Guardando...</span>
+                } @else {
+                  <i class="pi pi-check text-xs"></i>
+                  <span>Guardar Ratificación</span>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- =================================================================== -->
+      <!-- MODAL: CONFIRMACIÓN DE CIERRE / REAPERTURA DE PERÍODO                -->
+      <!-- =================================================================== -->
+      @if (modalCierrePeriodo()) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            <div class="p-5 text-center space-y-3">
+              <div class="w-12 h-12 rounded-full mx-auto flex items-center justify-center"
+                   [class]="periodoEvaluacionAbierto() ? 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300'">
+                <i [class]="periodoEvaluacionAbierto() ? 'pi pi-lock text-xl' : 'pi pi-lock-open text-xl'"></i>
+              </div>
+
+              <h3 class="text-base font-black text-foreground">
+                {{ periodoEvaluacionAbierto() ? '¿Cerrar Período de Evaluación Docente?' : '¿Reabrir Período de Evaluación Docente?' }}
+              </h3>
+
+              <p class="text-xs text-muted-foreground leading-relaxed">
+                @if (periodoEvaluacionAbierto()) {
+                  Al cerrar el período institucional, ningún Director de Carrera ni estudiante podrá registrar nuevas evaluaciones ni habilitar ventanas de semestres en el sistema.
+                } @else {
+                  Al reabrir el período, se restablecerá el acceso a directores y estudiantes para completar evaluaciones pendientes.
+                }
+              </p>
+            </div>
+
+            <div class="p-4 border-t border-border bg-muted/30 flex items-center justify-end gap-2">
+              <button 
+                type="button" 
+                (click)="modalCierrePeriodo.set(false)"
+                [disabled]="conmutandoPeriodo()"
+                class="px-4 py-2 rounded-xl bg-card border border-border hover:bg-muted font-bold text-xs text-foreground cursor-pointer">
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                (click)="conmutarPeriodoEvaluacion()"
+                [disabled]="conmutandoPeriodo()"
+                [class]="periodoEvaluacionAbierto() ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'"
+                class="px-4 py-2 rounded-xl font-black text-xs cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50">
+                @if (conmutandoPeriodo()) {
+                  <i class="pi pi-spin pi-spinner text-xs"></i>
+                  <span>Procesando...</span>
+                } @else {
+                  <i class="pi pi-check text-xs"></i>
+                  <span>{{ periodoEvaluacionAbierto() ? 'Sí, Cerrar Período' : 'Sí, Reabrir Período' }}</span>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Toast Notificación -->
       @if (toastMessage()) {
         <div class="fixed bottom-6 right-6 bg-foreground text-background px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-bounce">
@@ -2055,7 +2797,27 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
   private readonly evaluacionService = inject(EvaluacionDocenteService);
   public readonly auth = inject(AuthService);
 
-  public vistaActiva = signal<'evaluaciones' | 'semestres' | 'estudiantes' | 'instrumentos'>('evaluaciones');
+  public vistaActiva = signal<'evaluaciones' | 'semestres' | 'estudiantes' | 'instrumentos' | 'ratificaciones' | 'cumplimiento'>('evaluaciones');
+
+  // Estado de Período y Cierre Centralizado
+  public periodoEvaluacionAbierto = signal<boolean>(true);
+  public conmutandoPeriodo = signal<boolean>(false);
+  public modalCierrePeriodo = signal<boolean>(false);
+
+  // Ratificaciones por Materia
+  public ratificaciones = signal<DocenteRatificacionMateria[]>([]);
+  public cargandoRatificaciones = signal<boolean>(false);
+  public filtroRatificacionEstado = signal<'TODOS' | 'RATIFICADO' | 'NO_RATIFICADO' | 'MODIFICADO'>('TODOS');
+  public busquedaRatificacion = signal<string>('');
+  public ratificacionParaModificar = signal<DocenteRatificacionMateria | null>(null);
+  public nuevoEstadoRatificacion = signal<'RATIFICADO' | 'NO_RATIFICADO'>('RATIFICADO');
+  public motivoModificacionRatificacion = '';
+  public guardandoRatificacion = signal<boolean>(false);
+
+  // Cumplimiento Institucional
+  public cumplimientos = signal<CumplimientoEvaluacion[]>([]);
+  public cargandoCumplimientos = signal<boolean>(false);
+  public busquedaCumplimiento = signal<string>('');
 
   // Habilitación por Semestres (Ventanas de 90 min)
   public semestresEstado = signal<SemestreHabilitacionEstado[]>([]);
@@ -2132,6 +2894,87 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
   public esAdminOResponsable = computed(() => {
     const rol = this.auth.usuario()?.rol;
     return rol === 'ADMINISTRADOR_SISTEMA' || rol === 'RESPONSABLE_EVALUACIONES';
+  });
+
+  public esAdmin = computed(() => {
+    return this.auth.usuario()?.rol === 'ADMINISTRADOR_SISTEMA';
+  });
+
+  public esTalentoHumano = computed(() => {
+    return this.auth.usuario()?.rol === 'TALENTO_HUMANO';
+  });
+
+  public puedeModificarRatificacion = computed(() => {
+    const u = this.auth.usuario();
+    if (!u) return false;
+    return u.rol === 'TALENTO_HUMANO' || u.rol === 'ADMINISTRADOR_SISTEMA' || !!u.puedeModificarRatificacionDocente;
+  });
+
+  public ratificacionesFiltradas = computed(() => {
+    let lista = this.ratificaciones();
+    const estado = this.filtroRatificacionEstado();
+    if (estado === 'RATIFICADO') {
+      lista = lista.filter(r => r.estadoFinal === 'RATIFICADO');
+    } else if (estado === 'NO_RATIFICADO') {
+      lista = lista.filter(r => r.estadoFinal === 'NO_RATIFICADO');
+    } else if (estado === 'MODIFICADO') {
+      lista = lista.filter(r => r.modificadoManualmente);
+    }
+    const q = this.busquedaRatificacion().trim().toLowerCase();
+    if (q) {
+      lista = lista.filter(r => 
+        (r.docenteNombre && r.docenteNombre.toLowerCase().includes(q)) ||
+        (r.docenteCi && r.docenteCi.toLowerCase().includes(q)) ||
+        (r.materiaNombre && r.materiaNombre.toLowerCase().includes(q)) ||
+        (r.materiaCodigo && r.materiaCodigo.toLowerCase().includes(q)) ||
+        (r.carreraNombre && r.carreraNombre.toLowerCase().includes(q)) ||
+        (r.sedeCodigo && r.sedeCodigo.toLowerCase().includes(q))
+      );
+    }
+    return lista;
+  });
+
+  public kpisRatificacion = computed(() => {
+    const lista = this.ratificaciones();
+    const total = lista.length;
+    const ratificados = lista.filter(r => r.estadoFinal === 'RATIFICADO').length;
+    const noRatificados = lista.filter(r => r.estadoFinal === 'NO_RATIFICADO').length;
+    const modificados = lista.filter(r => r.modificadoManualmente).length;
+    const pctRatificados = total > 0 ? Math.round((ratificados / total) * 100) : 0;
+    const pctNoRatificados = total > 0 ? Math.round((noRatificados / total) * 100) : 0;
+    return { total, ratificados, noRatificados, modificados, pctRatificados, pctNoRatificados };
+  });
+
+  public cumplimientosFiltrados = computed(() => {
+    let lista = this.cumplimientos();
+    const q = this.busquedaCumplimiento().trim().toLowerCase();
+    if (q) {
+      lista = lista.filter(c => 
+        (c.materiaNombre && c.materiaNombre.toLowerCase().includes(q)) ||
+        (c.materiaCodigo && c.materiaCodigo.toLowerCase().includes(q)) ||
+        (c.carreraNombre && c.carreraNombre.toLowerCase().includes(q)) ||
+        (c.sedeNombre && c.sedeNombre.toLowerCase().includes(q)) ||
+        (c.sedeCodigo && c.sedeCodigo.toLowerCase().includes(q))
+      );
+    }
+    return lista;
+  });
+
+  public kpisCumplimiento = computed(() => {
+    const lista = this.cumplimientos();
+    let totalMaterias = 0;
+    let materiasEvaluadas = 0;
+    let totalEstudiantes = 0;
+    let estudiantesEvaluaron = 0;
+    for (const c of lista) {
+      totalMaterias += c.totalMateriasAsignadas || 0;
+      materiasEvaluadas += c.materiasEvaluadasDirector || 0;
+      totalEstudiantes += c.totalEstudiantesMatriculados || 0;
+      estudiantesEvaluaron += c.totalEstudiantesEvaluaron || 0;
+    }
+    const pctDirector = totalMaterias > 0 ? Math.round((materiasEvaluadas / totalMaterias) * 100) : 0;
+    const pctEstudiantes = totalEstudiantes > 0 ? Math.round((estudiantesEvaluaron / totalEstudiantes) * 100) : 0;
+    return { totalMaterias, materiasEvaluadas, pctDirector, totalEstudiantes, estudiantesEvaluaron, pctEstudiantes };
   });
 
   public esVicerrector = computed(() => {
@@ -2240,11 +3083,19 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
     this.formFechaAplicacion = hoy.toISOString().substring(0, 10);
     this.formHoraAplicacion = hoy.toTimeString().substring(0, 5);
 
+    if (this.esTalentoHumano()) {
+      this.vistaActiva.set('ratificaciones');
+    }
+
+    this.cargarEstadoPeriodo();
     this.cargarInstrumentoVigente();
     if (this.esAdminOResponsable()) {
       this.cargarTodosInstrumentos();
     }
     this.cargarSedes();
+    if (this.esTalentoHumano()) {
+      this.cargarRatificaciones();
+    }
   }
 
   public ngOnDestroy(): void {
@@ -2300,6 +3151,509 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
       this.cargarAvanceEstudiantes(this.filtroSedeCodigo, this.filtroCarreraCodigo);
       this.cargarEstadosSemestres(this.filtroSedeCodigo, this.filtroCarreraCodigo);
     }
+    if (this.vistaActiva() === 'ratificaciones') {
+      this.cargarRatificaciones();
+    } else if (this.vistaActiva() === 'cumplimiento') {
+      this.cargarCumplimiento();
+    }
+  }
+
+  public cargarEstadoPeriodo(): void {
+    this.evaluacionService.obtenerEstadoPeriodo().subscribe({
+      next: estado => {
+        this.periodoEvaluacionAbierto.set(estado.periodoEvaluacionDocenteAbierto);
+      },
+      error: err => console.warn('Error al obtener estado del período:', err)
+    });
+  }
+
+  public conmutarPeriodoEvaluacion(): void {
+    if (!this.esAdmin()) return;
+    this.conmutandoPeriodo.set(true);
+    const nuevoEstado = !this.periodoEvaluacionAbierto();
+    this.evaluacionService.conmutarPeriodo(nuevoEstado).subscribe({
+      next: res => {
+        this.periodoEvaluacionAbierto.set(res.periodoEvaluacionDocenteAbierto);
+        this.conmutandoPeriodo.set(false);
+        this.modalCierrePeriodo.set(false);
+        this.mostrarToast(res.periodoEvaluacionDocenteAbierto
+          ? 'Período de evaluación docente ABIERTO con éxito.'
+          : 'Período de evaluación docente CERRADO institucionalmente.');
+      },
+      error: () => {
+        this.conmutandoPeriodo.set(false);
+        this.mostrarToast('Error al modificar el estado del período.');
+      }
+    });
+  }
+
+  public cambiarARatificaciones(): void {
+    this.vistaActiva.set('ratificaciones');
+    this.cargarRatificaciones();
+  }
+
+  public cargarRatificaciones(): void {
+    this.cargandoRatificaciones.set(true);
+    const gestion = this.storage.gestionActiva();
+    const sede = this.filtroSedeCodigo || undefined;
+    const carrera = this.filtroCarreraCodigo || undefined;
+    const estado = this.filtroRatificacionEstado() !== 'MODIFICADO' ? this.filtroRatificacionEstado() : undefined;
+    this.evaluacionService.listarReporteRatificados(gestion, sede, carrera, estado).subscribe({
+      next: lista => {
+        this.ratificaciones.set(lista || []);
+        this.cargandoRatificaciones.set(false);
+      },
+      error: err => {
+        console.warn('Error al cargar reporte de ratificaciones:', err);
+        this.cargandoRatificaciones.set(false);
+        this.mostrarToast('No se pudo cargar el reporte de ratificaciones.');
+      }
+    });
+  }
+
+  public abrirModalModificarRatificacion(r: DocenteRatificacionMateria): void {
+    this.ratificacionParaModificar.set(r);
+    this.nuevoEstadoRatificacion.set(r.estadoFinal === 'RATIFICADO' ? 'NO_RATIFICADO' : 'RATIFICADO');
+    this.motivoModificacionRatificacion = r.motivoModificacion || '';
+  }
+
+  public cerrarModalModificarRatificacion(): void {
+    this.ratificacionParaModificar.set(null);
+    this.motivoModificacionRatificacion = '';
+  }
+
+  public guardarModificacionRatificacion(): void {
+    const item = this.ratificacionParaModificar();
+    if (!item) return;
+    const motivo = (this.motivoModificacionRatificacion || '').trim();
+    if (motivo.length < 5) {
+      this.mostrarToast('El motivo de la modificación debe tener al menos 5 caracteres.');
+      return;
+    }
+    this.guardandoRatificacion.set(true);
+    this.evaluacionService.modificarRatificacion(item.id, {
+      nuevoEstado: this.nuevoEstadoRatificacion(),
+      motivo: motivo
+    }).subscribe({
+      next: actualizado => {
+        this.guardandoRatificacion.set(false);
+        this.ratificaciones.update(list => list.map(r => r.id === item.id ? actualizado : r));
+        this.cerrarModalModificarRatificacion();
+        this.mostrarToast(`Ratificación actualizada con éxito para ${item.docenteNombre}.`);
+      },
+      error: err => {
+        this.guardandoRatificacion.set(false);
+        this.mostrarToast(err?.error?.message || 'Error al actualizar la ratificación.');
+      }
+    });
+  }
+
+  public descargarReporteRatificacionesExcel(): void {
+    const lista = this.ratificacionesFiltradas();
+    if (lista.length === 0) {
+      this.mostrarToast('No hay datos para exportar.');
+      return;
+    }
+    const headers = [
+      'Gestión',
+      'Sede',
+      'Carrera',
+      'Docente',
+      'CI',
+      'Código Materia',
+      'Materia',
+      'Grupo',
+      'Nota Director (50)',
+      'Nota Estudiantes (50)',
+      'Nota Final (100)',
+      'Estado Calculado',
+      'Estado Final (Ratificación)',
+      'Modificado Manualmente',
+      'Modificado Por',
+      'Motivo Modificación',
+      'Fecha Modificación'
+    ];
+    const rows = lista.map(r => [
+      `"${r.gestion || ''}"`,
+      `"${r.sedeNombre || r.sedeCodigo || ''}"`,
+      `"${r.carreraNombre || r.carreraCodigo || ''}"`,
+      `"${r.docenteNombre || ''}"`,
+      `"${r.docenteCi || ''}"`,
+      `"${r.materiaCodigo || ''}"`,
+      `"${r.materiaNombre || ''}"`,
+      `"${r.grupoCodigo || ''}"`,
+      r.notaDirector50 !== undefined && r.notaDirector50 !== null ? r.notaDirector50 : '',
+      r.notaEstudiantes50 !== undefined && r.notaEstudiantes50 !== null ? r.notaEstudiantes50 : '',
+      r.notaFinal100 !== undefined && r.notaFinal100 !== null ? r.notaFinal100 : '',
+      `"${r.estadoCalculado || ''}"`,
+      `"${r.estadoFinal || ''}"`,
+      `"${r.modificadoManualmente ? 'SÍ' : 'NO'}"`,
+      `"${r.modificadoPorNombre || r.modificadoPor || ''}"`,
+      `"${(r.motivoModificacion || '').replace(/"/g, '""')}"`,
+      `"${r.modificadoEn || ''}"`
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte_ratificacion_docentes_${this.storage.gestionActiva()}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.mostrarToast('Reporte CSV descargado con éxito.');
+  }
+
+  public descargarReporteRatificacionesPdf(): void {
+    const lista = this.ratificacionesFiltradas();
+    if (lista.length === 0) {
+      this.mostrarToast('No hay datos para generar el PDF.');
+      return;
+    }
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter', compress: true });
+    const pageWidth = 215.9;
+    const pageHeight = 279.4;
+    const margin = 14;
+    const contentWidth = pageWidth - margin * 2;
+    const purple = { r: 49, g: 39, b: 130 };
+    const dark = { r: 24, g: 30, b: 42 };
+    const muted = { r: 100, g: 110, b: 125 };
+    const lightBg = { r: 247, g: 249, b: 252 };
+    const border = { r: 215, g: 222, b: 232 };
+    const green = { r: 16, g: 130, b: 80 };
+    const red = { r: 185, g: 28, b: 28 };
+
+    const fechaStr = new Date().toLocaleDateString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const dibujarCabecera = (pagActual: number) => {
+      try {
+        pdf.addImage(UNITEPC_LOGO_PNG, 'PNG', margin, 8.5, 36, 8.1);
+      } catch (e) {
+        console.warn('Logo error', e);
+      }
+      const textStartX = margin + 40;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC', textStartX, 11);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA) · TALENTO HUMANO', textStartX, 14.5);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.text('REPORTE OFICIAL DE RATIFICACIÓN DOCENTE POR ASIGNATURA', textStartX, 19);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(`Emisión: ${fechaStr}`, pageWidth - margin, 11, { align: 'right' });
+      pdf.text(`Gestión: ${this.storage.gestionActiva()}`, pageWidth - margin, 15, { align: 'right' });
+      pdf.text(`Página ${pagActual}`, pageWidth - margin, 19, { align: 'right' });
+
+      pdf.setDrawColor(purple.r, purple.g, purple.b);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, 23, pageWidth - margin, 23);
+    };
+
+    const dibujarCabeceraTabla = (currY: number): number => {
+      pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.setLineWidth(0.2);
+      pdf.rect(margin, currY, contentWidth, 7, 'FD');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+
+      pdf.text('#', margin + 3, currY + 4.5);
+      pdf.text('DOCENTE / C.I.', margin + 10, currY + 4.5);
+      pdf.text('ASIGNATURA (CÓD - G)', margin + 70, currY + 4.5);
+      pdf.text('SEDE / CARRERA', margin + 120, currY + 4.5);
+      pdf.text('DIR.', margin + 152, currY + 4.5, { align: 'center' });
+      pdf.text('EST.', margin + 162, currY + 4.5, { align: 'center' });
+      pdf.text('FINAL', margin + 172, currY + 4.5, { align: 'center' });
+      pdf.text('RATIFICACIÓN', margin + contentWidth - 2, currY + 4.5, { align: 'right' });
+
+      return currY + 7;
+    };
+
+    let paginaActual = 1;
+    dibujarCabecera(paginaActual);
+    let y = 30;
+    y = dibujarCabeceraTabla(y);
+
+    lista.forEach((item, index) => {
+      const rowHeight = 7;
+      if (y + rowHeight > pageHeight - 25) {
+        pdf.addPage();
+        paginaActual++;
+        dibujarCabecera(paginaActual);
+        y = 30;
+        y = dibujarCabeceraTabla(y);
+      }
+
+      if (index % 2 === 1) {
+        pdf.setFillColor(252, 253, 255);
+        pdf.rect(margin, y, contentWidth, rowHeight, 'F');
+      }
+
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.setLineWidth(0.1);
+      pdf.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.text(String(index + 1), margin + 3, y + 4.5);
+
+      pdf.setFont('helvetica', 'bold');
+      const docNom = item.docenteNombre.length > 32 ? item.docenteNombre.slice(0, 32) + '...' : item.docenteNombre;
+      pdf.text(docNom, margin + 10, y + 4.5);
+
+      pdf.setFont('helvetica', 'normal');
+      const matNom = item.materiaNombre.length > 25 ? item.materiaNombre.slice(0, 25) + '...' : item.materiaNombre;
+      pdf.text(`${matNom} (${item.materiaCodigo}-${item.grupoCodigo || '1'})`, margin + 70, y + 4.5);
+
+      const sedCar = `${item.sedeCodigo} - ${(item.carreraNombre || item.carreraCodigo || '').slice(0, 16)}`;
+      pdf.text(sedCar, margin + 120, y + 4.5);
+
+      pdf.text(item.notaDirector50 !== null ? Number(item.notaDirector50).toFixed(1) : '—', margin + 152, y + 4.5, { align: 'center' });
+      pdf.text(item.notaEstudiantes50 !== null ? Number(item.notaEstudiantes50).toFixed(1) : '—', margin + 162, y + 4.5, { align: 'center' });
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(item.notaFinal100 !== null ? Number(item.notaFinal100).toFixed(1) : '0.0', margin + 172, y + 4.5, { align: 'center' });
+
+      if (item.estadoFinal === 'RATIFICADO') {
+        pdf.setTextColor(green.r, green.g, green.b);
+        pdf.text('RATIFICADO', margin + contentWidth - 2, y + 4.5, { align: 'right' });
+      } else {
+        pdf.setTextColor(red.r, red.g, red.b);
+        pdf.text('NO RATIFICADO', margin + contentWidth - 2, y + 4.5, { align: 'right' });
+      }
+
+      y += rowHeight;
+    });
+
+    if (y + 25 > pageHeight - 15) {
+      pdf.addPage();
+      paginaActual++;
+      dibujarCabecera(paginaActual);
+      y = 35;
+    } else {
+      y += 10;
+    }
+
+    const firmaWidth = 50;
+    const firma1X = margin + 25;
+    const firma2X = pageWidth - margin - firmaWidth - 25;
+    pdf.setDrawColor(muted.r, muted.g, muted.b);
+    pdf.setLineWidth(0.3);
+    pdf.line(firma1X, y + 12, firma1X + firmaWidth, y + 12);
+    pdf.line(firma2X, y + 12, firma2X + firmaWidth, y + 12);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text('TALENTO HUMANO INSTITUCIONAL', firma1X + firmaWidth / 2, y + 16, { align: 'center' });
+    pdf.text('VICERRECTORADO ACADÉMICO', firma2X + firmaWidth / 2, y + 16, { align: 'center' });
+
+    pdf.save(`reporte_ratificacion_docentes_${this.storage.gestionActiva()}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    this.mostrarToast('Reporte PDF de ratificación generado con éxito.');
+  }
+
+  public cambiarACumplimiento(): void {
+    this.vistaActiva.set('cumplimiento');
+    this.cargarCumplimiento();
+  }
+
+  public cargarCumplimiento(): void {
+    this.cargandoCumplimientos.set(true);
+    const gestion = this.storage.gestionActiva();
+    const sede = this.filtroSedeCodigo || undefined;
+    const carrera = this.filtroCarreraCodigo || undefined;
+    this.evaluacionService.listarCumplimiento(gestion, sede, carrera).subscribe({
+      next: lista => {
+        this.cumplimientos.set(lista || []);
+        this.cargandoCumplimientos.set(false);
+      },
+      error: err => {
+        console.warn('Error al cargar reporte de cumplimiento:', err);
+        this.cargandoCumplimientos.set(false);
+        this.mostrarToast('No se pudo cargar el reporte de cumplimiento.');
+      }
+    });
+  }
+
+  public descargarReporteCumplimientoExcel(): void {
+    const lista = this.cumplimientosFiltrados();
+    if (lista.length === 0) {
+      this.mostrarToast('No hay datos para exportar.');
+      return;
+    }
+    const headers = [
+      'Gestión',
+      'Sede',
+      'Carrera',
+      'Código Materia',
+      'Materia',
+      'Grupo',
+      'Total Materias Asignadas',
+      'Materias Evaluadas Director',
+      '% Cumplimiento Director',
+      'Total Estudiantes Matriculados',
+      'Estudiantes Evaluaron',
+      '% Cumplimiento Estudiantes'
+    ];
+    const rows = lista.map(c => [
+      `"${c.gestion || ''}"`,
+      `"${c.sedeNombre || c.sedeCodigo || ''}"`,
+      `"${c.carreraNombre || c.carreraCodigo || ''}"`,
+      `"${c.materiaCodigo || ''}"`,
+      `"${c.materiaNombre || ''}"`,
+      `"${c.grupoCodigo || ''}"`,
+      c.totalMateriasAsignadas || 0,
+      c.materiasEvaluadasDirector || 0,
+      `${c.porcentajeCumplimientoDirector || 0}%`,
+      c.totalEstudiantesMatriculados || 0,
+      c.totalEstudiantesEvaluaron || 0,
+      `${c.porcentajeCumplimientoEstudiantes || 0}%`
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte_cumplimiento_evaluacion_${this.storage.gestionActiva()}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.mostrarToast('Reporte de cumplimiento descargado.');
+  }
+
+  public descargarReporteCumplimientoPdf(): void {
+    const lista = this.cumplimientosFiltrados();
+    if (lista.length === 0) {
+      this.mostrarToast('No hay datos para generar el PDF.');
+      return;
+    }
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter', compress: true });
+    const pageWidth = 215.9;
+    const pageHeight = 279.4;
+    const margin = 14;
+    const contentWidth = pageWidth - margin * 2;
+    const purple = { r: 49, g: 39, b: 130 };
+    const dark = { r: 24, g: 30, b: 42 };
+    const muted = { r: 100, g: 110, b: 125 };
+    const lightBg = { r: 247, g: 249, b: 252 };
+    const border = { r: 215, g: 222, b: 232 };
+
+    const fechaStr = new Date().toLocaleDateString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const dibujarCabecera = (pagActual: number) => {
+      try {
+        pdf.addImage(UNITEPC_LOGO_PNG, 'PNG', margin, 8.5, 36, 8.1);
+      } catch (e) {
+        console.warn('Logo error', e);
+      }
+      const textStartX = margin + 40;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC', textStartX, 11);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', textStartX, 14.5);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.text('REPORTE OFICIAL DE CUMPLIMIENTO DE EVALUACIÓN DOCENTE', textStartX, 19);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(`Emisión: ${fechaStr}`, pageWidth - margin, 11, { align: 'right' });
+      pdf.text(`Gestión: ${this.storage.gestionActiva()}`, pageWidth - margin, 15, { align: 'right' });
+      pdf.text(`Página ${pagActual}`, pageWidth - margin, 19, { align: 'right' });
+
+      pdf.setDrawColor(purple.r, purple.g, purple.b);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, 23, pageWidth - margin, 23);
+    };
+
+    const dibujarCabeceraTabla = (currY: number): number => {
+      pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.setLineWidth(0.2);
+      pdf.rect(margin, currY, contentWidth, 7, 'FD');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+
+      pdf.text('#', margin + 3, currY + 4.5);
+      pdf.text('SEDE', margin + 10, currY + 4.5);
+      pdf.text('CARRERA', margin + 25, currY + 4.5);
+      pdf.text('ASIGNATURA (CÓDIGO - GRUPO)', margin + 75, currY + 4.5);
+      pdf.text('AVANCE DIRECTOR', margin + 130, currY + 4.5);
+      pdf.text('AVANCE ESTUDIANTES', margin + 160, currY + 4.5);
+
+      return currY + 7;
+    };
+
+    let paginaActual = 1;
+    dibujarCabecera(paginaActual);
+    let y = 30;
+    y = dibujarCabeceraTabla(y);
+
+    lista.forEach((item, index) => {
+      const rowHeight = 7;
+      if (y + rowHeight > pageHeight - 20) {
+        pdf.addPage();
+        paginaActual++;
+        dibujarCabecera(paginaActual);
+        y = 30;
+        y = dibujarCabeceraTabla(y);
+      }
+
+      if (index % 2 === 1) {
+        pdf.setFillColor(252, 253, 255);
+        pdf.rect(margin, y, contentWidth, rowHeight, 'F');
+      }
+
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.setLineWidth(0.1);
+      pdf.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.text(String(index + 1), margin + 3, y + 4.5);
+      pdf.text(item.sedeCodigo || '—', margin + 10, y + 4.5);
+
+      const carNom = (item.carreraNombre || item.carreraCodigo || '').slice(0, 26);
+      pdf.text(carNom, margin + 25, y + 4.5);
+
+      const matNom = item.materiaCodigo ? `${(item.materiaNombre || '').slice(0, 26)} (${item.materiaCodigo}-${item.grupoCodigo || '1'})` : 'Todas';
+      pdf.text(matNom, margin + 75, y + 4.5);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${item.porcentajeCumplimientoDirector || 0}% (${item.materiasEvaluadasDirector || 0}/${item.totalMateriasAsignadas || 0})`, margin + 130, y + 4.5);
+      pdf.text(`${item.porcentajeCumplimientoEstudiantes || 0}% (${item.totalEstudiantesEvaluaron || 0}/${item.totalEstudiantesMatriculados || 0})`, margin + 160, y + 4.5);
+
+      y += rowHeight;
+    });
+
+    pdf.save(`reporte_cumplimiento_evaluacion_${this.storage.gestionActiva()}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    this.mostrarToast('Reporte PDF de cumplimiento generado.');
   }
 
   public cambiarASemestres(): void {

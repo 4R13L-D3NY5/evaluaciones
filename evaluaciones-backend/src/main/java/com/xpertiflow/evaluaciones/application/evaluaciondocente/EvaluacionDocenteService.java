@@ -25,6 +25,7 @@ public class EvaluacionDocenteService {
     private final EvaluacionCriterioRepository criterioRepository;
     private final EvaluacionDocenteRegistroRepository registroRepository;
     private final EvaluacionDocenteRespuestaRepository respuestaRepository;
+    private final com.xpertiflow.evaluaciones.domain.repository.ConfiguracionEvaluacionesRepository configuracionEvaluacionesRepository;
 
     @Transactional(readOnly = true)
     public EvaluacionInstrumentoDto obtenerInstrumentoVigente() {
@@ -223,6 +224,12 @@ public class EvaluacionDocenteService {
 
     @Transactional
     public EvaluacionDocenteRegistroDto aplicarEvaluacion(EvaluacionDocenteAplicarRequestDto req, Authentication auth) {
+        boolean abierto = configuracionEvaluacionesRepository.findById((short) 1)
+                .map(com.xpertiflow.evaluaciones.domain.entity.ConfiguracionEvaluaciones::getPeriodoEvaluacionDocenteAbierto)
+                .orElse(true);
+        if (!abierto) {
+            throw new IllegalStateException("El período de evaluación docente ha sido cerrado institucionalmente por el Administrador.");
+        }
         String usuario = auth != null ? auth.getName() : "SISTEMA";
 
         // Siempre aplicar con el instrumento que se encuentra oficialmente VIGENTE para el Director

@@ -70,6 +70,8 @@ public class ConfiguracionEvaluacionesDto {
 
     private Boolean permitirDirectorEdicionRoles;
 
+    private Boolean periodoEvaluacionDocenteAbierto;
+
     private LocalDateTime actualizadoEn;
 
     private String actualizadoPor;

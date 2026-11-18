@@ -74,6 +74,9 @@ public class ConfiguracionEvaluaciones {
     @Column(name = "permitir_director_edicion_roles", nullable = false)
     private Boolean permitirDirectorEdicionRoles = true;
 
+    @Column(name = "periodo_evaluacion_docente_abierto", nullable = false)
+    private Boolean periodoEvaluacionDocenteAbierto = true;
+
     @Column(name = "actualizado_en", nullable = false)
     private LocalDateTime actualizadoEn;
 

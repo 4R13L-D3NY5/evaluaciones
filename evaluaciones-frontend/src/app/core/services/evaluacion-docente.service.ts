@@ -9,7 +9,11 @@ import {
   EvaluacionEstudianteAplicarRequest,
   EvaluacionConsolidadaDocenteMateria,
   SemestreHabilitacionEstado,
-  HabilitarSemestresRequest
+  HabilitarSemestresRequest,
+  DocenteRatificacionMateria,
+  ModificarRatificacionRequest,
+  CumplimientoEvaluacion,
+  PeriodoEvaluacionDocenteEstado
 } from '../models/evaluacion-docente.models';
 
 @Injectable({
@@ -117,5 +121,41 @@ export class EvaluacionDocenteService {
       .set('semestre', semestre.toString());
     if (gestion) params = params.set('gestion', gestion);
     return this._http.post<SemestreHabilitacionEstado[]>(`${this._baseUrl}/semestres/deshabilitar`, null, { params });
+  }
+
+  // --- Período de Evaluación y Cierre Administrativo ---
+
+  public obtenerEstadoPeriodo(): Observable<PeriodoEvaluacionDocenteEstado> {
+    return this._http.get<PeriodoEvaluacionDocenteEstado>(`${this._baseUrl}/periodo-estado`);
+  }
+
+  public conmutarPeriodo(abierto: boolean): Observable<PeriodoEvaluacionDocenteEstado> {
+    const params = new HttpParams().set('abierto', abierto.toString());
+    return this._http.put<PeriodoEvaluacionDocenteEstado>(`${this._baseUrl}/periodo-estado`, null, { params });
+  }
+
+  // --- Reporte de Ratificación de Docentes por Materia ---
+
+  public listarReporteRatificados(gestion?: string, sedeCodigo?: string, carreraCodigo?: string, estado?: string): Observable<DocenteRatificacionMateria[]> {
+    let params = new HttpParams();
+    if (gestion) params = params.set('gestion', gestion);
+    if (sedeCodigo && sedeCodigo !== 'TODAS') params = params.set('sedeCodigo', sedeCodigo);
+    if (carreraCodigo && carreraCodigo !== 'TODAS') params = params.set('carreraCodigo', carreraCodigo);
+    if (estado && estado !== 'TODOS') params = params.set('estado', estado);
+    return this._http.get<DocenteRatificacionMateria[]>(`${this._baseUrl}/reportes/ratificados`, { params });
+  }
+
+  public modificarRatificacion(id: number, request: ModificarRatificacionRequest): Observable<DocenteRatificacionMateria> {
+    return this._http.put<DocenteRatificacionMateria>(`${this._baseUrl}/ratificacion/${id}`, request);
+  }
+
+  // --- Reporte de Cumplimiento Institucional ---
+
+  public listarCumplimiento(gestion?: string, sedeCodigo?: string, carreraCodigo?: string): Observable<CumplimientoEvaluacion[]> {
+    let params = new HttpParams();
+    if (gestion) params = params.set('gestion', gestion);
+    if (sedeCodigo && sedeCodigo !== 'TODAS') params = params.set('sedeCodigo', sedeCodigo);
+    if (carreraCodigo && carreraCodigo !== 'TODAS') params = params.set('carreraCodigo', carreraCodigo);
+    return this._http.get<CumplimientoEvaluacion[]>(`${this._baseUrl}/reportes/cumplimiento`, { params });
   }
 }
