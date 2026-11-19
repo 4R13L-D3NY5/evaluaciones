@@ -27,7 +27,7 @@ public class EvaluacionDocenteController {
     private final com.xpertiflow.evaluaciones.application.evaluaciondocente.EvaluacionDocenteReportesService evaluacionDocenteReportesService;
 
     @GetMapping("/instrumento-vigente")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
     @Operation(summary = "Obtener el instrumento de evaluación docente que se encuentra actualmente en vigencia")
     public ResponseEntity<EvaluacionInstrumentoDto> obtenerInstrumentoVigente() {
         return ResponseEntity.ok(evaluacionDocenteService.obtenerInstrumentoVigente());
@@ -68,7 +68,7 @@ public class EvaluacionDocenteController {
     }
 
     @GetMapping("/registros")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
     @Operation(summary = "Listar evaluaciones docentes aplicadas por gestión, sede y carrera")
     public ResponseEntity<List<EvaluacionDocenteRegistroDto>> listarRegistros(
             @RequestParam String gestion,
@@ -78,7 +78,7 @@ public class EvaluacionDocenteController {
     }
 
     @GetMapping("/registros/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
     @Operation(summary = "Obtener el detalle y respuestas de una evaluación docente aplicada")
     public ResponseEntity<EvaluacionDocenteRegistroDto> obtenerRegistroPorId(@PathVariable String id) {
         return ResponseEntity.ok(evaluacionDocenteService.obtenerRegistroPorId(id));
@@ -105,7 +105,7 @@ public class EvaluacionDocenteController {
     }
 
     @GetMapping("/avance-estudiantes")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
     @Operation(summary = "Consultar avance de evaluación docente por estudiantes (ej. 3/5) en una carrera")
     public ResponseEntity<List<EstudianteAvanceEvaluacionDto>> listarAvanceEstudiantes(
             @RequestParam String sedeCodigo,
@@ -115,7 +115,7 @@ public class EvaluacionDocenteController {
     }
 
     @GetMapping("/resumen-consolidado")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
     @Operation(summary = "Obtener resumen consolidado (50% Director + 50% Estudiantes) por materia y docente")
     public ResponseEntity<List<EvaluacionConsolidadaDocenteMateriaDto>> listarResumenConsolidado(
             @RequestParam String sedeCodigo,
@@ -125,7 +125,7 @@ public class EvaluacionDocenteController {
     }
 
     @GetMapping("/semestres/estados")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
     @Operation(summary = "Consultar el estado de habilitación de evaluación por semestres para una carrera")
     public ResponseEntity<List<SemestreHabilitacionEstadoDto>> listarEstadosSemestres(
             @RequestParam String sedeCodigo,
@@ -157,25 +157,30 @@ public class EvaluacionDocenteController {
         return ResponseEntity.ok(evaluacionDocenteEstudianteService.deshabilitarSemestre(sedeCodigo, carreraCodigo, gestion, semestre, usuario));
     }
 
-    @GetMapping("/periodo/estado")
+    @GetMapping({"/periodo/estado", "/periodo-estado"})
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
     @Operation(summary = "Consultar el estado del período de evaluación docente (abierto o cerrado)")
-    public ResponseEntity<Boolean> obtenerEstadoPeriodo() {
-        return ResponseEntity.ok(evaluacionDocenteReportesService.obtenerEstadoPeriodo());
+    public ResponseEntity<java.util.Map<String, Object>> obtenerEstadoPeriodo() {
+        return ResponseEntity.ok(java.util.Map.of(
+                "periodoEvaluacionDocenteAbierto", evaluacionDocenteReportesService.obtenerEstadoPeriodo()
+        ));
     }
 
-    @PutMapping("/periodo/conmutar")
+    @PutMapping({"/periodo/conmutar", "/periodo-estado"})
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
     @Operation(summary = "Cerrar o reabrir el período institucional de evaluación docente (exclusivo Administrador)")
-    public ResponseEntity<Boolean> conmutarPeriodoEvaluacion(
+    public ResponseEntity<java.util.Map<String, Object>> conmutarPeriodoEvaluacion(
             @RequestParam boolean abierto,
             Authentication authentication,
             jakarta.servlet.http.HttpServletRequest request) {
         String ipOrigen = com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil.obtenerIpCliente(request);
-        return ResponseEntity.ok(evaluacionDocenteReportesService.conmutarPeriodoEvaluacion(abierto, authentication, ipOrigen));
+        boolean nuevo = evaluacionDocenteReportesService.conmutarPeriodoEvaluacion(abierto, authentication, ipOrigen);
+        return ResponseEntity.ok(java.util.Map.of(
+                "periodoEvaluacionDocenteAbierto", nuevo
+        ));
     }
 
-    @GetMapping("/reportes/ratificaciones")
+    @GetMapping({"/reportes/ratificaciones", "/reportes/ratificados"})
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','VICERRECTOR','TALENTO_HUMANO')")
     @Operation(summary = "Reporte de Docentes Ratificados (>=71) y No Ratificados (<=70) por Asignatura/Materia")
     public ResponseEntity<List<DocenteRatificacionMateriaDto>> listarReporteRatificados(
@@ -186,7 +191,7 @@ public class EvaluacionDocenteController {
         return ResponseEntity.ok(evaluacionDocenteReportesService.listarReporteRatificados(gestion, sedeCodigo, carreraCodigo, estadoFiltro));
     }
 
-    @PutMapping("/reportes/ratificaciones/{id}/modificar")
+    @PutMapping({"/reportes/ratificaciones/{id}/modificar", "/ratificacion/{id}"})
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','TALENTO_HUMANO','VICERRECTOR')")
     @Operation(summary = "Modificar manualmente la ratificación de un docente en una materia (con motivo obligatorio)")
     public ResponseEntity<DocenteRatificacionMateriaDto> modificarRatificacion(
