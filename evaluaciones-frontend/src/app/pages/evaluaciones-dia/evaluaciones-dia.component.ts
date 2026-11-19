@@ -5308,23 +5308,7 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
         this.evaluaciones.set(uiList);
         this._cargarEstadoMarcas(uiList);
         this._cargarEstadoBancos(uiList);
-        if (uiList.length === 0) {
-          this.cargando.set(false);
-          return;
-        }
-
-        forkJoin(uiList.map(item => this._rolService.listarAuditoria(item.id).pipe(
-          catchError(() => of([] as AuditoriaRolExamen[]))
-        ))).subscribe({
-          next: auditorias => {
-            this.evaluaciones.set(uiList.map((item, index) => ({
-              ...item,
-              auditoria: auditorias[index]
-            })));
-            this.cargando.set(false);
-          },
-          error: () => this.cargando.set(false)
-        });
+        this.cargando.set(false);
       },
       error: err => {
         console.error('Error cargando evaluaciones desde backend:', err);
@@ -5613,6 +5597,10 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   private _cargarEstadoMarcas(items: EvaluacionItemUI[]): void {
     this.estadoMarcas.set({});
     this.estadoListas.set({});
+    if (items.length > 60) {
+      // En consultas masivas (toda la sede), no saturar el navegador con miles de peticiones simultáneas
+      return;
+    }
     items.filter(item => this.puedeGestionarCartillas(item)).forEach(item => {
       this._cartillasOmr.obtenerPreparacion(item.id).subscribe({
         next: preparacion => {
