@@ -185,6 +185,7 @@ public class AutenticacionService {
             case "VICERRECTOR" -> "Vicerrector";
             case "DIRECTOR_CARRERA" -> "Director de carrera";
             case "VERIFICADOR" -> "Verificador de exámenes";
+            case "TALENTO_HUMANO" -> "Talento Humano";
             default -> codigo;
         };
     }

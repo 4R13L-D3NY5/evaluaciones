@@ -383,8 +383,8 @@ export class UsuariosSistemaComponent implements OnInit {
   private carrerasSeleccionadas = new Map<string, AlcanceAcademico>();
   private campusesSeleccionados = new Map<string, AlcanceCampus>();
 
-  private readonly rolesDeEvaluaciones = new Set(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VERIFICADOR', 'EVALUADOR_VOCACIONAL']);
-  private readonly rolesInstitucionales = new Set(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'DOCENTE', 'VICERRECTOR', 'VERIFICADOR', 'EVALUADOR_VOCACIONAL']);
+  private readonly rolesDeEvaluaciones = new Set(['RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'VERIFICADOR', 'EVALUADOR_VOCACIONAL', 'TALENTO_HUMANO']);
+  private readonly rolesInstitucionales = new Set(['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'PERSONAL_EVALUACIONES', 'DIRECTOR_CARRERA', 'DOCENTE', 'VICERRECTOR', 'VERIFICADOR', 'EVALUADOR_VOCACIONAL', 'TALENTO_HUMANO']);
 
   private readonly catalogoRolesBase: RolCatalogo[] = [
     {
@@ -490,6 +490,19 @@ export class UsuariosSistemaComponent implements OnInit {
         'Sin permisos de edición operativa.'
       ],
       icono: 'pi pi-chart-bar'
+    },
+    {
+      codigo: 'TALENTO_HUMANO',
+      nombre: 'Talento Humano',
+      descripcion: 'Acceso exclusivo a reportes de evaluación docente y gestión de ratificaciones por materia.',
+      alcance: 'Toda la institución o sedes asignadas',
+      permisos: [
+        'Consultar reportes de ratificación docente por materia.',
+        'Modificar estado de ratificación (ratificar / desratificar) con justificación auditada.',
+        'Consultar reporte de cumplimiento de evaluación docente institucional.',
+        'Descargar reportes oficiales en Excel y PDF.'
+      ],
+      icono: 'pi pi-users'
     }
   ];
 
