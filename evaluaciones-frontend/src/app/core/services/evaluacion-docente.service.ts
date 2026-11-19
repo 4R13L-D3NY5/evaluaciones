@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import {
   EvaluacionInstrumento,
   EvaluacionDocenteRegistro,
@@ -126,12 +126,16 @@ export class EvaluacionDocenteService {
   // --- Período de Evaluación y Cierre Administrativo ---
 
   public obtenerEstadoPeriodo(): Observable<PeriodoEvaluacionDocenteEstado> {
-    return this._http.get<PeriodoEvaluacionDocenteEstado>(`${this._baseUrl}/periodo-estado`);
+    return this._http.get<any>(`${this._baseUrl}/periodo/estado`).pipe(
+      map(res => typeof res === 'boolean' ? { periodoEvaluacionDocenteAbierto: res, gestion: '' } : res)
+    );
   }
 
   public conmutarPeriodo(abierto: boolean): Observable<PeriodoEvaluacionDocenteEstado> {
     const params = new HttpParams().set('abierto', abierto.toString());
-    return this._http.put<PeriodoEvaluacionDocenteEstado>(`${this._baseUrl}/periodo-estado`, null, { params });
+    return this._http.put<any>(`${this._baseUrl}/periodo/conmutar`, null, { params }).pipe(
+      map(res => typeof res === 'boolean' ? { periodoEvaluacionDocenteAbierto: res, gestion: '' } : res)
+    );
   }
 
   // --- Reporte de Ratificación de Docentes por Materia ---
@@ -142,11 +146,11 @@ export class EvaluacionDocenteService {
     if (sedeCodigo && sedeCodigo !== 'TODAS') params = params.set('sedeCodigo', sedeCodigo);
     if (carreraCodigo && carreraCodigo !== 'TODAS') params = params.set('carreraCodigo', carreraCodigo);
     if (estado && estado !== 'TODOS') params = params.set('estado', estado);
-    return this._http.get<DocenteRatificacionMateria[]>(`${this._baseUrl}/reportes/ratificados`, { params });
+    return this._http.get<DocenteRatificacionMateria[]>(`${this._baseUrl}/reportes/ratificaciones`, { params });
   }
 
   public modificarRatificacion(id: number, request: ModificarRatificacionRequest): Observable<DocenteRatificacionMateria> {
-    return this._http.put<DocenteRatificacionMateria>(`${this._baseUrl}/ratificacion/${id}`, request);
+    return this._http.put<DocenteRatificacionMateria>(`${this._baseUrl}/reportes/ratificaciones/${id}/modificar`, request);
   }
 
   // --- Reporte de Cumplimiento Institucional ---
