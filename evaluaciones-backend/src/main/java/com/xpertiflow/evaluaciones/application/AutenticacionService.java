@@ -170,6 +170,8 @@ public class AutenticacionService {
                 .forEach(carreras::add);
         dto.setCarrerasAsignadas(carreras.stream().sorted(Comparator.naturalOrder()).toList());
         dto.setPuedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen());
+        dto.setPuedeAprobarSolicitudesRol(usuario.isPuedeAprobarSolicitudesRol());
+        dto.setPuedeModificarRatificacionDocente(usuario.isPuedeModificarRatificacionDocente());
         return dto;
     }
 
@@ -183,6 +185,7 @@ public class AutenticacionService {
             case "VICERRECTOR" -> "Vicerrector";
             case "DIRECTOR_CARRERA" -> "Director de carrera";
             case "VERIFICADOR" -> "Verificador de exámenes";
+            case "TALENTO_HUMANO" -> "Talento Humano";
             default -> codigo;
         };
     }

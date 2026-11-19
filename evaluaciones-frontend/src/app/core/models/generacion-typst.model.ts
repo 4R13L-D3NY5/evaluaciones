@@ -79,3 +79,25 @@ export interface DocumentoExamen {
   archivoPdfPath: string;
   nombreArchivo: string;
 }
+
+export interface GeneracionHistorialItem {
+  jobId: string;
+  rolExamenId: string;
+  estado: string;
+  mensaje?: string;
+  solicitadoEn: string;
+  actualizadoEn: string;
+  totalEstudiantes: number;
+  totalVariantes: number;
+  esVersionActiva: boolean;
+  mapeos: GeneracionTypstMapeo[];
+  variantes: GeneracionTypstVariante[];
+}
+
+export interface RestaurarGeneracionResponse {
+  rolExamenId: string;
+  jobIdRestaurado: string;
+  totalMapeosRestaurados: number;
+  totalCalificacionesRecalibradas: number;
+  mensaje: string;
+}

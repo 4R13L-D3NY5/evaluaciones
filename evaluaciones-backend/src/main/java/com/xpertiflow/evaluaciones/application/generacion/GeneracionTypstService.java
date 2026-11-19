@@ -12,6 +12,9 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.DocumentoExamenDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.ConfiguracionGeneracionResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.MapeoResultadoDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.VarianteResultadoDto;
+import com.xpertiflow.evaluaciones.api.dto.RecalificarOmrRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionHistorialItemDto;
+import com.xpertiflow.evaluaciones.api.dto.generacion.RestaurarGeneracionResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.PrevisualizacionTypstRequestDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.GroupItemDto;
 import com.xpertiflow.evaluaciones.api.dto.gateway.StudentItemDto;
@@ -20,9 +23,12 @@ import com.xpertiflow.evaluaciones.api.dto.ConfiguracionEvaluacionesDto;
 import com.xpertiflow.evaluaciones.api.dto.ConfiguracionParcialDto;
 import com.xpertiflow.evaluaciones.application.RolExamenService;
 import com.xpertiflow.evaluaciones.application.ConfiguracionEvaluacionesService;
+import com.xpertiflow.evaluaciones.application.OmrProcesamientoService;
 import com.xpertiflow.evaluaciones.application.OrdenEstudiantes;
 import com.xpertiflow.evaluaciones.config.AppProperties;
+import com.xpertiflow.evaluaciones.domain.entity.AuditoriaEvaluacion;
 import com.xpertiflow.evaluaciones.domain.entity.BancoPreguntas;
+import com.xpertiflow.evaluaciones.domain.entity.CalificacionOmr;
 import com.xpertiflow.evaluaciones.domain.entity.ExamenVariante;
 import com.xpertiflow.evaluaciones.domain.entity.GeneracionTypstJob;
 import com.xpertiflow.evaluaciones.domain.entity.MapeoEstudianteVariante;
@@ -30,7 +36,9 @@ import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
 import com.xpertiflow.evaluaciones.domain.enums.EstadoFlujo;
 import com.xpertiflow.evaluaciones.domain.enums.ModalidadExamen;
 import com.xpertiflow.evaluaciones.domain.enums.TipoParcial;
+import com.xpertiflow.evaluaciones.domain.repository.AuditoriaEvaluacionRepository;
 import com.xpertiflow.evaluaciones.domain.repository.BancoPreguntasRepository;
+import com.xpertiflow.evaluaciones.domain.repository.CalificacionOmrRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ExamenVarianteRepository;
 import com.xpertiflow.evaluaciones.domain.repository.GeneracionTypstJobRepository;
 import com.xpertiflow.evaluaciones.domain.repository.MapeoEstudianteVarianteRepository;
@@ -51,6 +59,7 @@ import java.util.List;
 import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.util.Comparator;
@@ -81,6 +90,9 @@ public class GeneracionTypstService {
     private final com.xpertiflow.evaluaciones.application.VerificacionPoliticaService verificacionPoliticaService;
     private final com.xpertiflow.evaluaciones.application.PoliticaTiempoEvaluacionesService politicaTiempoEvaluacionesService;
     private final SalaExamenVirtualRepository salaRepository;
+    private final CalificacionOmrRepository calificacionOmrRepository;
+    private final AuditoriaEvaluacionRepository auditoriaEvaluacionRepository;
+    private final OmrProcesamientoService omrProcesamientoService;
 
     private final Map<String, GeneracionTypstResultadoDto> estados = new ConcurrentHashMap<>();
     private static final Set<EstadoFlujo> ESTADOS_CON_DOCUMENTO = Set.of(
@@ -106,6 +118,16 @@ public class GeneracionTypstService {
 
         verificacionPoliticaService.exigirVerificado(rol);
         politicaTiempoEvaluacionesService.exigirGeneracionHabilitada(rol, authentication);
+
+        if (rol.getEstadoFlujo() != null && Set.of(EstadoFlujo.IMPRESO, EstadoFlujo.ENTREGADO, EstadoFlujo.DEVUELTO,
+                EstadoFlujo.PENDIENTE_NOTAS, EstadoFlujo.CALIFICADO, EstadoFlujo.CONFIRMADO).contains(rol.getEstadoFlujo())) {
+            boolean esAdmin = authentication != null && authentication.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMINISTRADOR_SISTEMA".equals(a.getAuthority()) || "ADMINISTRADOR_SISTEMA".equals(a.getAuthority()));
+            if (!esAdmin) {
+                throw new IllegalStateException("No se puede volver a generar el examen porque ya se encuentra en estado "
+                        + rol.getEstadoFlujo().getValor() + ". Para corregir variantes o restaurar una versión previa generada, contacte al Administrador del Sistema.");
+            }
+        }
 
         String jobId = request.getJobId();
         if (jobId == null || jobId.isBlank()) {
@@ -368,6 +390,216 @@ public class GeneracionTypstService {
         respuesta.setVariantes(variantes);
         respuesta.setMapeos(mapeos);
         return respuesta;
+    }
+
+    /**
+     * Consulta el historial de todos los trabajos de generación Typst registrados
+     * para una evaluación y determina cuál de ellos coincide con la asignación activa.
+     */
+    @Transactional(readOnly = true)
+    public List<GeneracionHistorialItemDto> listarHistorial(String rolExamenId) {
+        rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new RuntimeException("Rol de examen no encontrado: " + rolExamenId));
+
+        List<GeneracionTypstJob> jobs = generacionTypstJobRepository.findByRolExamenIdOrderBySolicitadoEnDesc(rolExamenId);
+        if (jobs.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<MapeoEstudianteVariante> mapeosActuales = mapeoRepository.findByRolExamenId(rolExamenId);
+        Map<String, String> activeVariantMap = mapeosActuales.stream()
+                .filter(m -> m.getCodigoEstudiante() != null && m.getLetraVariante() != null)
+                .collect(Collectors.toMap(
+                        m -> m.getCodigoEstudiante().trim(),
+                        m -> m.getLetraVariante().trim().toUpperCase(),
+                        (a, b) -> a));
+
+        List<GeneracionHistorialItemDto> historial = new ArrayList<>();
+        for (GeneracionTypstJob job : jobs) {
+            GeneracionTypstResultadoDto dto = reconstruirResultadoPersistido(job);
+            boolean esActiva = false;
+            if (!activeVariantMap.isEmpty() && dto.getMapeos() != null && !dto.getMapeos().isEmpty()) {
+                long coincidentes = dto.getMapeos().stream()
+                        .filter(m -> m.getCodigoEstudiante() != null && m.getLetraVariante() != null)
+                        .filter(m -> m.getLetraVariante().trim().equalsIgnoreCase(activeVariantMap.get(m.getCodigoEstudiante().trim())))
+                        .count();
+                esActiva = coincidentes > 0 && coincidentes == dto.getMapeos().size();
+            }
+
+            historial.add(GeneracionHistorialItemDto.builder()
+                    .jobId(job.getJobId())
+                    .rolExamenId(job.getRolExamenId())
+                    .estado(job.getEstado())
+                    .mensaje(job.getMensaje())
+                    .solicitadoEn(job.getSolicitadoEn())
+                    .actualizadoEn(job.getActualizadoEn())
+                    .totalEstudiantes(dto.getMapeos() != null ? dto.getMapeos().size() : 0)
+                    .totalVariantes(dto.getVariantes() != null ? dto.getVariantes().size() : 0)
+                    .esVersionActiva(esActiva)
+                    .mapeos(dto.getMapeos())
+                    .variantes(dto.getVariantes())
+                    .build());
+        }
+        return historial;
+    }
+
+    /**
+     * Restaura los mapeos de estudiantes a variantes de un trabajo de generación histórico.
+     * Si ya existen cartillas calificadas en OMR, sincroniza la letra de variante de cada
+     * estudiante y dispara la recalificación automática para re-evaluar contra el patrón correcto.
+     */
+    @Transactional
+    public RestaurarGeneracionResponseDto restaurarGeneracion(String rolExamenId, String jobId, Authentication authentication, String ipOrigen) {
+        RolExamen rol = rolRepository.findById(rolExamenId)
+                .orElseThrow(() -> new IllegalArgumentException("Rol de examen no encontrado: " + rolExamenId));
+
+        GeneracionTypstJob job = generacionTypstJobRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalArgumentException("Trabajo de generación no encontrado: " + jobId));
+
+        if (!rolExamenId.equals(job.getRolExamenId())) {
+            throw new IllegalArgumentException("El trabajo de generación no corresponde al rol de examen indicado.");
+        }
+
+        GeneracionTypstResultadoDto resultado;
+        try {
+            resultado = objectMapper.readValue(job.getResultadoJson(), GeneracionTypstResultadoDto.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo leer el resultado histórico de la generación: " + e.getMessage(), e);
+        }
+
+        if (resultado == null || resultado.getMapeos() == null || resultado.getMapeos().isEmpty()) {
+            throw new IllegalStateException("La generación seleccionada no contiene mapeos de estudiantes para restaurar.");
+        }
+
+        // 1. Reemplazar mapeos actuales con los de la versión seleccionada
+        mapeoRepository.deleteByRolExamenId(rolExamenId);
+        mapeoRepository.flush();
+
+        String groupIdOficial = rol.getSeaGroupId() != null && !rol.getSeaGroupId().isBlank()
+                ? rol.getSeaGroupId() : rol.getGrupo();
+        Map<String, StudentItemDto> gatewayStudentsMap = Collections.emptyMap();
+        try {
+            List<StudentItemDto> gatewayStudents = unitepcGatewayClient.getStudentsByGroup(groupIdOficial);
+            if (gatewayStudents != null) {
+                gatewayStudentsMap = gatewayStudents.stream()
+                        .filter(s -> s.getStudentCode() != null)
+                        .collect(Collectors.toMap(StudentItemDto::getStudentCode, s -> s, (a, b) -> a));
+            }
+        } catch (Exception ex) {
+            log.warn("No se pudo obtener información de toma de grupos del Gateway al restaurar rol {}: {}", rolExamenId, ex.getMessage());
+        }
+
+        Map<String, String> estudianteAVarianteRestaurada = new HashMap<>();
+
+        for (MapeoResultadoDto dto : resultado.getMapeos()) {
+            if (dto.getCodigoEstudiante() == null || dto.getCodigoEstudiante().isBlank()) {
+                continue;
+            }
+            String letra = dto.getLetraVariante();
+            String varianteId = String.format("VAR-%s-%s", rolExamenId, letra);
+            MapeoEstudianteVariante mapeo = new MapeoEstudianteVariante();
+            mapeo.setRolExamenId(rolExamenId);
+            mapeo.setVarianteId(varianteId);
+            mapeo.setCodigoEstudiante(dto.getCodigoEstudiante());
+            mapeo.setNombres(dto.getNombres() != null ? dto.getNombres().trim() : "");
+            mapeo.setApellidoPaterno(valorODefault(dto.getApellidoPaterno(), ""));
+            mapeo.setApellidoMaterno(valorODefault(dto.getApellidoMaterno(), ""));
+            mapeo.setLetraVariante(letra);
+            mapeo.setHashControlSeguridad(dto.getHashControl());
+            mapeo.setCuadernilloIndividualPdf(dto.getCuadernilloPdfPath());
+            mapeo.setEstadoAsistencia("PRESENTE");
+
+            StudentItemDto gwEst = gatewayStudentsMap.get(dto.getCodigoEstudiante().trim());
+            if (gwEst != null) {
+                mapeo.setSeaEnrollCreatedAt(gwEst.getEnrollCreatedAt());
+                mapeo.setSeaEnrollUpdatedAt(gwEst.getEnrollUpdatedAt());
+            }
+
+            mapeoRepository.save(mapeo);
+            estudianteAVarianteRestaurada.put(dto.getCodigoEstudiante().trim(), letra);
+        }
+
+        // 2. Si el job histórico incluye rutas de archivos de variantes, actualizar si existen
+        if (resultado.getVariantes() != null) {
+            for (VarianteResultadoDto vDto : resultado.getVariantes()) {
+                varianteRepository.findByRolExamenIdAndLetraVariante(rolExamenId, vDto.getLetra()).ifPresent(v -> {
+                    if (vDto.getArchivoPdfPath() != null && !vDto.getArchivoPdfPath().isBlank()) {
+                        v.setArchivoPdfPath(vDto.getArchivoPdfPath());
+                    }
+                    if (vDto.getArchivoTypstPath() != null && !vDto.getArchivoTypstPath().isBlank()) {
+                        v.setArchivoTypstPath(vDto.getArchivoTypstPath());
+                    }
+                    if (vDto.getArchivoRemarkXlsxPath() != null && !vDto.getArchivoRemarkXlsxPath().isBlank()) {
+                        v.setArchivoRemarkXlsxPath(vDto.getArchivoRemarkXlsxPath());
+                    }
+                    varianteRepository.save(v);
+                });
+            }
+        }
+
+        // 3. Actualizar conteo de estudiantes inscritos en el rol
+        rol.setEstudiantesInscritosCount(resultado.getMapeos().size());
+        rolRepository.save(rol);
+
+        // 4. Si ya existen calificaciones OMR registradas, actualizar la letra de variante para cada estudiante
+        List<CalificacionOmr> calificaciones = calificacionOmrRepository.findByRolExamenIdOrderByCodigoEstudianteAsc(rolExamenId);
+        int calificacionesActualizadas = 0;
+        if (!calificaciones.isEmpty()) {
+            for (CalificacionOmr cal : calificaciones) {
+                String nuevaLetra = estudianteAVarianteRestaurada.get(cal.getCodigoEstudiante().trim());
+                if (nuevaLetra != null && !nuevaLetra.isBlank()) {
+                    cal.setLetraVariante(nuevaLetra);
+                    calificacionOmrRepository.save(cal);
+                    calificacionesActualizadas++;
+                }
+            }
+            calificacionOmrRepository.flush();
+
+            // Si el estado permite recalificación, recalificar con el motor OMR automáticamente
+            if (rol.getEstadoFlujo() != null && Set.of(EstadoFlujo.DEVUELTO, EstadoFlujo.PENDIENTE_NOTAS,
+                    EstadoFlujo.CALIFICADO, EstadoFlujo.CONFIRMADO).contains(rol.getEstadoFlujo())) {
+                try {
+                    RecalificarOmrRequestDto reqRecalificar = new RecalificarOmrRequestDto();
+                    reqRecalificar.setMotivo("Restauración a versión de generación previa (Job " + jobId + ")");
+                    omrProcesamientoService.recalificarEvaluacion(rolExamenId, reqRecalificar, authentication, ipOrigen);
+                    log.info("Recalificación OMR completada tras restaurar generación {} en rol {}", jobId, rolExamenId);
+                } catch (Exception ex) {
+                    log.error("Error al recalificar automáticamente tras restaurar generación {} en rol {}", jobId, rolExamenId, ex);
+                }
+            }
+        }
+
+        // 5. Registrar auditoría formal inmutable
+        String usuario = authentication != null && authentication.getName() != null ? authentication.getName() : "ADMINISTRADOR_SISTEMA";
+        try {
+            Map<String, Object> auditoriaData = new LinkedHashMap<>();
+            auditoriaData.put("accion", "RESTAURACION_VERSION_GENERACION");
+            auditoriaData.put("jobIdRestaurado", jobId);
+            auditoriaData.put("totalMapeosRestaurados", resultado.getMapeos().size());
+            auditoriaData.put("calificacionesActualizadas", calificacionesActualizadas);
+            auditoriaData.put("fechaRestauracion", LocalDateTime.now().toString());
+
+            auditoriaEvaluacionRepository.save(AuditoriaEvaluacion.builder()
+                    .rolExamen(rol)
+                    .etapaOrigen(rol.getEstadoFlujo() != null ? rol.getEstadoFlujo().getValor() : "DESCONOCIDO")
+                    .etapaDestino(rol.getEstadoFlujo() != null ? rol.getEstadoFlujo().getValor() : "DESCONOCIDO")
+                    .accion("RESTAURACION_VERSION_GENERACION")
+                    .usuario(usuario)
+                    .ipOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1")
+                    .detallesJson(objectMapper.writeValueAsString(auditoriaData))
+                    .build());
+        } catch (Exception ex) {
+            log.error("Error al registrar auditoría de restauración de generación", ex);
+        }
+
+        return RestaurarGeneracionResponseDto.builder()
+                .rolExamenId(rolExamenId)
+                .jobIdRestaurado(jobId)
+                .totalMapeosRestaurados(resultado.getMapeos().size())
+                .totalCalificacionesRecalibradas(calificacionesActualizadas)
+                .mensaje("Se restauró con éxito la versión de generación (" + resultado.getMapeos().size() + " estudiantes asignados"
+                        + (calificacionesActualizadas > 0 ? ", " + calificacionesActualizadas + " calificaciones OMR sincronizadas y recalificadas" : "") + ").")
+                .build();
     }
 
     /**

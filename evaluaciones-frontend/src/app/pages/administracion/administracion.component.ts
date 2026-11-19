@@ -706,6 +706,7 @@ export interface ParcialConfig {
                           <th class="py-2.5 px-4">Sedes Asignadas</th>
                           <th class="py-2.5 px-3 text-center">Edición Directa</th>
                           <th class="py-2.5 px-3 text-center">Aprobar Solicitudes</th>
+                          <th class="py-2.5 px-3 text-center">Ratificación Docente</th>
                           <th class="py-2.5 px-4 text-right">Acciones de Autorización</th>
                         </tr>
                       </thead>
@@ -759,6 +760,17 @@ export interface ParcialConfig {
                                 </span>
                               }
                             </td>
+                            <td class="py-2.5 px-3 text-center">
+                              @if (vr.puedeModificarRatificacionDocente) {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-teal-100 dark:bg-teal-950/60 text-teal-800 dark:text-teal-300 border border-teal-300 dark:border-teal-700 px-2 py-0.5 text-[10px] font-bold">
+                                  <i class="pi pi-check text-[9px]"></i> Autorizado
+                                </span>
+                              } @else {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 px-2 py-0.5 text-[10px] font-bold">
+                                  <i class="pi pi-ban text-[9px]"></i> Inhabilitado
+                                </span>
+                              }
+                            </td>
                             <td class="py-2.5 px-4 text-right">
                               <div class="inline-flex items-center gap-1.5">
                                 <button 
@@ -787,6 +799,20 @@ export interface ParcialConfig {
                                     <i [class]="vr.puedeAprobarSolicitudesRol ? 'pi pi-times' : 'pi pi-check-circle'" class="text-[9px]"></i>
                                   }
                                   <span>{{ vr.puedeAprobarSolicitudesRol ? 'Quitar Aprobación' : 'Dar Aprobación' }}</span>
+                                </button>
+
+                                <button 
+                                  (click)="togglePermisoRatificacionVicerrector(vr)"
+                                  [disabled]="actualizandoRatificacionVicerrectorId() === vr.id"
+                                  [class]="vr.puedeModificarRatificacionDocente ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' : 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800'"
+                                  class="border font-bold text-[10px] px-2 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-wait"
+                                  [title]="vr.puedeModificarRatificacionDocente ? 'Inhabilitar facultad para modificar ratificación docente' : 'Autorizar facultad para modificar ratificación docente'">
+                                  @if (actualizandoRatificacionVicerrectorId() === vr.id) {
+                                    <i class="pi pi-spin pi-spinner text-xs"></i>
+                                  } @else {
+                                    <i [class]="vr.puedeModificarRatificacionDocente ? 'pi pi-times' : 'pi pi-check-circle'" class="text-[9px]"></i>
+                                  }
+                                  <span>{{ vr.puedeModificarRatificacionDocente ? 'Quitar Ratificar' : 'Dar Ratificar' }}</span>
                                 </button>
                               </div>
                             </td>
@@ -2148,7 +2174,11 @@ export class AdministracionEvaluacionesComponent {
   public readonly totalVicerrectoresAprobacion = computed(() => {
     return this.vicerrectores().filter(v => v.puedeAprobarSolicitudesRol).length;
   });
+  public readonly totalVicerrectoresRatificacion = computed(() => {
+    return this.vicerrectores().filter(v => v.puedeModificarRatificacionDocente).length;
+  });
   public actualizandoAprobacionVicerrectorId = signal<number | null>(null);
+  public actualizandoRatificacionVicerrectorId = signal<number | null>(null);
   public verificacionSedeCodigo = ''; public verificacionSedeNombre = ''; public verificacionCarreraCodigo = ''; public verificacionCarreraNombre = ''; public verificacionHabilitada = false;
   public carrerasVerificacion: Career[] = [];
   public cargandoCarrerasVerificacion = false;
@@ -2251,6 +2281,22 @@ export class AdministracionEvaluacionesComponent {
       error: () => {
         this.actualizandoAprobacionVicerrectorId.set(null);
         this._mostrarToast('Error al actualizar el permiso de aprobación del vicerrector.');
+      }
+    });
+  }
+
+  public togglePermisoRatificacionVicerrector(vr: VicerrectorEdicionRol): void {
+    const nuevoEstado = !vr.puedeModificarRatificacionDocente;
+    this.actualizandoRatificacionVicerrectorId.set(vr.id);
+    this._configuracionService.actualizarPermisoRatificacionVicerrector(vr.id, nuevoEstado).subscribe({
+      next: actualizado => {
+        this.actualizandoRatificacionVicerrectorId.set(null);
+        this.vicerrectores.update(list => list.map(item => item.id === vr.id ? actualizado : item));
+        this._mostrarToast(`Permiso de ratificación docente ${nuevoEstado ? 'AUTORIZADO' : 'INHABILITADO'} para ${vr.nombreCompleto}`);
+      },
+      error: () => {
+        this.actualizandoRatificacionVicerrectorId.set(null);
+        this._mostrarToast('Error al actualizar el permiso de ratificación del vicerrector.');
       }
     });
   }

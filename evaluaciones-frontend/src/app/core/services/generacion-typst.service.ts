@@ -9,7 +9,9 @@ import {
   GeneracionColaResponse,
   DocumentoExamen,
   ConfiguracionGeneracion,
-  PrevisualizacionTypstRequest
+  PrevisualizacionTypstRequest,
+  GeneracionHistorialItem,
+  RestaurarGeneracionResponse
 } from '../models/generacion-typst.model';
 
 /**
@@ -90,6 +92,24 @@ export class GeneracionTypstService {
     return this._http.get<ConfiguracionGeneracion>(`${this._baseUrl}/roles/${rolExamenId}/configuracion`).pipe(
       catchError(err => {
         console.error(`[GeneracionTypstService] Error al consultar configuración del rol ${rolExamenId}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public listarHistorial(rolExamenId: string): Observable<GeneracionHistorialItem[]> {
+    return this._http.get<GeneracionHistorialItem[]>(`${this._baseUrl}/roles/${rolExamenId}/historial`).pipe(
+      catchError(err => {
+        console.error(`[GeneracionTypstService] Error al consultar historial del rol ${rolExamenId}:`, err);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  public restaurarGeneracion(rolExamenId: string, jobId: string): Observable<RestaurarGeneracionResponse> {
+    return this._http.post<RestaurarGeneracionResponse>(`${this._baseUrl}/roles/${rolExamenId}/restaurar/${jobId}`, {}).pipe(
+      catchError(err => {
+        console.error(`[GeneracionTypstService] Error al restaurar versión ${jobId} para rol ${rolExamenId}:`, err);
         return throwError(() => err);
       })
     );

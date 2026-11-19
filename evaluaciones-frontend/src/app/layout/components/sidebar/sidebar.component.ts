@@ -267,6 +267,10 @@ export class SidebarComponent implements OnInit {
       ? this.menuItems.filter(item => !item.soloRoles) 
       : this.menuItems.filter(item => item.roles.includes(usuario.rol));
 
+    if (usuario.rol === 'TALENTO_HUMANO') {
+      return items.filter(item => item.route === '/evaluacion-docente');
+    }
+
     if (usuario.rol === 'VICERRECTOR') {
       return items.map(item => {
         if (item.route === '/administracion-evaluaciones') {
@@ -302,7 +306,7 @@ export class SidebarComponent implements OnInit {
       route: '/evaluacion-docente',
       icon: 'pi pi-user-edit',
       description: 'Evaluación de competencias docentes por Director de Carrera y Administrador',
-      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR']
+      roles: ['ADMINISTRADOR_SISTEMA', 'RESPONSABLE_EVALUACIONES', 'DIRECTOR_CARRERA', 'VICERRECTOR', 'TALENTO_HUMANO']
     },
     {
       label: 'Banco de Preguntas',

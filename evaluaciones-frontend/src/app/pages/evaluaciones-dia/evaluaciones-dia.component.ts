@@ -50,7 +50,8 @@ import {
   GeneracionTypstResultado,
   GeneracionColaResponse,
   ConfiguracionGeneracion,
-  GeneracionTypstVariante
+  GeneracionTypstVariante,
+  GeneracionHistorialItem
 } from '../../core/models/generacion-typst.model';
 import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import { CampusCarrerasService, CarreraCampusAsignada } from '../../core/services/campus-carreras.service';
@@ -866,6 +867,25 @@ interface CampusDisponible extends Campus {
                           </div>
                         }
 
+                        <!-- 6. Historial de Generaciones (Solo ADMINISTRADOR_SISTEMA) -->
+                        @if (esAdministradorSistema()) {
+                          <div class="relative group/historialGen">
+                            <button
+                              (click)="abrirModalHistorialGeneraciones(item)"
+                              title="Historial y restauración de versiones generadas"
+                              aria-label="Historial y restauración de versiones generadas"
+                              class="h-7 w-7 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center cursor-pointer transition-colors shadow-2xs">
+                              <i class="pi pi-history text-xs"></i>
+                            </button>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/historialGen:flex flex-col items-center z-50 pointer-events-none">
+                              <span class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg whitespace-nowrap">
+                                Historial de Generaciones (Restaurar)
+                              </span>
+                              <div class="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
+                            </div>
+                          </div>
+                        }
+
                       </div>
                     </td>
 
@@ -1566,6 +1586,169 @@ interface CampusDisponible extends Campus {
 
             <div class="bg-muted/40 border-t border-border p-4 flex justify-end">
               <button (click)="cerrarSupervisionCola()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black cursor-pointer">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: HISTORIAL DE VERSIONES GENERADAS (SOLO ADMINISTRADOR_SISTEMA) -->
+      @if (dialogHistorialGeneraciones()) {
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in overflow-y-auto">
+          <div class="bg-card border border-border rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden animate-scale-in my-auto max-h-[90vh] flex flex-col">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-4.5 flex items-center justify-between shrink-0">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300">
+                  <i class="pi pi-history text-lg"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-black text-white">Historial de Generaciones Typst</h3>
+                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-400/30">Admin</span>
+                  </div>
+                  @if (evaluacionSeleccionadaHistorial(); as ev) {
+                    <p class="text-xs text-white/70 mt-0.5">
+                      {{ ev.materia }} · Grupo {{ ev.grupo }} · {{ ev.tipo }} ({{ ev.codigo }})
+                    </p>
+                  }
+                </div>
+              </div>
+              <button (click)="cerrarModalHistorialGeneraciones()" [disabled]="restaurandoGeneracion()" aria-label="Cerrar historial" title="Cerrar" class="h-8 w-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer disabled:opacity-40">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+
+            <!-- Body scrollable -->
+            <div class="p-5 space-y-4 overflow-y-auto flex-1">
+              <!-- Notice box -->
+              <div class="rounded-xl border border-purple-200 bg-purple-50/70 p-3.5 text-xs text-purple-950 leading-relaxed flex gap-3 items-start">
+                <i class="pi pi-info-circle text-purple-700 text-base mt-0.5 shrink-0"></i>
+                <div class="space-y-1">
+                  <p class="font-bold">Auditoría y restauración de versiones de examen:</p>
+                  <p class="text-[11px] text-purple-900">
+                    Muestra todos los trabajos de generación ejecutados. La <strong>versión activa</strong> es la que coincide actualmente con la base de datos.
+                    Si se generó un nuevo lote por error tras la impresión física, puedes <strong>restaurar la versión anterior</strong>.
+                    El sistema restablecerá la nómina de estudiantes con sus variantes originales y, si ya existen cartillas escaneadas en OMR,
+                    sincronizará la letra de variante y las recalificará automáticamente contra su clave correcta.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Loading state -->
+              @if (cargandoHistorialGeneraciones()) {
+                <div class="py-16 text-center text-xs text-muted-foreground">
+                  <i class="pi pi-spin pi-spinner text-purple-700 text-2xl"></i>
+                  <p class="mt-3 font-bold text-foreground">Consultando historial de generaciones...</p>
+                </div>
+              } @else if (historialGeneraciones().length === 0) {
+                <div class="py-12 text-center text-muted-foreground text-xs font-semibold">
+                  <i class="pi pi-inbox text-3xl mb-2 block opacity-40"></i>
+                  No se registraron trabajos de generación previos para esta evaluación.
+                </div>
+              } @else {
+                <div class="space-y-3">
+                  @for (job of historialGeneraciones(); track job.jobId; let idx = $index) {
+                    <div class="rounded-xl border transition-all"
+                         [ngClass]="job.esVersionActiva ? 'border-emerald-400 bg-emerald-50/30' : 'border-border bg-card'">
+                      <!-- Card header / summary -->
+                      <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="space-y-1 flex-1">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-bold text-xs text-foreground">Versión #{{ historialGeneraciones().length - idx }}</span>
+                            <span class="font-mono text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border" title="Job ID">{{ job.jobId }}</span>
+                            @if (job.esVersionActiva) {
+                              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <i class="pi pi-check-circle text-[10px]"></i> Versión Activa en BD
+                              </span>
+                            } @else {
+                              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-muted-foreground bg-muted border border-border">
+                                Versión Anterior
+                              </span>
+                            }
+                            <span [class]="job.estado === 'COMPLETADO' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'"
+                                  class="text-[9px] font-bold uppercase px-2 py-0.5 rounded border">
+                              {{ job.estado }}
+                            </span>
+                          </div>
+
+                          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
+                            <span><i class="pi pi-calendar mr-1"></i>{{ formatearFechaHoraAuditoria(job.solicitadoEn) }}</span>
+                            <span><i class="pi pi-users mr-1"></i><strong>{{ job.totalEstudiantes }}</strong> estudiantes</span>
+                            <span><i class="pi pi-file mr-1"></i><strong>{{ job.totalVariantes }}</strong> variantes</span>
+                          </div>
+                        </div>
+
+                        <!-- Card actions -->
+                        <div class="flex items-center gap-2 shrink-0">
+                          <button
+                            (click)="toggleExpandirEstudiantes(job.jobId)"
+                            class="px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs">
+                            <i class="pi" [class.pi-chevron-down]="jobIdExpandido() !== job.jobId" [class.pi-chevron-up]="jobIdExpandido() === job.jobId"></i>
+                            <span>{{ jobIdExpandido() === job.jobId ? 'Ocultar nómina' : 'Ver nómina (' + job.totalEstudiantes + ')' }}</span>
+                          </button>
+
+                          @if (!job.esVersionActiva) {
+                            <button
+                              (click)="restaurarVersionGeneracion(job)"
+                              [disabled]="restaurandoGeneracion()"
+                              class="px-3 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs">
+                              <i class="pi" [class.pi-spin]="restaurandoGeneracion()" [class.pi-spinner]="restaurandoGeneracion()" [class.pi-undo]="!restaurandoGeneracion()"></i>
+                              <span>Restaurar esta versión</span>
+                            </button>
+                          } @else {
+                            <div class="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black flex items-center gap-1.5">
+                              <i class="pi pi-check"></i>
+                              <span>Activa</span>
+                            </div>
+                          }
+                        </div>
+                      </div>
+
+                      <!-- Expandable student roster -->
+                      @if (jobIdExpandido() === job.jobId) {
+                        <div class="border-t border-border bg-muted/20 p-3 animate-fade-in">
+                          <div class="text-[11px] font-bold text-muted-foreground mb-2 flex items-center justify-between">
+                            <span>Nómina de estudiantes y variantes asignadas en este trabajo:</span>
+                            <span class="font-mono text-[10px]">{{ job.mapeos.length }} registros</span>
+                          </div>
+                          @if (job.mapeos.length > 0) {
+                            <div class="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border bg-background text-xs">
+                              <div class="grid grid-cols-[100px_1fr_90px] gap-2 px-3 py-2 bg-muted/60 text-[10px] font-black uppercase text-muted-foreground sticky top-0">
+                                <span>Código</span>
+                                <span>Estudiante</span>
+                                <span class="text-center">Variante</span>
+                              </div>
+                              @for (m of job.mapeos; track m.codigoEstudiante) {
+                                <div class="grid grid-cols-[100px_1fr_90px] gap-2 px-3 py-2 items-center">
+                                  <span class="font-mono font-bold">{{ m.codigoEstudiante }}</span>
+                                  <span class="truncate font-medium">{{ m.nombres }} {{ m.apellidoPaterno || '' }} {{ m.apellidoMaterno || '' }}</span>
+                                  <div class="text-center">
+                                    <span class="px-2 py-0.5 rounded font-mono font-black text-[10px] bg-purple-100 text-purple-800 border border-purple-200">
+                                      Tipo {{ m.letraVariante }}
+                                    </span>
+                                  </div>
+                                </div>
+                              }
+                            </div>
+                          } @else {
+                            <div class="text-xs text-muted-foreground py-2 text-center">No hay detalle de mapeos en el registro.</div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-muted/40 border-t border-border p-4 flex justify-between items-center shrink-0">
+              <span class="text-[11px] text-muted-foreground">
+                <i class="pi pi-shield mr-1 text-purple-700"></i> Acción reservada exclusivamente para el Administrador del Sistema.
+              </span>
+              <button (click)="cerrarModalHistorialGeneraciones()" [disabled]="restaurandoGeneracion()" class="px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground cursor-pointer disabled:opacity-50">
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
@@ -4519,6 +4702,14 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   public simulandoRezagado = signal<boolean>(false);
   public readonly esEntornoLocal: boolean = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
+  // Historial de Versiones Generadas (ADMINISTRADOR_SISTEMA)
+  public readonly dialogHistorialGeneraciones = signal<boolean>(false);
+  public readonly evaluacionSeleccionadaHistorial = signal<EvaluacionItemUI | null>(null);
+  public readonly historialGeneraciones = signal<GeneracionHistorialItem[]>([]);
+  public readonly cargandoHistorialGeneraciones = signal<boolean>(false);
+  public readonly restaurandoGeneracion = signal<boolean>(false);
+  public readonly jobIdExpandido = signal<string | null>(null);
+
   // Conciliación de colegiaturas y pagos de último momento en entrega/devolución
   public dialogConciliacionDevolucion = signal<boolean>(false);
   public conciliacionDevolucionActual = signal<ConciliacionEntregaResponse | null>(null);
@@ -5731,6 +5922,70 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     this.dialogConfiguracionGeneracion.set(false);
     this.evaluacionSeleccionadaConfiguracion.set(null);
     this.configuracionGeneracion.set(null);
+  }
+
+  public abrirModalHistorialGeneraciones(item: EvaluacionItemUI): void {
+    this.evaluacionSeleccionadaHistorial.set(item);
+    this.dialogHistorialGeneraciones.set(true);
+    this.jobIdExpandido.set(null);
+    this.cargarHistorialGeneraciones(item.id);
+  }
+
+  public cerrarModalHistorialGeneraciones(): void {
+    if (this.restaurandoGeneracion()) return;
+    this.dialogHistorialGeneraciones.set(false);
+    this.evaluacionSeleccionadaHistorial.set(null);
+    this.historialGeneraciones.set([]);
+    this.jobIdExpandido.set(null);
+  }
+
+  public toggleExpandirEstudiantes(jobId: string): void {
+    this.jobIdExpandido.update(current => current === jobId ? null : jobId);
+  }
+
+  public cargarHistorialGeneraciones(rolExamenId: string): void {
+    this.cargandoHistorialGeneraciones.set(true);
+    this._generacionTypst.listarHistorial(rolExamenId).subscribe({
+      next: historial => {
+        this.historialGeneraciones.set(historial || []);
+        this.cargandoHistorialGeneraciones.set(false);
+      },
+      error: () => {
+        this.cargandoHistorialGeneraciones.set(false);
+        this._mostrarToast('No se pudo cargar el historial de generaciones.', 'error');
+      }
+    });
+  }
+
+  public async restaurarVersionGeneracion(job: GeneracionHistorialItem): Promise<void> {
+    const item = this.evaluacionSeleccionadaHistorial();
+    if (!item || this.restaurandoGeneracion()) return;
+
+    const fechaFormateada = this.formatearFechaHoraAuditoria(job.solicitadoEn);
+    const confirmado = await this._feedback.confirmar(
+      `¿Está seguro de restaurar la versión generada el ${fechaFormateada} (${job.totalEstudiantes} estudiantes)?\n\n` +
+      `Esta acción reasignará las variantes de examen de todos los estudiantes a dicha versión y, si ya existen cartillas escaneadas en OMR, las sincronizará y recalificará automáticamente contra el patrón correspondiente.`,
+      'Restaurar Versión de Generación',
+      'warning',
+      'Restaurar Versión'
+    );
+
+    if (!confirmado) return;
+
+    this.restaurandoGeneracion.set(true);
+    this._generacionTypst.restaurarGeneracion(item.id, job.jobId).subscribe({
+      next: res => {
+        this.restaurandoGeneracion.set(false);
+        this._mostrarToast(res.mensaje || 'Versión de generación restaurada con éxito.', 'success');
+        this.cargarHistorialGeneraciones(item.id);
+        this._cargarEvaluaciones();
+      },
+      error: err => {
+        this.restaurandoGeneracion.set(false);
+        const msg = err?.error?.message || err?.message || 'Error al restaurar la versión de generación.';
+        this._mostrarToast(msg, 'error');
+      }
+    });
   }
 
   public nombreMapeo(mapeo: ConfiguracionGeneracion['mapeos'][number]): string {

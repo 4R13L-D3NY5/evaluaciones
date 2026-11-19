@@ -191,3 +191,54 @@ export interface EvaluacionConsolidadaDocenteMateria {
   puntajeFinal100: number;
   estadoFinal: string;
 }
+
+export interface DocenteRatificacionMateria {
+  id: number;
+  gestion: string;
+  sedeCodigo: string;
+  sedeNombre?: string;
+  carreraCodigo: string;
+  carreraNombre?: string;
+  materiaCodigo: string;
+  materiaNombre: string;
+  grupoCodigo?: string;
+  docenteCi?: string;
+  docenteNombre: string;
+  notaDirector50: number;
+  notaEstudiantes50: number;
+  notaFinal100: number;
+  estadoCalculado: 'RATIFICADO' | 'NO_RATIFICADO';
+  estadoFinal: 'RATIFICADO' | 'NO_RATIFICADO';
+  modificadoManualmente: boolean;
+  motivoModificacion?: string;
+  modificadoPor?: string;
+  modificadoPorNombre?: string;
+  modificadoEn?: string;
+}
+
+export interface ModificarRatificacionRequest {
+  nuevoEstado: 'RATIFICADO' | 'NO_RATIFICADO';
+  motivo: string;
+}
+
+export interface CumplimientoEvaluacion {
+  gestion: string;
+  sedeCodigo: string;
+  sedeNombre: string;
+  carreraCodigo: string;
+  carreraNombre: string;
+  materiaCodigo?: string;
+  materiaNombre?: string;
+  grupoCodigo?: string;
+  totalMateriasAsignadas: number;
+  materiasEvaluadasDirector: number;
+  porcentajeCumplimientoDirector: number;
+  totalEstudiantesMatriculados: number;
+  totalEstudiantesEvaluaron: number;
+  porcentajeCumplimientoEstudiantes: number;
+}
+
+export interface PeriodoEvaluacionDocenteEstado {
+  periodoEvaluacionDocenteAbierto: boolean;
+  gestion: string;
+}

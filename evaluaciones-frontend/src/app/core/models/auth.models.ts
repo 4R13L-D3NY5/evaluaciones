@@ -6,7 +6,8 @@ export type AppRole =
   | 'VICERRECTOR'
   | 'DIRECTOR_CARRERA'
   | 'VERIFICADOR'
-  | 'EVALUADOR_VOCACIONAL';
+  | 'EVALUADOR_VOCACIONAL'
+  | 'TALENTO_HUMANO';
 
 export interface UsuarioSesion {
   usuario: string;
@@ -18,6 +19,8 @@ export interface UsuarioSesion {
   sedesAsignadas: string[];
   carrerasAsignadas: string[];
   puedeEditarRolesExamen?: boolean;
+  puedeAprobarSolicitudesRol?: boolean;
+  puedeModificarRatificacionDocente?: boolean;
   sesionExpiraEn?: number;
   sesionDuracionSegundos?: number;
 }

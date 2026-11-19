@@ -84,8 +84,8 @@ public class UsuariosSistemaService {
     @Transactional(readOnly = true)
     public List<UsuarioSistemaResponseDto> listar(String contexto) {
         Set<String> rolesVisibles = "EVALUACIONES".equalsIgnoreCase(contexto)
-                ? Set.of("RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "VERIFICADOR", "EVALUADOR_VOCACIONAL")
-                : Set.of("ADMINISTRADOR_SISTEMA", "RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "DOCENTE", "VICERRECTOR", "VERIFICADOR", "EVALUADOR_VOCACIONAL");
+                ? Set.of("RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "VERIFICADOR", "EVALUADOR_VOCACIONAL", "TALENTO_HUMANO")
+                : Set.of("ADMINISTRADOR_SISTEMA", "RESPONSABLE_EVALUACIONES", "PERSONAL_EVALUACIONES", "DIRECTOR_CARRERA", "DOCENTE", "VICERRECTOR", "VERIFICADOR", "EVALUADOR_VOCACIONAL", "TALENTO_HUMANO");
         Map<String, AlcanceSea> alcancesSea = "EVALUACIONES".equalsIgnoreCase(contexto)
                 ? Map.of() : construirAlcancesSea();
         return usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
@@ -485,6 +485,9 @@ public class UsuariosSistemaService {
         usuario.setProveedorIdentidad("INTERNO");
         usuario.setCreadoEn(java.time.LocalDateTime.now());
         usuario.setActualizadoEn(java.time.LocalDateTime.now());
+        if ("TALENTO_HUMANO".equals(usuario.getRolCodigo())) {
+            usuario.setPuedeModificarRatificacionDocente(true);
+        }
         completarAlcances(usuario, request);
         UsuarioSistema guardado = usuarioRepository.save(usuario);
         registrarAuditoria(guardado, "USUARIO_CREADO", actor, "Rol " + guardado.getRolCodigo(), ipOrigen);
@@ -509,6 +512,9 @@ public class UsuariosSistemaService {
         usuario.setNombreCompleto(nombreRequerido(request.getNombreCompleto()));
         usuario.setRolCodigo(request.getRolCodigo().trim().toUpperCase(Locale.ROOT));
         usuario.setActivo(request.isActivo());
+        if ("TALENTO_HUMANO".equals(usuario.getRolCodigo())) {
+            usuario.setPuedeModificarRatificacionDocente(true);
+        }
         completarAlcances(usuario, request);
         usuario.setActualizadoEn(java.time.LocalDateTime.now());
         UsuarioSistema guardado = usuarioRepository.save(usuario);
@@ -681,6 +687,9 @@ public class UsuariosSistemaService {
         usuario.setNombreCompleto(nombreRequerido(request.getNombreCompleto()));
         usuario.setRolCodigo(request.getRolCodigo().trim().toUpperCase(Locale.ROOT));
         usuario.setActivo(request.isActivo());
+        if ("TALENTO_HUMANO".equals(usuario.getRolCodigo())) {
+            usuario.setPuedeModificarRatificacionDocente(true);
+        }
         completarAlcances(usuario, request);
         usuario.setActualizadoEn(java.time.LocalDateTime.now());
     }

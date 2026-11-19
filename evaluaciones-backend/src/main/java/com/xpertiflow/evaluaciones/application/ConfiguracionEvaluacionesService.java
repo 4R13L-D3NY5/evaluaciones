@@ -78,6 +78,9 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setValidarCuotasGrupos(request.getValidarCuotasGrupos() != null ? request.getValidarCuotasGrupos() : true);
         configuracion.setValidarHabilitacionAlumnos(request.getValidarHabilitacionAlumnos() != null ? request.getValidarHabilitacionAlumnos() : true);
         configuracion.setPermitirDirectorEdicionRoles(request.getPermitirDirectorEdicionRoles() != null ? request.getPermitirDirectorEdicionRoles() : true);
+        if (request.getPeriodoEvaluacionDocenteAbierto() != null) {
+            configuracion.setPeriodoEvaluacionDocenteAbierto(request.getPeriodoEvaluacionDocenteAbierto());
+        }
         configuracion.setActualizadoEn(LocalDateTime.now());
         String actorReal = (actor != null && !actor.isBlank()) ? actor : usuarioValido(request.getActualizadoPor());
         configuracion.setActualizadoPor(actorReal);
@@ -128,6 +131,7 @@ public class ConfiguracionEvaluacionesService {
                             .sedesAsignadas(sedes)
                             .puedeEditarRolesExamen(u.isPuedeEditarRolesExamen())
                             .puedeAprobarSolicitudesRol(u.isPuedeAprobarSolicitudesRol())
+                            .puedeModificarRatificacionDocente(u.isPuedeModificarRatificacionDocente())
                             .build();
                 })
                 .toList();
@@ -177,6 +181,7 @@ public class ConfiguracionEvaluacionesService {
                 .sedesAsignadas(sedes)
                 .puedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen())
                 .puedeAprobarSolicitudesRol(usuario.isPuedeAprobarSolicitudesRol())
+                .puedeModificarRatificacionDocente(usuario.isPuedeModificarRatificacionDocente())
                 .build();
     }
 
@@ -224,6 +229,52 @@ public class ConfiguracionEvaluacionesService {
                 .sedesAsignadas(sedes)
                 .puedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen())
                 .puedeAprobarSolicitudesRol(usuario.isPuedeAprobarSolicitudesRol())
+                .puedeModificarRatificacionDocente(usuario.isPuedeModificarRatificacionDocente())
+                .build();
+    }
+
+    @Transactional
+    public com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto actualizarPermisoRatificacionVicerrector(
+            Long usuarioId, boolean puedeRatificar, String actor, String ipOrigen) {
+        com.xpertiflow.evaluaciones.domain.entity.UsuarioSistema usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con ID: " + usuarioId));
+        usuario.setPuedeModificarRatificacionDocente(puedeRatificar);
+        usuario.setActualizadoEn(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+
+        AuditoriaUsuario auditoria = new AuditoriaUsuario();
+        auditoria.setUsuarioObjetivoId(usuario.getId());
+        auditoria.setUsuarioObjetivoCi(usuario.getCi());
+        auditoria.setAccion("PERMISO_RATIFICACION_DOCENTE_ACTUALIZADO");
+        auditoria.setRealizadoPor(actor != null ? actor : "SISTEMA");
+        auditoria.setDetalle("Se " + (puedeRatificar ? "AUTORIZO" : "DESAUTORIZO") + " la modificacion de ratificaciones para el usuario " + usuario.getUsuario() + " (" + usuario.getNombreCompleto() + ")");
+        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
+        auditoria.setFechaEvento(LocalDateTime.now());
+        auditoriaUsuarioRepository.save(auditoria);
+
+        List<String> sedes = new java.util.ArrayList<>();
+        if (usuario.getSedesAsignadas() != null && !usuario.getSedesAsignadas().isBlank()) {
+            sedes.addAll(java.util.Arrays.stream(usuario.getSedesAsignadas().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .toList());
+        }
+        usuario.getSedes().forEach(s -> {
+            String cod = s.getCodigo().trim();
+            if (!cod.isBlank() && !sedes.contains(cod)) {
+                sedes.add(cod);
+            }
+        });
+
+        return com.xpertiflow.evaluaciones.api.dto.VicerrectorEdicionRolDto.builder()
+                .id(usuario.getId())
+                .usuario(usuario.getUsuario())
+                .ci(usuario.getCi())
+                .nombreCompleto(usuario.getNombreCompleto())
+                .sedesAsignadas(sedes)
+                .puedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen())
+                .puedeAprobarSolicitudesRol(usuario.isPuedeAprobarSolicitudesRol())
+                .puedeModificarRatificacionDocente(usuario.isPuedeModificarRatificacionDocente())
                 .build();
     }
 
@@ -248,6 +299,7 @@ public class ConfiguracionEvaluacionesService {
         configuracion.setValidarCuotasGrupos(true);
         configuracion.setValidarHabilitacionAlumnos(true);
         configuracion.setPermitirDirectorEdicionRoles(true);
+        configuracion.setPeriodoEvaluacionDocenteAbierto(true);
         configuracion.setActualizadoPor("ADMIN_EVALUACIONES");
         configuracion.setActualizadoEn(LocalDateTime.now());
         return configuracion;
@@ -276,6 +328,7 @@ public class ConfiguracionEvaluacionesService {
         dto.setValidarCuotasGrupos(configuracion.getValidarCuotasGrupos() != null ? configuracion.getValidarCuotasGrupos() : true);
         dto.setValidarHabilitacionAlumnos(configuracion.getValidarHabilitacionAlumnos() != null ? configuracion.getValidarHabilitacionAlumnos() : true);
         dto.setPermitirDirectorEdicionRoles(configuracion.getPermitirDirectorEdicionRoles() != null ? configuracion.getPermitirDirectorEdicionRoles() : true);
+        dto.setPeriodoEvaluacionDocenteAbierto(configuracion.getPeriodoEvaluacionDocenteAbierto() != null ? configuracion.getPeriodoEvaluacionDocenteAbierto() : true);
         dto.setActualizadoEn(configuracion.getActualizadoEn());
         dto.setActualizadoPor(configuracion.getActualizadoPor());
         return dto;

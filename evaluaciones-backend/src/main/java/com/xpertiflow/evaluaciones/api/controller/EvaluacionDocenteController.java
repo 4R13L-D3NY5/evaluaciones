@@ -24,6 +24,7 @@ public class EvaluacionDocenteController {
 
     private final EvaluacionDocenteService evaluacionDocenteService;
     private final EvaluacionDocenteEstudianteService evaluacionDocenteEstudianteService;
+    private final com.xpertiflow.evaluaciones.application.evaluaciondocente.EvaluacionDocenteReportesService evaluacionDocenteReportesService;
 
     @GetMapping("/instrumento-vigente")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR')")
@@ -154,5 +155,56 @@ public class EvaluacionDocenteController {
             Authentication authentication) {
         String usuario = authentication != null ? authentication.getName() : "DIRECTOR";
         return ResponseEntity.ok(evaluacionDocenteEstudianteService.deshabilitarSemestre(sedeCodigo, carreraCodigo, gestion, semestre, usuario));
+    }
+
+    @GetMapping("/periodo/estado")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
+    @Operation(summary = "Consultar el estado del período de evaluación docente (abierto o cerrado)")
+    public ResponseEntity<Boolean> obtenerEstadoPeriodo() {
+        return ResponseEntity.ok(evaluacionDocenteReportesService.obtenerEstadoPeriodo());
+    }
+
+    @PutMapping("/periodo/conmutar")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Cerrar o reabrir el período institucional de evaluación docente (exclusivo Administrador)")
+    public ResponseEntity<Boolean> conmutarPeriodoEvaluacion(
+            @RequestParam boolean abierto,
+            Authentication authentication,
+            jakarta.servlet.http.HttpServletRequest request) {
+        String ipOrigen = com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil.obtenerIpCliente(request);
+        return ResponseEntity.ok(evaluacionDocenteReportesService.conmutarPeriodoEvaluacion(abierto, authentication, ipOrigen));
+    }
+
+    @GetMapping("/reportes/ratificaciones")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','VICERRECTOR','TALENTO_HUMANO')")
+    @Operation(summary = "Reporte de Docentes Ratificados (>=71) y No Ratificados (<=70) por Asignatura/Materia")
+    public ResponseEntity<List<DocenteRatificacionMateriaDto>> listarReporteRatificados(
+            @RequestParam String gestion,
+            @RequestParam String sedeCodigo,
+            @RequestParam(required = false) String carreraCodigo,
+            @RequestParam(required = false) String estadoFiltro) {
+        return ResponseEntity.ok(evaluacionDocenteReportesService.listarReporteRatificados(gestion, sedeCodigo, carreraCodigo, estadoFiltro));
+    }
+
+    @PutMapping("/reportes/ratificaciones/{id}/modificar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','TALENTO_HUMANO','VICERRECTOR')")
+    @Operation(summary = "Modificar manualmente la ratificación de un docente en una materia (con motivo obligatorio)")
+    public ResponseEntity<DocenteRatificacionMateriaDto> modificarRatificacion(
+            @PathVariable Long id,
+            @Valid @RequestBody ModificarRatificacionRequestDto dto,
+            Authentication authentication,
+            jakarta.servlet.http.HttpServletRequest request) {
+        String ipOrigen = com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil.obtenerIpCliente(request);
+        return ResponseEntity.ok(evaluacionDocenteReportesService.modificarRatificacion(id, dto, authentication, ipOrigen));
+    }
+
+    @GetMapping("/reportes/cumplimiento")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','VICERRECTOR','TALENTO_HUMANO')")
+    @Operation(summary = "Reporte de porcentaje de cumplimiento de evaluación docente por Sede, Carrera y Materia")
+    public ResponseEntity<List<CumplimientoEvaluacionDto>> listarCumplimiento(
+            @RequestParam String gestion,
+            @RequestParam String sedeCodigo,
+            @RequestParam(required = false) String carreraCodigo) {
+        return ResponseEntity.ok(evaluacionDocenteReportesService.listarCumplimiento(gestion, sedeCodigo, carreraCodigo));
     }
 }

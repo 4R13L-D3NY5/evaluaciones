@@ -33,6 +33,7 @@ public class EvaluacionDocenteEstudianteService {
     private final NotaDocenteRepository notaDocenteRepository;
     private final UnitepcGatewayClient unitepcGatewayClient;
     private final EvaluacionHabilitacionSemestreRepository habilitacionSemestreRepository;
+    private final com.xpertiflow.evaluaciones.domain.repository.ConfiguracionEvaluacionesRepository configuracionEvaluacionesRepository;
 
     /**
      * Normaliza los formatos de gestión (ej. '2-2026', 'II-2026', 'ACTIVA') al formato canónico 'II-2026'.
@@ -228,6 +229,12 @@ public class EvaluacionDocenteEstudianteService {
      */
     @Transactional
     public EvaluacionEstudianteRegistro registrarEvaluacion(EvaluacionEstudianteAplicarRequestDto request, String ipOrigen) {
+        boolean abierto = configuracionEvaluacionesRepository.findById((short) 1)
+                .map(com.xpertiflow.evaluaciones.domain.entity.ConfiguracionEvaluaciones::getPeriodoEvaluacionDocenteAbierto)
+                .orElse(true);
+        if (!abierto) {
+            throw new IllegalStateException("El período de evaluación docente ha sido cerrado institucionalmente.");
+        }
         String matricula = request.getEstudianteCodigo().trim();
         String materiaCod = request.getMateriaCodigo().trim();
         String grupoCod = request.getGrupoCodigo().trim();
@@ -641,6 +648,12 @@ public class EvaluacionDocenteEstudianteService {
      */
     @Transactional
     public List<SemestreHabilitacionEstadoDto> habilitarSemestres(HabilitarSemestresRequestDto request, String usuario) {
+        boolean abierto = configuracionEvaluacionesRepository.findById((short) 1)
+                .map(com.xpertiflow.evaluaciones.domain.entity.ConfiguracionEvaluaciones::getPeriodoEvaluacionDocenteAbierto)
+                .orElse(true);
+        if (!abierto) {
+            throw new IllegalStateException("El período de evaluación docente ha sido cerrado institucionalmente.");
+        }
         if (request == null || request.getSedeCodigo() == null || request.getCarreraCodigo() == null) {
             throw new IllegalArgumentException("Sede y Carrera son obligatorias para habilitar semestres.");
         }

@@ -6,15 +6,21 @@ import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionColaResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.DocumentoExamenDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.ConfiguracionGeneracionResponseDto;
 import com.xpertiflow.evaluaciones.api.dto.generacion.PrevisualizacionTypstRequestDto;
+import com.xpertiflow.evaluaciones.api.dto.generacion.GeneracionHistorialItemDto;
+import com.xpertiflow.evaluaciones.api.dto.generacion.RestaurarGeneracionResponseDto;
 import com.xpertiflow.evaluaciones.application.generacion.GeneracionTypstService;
+import com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/generacion-typst")
@@ -59,6 +65,25 @@ public class GeneracionTypstController {
     @Operation(summary = "Consultar variantes, patrones y asignaciones persistidas")
     public ResponseEntity<ConfiguracionGeneracionResponseDto> consultarConfiguracion(@PathVariable String rolExamenId) {
         return ResponseEntity.ok(generacionTypstService.consultarConfiguracion(rolExamenId));
+    }
+
+    @GetMapping("/roles/{rolExamenId}/historial")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Consultar historial de versiones generadas Typst de una evaluación")
+    public ResponseEntity<List<GeneracionHistorialItemDto>> consultarHistorial(@PathVariable String rolExamenId) {
+        return ResponseEntity.ok(generacionTypstService.listarHistorial(rolExamenId));
+    }
+
+    @PostMapping("/roles/{rolExamenId}/restaurar/{jobId}")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Restaurar asignaciones de estudiantes a variantes de una versión previa generada")
+    public ResponseEntity<RestaurarGeneracionResponseDto> restaurarGeneracion(
+            @PathVariable String rolExamenId,
+            @PathVariable String jobId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        String ipOrigen = ClientIpUtil.obtenerIpCliente(httpRequest);
+        return ResponseEntity.ok(generacionTypstService.restaurarGeneracion(rolExamenId, jobId, authentication, ipOrigen));
     }
 
     @GetMapping("/{jobId}/resultado")
