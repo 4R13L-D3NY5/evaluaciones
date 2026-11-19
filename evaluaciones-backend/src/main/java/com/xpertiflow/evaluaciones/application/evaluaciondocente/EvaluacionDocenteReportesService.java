@@ -218,7 +218,7 @@ public class EvaluacionDocenteReportesService {
         boolean esTalento = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_TALENTO_HUMANO"));
 
-        UsuarioSistema usuarioAuth = usuarioRepository.findByUsuario(authentication.getName()).orElse(null);
+        UsuarioSistema usuarioAuth = usuarioRepository.findByUsuarioIgnoreCase(authentication.getName()).orElse(null);
         boolean puedeModificar = esAdmin || esTalento || (usuarioAuth != null && usuarioAuth.isPuedeModificarRatificacionDocente());
 
         if (!puedeModificar) {

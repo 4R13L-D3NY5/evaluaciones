@@ -10,6 +10,8 @@ public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, 
 
     Optional<UsuarioSistema> findByUsuarioIgnoreCase(String usuario);
 
+    Optional<UsuarioSistema> findByUsuario(String usuario);
+
     Optional<UsuarioSistema> findByCi(String ci);
 
     boolean existsByCi(String ci);
