@@ -204,16 +204,35 @@ export interface DocenteRatificacionMateria {
   grupoCodigo?: string;
   docenteCi?: string;
   docenteNombre: string;
+
+  // Notas (compatibilidad dual)
+  notaDirector?: number;
   notaDirector50: number;
+  notaEstudiantes?: number;
   notaEstudiantes50: number;
+  notaFinal?: number;
   notaFinal100: number;
-  estadoCalculado: 'RATIFICADO' | 'NO_RATIFICADO';
+
+  // Estados (compatibilidad dual)
+  estadoCalculado: 'RATIFICADO' | 'NO_RATIFICADO' | string;
+  estadoDefinitivo?: 'RATIFICADO' | 'NO_RATIFICADO' | string;
   estadoFinal: 'RATIFICADO' | 'NO_RATIFICADO';
+
+  // Auditoría y Override (compatibilidad dual)
+  esModificadoManualmente?: boolean;
   modificadoManualmente: boolean;
   motivoModificacion?: string;
+  modificadoPorUsuario?: string;
   modificadoPor?: string;
   modificadoPorNombre?: string;
+  fechaModificacion?: string;
   modificadoEn?: string;
+
+  // Metadatos auxiliares
+  directorEvaluado?: boolean;
+  totalEstudiantesEvaluaron?: number;
+  totalEstudiantesMatriculados?: number;
+  estudiantesParticipacionPorcentaje?: number;
 }
 
 export interface ModificarRatificacionRequest {

@@ -140,17 +140,73 @@ export class EvaluacionDocenteService {
 
   // --- Reporte de Ratificación de Docentes por Materia ---
 
+  private _normalizarRatificacion(r: any): DocenteRatificacionMateria {
+    if (!r) return r;
+    const notaDir = Number(r.notaDirector50 ?? r.notaDirector ?? 0);
+    const notaEst = Number(r.notaEstudiantes50 ?? r.notaEstudiantes ?? 0);
+    const notaFinal = Number(r.notaFinal100 ?? r.notaFinal ?? (notaDir + notaEst));
+    const esManual = Boolean(r.modificadoManualmente ?? r.esModificadoManualmente ?? false);
+
+    const estadoDef = String(r.estadoFinal || r.estadoDefinitivo || '').trim().toUpperCase();
+    const estadoCalc = String(r.estadoCalculado || (notaFinal >= 71 ? 'RATIFICADO' : 'NO_RATIFICADO')).trim().toUpperCase();
+
+    // Si fue modificado manualmente, respetamos el estado manual. Si no, calculamos estrictamente con la nota oficial (>=71)
+    const estadoFinalNormalizado: 'RATIFICADO' | 'NO_RATIFICADO' = esManual && (estadoDef === 'RATIFICADO' || estadoDef === 'NO_RATIFICADO')
+      ? (estadoDef as 'RATIFICADO' | 'NO_RATIFICADO')
+      : (notaFinal >= 71 ? 'RATIFICADO' : 'NO_RATIFICADO');
+
+    return {
+      ...r,
+      id: Number(r.id),
+      gestion: r.gestion,
+      sedeCodigo: r.sedeCodigo,
+      sedeNombre: r.sedeNombre,
+      carreraCodigo: r.carreraCodigo,
+      carreraNombre: r.carreraNombre,
+      materiaCodigo: r.materiaCodigo,
+      materiaNombre: r.materiaNombre,
+      grupoCodigo: r.grupoCodigo,
+      docenteCi: r.docenteCi,
+      docenteNombre: r.docenteNombre,
+      notaDirector: notaDir,
+      notaDirector50: Math.round(notaDir * 100) / 100,
+      notaEstudiantes: notaEst,
+      notaEstudiantes50: Math.round(notaEst * 100) / 100,
+      notaFinal: notaFinal,
+      notaFinal100: Math.round(notaFinal * 100) / 100,
+      estadoCalculado: estadoCalc || (notaFinal >= 71 ? 'RATIFICADO' : 'NO_RATIFICADO'),
+      estadoDefinitivo: estadoFinalNormalizado,
+      estadoFinal: estadoFinalNormalizado,
+      esModificadoManualmente: esManual,
+      modificadoManualmente: esManual,
+      motivoModificacion: r.motivoModificacion,
+      modificadoPor: r.modificadoPor || r.modificadoPorUsuario || '',
+      modificadoPorUsuario: r.modificadoPorUsuario || r.modificadoPor || '',
+      modificadoPorNombre: r.modificadoPorNombre,
+      modificadoEn: r.modificadoEn || r.fechaModificacion || '',
+      fechaModificacion: r.fechaModificacion || r.modificadoEn || '',
+      directorEvaluado: Boolean(r.directorEvaluado),
+      totalEstudiantesEvaluaron: Number(r.totalEstudiantesEvaluaron || 0),
+      totalEstudiantesMatriculados: Number(r.totalEstudiantesMatriculados || 0),
+      estudiantesParticipacionPorcentaje: Number(r.estudiantesParticipacionPorcentaje || 0)
+    };
+  }
+
   public listarReporteRatificados(gestion?: string, sedeCodigo?: string, carreraCodigo?: string, estado?: string): Observable<DocenteRatificacionMateria[]> {
     let params = new HttpParams();
     if (gestion) params = params.set('gestion', gestion);
     if (sedeCodigo && sedeCodigo !== 'TODAS') params = params.set('sedeCodigo', sedeCodigo);
     if (carreraCodigo && carreraCodigo !== 'TODAS') params = params.set('carreraCodigo', carreraCodigo);
     if (estado && estado !== 'TODOS') params = params.set('estado', estado);
-    return this._http.get<DocenteRatificacionMateria[]>(`${this._baseUrl}/reportes/ratificaciones`, { params });
+    return this._http.get<DocenteRatificacionMateria[]>(`${this._baseUrl}/reportes/ratificaciones`, { params }).pipe(
+      map(items => Array.isArray(items) ? items.map(r => this._normalizarRatificacion(r)) : [])
+    );
   }
 
   public modificarRatificacion(id: number, request: ModificarRatificacionRequest): Observable<DocenteRatificacionMateria> {
-    return this._http.put<DocenteRatificacionMateria>(`${this._baseUrl}/reportes/ratificaciones/${id}/modificar`, request);
+    return this._http.put<DocenteRatificacionMateria>(`${this._baseUrl}/reportes/ratificaciones/${id}/modificar`, request).pipe(
+      map(r => this._normalizarRatificacion(r))
+    );
   }
 
   // --- Reporte de Cumplimiento Institucional ---
