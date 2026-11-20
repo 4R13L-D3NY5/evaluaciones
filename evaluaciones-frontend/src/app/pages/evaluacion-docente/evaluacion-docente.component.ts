@@ -1589,7 +1589,7 @@ export interface DocenteEvaluacionRow {
                         <!-- Estado Ratificación -->
                         <td class="p-3.5 text-center">
                           <div class="inline-flex flex-col items-center gap-1">
-                            @if (r.estadoFinal === 'RATIFICADO') {
+                            @if ((r.estadoFinal || r.estadoDefinitivo) === 'RATIFICADO') {
                               <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] font-black uppercase tracking-wider">
                                 <i class="pi pi-check text-[9px]"></i> RATIFICADO
                               </span>
@@ -1599,9 +1599,9 @@ export interface DocenteEvaluacionRow {
                               </span>
                             }
 
-                            @if (r.modificadoManualmente) {
+                            @if (r.modificadoManualmente || r.esModificadoManualmente) {
                               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 text-[9px] font-bold border border-purple-200"
-                                    [title]="'Modificado por: ' + (r.modificadoPorNombre || r.modificadoPor) + '\nMotivo: ' + r.motivoModificacion">
+                                    [title]="'Modificado por: ' + (r.modificadoPorNombre || r.modificadoPor || r.modificadoPorUsuario) + '\nMotivo: ' + (r.motivoModificacion || 'Sin detalle')">
                                 <i class="pi pi-pencil text-[8px]"></i> Modificado Manualmente
                               </span>
                             }
@@ -2948,11 +2948,11 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
     let lista = this.ratificaciones();
     const estado = this.filtroRatificacionEstado();
     if (estado === 'RATIFICADO') {
-      lista = lista.filter(r => r.estadoFinal === 'RATIFICADO');
+      lista = lista.filter(r => (r.estadoFinal || r.estadoDefinitivo) === 'RATIFICADO');
     } else if (estado === 'NO_RATIFICADO') {
-      lista = lista.filter(r => r.estadoFinal === 'NO_RATIFICADO');
+      lista = lista.filter(r => (r.estadoFinal || r.estadoDefinitivo) === 'NO_RATIFICADO');
     } else if (estado === 'MODIFICADO') {
-      lista = lista.filter(r => r.modificadoManualmente);
+      lista = lista.filter(r => Boolean(r.modificadoManualmente || r.esModificadoManualmente));
     }
     const q = this.busquedaRatificacion().trim().toLowerCase();
     if (q) {
@@ -2971,9 +2971,9 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
   public kpisRatificacion = computed(() => {
     const lista = this.ratificaciones();
     const total = lista.length;
-    const ratificados = lista.filter(r => r.estadoFinal === 'RATIFICADO').length;
-    const noRatificados = lista.filter(r => r.estadoFinal === 'NO_RATIFICADO').length;
-    const modificados = lista.filter(r => r.modificadoManualmente).length;
+    const ratificados = lista.filter(r => (r.estadoFinal || r.estadoDefinitivo) === 'RATIFICADO').length;
+    const noRatificados = lista.filter(r => (r.estadoFinal || r.estadoDefinitivo) === 'NO_RATIFICADO').length;
+    const modificados = lista.filter(r => Boolean(r.modificadoManualmente || r.esModificadoManualmente)).length;
     const pctRatificados = total > 0 ? Math.round((ratificados / total) * 100) : 0;
     const pctNoRatificados = total > 0 ? Math.round((noRatificados / total) * 100) : 0;
     return { total, ratificados, noRatificados, modificados, pctRatificados, pctNoRatificados };
@@ -3251,28 +3251,37 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
     modificadoPor?: string;
     motivo?: string;
   } {
-    if (mat.ratificacion) {
-      return {
-        estado: mat.ratificacion.estadoFinal,
-        modificadoManualmente: mat.ratificacion.modificadoManualmente,
-        modificadoPor: mat.ratificacion.modificadoPorNombre || mat.ratificacion.modificadoPor,
-        motivo: mat.ratificacion.motivoModificacion
-      };
-    }
-    const r = this.ratificaciones().find(item =>
+    // 1. Obtener la ratificación guardada en el item o en el listado reactivo
+    const r = mat.ratificacion || this.ratificaciones().find(item =>
       item.materiaCodigo.trim().toUpperCase() === mat.materiaCodigo.trim().toUpperCase() &&
       item.docenteNombre.trim().toUpperCase() === doc.docenteNombre.trim().toUpperCase()
     );
+
     if (r) {
       mat.ratificacion = r;
-      return {
-        estado: r.estadoFinal,
-        modificadoManualmente: r.modificadoManualmente,
-        modificadoPor: r.modificadoPorNombre || r.modificadoPor,
-        motivo: r.motivoModificacion
-      };
+      const esManual = Boolean(r.modificadoManualmente || r.esModificadoManualmente);
+      const motivo = r.motivoModificacion;
+      const modPor = r.modificadoPorNombre || r.modificadoPor || r.modificadoPorUsuario;
+
+      // Si fue modificado manualmente por autoridad, se respeta estrictamente su decisión
+      if (esManual) {
+        const estadoManual = (r.estadoFinal || r.estadoDefinitivo || '').toUpperCase();
+        return {
+          estado: estadoManual === 'RATIFICADO' ? 'RATIFICADO' : 'NO_RATIFICADO',
+          modificadoManualmente: true,
+          modificadoPor: modPor,
+          motivo: motivo
+        };
+      }
     }
-    const nota = mat.consolidado?.puntajeFinal100 || 0;
+
+    // 2. Si no es modificación manual, calcular estrictamente según la nota consolidada oficial (>= 71 RATIFICADO)
+    const notaConsolidada = mat.consolidado?.puntajeFinal100;
+    const notaRatif = r ? (r.notaFinal100 ?? r.notaFinal) : undefined;
+    const nota = (notaConsolidada !== undefined && notaConsolidada !== null)
+      ? Number(notaConsolidada)
+      : Number(notaRatif || 0);
+
     return {
       estado: nota >= 71 ? 'RATIFICADO' : 'NO_RATIFICADO',
       modificadoManualmente: false
