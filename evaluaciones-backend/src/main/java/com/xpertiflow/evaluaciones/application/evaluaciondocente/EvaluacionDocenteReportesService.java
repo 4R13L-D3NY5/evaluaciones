@@ -1,14 +1,7 @@
 package com.xpertiflow.evaluaciones.application.evaluaciondocente;
 
-import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.CumplimientoEvaluacionDto;
-import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.DocenteRatificacionMateriaDto;
-import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.EvaluacionConsolidadaDocenteMateriaDto;
-import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.ModificarRatificacionRequestDto;
-import com.xpertiflow.evaluaciones.domain.entity.AuditoriaUsuario;
-import com.xpertiflow.evaluaciones.domain.entity.ConfiguracionEvaluaciones;
-import com.xpertiflow.evaluaciones.domain.entity.DocenteRatificacion;
-import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
-import com.xpertiflow.evaluaciones.domain.entity.UsuarioSistema;
+import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.*;
+import com.xpertiflow.evaluaciones.domain.entity.*;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaUsuarioRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ConfiguracionEvaluacionesRepository;
 import com.xpertiflow.evaluaciones.domain.repository.DocenteRatificacionRepository;
@@ -381,7 +374,6 @@ public class EvaluacionDocenteReportesService {
             if (regDir.getRespuestas() != null) {
                 dirRespuestas = regDir.getRespuestas().stream()
                         .map(r -> EvaluacionDocenteRespuestaDto.builder()
-                                .id(r.getId())
                                 .criterioId(r.getCriterio() != null ? r.getCriterio().getId() : null)
                                 .seccionCodigo(r.getCriterio() != null && r.getCriterio().getSeccion() != null ? r.getCriterio().getSeccion().getCodigo() : null)
                                 .numero(r.getCriterio() != null ? r.getCriterio().getNumero() : null)
