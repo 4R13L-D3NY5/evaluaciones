@@ -317,6 +317,7 @@ public class EvaluacionDocenteService {
                 .puntajeMaximo(maximoPuntos)
                 .porcentaje(porcentaje)
                 .observaciones(req.getObservaciones())
+                .retroalimentacion(req.getRetroalimentacion())
                 .estado("COMPLETADA")
                 .creadoPor(usuario)
                 .build();
@@ -438,6 +439,7 @@ public class EvaluacionDocenteService {
                 .puntajeMaximo(reg.getPuntajeMaximo())
                 .porcentaje(reg.getPorcentaje())
                 .observaciones(reg.getObservaciones())
+                .retroalimentacion(reg.getRetroalimentacion())
                 .estado(reg.getEstado())
                 .creadoPor(reg.getCreadoPor())
                 .creadoEn(reg.getCreadoEn())

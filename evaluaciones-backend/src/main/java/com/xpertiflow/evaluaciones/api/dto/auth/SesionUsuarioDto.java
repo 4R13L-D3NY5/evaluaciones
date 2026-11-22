@@ -7,6 +7,7 @@ import java.util.List;
 @Data
 public class SesionUsuarioDto {
 
+    private Long id;
     private String usuario;
     private String correo;
     private String nombreCompleto;
@@ -18,6 +19,8 @@ public class SesionUsuarioDto {
     private boolean puedeEditarRolesExamen;
     private boolean puedeAprobarSolicitudesRol;
     private boolean puedeModificarRatificacionDocente;
+    private boolean puedeObservarEvaluacionDocente;
+    private String tituloFirmaEvaluacionDocente;
     /** Momento estimado de expiración de la sesión HTTP, expresado en milisegundos. */
     private Long sesionExpiraEn;
     /** Duración de inactividad configurada para la sesión, en segundos. */

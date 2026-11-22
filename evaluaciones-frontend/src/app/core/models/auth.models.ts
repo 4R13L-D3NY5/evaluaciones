@@ -10,6 +10,7 @@ export type AppRole =
   | 'TALENTO_HUMANO';
 
 export interface UsuarioSesion {
+  id?: number;
   usuario: string;
   correo?: string;
   nombreCompleto: string;
@@ -21,6 +22,8 @@ export interface UsuarioSesion {
   puedeEditarRolesExamen?: boolean;
   puedeAprobarSolicitudesRol?: boolean;
   puedeModificarRatificacionDocente?: boolean;
+  puedeObservarEvaluacionDocente?: boolean;
+  tituloFirmaEvaluacionDocente?: string;
   sesionExpiraEn?: number;
   sesionDuracionSegundos?: number;
 }

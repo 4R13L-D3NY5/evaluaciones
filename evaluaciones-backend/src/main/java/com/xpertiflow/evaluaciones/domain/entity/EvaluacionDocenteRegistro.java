@@ -109,6 +109,9 @@ public class EvaluacionDocenteRegistro {
     @Column(name = "observaciones", columnDefinition = "TEXT")
     private String observaciones;
 
+    @Column(name = "retroalimentacion", columnDefinition = "TEXT")
+    private String retroalimentacion;
+
     @Column(name = "estado", length = 30, nullable = false)
     @Builder.Default
     private String estado = "COMPLETADA";

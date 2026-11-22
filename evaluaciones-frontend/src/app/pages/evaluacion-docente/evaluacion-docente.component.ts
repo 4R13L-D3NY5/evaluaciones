@@ -22,7 +22,13 @@ import {
   DocenteRatificacionMateria,
   ModificarRatificacionRequest,
   CumplimientoEvaluacion,
-  PeriodoEvaluacionDocenteEstado
+  PeriodoEvaluacionDocenteEstado,
+  FichaOficialMateriaDocente,
+  AreaPuntajeEstudiante,
+  ObservacionTercero,
+  FirmanteOficial,
+  GuardarObservacionesDirectorRequest,
+  GuardarObservacionTerceroRequest
 } from '../../core/models/evaluacion-docente.models';
 
 export interface FormCriterioItem {
@@ -616,10 +622,11 @@ export interface DocenteEvaluacionRow {
                                       @if (mat.registroEvaluacion; as reg) {
                                         <button 
                                           type="button" 
-                                          (click)="abrirFichaEvaluacion(reg)"
-                                          class="px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-bold inline-flex items-center gap-1 shadow-2xs">
+                                          (click)="abrirFichaOficial(doc, mat)"
+                                          class="px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-bold inline-flex items-center gap-1 shadow-2xs cursor-pointer"
+                                          title="Ver Ficha Oficial de Evaluación Docente por Asignatura">
                                           <i class="pi pi-file text-primary"></i>
-                                          <span>Ficha Director</span>
+                                          <span>Ficha Oficial</span>
                                         </button>
                                         @if (esAdminOResponsable()) {
                                           <button 
@@ -2034,98 +2041,339 @@ export interface DocenteEvaluacionRow {
       }
 
       <!-- =================================================================== -->
-      <!-- MODAL / FICHA OFICIAL DE EVALUACIÓN (IMPRIMIBLE)                   -->
+      <!-- MODAL / FICHA OFICIAL DE EVALUACIÓN (CARGANDO)                      -->
       <!-- =================================================================== -->
-      @if (fichaVisualizada(); as reg) {
+      @if (cargandoFichaOficial()) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div class="bg-card border border-border rounded-2xl p-6 shadow-2xl flex items-center gap-3 text-foreground">
+            <i class="pi pi-spin pi-spinner text-purple-700 text-xl"></i>
+            <span class="text-xs font-bold">Cargando Ficha Oficial de Evaluación por Asignatura...</span>
+          </div>
+        </div>
+      }
+
+      <!-- =================================================================== -->
+      <!-- MODAL / FICHA OFICIAL DE EVALUACIÓN POR ASIGNATURA                  -->
+      <!-- =================================================================== -->
+      @if (fichaOficial(); as ficha) {
         <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div class="bg-card border border-border rounded-2xl shadow-2xl max-w-4xl w-full max-h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             
+            <!-- Barra superior del modal -->
             <div class="p-4 border-b border-border flex items-center justify-between bg-muted/30">
               <span class="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <i class="pi pi-file text-primary"></i> Ficha Oficial de Evaluación Docente
+                <i class="pi pi-file-check text-purple-700 text-sm"></i> Ficha Oficial de Evaluación Docente por Asignatura
               </span>
               <div class="flex items-center gap-2">
                 <button 
                   type="button" 
-                  (click)="descargarFichaPdf(reg)" 
-                  class="px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer">
+                  (click)="descargarFichaOficialPdf(ficha)" 
+                  class="px-3.5 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer">
                   <i class="pi pi-file-pdf text-red-600"></i> Descargar Ficha PDF
                 </button>
                 <button 
                   type="button" 
-                  (click)="fichaVisualizada.set(null)" 
-                  class="h-8 w-8 rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center">
+                  (click)="fichaOficial.set(null)" 
+                  class="h-8 w-8 rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center cursor-pointer">
                   <i class="pi pi-times"></i>
                 </button>
               </div>
             </div>
 
             <!-- Contenido de la Ficha (Estilo UNITEPC Oficial) -->
-            <div id="ficha-evaluacion-print" class="p-8 overflow-y-auto space-y-6 text-foreground bg-white text-black font-sans">
+            <div id="ficha-evaluacion-print" class="p-6 sm:p-8 overflow-y-auto space-y-6 text-foreground bg-white text-black font-sans">
               
-              <div class="text-center border-b pb-4">
+              <!-- Cabecera Oficial UNITEPC -->
+              <div class="text-center border-b border-gray-200 pb-4">
                 <img src="assets/logo_unitepc_clean.png" alt="UNITEPC" class="h-10 mx-auto mb-2 object-contain" />
-                <h2 class="text-lg font-black tracking-wide uppercase">EVALUACIÓN DE LA COMPETENCIA DOCENTE</h2>
+                <h2 class="text-lg font-black tracking-wide uppercase text-gray-900">EVALUACIÓN DE LA COMPETENCIA DOCENTE</h2>
                 <p class="text-xs text-gray-600 font-bold mt-0.5">UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC</p>
-                <span class="inline-block px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase mt-1.5">
-                  {{ reg.instrumentoTitulo }}
-                </span>
+                <div class="flex items-center justify-center gap-2 mt-2">
+                  <span class="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 text-[10px] font-black uppercase">
+                    Ficha Oficial por Asignatura · Gestión {{ ficha.gestion }}
+                  </span>
+                  @if (ficha.directorInstrumentoTitulo) {
+                    <span class="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[10px] font-bold">
+                      {{ ficha.directorInstrumentoTitulo }}
+                    </span>
+                  }
+                </div>
               </div>
 
               <!-- DATOS GENERALES -->
-              <div class="border rounded-lg p-4 bg-gray-50/50 space-y-2 text-xs">
-                <h4 class="font-black text-[11px] uppercase tracking-wider text-gray-700 border-b pb-1">DATOS GENERALES</h4>
-                <div class="grid grid-cols-2 gap-2">
-                  <div><strong>FACULTAD / CARRERA:</strong> {{ reg.carreraNombre }} ({{ reg.carreraCodigo }})</div>
-                  <div><strong>SEDE ACADÉMICA:</strong> {{ reg.sedeNombre }}</div>
-                  <div><strong>ASIGNATURA:</strong> {{ reg.materiaNombre }} (Grupo {{ reg.grupoCodigo }})</div>
-                  <div><strong>NOMBRE DEL DOCENTE:</strong> {{ reg.docenteNombre }}</div>
-                  <div><strong>FECHA DE EVALUACIÓN:</strong> {{ reg.fechaEvaluacion }}</div>
-                  <div><strong>HORA:</strong> {{ reg.horaEvaluacion || '—' }}</div>
-                  <div class="col-span-2"><strong>NOMBRE DEL EVALUADOR:</strong> {{ reg.evaluadorNombre }} ({{ reg.evaluadorRol }})</div>
+              <div class="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-2 text-xs">
+                <h4 class="font-black text-[11px] uppercase tracking-wider text-purple-900 border-b border-gray-200 pb-1 flex items-center gap-1.5">
+                  <i class="pi pi-info-circle text-xs"></i> DATOS GENERALES DE LA ASIGNATURA Y DEL DOCENTE
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  <div><strong class="text-gray-600">FACULTAD / CARRERA:</strong> <span class="font-bold text-gray-900">{{ ficha.carreraNombre }} ({{ ficha.carreraCodigo }})</span></div>
+                  <div><strong class="text-gray-600">SEDE ACADÉMICA:</strong> <span class="font-bold text-gray-900">{{ ficha.sedeNombre }}</span></div>
+                  <div><strong class="text-gray-600">ASIGNATURA:</strong> <span class="font-bold text-gray-900">{{ ficha.materiaNombre }} ({{ ficha.materiaCodigo }}) · Grupo {{ ficha.grupoCodigo }}</span></div>
+                  <div><strong class="text-gray-600">DOCENTE EVALUADO:</strong> <span class="font-bold text-gray-900">{{ ficha.docenteNombre }} (C.I. {{ ficha.docenteCi || '—' }})</span></div>
+                  <div><strong class="text-gray-600">FECHA DE EVALUACIÓN:</strong> <span class="font-bold text-gray-900">{{ ficha.directorFechaEvaluacion || '—' }} {{ ficha.directorHoraEvaluacion || '' }}</span></div>
+                  <div><strong class="text-gray-600">EVALUADOR / DIRECTOR:</strong> <span class="font-bold text-gray-900">{{ ficha.directorEvaluadorNombre || 'Sin registrar' }} ({{ ficha.directorEvaluadorRol || 'Director de Carrera' }})</span></div>
                 </div>
               </div>
 
-              <!-- PUNTAJE TOTAL DE LA EVALUACIÓN -->
-              <div class="border rounded-lg p-4 space-y-2 text-xs">
-                <h4 class="font-black text-[11px] uppercase tracking-wider text-gray-700 border-b pb-1">PUNTAJE TOTAL DE LA EVALUACIÓN</h4>
+              <!-- RESUMEN CONSOLIDADO INSTITUCIONAL (100 PTS) -->
+              <div class="border border-purple-200 bg-purple-50/40 rounded-xl p-4 space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-100 pb-2">
+                  <span class="text-xs font-black uppercase text-purple-900 tracking-wider">
+                    CONSOLIDADO INSTITUCIONAL DE RATIFICACIÓN (100 PUNTOS)
+                  </span>
+                  <div class="flex items-center gap-2">
+                    <span [class]="ficha.estadoRatificacion === 'RATIFICADO' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300'" class="px-3 py-1 rounded-full text-xs font-black uppercase border flex items-center gap-1 shadow-2xs">
+                      <i [class]="ficha.estadoRatificacion === 'RATIFICADO' ? 'pi pi-check-circle' : 'pi pi-times-circle'"></i>
+                      <span>{{ ficha.estadoRatificacion === 'RATIFICADO' ? 'RATIFICADO' : 'NO RATIFICADO' }}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                  <div class="p-3 bg-white border border-gray-200 rounded-lg shadow-2xs">
+                    <span class="block text-[10px] font-bold uppercase text-gray-500">1. Calificación Director (50%)</span>
+                    <strong class="text-base font-black text-gray-900 font-mono">{{ ficha.directorPuntos50 }} / 50 Pts</strong>
+                  </div>
+                  <div class="p-3 bg-white border border-gray-200 rounded-lg shadow-2xs">
+                    <span class="block text-[10px] font-bold uppercase text-gray-500">2. Calificación Estudiantes (50%)</span>
+                    <strong class="text-base font-black text-gray-900 font-mono">{{ ficha.estudiantesPuntos50 }} / 50 Pts</strong>
+                    <span class="block text-[10px] text-gray-500 mt-0.5">{{ ficha.totalEstudiantesEvaluaron }} estudiantes evaluaron</span>
+                  </div>
+                  <div class="p-3 bg-white border border-purple-300 rounded-lg shadow-2xs">
+                    <span class="block text-[10px] font-black uppercase text-purple-800">Nota Final Consolidada</span>
+                    <strong class="text-xl font-black text-purple-900 font-mono">{{ ficha.puntajeFinal100 }} / 100 Pts</strong>
+                  </div>
+                </div>
+
+                @if (ficha.ratificacionModificadaManualmente) {
+                  <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                    <i class="pi pi-exclamation-triangle text-amber-700 mt-0.5"></i>
+                    <div>
+                      <span class="font-black">Modificación Administrativa Registrada:</span>
+                      <p class="text-[11px] text-amber-800 mt-0.5">
+                        Por: <strong>{{ ficha.ratificacionModificadoPor }}</strong> · Motivo: <em>{{ ficha.ratificacionMotivo }}</em>
+                      </p>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- 1. COMPONENTE DIRECTOR (MÁX 50 PTS) -->
+              <div class="border border-gray-200 rounded-xl p-4 space-y-3 text-xs bg-white">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-2">
+                  <h4 class="font-black text-[11px] uppercase tracking-wider text-gray-800">
+                    1. EVALUACIÓN DEL DIRECTOR DE CARRERA (MÁXIMO 50 PUNTOS)
+                  </h4>
+                  <span class="font-mono font-black text-xs text-purple-900 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                    Subtotal: {{ ficha.directorPuntos50 }} / 50 Pts
+                  </span>
+                </div>
+
                 <div class="grid grid-cols-3 gap-2 py-1">
-                  <div class="p-2 border rounded bg-gray-50 text-center">
+                  <div class="p-2.5 border border-gray-200 rounded-lg bg-gray-50 text-center">
                     <span class="block text-[10px] text-gray-500 font-bold uppercase">Competencia Actitudinal</span>
-                    <strong class="text-sm font-black font-mono">{{ reg.puntajeActitudinal }} Pts.</strong>
+                    <strong class="text-sm font-black font-mono text-gray-900">{{ ficha.directorPuntajeActitudinal }} Pts</strong>
                   </div>
-                  <div class="p-2 border rounded bg-gray-50 text-center">
+                  <div class="p-2.5 border border-gray-200 rounded-lg bg-gray-50 text-center">
                     <span class="block text-[10px] text-gray-500 font-bold uppercase">Competencia Procedimental</span>
-                    <strong class="text-sm font-black font-mono">{{ reg.puntajeProcedimental }} Pts.</strong>
+                    <strong class="text-sm font-black font-mono text-gray-900">{{ ficha.directorPuntajeProcedimental }} Pts</strong>
                   </div>
-                  <div class="p-2 border rounded bg-gray-50 text-center">
+                  <div class="p-2.5 border border-gray-200 rounded-lg bg-gray-50 text-center">
                     <span class="block text-[10px] text-gray-500 font-bold uppercase">Competencia Cognitiva</span>
-                    <strong class="text-sm font-black font-mono">{{ reg.puntajeCognitivo }} Pts.</strong>
+                    <strong class="text-sm font-black font-mono text-gray-900">{{ ficha.directorPuntajeCognitivo }} Pts</strong>
                   </div>
                 </div>
-                <div class="p-3 bg-indigo-50 border border-indigo-200 rounded flex items-center justify-between text-xs font-black">
-                  <span>PUNTAJE FINAL CONSOLIDADO:</span>
-                  <span class="text-base text-indigo-900 font-mono">{{ reg.puntajeTotal }} / {{ reg.puntajeMaximo }} Pts ({{ reg.porcentaje }}%)</span>
+
+                <!-- Campos Editables del Director: Observaciones y Retroalimentación -->
+                <div class="space-y-3 pt-2">
+                  <div>
+                    <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Observaciones del Director de Carrera:
+                    </label>
+                    <textarea 
+                      [(ngModel)]="textoObsDirector"
+                      [disabled]="!puedeEditarObservacionesDirector()"
+                      rows="2"
+                      placeholder="Ingrese observaciones pertinentes sobre el desempeño de la materia..."
+                      class="w-full text-xs p-2.5 rounded-lg border border-gray-300 bg-gray-50/50 text-gray-900 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-purple-600 disabled:opacity-75 disabled:cursor-not-allowed"></textarea>
+                  </div>
+
+                  <div>
+                    <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Retroalimentación Pedagógica del Director:
+                    </label>
+                    <textarea 
+                      [(ngModel)]="textoRetroalimentacionDirector"
+                      [disabled]="!puedeEditarObservacionesDirector()"
+                      rows="2"
+                      placeholder="Ingrese retroalimentación pedagógica y recomendaciones formativas para el docente..."
+                      class="w-full text-xs p-2.5 rounded-lg border border-gray-300 bg-gray-50/50 text-gray-900 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-purple-600 disabled:opacity-75 disabled:cursor-not-allowed"></textarea>
+                  </div>
+
+                  @if (puedeEditarObservacionesDirector() && ficha.directorEvaluado) {
+                    <div class="flex justify-end">
+                      <button 
+                        type="button" 
+                        (click)="guardarObservacionesDirector()"
+                        [disabled]="guardandoObsDirector()"
+                        class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait">
+                        @if (guardandoObsDirector()) {
+                          <i class="pi pi-spin pi-spinner text-xs"></i>
+                          <span>Guardando...</span>
+                        } @else {
+                          <i class="pi pi-save text-xs"></i>
+                          <span>Guardar Observaciones y Retroalimentación</span>
+                        }
+                      </button>
+                    </div>
+                  }
                 </div>
               </div>
 
-              @if (reg.observaciones) {
-                <div class="border rounded-lg p-3 text-xs bg-gray-50">
-                  <strong>OBSERVACIONES / RECOMENDACIONES:</strong>
-                  <p class="mt-1 text-gray-700">{{ reg.observaciones }}</p>
+              <!-- 2. COMPONENTE ESTUDIANTES (MÁX 50 PTS) - SOLO VALORES -->
+              <div class="border border-gray-200 rounded-xl p-4 space-y-3 text-xs bg-white">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-gray-200 pb-2">
+                  <div>
+                    <h4 class="font-black text-[11px] uppercase tracking-wider text-gray-800">
+                      2. EVALUACIÓN DE LOS ESTUDIANTES POR ÁREAS - SOLO VALORES (MÁXIMO 50 PUNTOS)
+                    </h4>
+                    <p class="text-[10px] text-gray-500">
+                      Participación: <strong>{{ ficha.totalEstudiantesEvaluaron }}</strong> de <strong>{{ ficha.totalEstudiantesMatriculados }}</strong> estudiantes inscritos (<strong>{{ ficha.estudiantesParticipacionPorcentaje }}%</strong>)
+                    </p>
+                  </div>
+                  <span class="font-mono font-black text-xs text-purple-900 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 self-start sm:self-center">
+                    Subtotal: {{ ficha.estudiantesPuntos50 }} / 50 Pts ({{ ficha.estudiantesPromedioPorcentaje }}%)
+                  </span>
                 </div>
-              }
 
-              <!-- Firmas -->
-              <div class="pt-12 grid grid-cols-2 gap-8 text-center text-xs">
-                <div>
-                  <div class="border-t border-gray-400 mx-auto w-48 pt-2"></div>
-                  <strong>FIRMA DEL DOCENTE EVALUADO</strong>
+                <!-- Tabla de 5 Dimensiones / Áreas Numéricas -->
+                <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                  <table class="w-full text-left text-xs">
+                    <thead class="bg-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-600 border-b border-gray-200">
+                      <tr>
+                        <th class="py-2 px-3">#</th>
+                        <th class="py-2 px-3">Dimensión / Área Oficial UNITEPC</th>
+                        <th class="py-2 px-3 text-center">Puntaje Obtenido</th>
+                        <th class="py-2 px-3 text-center">Máximo</th>
+                        <th class="py-2 px-3 text-center">Porcentaje (%)</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                      @for (area of ficha.estudiantesPuntajePorAreas; track area.areaCodigo; let idx = $index) {
+                        <tr class="hover:bg-gray-50/50">
+                          <td class="py-2 px-3 font-mono font-bold text-gray-500">{{ idx + 1 }}</td>
+                          <td class="py-2 px-3 font-bold text-gray-900">{{ area.areaNombre }}</td>
+                          <td class="py-2 px-3 text-center font-mono font-black text-purple-900">{{ area.puntajePromedio | number:'1.1-2' }} Pts</td>
+                          <td class="py-2 px-3 text-center font-mono text-gray-500">{{ area.puntajeMaximo | number:'1.0-0' }} Pts</td>
+                          <td class="py-2 px-3 text-center">
+                            <span class="font-mono font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-full text-[11px]">
+                              {{ area.porcentaje }}%
+                            </span>
+                          </td>
+                        </tr>
+                      }
+                      @if (ficha.estudiantesPuntajePorAreas.length === 0) {
+                        <tr>
+                          <td colspan="5" class="py-4 text-center text-gray-500 italic">
+                            Aún no se registran evaluaciones por parte de los estudiantes para esta asignatura.
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
                 </div>
-                <div>
-                  <div class="border-t border-gray-400 mx-auto w-48 pt-2"></div>
-                  <strong>RESPONSABLE DE LA EVALUACIÓN</strong>
-                  <div class="text-[10px] text-gray-500">{{ reg.evaluadorNombre }}</div>
+              </div>
+
+              <!-- 3. OBSERVACIONES DE TERCEROS (VICERRECTORADO / AUTORIDADES) -->
+              <div class="border border-gray-200 rounded-xl p-4 space-y-3 text-xs bg-white">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-2">
+                  <h4 class="font-black text-[11px] uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
+                    <i class="pi pi-comments text-purple-700"></i> OBSERVACIONES DE TERCEROS Y AUTORIDADES (VICERRECTORADO)
+                  </h4>
+                  <span class="text-[10px] text-gray-500 font-bold">
+                    {{ ficha.observacionesTerceros.length }} observación(es) registrada(s)
+                  </span>
+                </div>
+
+                <!-- Lista de observaciones previas -->
+                @if (ficha.observacionesTerceros.length > 0) {
+                  <div class="space-y-2">
+                    @for (obs of ficha.observacionesTerceros; track obs.id) {
+                      <div class="p-3 rounded-lg border border-gray-200 bg-gray-50/60 space-y-1">
+                        <div class="flex items-center justify-between">
+                          <span class="font-black text-gray-900 text-[11px]">
+                            {{ obs.usuarioNombre }} <span class="text-purple-700 font-bold">· {{ obs.tituloFirma || obs.usuarioRol }}</span>
+                          </span>
+                          <span class="text-[10px] text-gray-500">{{ obs.fechaActualizacion || obs.fechaRegistro }}</span>
+                        </div>
+                        <p class="text-gray-800 leading-relaxed">{{ obs.observacion }}</p>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <p class="text-gray-500 italic text-center py-2">
+                    No existen observaciones de vicerrectores o terceros registradas en esta asignatura.
+                  </p>
+                }
+
+                <!-- Formulario para ingresar / actualizar observación de tercero -->
+                @if (puedeDejarObservacionTercero()) {
+                  <div class="border-t border-gray-200 pt-3 space-y-2">
+                    <label class="block text-[11px] font-bold text-purple-900 uppercase">
+                      Registrar Observación Institucional sobre esta Asignatura:
+                    </label>
+                    <textarea 
+                      [(ngModel)]="textoNuevaObsTercero"
+                      rows="2"
+                      placeholder="Escriba aquí su observación institucional sobre el docente o la asignatura..."
+                      class="w-full text-xs p-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-purple-600 shadow-2xs"></textarea>
+                    <div class="flex justify-end">
+                      <button 
+                        type="button" 
+                        (click)="guardarObservacionTercero()"
+                        [disabled]="guardandoObsTercero()"
+                        class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait">
+                        @if (guardandoObsTercero()) {
+                          <i class="pi pi-spin pi-spinner text-xs"></i>
+                          <span>Guardando...</span>
+                        } @else {
+                          <i class="pi pi-check text-xs"></i>
+                          <span>Guardar Observación de Autoridad</span>
+                        }
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- 4. BASE DE FIRMAS OFICIALES -->
+              <div class="pt-6 border-t border-gray-200">
+                <h4 class="text-center font-black text-[10px] uppercase tracking-wider text-gray-500 mb-8">
+                  BASE OFICIAL DE FIRMAS Y CONFORMIDAD INSTITUCIONAL
+                </h4>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center text-xs">
+                  <!-- Firma Docente -->
+                  <div class="flex flex-col justify-end">
+                    <div class="border-t border-gray-400 mx-auto w-36 pt-2"></div>
+                    <strong class="text-[11px] text-gray-900 block">DOCENTE EVALUADO</strong>
+                    <span class="text-[10px] text-gray-600 block">{{ ficha.docenteNombre }}</span>
+                  </div>
+
+                  <!-- Firma Director -->
+                  <div class="flex flex-col justify-end">
+                    <div class="border-t border-gray-400 mx-auto w-36 pt-2"></div>
+                    <strong class="text-[11px] text-gray-900 block">RESPONSABLE EVALUACIÓN</strong>
+                    <span class="text-[10px] text-gray-600 block">{{ ficha.directorEvaluadorNombre || 'Director de Carrera' }}</span>
+                  </div>
+
+                  <!-- Firmas de Autoridades Configuradas (Vicerrectores / Talento Humano) -->
+                  @for (fo of ficha.firmantesOficiales; track fo.usuarioId) {
+                    <div class="flex flex-col justify-end">
+                      <div class="border-t border-gray-400 mx-auto w-36 pt-2"></div>
+                      <strong class="text-[11px] text-gray-900 block">{{ fo.tituloFirma || fo.rol }}</strong>
+                      <span class="text-[10px] text-gray-600 block">{{ fo.nombreCompleto }}</span>
+                    </div>
+                  }
                 </div>
               </div>
 
@@ -2896,8 +3144,15 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
   public formObservaciones = '';
   public respuestasMap: Record<string, number> = {};
 
-  // Modal Ver Ficha
+  // Modal Ver Ficha Oficial de Asignatura
   public fichaVisualizada = signal<EvaluacionDocenteRegistro | null>(null);
+  public fichaOficial = signal<FichaOficialMateriaDocente | null>(null);
+  public cargandoFichaOficial = signal<boolean>(false);
+  public guardandoObsDirector = signal<boolean>(false);
+  public guardandoObsTercero = signal<boolean>(false);
+  public textoNuevaObsTercero = signal<string>('');
+  public textoObsDirector = signal<string>('');
+  public textoRetroalimentacionDirector = signal<string>('');
 
   // Modal Confirmar Restablecer
   public materiaParaRestablecer = signal<{ doc: DocenteEvaluacionRow, mat: MateriaDocenteItem } | null>(null);
@@ -5530,6 +5785,483 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
 
   public abrirFichaEvaluacion(reg: EvaluacionDocenteRegistro): void {
     this.fichaVisualizada.set(reg);
+  }
+
+  public puedeEditarObservacionesDirector(): boolean {
+    return this.puedeOperar();
+  }
+
+  public puedeDejarObservacionTercero(): boolean {
+    const usr = this.auth.usuario();
+    if (!usr) return false;
+    return usr.rol === 'ADMINISTRADOR_SISTEMA' || 
+           usr.rol === 'RESPONSABLE_EVALUACIONES' || 
+           usr.rol === 'VICERRECTOR' || 
+           Boolean(usr.puedeObservarEvaluacionDocente);
+  }
+
+  public abrirFichaOficial(doc: DocenteEvaluacionRow, mat: MateriaDocenteItem): void {
+    const gestion = this.storage.gestionActiva() || '2026-1';
+    const sedeCodigo = this.filtroSedeCodigo;
+    const carreraCodigo = this.filtroCarreraCodigo;
+    const materiaCodigo = mat.materiaCodigo;
+    const docenteCi = doc.docenteCi || '';
+    const docenteNombre = doc.docenteNombre;
+
+    this.cargandoFichaOficial.set(true);
+    this.evaluacionService.obtenerFichaOficial(gestion, sedeCodigo, carreraCodigo, materiaCodigo, docenteCi, docenteNombre).subscribe({
+      next: ficha => {
+        this.fichaOficial.set(ficha);
+        this.textoObsDirector.set(ficha.directorObservaciones || '');
+        this.textoRetroalimentacionDirector.set(ficha.directorRetroalimentacion || '');
+        const miUsuarioId = this.auth.usuario()?.id;
+        const miNombre = this.auth.usuario()?.nombreCompleto;
+        const miObs = ficha.observacionesTerceros?.find(o => (miUsuarioId && o.usuarioId === miUsuarioId) || (miNombre && o.usuarioNombre === miNombre));
+        this.textoNuevaObsTercero.set(miObs?.observacion || '');
+        this.cargandoFichaOficial.set(false);
+      },
+      error: () => {
+        this.cargandoFichaOficial.set(false);
+        this.mostrarToast('No se pudo obtener la Ficha Oficial de Evaluación de la Asignatura.');
+      }
+    });
+  }
+
+  public guardarObservacionesDirector(): void {
+    const ficha = this.fichaOficial();
+    if (!ficha) return;
+    if (!ficha.directorRegistroId) {
+      this.mostrarToast('Se requiere que el Director haya completado la evaluación para guardar observaciones.');
+      return;
+    }
+    this.guardandoObsDirector.set(true);
+    this.evaluacionService.guardarObservacionesDirector({
+      registroId: ficha.directorRegistroId,
+      observaciones: this.textoObsDirector(),
+      retroalimentacion: this.textoRetroalimentacionDirector()
+    }).subscribe({
+      next: () => {
+        this.guardandoObsDirector.set(false);
+        this.fichaOficial.update(f => f ? {
+          ...f,
+          directorObservaciones: this.textoObsDirector(),
+          directorRetroalimentacion: this.textoRetroalimentacionDirector()
+        } : null);
+        this.mostrarToast('Observaciones y retroalimentación pedagógica del Director guardadas.');
+      },
+      error: () => {
+        this.guardandoObsDirector.set(false);
+        this.mostrarToast('Error al guardar observaciones del Director.');
+      }
+    });
+  }
+
+  public guardarObservacionTercero(): void {
+    const ficha = this.fichaOficial();
+    if (!ficha) return;
+    const obs = this.textoNuevaObsTercero().trim();
+    if (!obs) {
+      this.mostrarToast('Ingrese el texto de la observación.');
+      return;
+    }
+    this.guardandoObsTercero.set(true);
+    this.evaluacionService.guardarObservacionTercero({
+      gestion: ficha.gestion,
+      sedeCodigo: ficha.sedeCodigo,
+      carreraCodigo: ficha.carreraCodigo,
+      materiaCodigo: ficha.materiaCodigo,
+      materiaNombre: ficha.materiaNombre,
+      grupoCodigo: ficha.grupoCodigo,
+      docenteCi: ficha.docenteCi,
+      docenteNombre: ficha.docenteNombre,
+      observacion: obs
+    }).subscribe({
+      next: observacionGuardada => {
+        this.guardandoObsTercero.set(false);
+        this.fichaOficial.update(f => {
+          if (!f) return null;
+          const index = f.observacionesTerceros.findIndex(o => o.usuarioId === observacionGuardada.usuarioId);
+          const nuevas = [...(f.observacionesTerceros || [])];
+          if (index >= 0) {
+            nuevas[index] = observacionGuardada;
+          } else {
+            nuevas.push(observacionGuardada);
+          }
+          return { ...f, observacionesTerceros: nuevas };
+        });
+        this.mostrarToast('Observación de autoridad registrada exitosamente.');
+      },
+      error: () => {
+        this.guardandoObsTercero.set(false);
+        this.mostrarToast('Error al guardar la observación de autoridad.');
+      }
+    });
+  }
+
+  public descargarFichaOficialPdf(ficha: FichaOficialMateriaDocente): void {
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter', compress: true });
+    const pageWidth = 215.9;
+    const pageHeight = 279.4;
+    const margin = 14;
+    const contentWidth = pageWidth - margin * 2;
+
+    const purple = { r: 49, g: 39, b: 130 };
+    const dark = { r: 24, g: 30, b: 42 };
+    const muted = { r: 100, g: 110, b: 125 };
+    const lightBg = { r: 247, g: 249, b: 252 };
+    const border = { r: 215, g: 222, b: 232 };
+    const green = { r: 16, g: 138, b: 84 };
+    const red = { r: 190, g: 24, b: 40 };
+
+    // Logo institucional UNITEPC
+    try {
+      pdf.addImage(UNITEPC_LOGO_PNG, 'PNG', margin, 8.5, 36, 8.1);
+    } catch (e) {
+      console.warn('No se pudo incrustar el logo en el PDF', e);
+    }
+
+    const textStartX = margin + 40;
+
+    // Cabecera Oficial
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(purple.r, purple.g, purple.b);
+    pdf.text('UNIVERSIDAD TÉCNICA PRIVADA COSMOS - UNITEPC', textStartX, 11);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(muted.r, muted.g, muted.b);
+    pdf.text('SISTEMA DE EVALUACIÓN ACADÉMICA (SEA)', textStartX, 14.5);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text('FICHA OFICIAL DE EVALUACIÓN DOCENTE POR ASIGNATURA', textStartX, 19);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    pdf.setTextColor(purple.r, purple.g, purple.b);
+    pdf.text(`GESTIÓN ACADÉMICA: ${ficha.gestion || 'VIGENTE'} · FICHA CONSOLIDADA INSTITUCIONAL`, textStartX, 23);
+
+    pdf.setDrawColor(purple.r, purple.g, purple.b);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, 25.5, pageWidth - margin, 25.5);
+
+    // Cuadro de Datos Generales
+    const metaY = 28;
+    const metaH = 28;
+    pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+    pdf.setDrawColor(border.r, border.g, border.b);
+    pdf.setLineWidth(0.2);
+    pdf.roundedRect(margin, metaY, contentWidth, metaH, 1.5, 1.5, 'FD');
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(purple.r, purple.g, purple.b);
+    pdf.text('DATOS GENERALES DE LA ASIGNATURA Y DEL DOCENTE', margin + 3, metaY + 4.5);
+
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+
+    const col1X = margin + 3;
+    const col2X = margin + contentWidth / 2 + 3;
+
+    pdf.text(`DOCENTE: ${ficha.docenteNombre}`, col1X, metaY + 10);
+    pdf.text(`C.I.: ${ficha.docenteCi || '—'}`, col2X, metaY + 10);
+
+    pdf.text(`ASIGNATURA: ${ficha.materiaNombre} (${ficha.materiaCodigo})`, col1X, metaY + 15);
+    pdf.text(`GRUPO / GESTIÓN: ${ficha.grupoCodigo} · ${ficha.gestion}`, col2X, metaY + 15);
+
+    pdf.text(`CARRERA: ${ficha.carreraNombre}`, col1X, metaY + 20);
+    pdf.text(`SEDE ACADÉMICA: ${ficha.sedeNombre}`, col2X, metaY + 20);
+
+    pdf.text(`EVALUADOR DIRECTOR: ${ficha.directorEvaluadorNombre || 'Director de Carrera'}`, col1X, metaY + 25);
+    pdf.text(`FECHA / HORA: ${ficha.directorFechaEvaluacion || '—'} ${ficha.directorHoraEvaluacion || ''}`, col2X, metaY + 25);
+
+    // Resumen Consolidado (100 Pts)
+    const scoreY = metaY + metaH + 3.5;
+    const scoreH = 14;
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(margin, scoreY, contentWidth, scoreH, 1.5, 1.5, 'FD');
+
+    const scoreColW = contentWidth / 4;
+    const consolidadoItems = [
+      { label: 'EVALUACIÓN DIRECTOR (50%)', val: `${ficha.directorPuntos50} / 50 Pts` },
+      { label: `ESTUDIANTES (50% - ${ficha.totalEstudiantesEvaluaron} est.)`, val: `${ficha.estudiantesPuntos50} / 50 Pts` },
+      { label: 'TOTAL CONSOLIDADO (100 PTS)', val: `${ficha.puntajeFinal100} / 100 Pts` },
+      { label: 'ESTADO DE RATIFICACIÓN', val: ficha.estadoRatificacion }
+    ];
+
+    consolidadoItems.forEach((sc, idx) => {
+      const x = margin + idx * scoreColW;
+      if (idx > 0) {
+        pdf.setDrawColor(border.r, border.g, border.b);
+        pdf.line(x, scoreY + 2, x, scoreY + scoreH - 2);
+      }
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(5.5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(sc.label, x + scoreColW / 2, scoreY + 4.5, { align: 'center' });
+
+      pdf.setFontSize(8);
+      if (idx === 3) {
+        const esRat = ficha.estadoRatificacion === 'RATIFICADO';
+        pdf.setTextColor(esRat ? green.r : red.r, esRat ? green.g : red.g, esRat ? green.b : red.b);
+      } else if (idx === 2) {
+        pdf.setTextColor(purple.r, purple.g, purple.b);
+      } else {
+        pdf.setTextColor(dark.r, dark.g, dark.b);
+      }
+      pdf.text(sc.val, x + scoreColW / 2, scoreY + 10, { align: 'center' });
+    });
+
+    let currY = scoreY + scoreH + 4;
+
+    // Componente 1: Evaluación del Director (Puntajes por Competencia)
+    pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+    pdf.setDrawColor(border.r, border.g, border.b);
+    pdf.rect(margin, currY, contentWidth, 5.5, 'FD');
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(purple.r, purple.g, purple.b);
+    pdf.text('1. EVALUACIÓN DE LA DIRECCIÓN DE CARRERA (MÁXIMO 50 PUNTOS)', margin + 3, currY + 3.8);
+
+    currY += 5.5;
+
+    const dirW = contentWidth / 4;
+    const dirSubscores = [
+      { label: 'COMPETENCIA ACTITUDINAL', val: `${ficha.directorPuntajeActitudinal} Pts` },
+      { label: 'COMPETENCIA PROCEDIMENTAL', val: `${ficha.directorPuntajeProcedimental} Pts` },
+      { label: 'COMPETENCIA COGNITIVA', val: `${ficha.directorPuntajeCognitivo} Pts` },
+      { label: 'SUBTOTAL DIRECTOR (50 PTS)', val: `${ficha.directorPuntos50} / 50 Pts` }
+    ];
+
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(margin, currY, contentWidth, 9, 'FD');
+
+    dirSubscores.forEach((ds, idx) => {
+      const x = margin + idx * dirW;
+      if (idx > 0) {
+        pdf.setDrawColor(border.r, border.g, border.b);
+        pdf.line(x, currY + 1.5, x, currY + 7.5);
+      }
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(5.5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(ds.label, x + dirW / 2, currY + 3.5, { align: 'center' });
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7);
+      pdf.setTextColor(idx === 3 ? purple.r : dark.r, idx === 3 ? purple.g : dark.g, idx === 3 ? purple.b : dark.b);
+      pdf.text(ds.val, x + dirW / 2, currY + 7.2, { align: 'center' });
+    });
+
+    currY += 12;
+
+    // Componente 2: Evaluación de los Estudiantes por Áreas (Solo Valores)
+    pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+    pdf.setDrawColor(border.r, border.g, border.b);
+    pdf.rect(margin, currY, contentWidth, 5.5, 'FD');
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(purple.r, purple.g, purple.b);
+    pdf.text(
+      `2. EVALUACIÓN DE LOS ESTUDIANTES POR ÁREAS - SOLO VALORES (MÁXIMO 50 PUNTOS) · ${ficha.totalEstudiantesEvaluaron}/${ficha.totalEstudiantesMatriculados} (${ficha.estudiantesParticipacionPorcentaje}%)`,
+      margin + 3,
+      currY + 3.8
+    );
+
+    currY += 5.5;
+
+    // Cabecera tabla de áreas estudiantes
+    pdf.setFillColor(242, 244, 248);
+    pdf.rect(margin, currY, contentWidth, 5, 'FD');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6);
+    pdf.setTextColor(dark.r, dark.g, dark.b);
+    pdf.text('#', margin + 3, currY + 3.5);
+    pdf.text('DIMENSIÓN / ÁREA EVALUADA (UNITEPC)', margin + 12, currY + 3.5);
+    pdf.text('PUNTAJE PROMEDIO', margin + 115, currY + 3.5, { align: 'center' });
+    pdf.text('PUNTAJE MÁX.', margin + 148, currY + 3.5, { align: 'center' });
+    pdf.text('PORCENTAJE', margin + 175, currY + 3.5, { align: 'center' });
+
+    currY += 5;
+
+    const areas = ficha.estudiantesPuntajePorAreas && ficha.estudiantesPuntajePorAreas.length > 0
+      ? ficha.estudiantesPuntajePorAreas
+      : [
+          { areaCodigo: 'DOMINIO', areaNombre: 'Dominio de la Asignatura', puntajePromedio: 0, puntajeMaximo: 10, porcentaje: 0 },
+          { areaCodigo: 'PLANIFICACION', areaNombre: 'Planificación de la Asignatura', puntajePromedio: 0, puntajeMaximo: 10, porcentaje: 0 },
+          { areaCodigo: 'METODOLOGIA', areaNombre: 'Metodología de Enseñanza', puntajePromedio: 0, puntajeMaximo: 10, porcentaje: 0 },
+          { areaCodigo: 'EVALUACION', areaNombre: 'Evaluación de Aprendizajes', puntajePromedio: 0, puntajeMaximo: 10, porcentaje: 0 },
+          { areaCodigo: 'ACTITUD', areaNombre: 'Actitud Docente', puntajePromedio: 0, puntajeMaximo: 10, porcentaje: 0 }
+        ];
+
+    areas.forEach((area, aIdx) => {
+      const rowH = 5.2;
+      if (aIdx % 2 === 1) {
+        pdf.setFillColor(252, 253, 254);
+        pdf.rect(margin, currY, contentWidth, rowH, 'F');
+      }
+      pdf.setDrawColor(border.r, border.g, border.b);
+      pdf.line(margin, currY + rowH, margin + contentWidth, currY + rowH);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(`${aIdx + 1}`, margin + 3, currY + 3.6);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6);
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.text(area.areaNombre, margin + 12, currY + 3.6);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text(`${area.puntajePromedio.toFixed(1)} Pts`, margin + 115, currY + 3.6, { align: 'center' });
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(`${area.puntajeMaximo.toFixed(1)} Pts`, margin + 148, currY + 3.6, { align: 'center' });
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.text(`${area.porcentaje}%`, margin + 175, currY + 3.6, { align: 'center' });
+
+      currY += rowH;
+    });
+
+    // Fila subtotal estudiantes
+    pdf.setFillColor(238, 242, 250);
+    pdf.rect(margin, currY, contentWidth, 5.5, 'FD');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6);
+    pdf.setTextColor(purple.r, purple.g, purple.b);
+    pdf.text('SUBTOTAL EVALUACIÓN ESTUDIANTIL (50 PUNTOS):', margin + 12, currY + 3.8);
+    pdf.text(`${ficha.estudiantesPuntos50} / 50 Pts (${ficha.estudiantesPromedioPorcentaje}%)`, margin + 148, currY + 3.8, { align: 'center' });
+
+    currY += 8.5;
+
+    // Observaciones y Retroalimentación del Director
+    const tieneObsDir = Boolean(ficha.directorObservaciones?.trim());
+    const tieneRetroDir = Boolean(ficha.directorRetroalimentacion?.trim());
+
+    if (tieneObsDir || tieneRetroDir) {
+      pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+      pdf.setDrawColor(border.r, border.g, border.b);
+      const boxH = (tieneObsDir && tieneRetroDir) ? 22 : 13;
+      pdf.roundedRect(margin, currY, contentWidth, boxH, 1, 1, 'FD');
+
+      let innerY = currY + 3.5;
+      if (tieneObsDir) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(5.5);
+        pdf.setTextColor(purple.r, purple.g, purple.b);
+        pdf.text('OBSERVACIONES DEL DIRECTOR DE CARRERA:', margin + 3, innerY);
+        innerY += 3.5;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(6);
+        pdf.setTextColor(dark.r, dark.g, dark.b);
+        const lineasObs = pdf.splitTextToSize(ficha.directorObservaciones || '', contentWidth - 6);
+        pdf.text(lineasObs.slice(0, 2), margin + 3, innerY);
+        innerY += 5;
+      }
+      if (tieneRetroDir) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(5.5);
+        pdf.setTextColor(purple.r, purple.g, purple.b);
+        pdf.text('RETROALIMENTACIÓN PEDAGÓGICA DEL DIRECTOR:', margin + 3, innerY);
+        innerY += 3.5;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(6);
+        pdf.setTextColor(dark.r, dark.g, dark.b);
+        const lineasRetro = pdf.splitTextToSize(ficha.directorRetroalimentacion || '', contentWidth - 6);
+        pdf.text(lineasRetro.slice(0, 2), margin + 3, innerY);
+      }
+      currY += boxH + 3.5;
+    }
+
+    // Observaciones de Terceros (Vicerrectores / Autoridades)
+    if (ficha.observacionesTerceros && ficha.observacionesTerceros.length > 0) {
+      pdf.setFillColor(lightBg.r, lightBg.g, lightBg.b);
+      pdf.setDrawColor(border.r, border.g, border.b);
+      const totalObs = ficha.observacionesTerceros.length;
+      const boxH = Math.min(totalObs * 9 + 5, 24);
+      pdf.roundedRect(margin, currY, contentWidth, boxH, 1, 1, 'FD');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(5.5);
+      pdf.setTextColor(purple.r, purple.g, purple.b);
+      pdf.text('OBSERVACIONES DE AUTORIDADES INSTITUCIONALES (VICERRECTORADO / DIRECCIÓN):', margin + 3, currY + 3.5);
+
+      let obsY = currY + 7;
+      ficha.observacionesTerceros.slice(0, 3).forEach(ot => {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(5.5);
+        pdf.setTextColor(dark.r, dark.g, dark.b);
+        pdf.text(`${ot.usuarioNombre} (${ot.tituloFirma || ot.usuarioRol}):`, margin + 3, obsY);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(5.5);
+        pdf.setTextColor(muted.r, muted.g, muted.b);
+        const line = pdf.splitTextToSize(ot.observacion, contentWidth - 6)[0];
+        pdf.text(line, margin + 3, obsY + 3);
+        obsY += 6.5;
+      });
+      currY += boxH + 3.5;
+    }
+
+    // Base de Firmas Oficiales
+    if (currY + 28 > pageHeight - 10) {
+      pdf.addPage();
+      currY = 25;
+    } else {
+      currY = Math.max(currY + 4, pageHeight - 40);
+    }
+
+    // Armar lista de firmantes: Docente, Director, y autoridades oficiales
+    const firmas: { linea1: string; linea2: string }[] = [
+      { linea1: 'FIRMA DEL DOCENTE EVALUADO', linea2: ficha.docenteNombre },
+      { linea1: 'DIRECTOR DE CARRERA / EVALUADOR', linea2: ficha.directorEvaluadorNombre || 'Responsable de Carrera' }
+    ];
+
+    if (ficha.firmantesOficiales && ficha.firmantesOficiales.length > 0) {
+      ficha.firmantesOficiales.forEach(fo => {
+        firmas.push({
+          linea1: (fo.tituloFirma || fo.rol).toUpperCase(),
+          linea2: fo.nombreCompleto
+        });
+      });
+    }
+
+    const nFirmas = firmas.length;
+    const colCount = nFirmas <= 3 ? nFirmas : 4;
+    const fw = (contentWidth - (colCount - 1) * 6) / colCount;
+
+    firmas.slice(0, 4).forEach((sig, idx) => {
+      const fx = margin + idx * (fw + 6);
+      pdf.setDrawColor(dark.r, dark.g, dark.b);
+      pdf.setLineWidth(0.3);
+      pdf.line(fx, currY + 12, fx + fw, currY + 12);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(5.5);
+      pdf.setTextColor(dark.r, dark.g, dark.b);
+      pdf.text(pdf.splitTextToSize(sig.linea1, fw)[0], fx + fw / 2, currY + 15.5, { align: 'center' });
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(5);
+      pdf.setTextColor(muted.r, muted.g, muted.b);
+      pdf.text(pdf.splitTextToSize(sig.linea2, fw)[0], fx + fw / 2, currY + 19, { align: 'center' });
+    });
+
+    const safeDoc = ficha.docenteNombre.replace(/\s+/g, '_').substring(0, 25);
+    const safeMat = ficha.materiaCodigo.replace(/\s+/g, '_');
+    pdf.save(`Ficha_Oficial_${safeDoc}_${safeMat}_${ficha.gestion}.pdf`);
+    this.mostrarToast(`Ficha Oficial en PDF descargada exitosamente.`);
   }
 
   public imprimirFicha(): void {

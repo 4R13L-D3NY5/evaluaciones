@@ -139,6 +139,7 @@ public class AutenticacionService {
 
     private SesionUsuarioDto mapear(UsuarioSistema usuario) {
         SesionUsuarioDto dto = new SesionUsuarioDto();
+        dto.setId(usuario.getId());
         dto.setUsuario(usuario.getUsuario());
         dto.setCorreo(usuario.getCorreo());
         dto.setNombreCompleto(usuario.getNombreCompleto());
@@ -172,6 +173,8 @@ public class AutenticacionService {
         dto.setPuedeEditarRolesExamen(usuario.isPuedeEditarRolesExamen());
         dto.setPuedeAprobarSolicitudesRol(usuario.isPuedeAprobarSolicitudesRol());
         dto.setPuedeModificarRatificacionDocente(usuario.isPuedeModificarRatificacionDocente());
+        dto.setPuedeObservarEvaluacionDocente(usuario.isPuedeObservarEvaluacionDocente());
+        dto.setTituloFirmaEvaluacionDocente(usuario.getTituloFirmaEvaluacionDocente());
         return dto;
     }
 

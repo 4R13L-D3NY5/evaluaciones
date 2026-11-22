@@ -66,6 +66,7 @@ public class EvaluacionDocenteAplicarRequestDto {
     private String horaEvaluacion;
 
     private String observaciones;
+    private String retroalimentacion;
 
     @NotEmpty(message = "Las respuestas de evaluación son obligatorias")
     @Valid

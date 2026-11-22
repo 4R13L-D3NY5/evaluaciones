@@ -58,6 +58,7 @@ export interface EvaluacionDocenteAplicarRequest {
   fechaEvaluacion: string; // YYYY-MM-DD
   horaEvaluacion?: string;
   observaciones?: string;
+  retroalimentacion?: string;
   respuestas: EvaluacionDocenteRespuesta[];
 }
 
@@ -90,6 +91,7 @@ export interface EvaluacionDocenteRegistro {
   puntajeMaximo: number;
   porcentaje: number;
   observaciones?: string;
+  retroalimentacion?: string;
   estado: string;
   creadoPor: string;
   creadoEn: string;
@@ -159,6 +161,7 @@ export interface EvaluacionEstudianteAplicarRequest {
   carreraCodigo?: string;
   instrumentoId?: string;
   observaciones?: string;
+  retroalimentacion?: string;
   respuestas: Record<string, number>;
 }
 
@@ -260,4 +263,126 @@ export interface CumplimientoEvaluacion {
 export interface PeriodoEvaluacionDocenteEstado {
   periodoEvaluacionDocenteAbierto: boolean;
   gestion: string;
+}
+
+export interface AreaPuntajeEstudiante {
+  areaCodigo: string;
+  areaNombre: string;
+  puntajePromedio: number;
+  puntajeMaximo: number;
+  porcentaje: number;
+}
+
+export interface ObservacionTercero {
+  id: number;
+  usuarioId: number;
+  usuarioNombre: string;
+  usuarioRol: string;
+  tituloFirma: string;
+  observacion: string;
+  fechaRegistro?: string;
+  fechaActualizacion?: string;
+}
+
+export interface FirmanteOficial {
+  usuarioId: number;
+  usuario: string;
+  nombreCompleto: string;
+  rol: string;
+  tituloFirma: string;
+  ordenFirma: number;
+  puedeObservar: boolean;
+  puedeRatificar: boolean;
+  esSoloVisual: boolean;
+}
+
+export interface FichaOficialMateriaDocente {
+  gestion: string;
+  sedeCodigo: string;
+  sedeNombre: string;
+  carreraCodigo: string;
+  carreraNombre: string;
+  materiaCodigo: string;
+  materiaNombre: string;
+  grupoCodigo: string;
+  docenteCi: string;
+  docenteNombre: string;
+
+  // Director (50 Pts)
+  directorEvaluado: boolean;
+  directorRegistroId?: string;
+  directorEvaluadorNombre?: string;
+  directorEvaluadorRol?: string;
+  directorFechaEvaluacion?: string;
+  directorHoraEvaluacion?: string;
+  directorInstrumentoTitulo?: string;
+  directorPuntajeActitudinal: number;
+  directorPuntajeProcedimental: number;
+  directorPuntajeCognitivo: number;
+  directorPuntajeTotal: number;
+  directorPuntos50: number;
+  directorObservaciones?: string;
+  directorRetroalimentacion?: string;
+  directorRespuestas?: EvaluacionDocenteRespuesta[];
+
+  // Estudiantes (50 Pts)
+  totalEstudiantesMatriculados: number;
+  totalEstudiantesEvaluaron: number;
+  estudiantesParticipacionPorcentaje: number;
+  estudiantesPromedioPorcentaje: number;
+  estudiantesPuntos50: number;
+  estudiantesPuntajePorAreas: AreaPuntajeEstudiante[];
+
+  // Consolidado Institucional (100 Pts)
+  puntajeFinal100: number;
+  estadoRatificacion: 'RATIFICADO' | 'NO_RATIFICADO';
+  ratificacionModificadaManualmente: boolean;
+  ratificacionModificadoPor?: string;
+  ratificacionMotivo?: string;
+
+  // Observaciones de Terceros
+  observacionesTerceros: ObservacionTercero[];
+
+  // Firmantes Oficiales
+  firmantesOficiales: FirmanteOficial[];
+}
+
+export interface GuardarObservacionesDirectorRequest {
+  registroId: string;
+  observaciones?: string;
+  retroalimentacion?: string;
+}
+
+export interface GuardarObservacionTerceroRequest {
+  gestion: string;
+  sedeCodigo: string;
+  carreraCodigo: string;
+  materiaCodigo: string;
+  materiaNombre?: string;
+  grupoCodigo?: string;
+  docenteCi: string;
+  docenteNombre?: string;
+  observacion: string;
+}
+
+export interface FirmanteConfiguracion {
+  usuarioId: number;
+  usuario: string;
+  nombreCompleto: string;
+  correo?: string;
+  rolCodigo: string;
+  rolNombre: string;
+  activo: boolean;
+  puedeObservar: boolean;
+  puedeModificarRatificacion: boolean;
+  tituloFirma: string;
+  ordenFirma: number;
+  esSoloVisual: boolean;
+}
+
+export interface ActualizarFirmanteRequest {
+  puedeObservar: boolean;
+  puedeModificarRatificacion: boolean;
+  tituloFirma: string;
+  ordenFirma: number;
 }
