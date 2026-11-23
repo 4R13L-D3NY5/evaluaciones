@@ -1,17 +1,15 @@
 package com.xpertiflow.evaluaciones.application.evaluaciondocente;
 
-import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.CumplimientoEvaluacionDto;
-import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.DocenteRatificacionMateriaDto;
-import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.EvaluacionConsolidadaDocenteMateriaDto;
-import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.ModificarRatificacionRequestDto;
-import com.xpertiflow.evaluaciones.domain.entity.AuditoriaUsuario;
-import com.xpertiflow.evaluaciones.domain.entity.ConfiguracionEvaluaciones;
-import com.xpertiflow.evaluaciones.domain.entity.DocenteRatificacion;
-import com.xpertiflow.evaluaciones.domain.entity.RolExamen;
-import com.xpertiflow.evaluaciones.domain.entity.UsuarioSistema;
+import com.xpertiflow.evaluaciones.api.dto.evaluaciondocente.*;
+import com.xpertiflow.evaluaciones.domain.entity.*;
 import com.xpertiflow.evaluaciones.domain.repository.AuditoriaUsuarioRepository;
 import com.xpertiflow.evaluaciones.domain.repository.ConfiguracionEvaluacionesRepository;
 import com.xpertiflow.evaluaciones.domain.repository.DocenteRatificacionRepository;
+import com.xpertiflow.evaluaciones.domain.repository.EvaluacionDocenteObservacionTerceroRepository;
+import com.xpertiflow.evaluaciones.domain.repository.EvaluacionDocenteRegistroRepository;
+import com.xpertiflow.evaluaciones.domain.repository.EvaluacionEstudianteRegistroRepository;
+import com.xpertiflow.evaluaciones.domain.repository.EvaluacionEstudianteRespuestaRepository;
+import com.xpertiflow.evaluaciones.domain.repository.EvaluacionInstrumentoRepository;
 import com.xpertiflow.evaluaciones.domain.repository.RolExamenRepository;
 import com.xpertiflow.evaluaciones.domain.repository.UsuarioSistemaRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +35,11 @@ public class EvaluacionDocenteReportesService {
     private final UsuarioSistemaRepository usuarioRepository;
     private final AuditoriaUsuarioRepository auditoriaUsuarioRepository;
     private final RolExamenRepository rolExamenRepository;
+    private final EvaluacionDocenteRegistroRepository docenteRegistroRepository;
+    private final EvaluacionEstudianteRegistroRepository estudianteRegistroRepository;
+    private final EvaluacionEstudianteRespuestaRepository estudianteRespuestaRepository;
+    private final EvaluacionDocenteObservacionTerceroRepository observacionTerceroRepository;
+    private final EvaluacionInstrumentoRepository instrumentoRepository;
 
     /**
      * Consulta el estado del período de evaluación docente (abierto o cerrado).
@@ -332,5 +335,534 @@ public class EvaluacionDocenteReportesService {
                 .thenComparing(CumplimientoEvaluacionDto::getMateriaNombre));
 
         return lista;
+    }
+
+    /**
+     * Obtiene la Ficha Oficial de Evaluación Docente por Asignatura consolidando:
+     * - Evaluación del Director de Carrera (50 pts, competencias actitudinal, procedimental, cognitiva, obs y retroalimentación)
+     * - Evaluación de los Estudiantes (50 pts, desglose de las 5 dimensiones oficiales, participación)
+     * - Puntaje Final Consolidado (100 pts) y estado de Ratificación
+     * - Observaciones de Terceros (Vicerrectores / Directores con título oficial)
+     * - Firmantes Oficiales Institucionales
+     */
+    @Transactional(readOnly = true)
+    public FichaOficialMateriaDocenteDto obtenerFichaOficial(
+            String gestion, String sedeCodigo, String carreraCodigo, String materiaCodigo, String docenteCi, String docenteNombre) {
+
+        String gActual = evaluacionDocenteEstudianteService.resolverGestionActiva(gestion);
+        String matCod = materiaCodigo != null ? materiaCodigo.trim() : "";
+        String docCi = docenteCi != null ? docenteCi.trim() : "";
+        String docNom = docenteNombre != null ? docenteNombre.trim() : "";
+
+        // 1. Componente Director
+        List<EvaluacionDocenteRegistro> registrosDirector = docenteRegistroRepository
+                .findByGestionAndSedeCodigoAndCarreraCodigoOrderByCreadoEnDesc(gActual, sedeCodigo, carreraCodigo);
+
+        EvaluacionDocenteRegistro regDir = registrosDirector.stream()
+                .filter(r -> r.getMateriaCodigo().trim().equalsIgnoreCase(matCod)
+                        && (r.getDocenteNombre().trim().equalsIgnoreCase(docNom)
+                            || (!docCi.isBlank() && docCi.equalsIgnoreCase(r.getDocenteIdentificacion()))))
+                .findFirst()
+                .orElse(null);
+
+        boolean dirEvaluado = regDir != null;
+        BigDecimal dirPuntos50 = BigDecimal.ZERO;
+        List<EvaluacionDocenteRespuestaDto> dirRespuestas = new ArrayList<>();
+        if (dirEvaluado) {
+            BigDecimal puntajeTotal = regDir.getPuntajeTotal() != null ? regDir.getPuntajeTotal() : BigDecimal.ZERO;
+            dirPuntos50 = puntajeTotal.multiply(BigDecimal.valueOf(50)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            if (regDir.getRespuestas() != null) {
+                dirRespuestas = regDir.getRespuestas().stream()
+                        .map(r -> EvaluacionDocenteRespuestaDto.builder()
+                                .criterioId(r.getCriterio() != null ? r.getCriterio().getId() : null)
+                                .seccionCodigo(r.getCriterio() != null && r.getCriterio().getSeccion() != null ? r.getCriterio().getSeccion().getCodigo() : null)
+                                .numero(r.getCriterio() != null ? r.getCriterio().getNumero() : null)
+                                .puntuacion(r.getPuntuacion())
+                                .build())
+                        .toList();
+            }
+        }
+
+        // 2. Componente Estudiantes
+        List<EvaluacionEstudianteRegistro> evalsEst = estudianteRegistroRepository
+                .findByGestionAndMateriaCodigoAndDocenteNombre(gActual, matCod, docNom);
+
+        Map<String, EvaluacionEstudianteRegistro> evalsPorEstudiante = new HashMap<>();
+        for (EvaluacionEstudianteRegistro er : evalsEst) {
+            evalsPorEstudiante.putIfAbsent(er.getEstudianteCodigo().trim(), er);
+        }
+        int totalEvaluaron = evalsPorEstudiante.size();
+
+        // Obtener total matriculados de roles examen
+        List<EvaluacionConsolidadaDocenteMateriaDto> consolidados =
+                evaluacionDocenteEstudianteService.listarResumenConsolidado(sedeCodigo, carreraCodigo, gActual);
+        EvaluacionConsolidadaDocenteMateriaDto consolidadoMateria = consolidados.stream()
+                .filter(c -> c.getMateriaCodigo().trim().equalsIgnoreCase(matCod)
+                        && c.getDocenteNombre().trim().equalsIgnoreCase(docNom))
+                .findFirst()
+                .orElse(null);
+
+        int totalMatriculados = consolidadoMateria != null ? consolidadoMateria.getTotalEstudiantesMatriculados() : 0;
+        BigDecimal estPromedioPct = BigDecimal.ZERO;
+        BigDecimal estPuntos50 = BigDecimal.ZERO;
+        BigDecimal estParticipacionPct = BigDecimal.ZERO;
+
+        if (totalEvaluaron > 0) {
+            BigDecimal sumaPorcentajes = evalsPorEstudiante.values().stream()
+                    .map(EvaluacionEstudianteRegistro::getPorcentaje)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            estPromedioPct = sumaPorcentajes.divide(BigDecimal.valueOf(totalEvaluaron), 2, RoundingMode.HALF_UP);
+            estPuntos50 = estPromedioPct.multiply(BigDecimal.valueOf(50)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        }
+        if (totalMatriculados > 0) {
+            estParticipacionPct = BigDecimal.valueOf((double) totalEvaluaron * 100 / totalMatriculados)
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // Desglose de áreas estudiantiles (5 dimensiones oficiales)
+        List<AreaPuntajeEstudianteDto> areasEstudiantes = calcularAreasEstudiantes(evalsPorEstudiante.values());
+
+        // 3. Consolidado Final (100 Pts)
+        BigDecimal puntajeFinal100 = dirPuntos50.add(estPuntos50).setScale(2, RoundingMode.HALF_UP);
+
+        // Estado Ratificación
+        Optional<DocenteRatificacion> optR = docenteRatificacionRepository
+                .findByGestionAndSedeCodigoAndCarreraCodigoAndMateriaCodigoAndDocenteCi(
+                        gActual, sedeCodigo, carreraCodigo, matCod, docCi);
+
+        String estadoRatificacion;
+        boolean ratifManual = false;
+        String modificadoPor = null;
+        String motivoModificacion = null;
+
+        if (optR.isPresent()) {
+            DocenteRatificacion r = optR.get();
+            estadoRatificacion = r.getEstadoDefinitivo();
+            ratifManual = r.isEsModificadoManualmente();
+            modificadoPor = r.getModificadoPorNombre() != null ? r.getModificadoPorNombre() : r.getModificadoPorUsuario();
+            motivoModificacion = r.getMotivoModificacion();
+        } else {
+            estadoRatificacion = puntajeFinal100.compareTo(BigDecimal.valueOf(71)) >= 0 ? "RATIFICADO" : "NO_RATIFICADO";
+        }
+
+        // 4. Observaciones de Terceros
+        List<EvaluacionDocenteObservacionTercero> obsList = observacionTerceroRepository
+                .findByGestionAndSedeCodigoAndCarreraCodigoAndMateriaCodigoAndDocenteCiOrderByCreadoEnAsc(
+                        gActual, sedeCodigo, carreraCodigo, matCod, docCi);
+
+        List<ObservacionTerceroDto> obsDtos = obsList.stream()
+                .map(this::mapearObservacionTercero)
+                .toList();
+
+        // 5. Firmantes Oficiales
+        List<FirmanteOficialDto> firmantes = listarFirmantesOficiales();
+
+        String sedeNom = regDir != null ? regDir.getSedeNombre() : (consolidadoMateria != null ? consolidadoMateria.getSedeCodigo() : sedeCodigo);
+        String carNom = regDir != null ? regDir.getCarreraNombre() : (consolidadoMateria != null ? consolidadoMateria.getCarreraCodigo() : carreraCodigo);
+        String matNom = regDir != null ? regDir.getMateriaNombre() : (consolidadoMateria != null ? consolidadoMateria.getMateriaNombre() : matCod);
+        String grpCod = regDir != null ? regDir.getGrupoCodigo() : (consolidadoMateria != null ? consolidadoMateria.getGrupoCodigo() : "");
+        String directorNombre = resolverDirectorCarreraNombre(sedeCodigo, carreraCodigo, regDir);
+
+        return FichaOficialMateriaDocenteDto.builder()
+                .gestion(gActual)
+                .sedeCodigo(sedeCodigo)
+                .sedeNombre(sedeNom)
+                .carreraCodigo(carreraCodigo)
+                .carreraNombre(carNom)
+                .materiaCodigo(matCod)
+                .materiaNombre(matNom)
+                .grupoCodigo(grpCod)
+                .docenteCi(docCi)
+                .docenteNombre(docNom)
+                .directorEvaluado(dirEvaluado)
+                .directorRegistroId(regDir != null ? regDir.getId() : null)
+                .directorCarreraNombre(directorNombre)
+                .directorEvaluadorNombre(regDir != null && regDir.getEvaluadorNombre() != null ? regDir.getEvaluadorNombre() : directorNombre)
+                .directorEvaluadorRol(regDir != null ? regDir.getEvaluadorRol() : "DIRECTOR_CARRERA")
+                .directorFechaEvaluacion(regDir != null && regDir.getFechaEvaluacion() != null ? regDir.getFechaEvaluacion().toString() : null)
+                .directorHoraEvaluacion(regDir != null ? regDir.getHoraEvaluacion() : null)
+                .directorInstrumentoTitulo(regDir != null && regDir.getInstrumento() != null ? regDir.getInstrumento().getTitulo() : "EVALUACIÓN DE LA COMPETENCIA DOCENTE")
+                .directorPuntajeActitudinal(regDir != null ? regDir.getPuntajeActitudinal() : BigDecimal.ZERO)
+                .directorPuntajeProcedimental(regDir != null ? regDir.getPuntajeProcedimental() : BigDecimal.ZERO)
+                .directorPuntajeCognitivo(regDir != null ? regDir.getPuntajeCognitivo() : BigDecimal.ZERO)
+                .directorPuntajeTotal(regDir != null ? regDir.getPuntajeTotal() : BigDecimal.ZERO)
+                .directorPuntos50(dirPuntos50)
+                .directorObservaciones(regDir != null ? regDir.getObservaciones() : null)
+                .directorRetroalimentacion(regDir != null ? regDir.getRetroalimentacion() : null)
+                .directorRespuestas(dirRespuestas)
+                .totalEstudiantesMatriculados(totalMatriculados)
+                .totalEstudiantesEvaluaron(totalEvaluaron)
+                .estudiantesParticipacionPorcentaje(estParticipacionPct)
+                .estudiantesPromedioPorcentaje(estPromedioPct)
+                .estudiantesPuntos50(estPuntos50)
+                .estudiantesPuntajePorAreas(areasEstudiantes)
+                .puntajeFinal100(puntajeFinal100)
+                .estadoRatificacion(estadoRatificacion)
+                .ratificacionModificadaManualmente(ratifManual)
+                .ratificacionModificadoPor(modificadoPor)
+                .ratificacionMotivo(motivoModificacion)
+                .observacionesTerceros(obsDtos)
+                .firmantesOficiales(firmantes)
+                .build();
+    }
+
+    /**
+     * Resuelve el nombre oficial del Director de Carrera para la sede y carrera indicadas.
+     */
+    private String resolverDirectorCarreraNombre(String sedeCodigo, String carreraCodigo, EvaluacionDocenteRegistro regDir) {
+        String sedeCod = sedeCodigo != null ? sedeCodigo.trim() : "";
+        String carCod = carreraCodigo != null ? carreraCodigo.trim() : "";
+
+        List<UsuarioSistema> directores = usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
+                .filter(u -> u.isActivo() && "DIRECTOR_CARRERA".equals(u.getRolCodigo()))
+                .filter(u -> {
+                    boolean coincideCarrera = u.getCarreras() != null && u.getCarreras().stream()
+                            .anyMatch(c -> c.getCodigo() != null && c.getCodigo().trim().equalsIgnoreCase(carCod));
+                    boolean coincideSede = u.getSedes() == null || u.getSedes().isEmpty() || u.getSedes().stream()
+                            .anyMatch(s -> s.getCodigo() != null && s.getCodigo().trim().equalsIgnoreCase(sedeCod));
+                    boolean coincideAsignacion = u.getAsignaciones() != null && u.getAsignaciones().stream()
+                            .anyMatch(a -> a.getCarreraCodigo().trim().equalsIgnoreCase(carCod)
+                                    && (a.getSedeCodigo().isBlank() || a.getSedeCodigo().trim().equalsIgnoreCase(sedeCod)));
+                    return (coincideCarrera && coincideSede) || coincideAsignacion;
+                })
+                .toList();
+
+        if (!directores.isEmpty()) {
+            return directores.get(0).getNombreCompleto();
+        }
+
+        if (regDir != null && regDir.getEvaluadorRol() != null 
+                && regDir.getEvaluadorRol().toUpperCase().contains("DIRECTOR")
+                && regDir.getEvaluadorNombre() != null && !regDir.getEvaluadorNombre().isBlank()) {
+            return regDir.getEvaluadorNombre();
+        }
+
+        if (regDir != null && regDir.getEvaluadorNombre() != null && !regDir.getEvaluadorNombre().isBlank()
+                && (regDir.getDocenteNombre() == null || !regDir.getEvaluadorNombre().trim().equalsIgnoreCase(regDir.getDocenteNombre().trim()))) {
+            return regDir.getEvaluadorNombre();
+        }
+
+        return "Director de Carrera";
+    }
+
+    /**
+     * Calcula los puntajes por dimensión/área de las evaluaciones estudiantiles.
+     */
+    private List<AreaPuntajeEstudianteDto> calcularAreasEstudiantes(Collection<EvaluacionEstudianteRegistro> registros) {
+        EvaluacionInstrumento inst = instrumentoRepository.findById("inst-estudiante-unitepc-v1").orElse(null);
+
+        Map<String, String> nombresPorCodigo = new LinkedHashMap<>();
+        if (inst != null && inst.getSecciones() != null && !inst.getSecciones().isEmpty()) {
+            inst.getSecciones().stream()
+                    .sorted(Comparator.comparingInt(com.xpertiflow.evaluaciones.domain.entity.EvaluacionSeccion::getOrden))
+                    .forEach(s -> nombresPorCodigo.put(s.getCodigo(), s.getNombre()));
+        } else {
+            nombresPorCodigo.put("DOMINIO", "DOMINIO DE LA ASIGNATURA");
+            nombresPorCodigo.put("PLANIFICACION", "PLANIFICACIÓN DE LA ASIGNATURA");
+            nombresPorCodigo.put("METODOLOGIA", "METODOLOGÍA DE ENSEÑANZA");
+            nombresPorCodigo.put("EVALUACION", "EVALUACIÓN DE APRENDIZAJES");
+            nombresPorCodigo.put("ACTITUD", "ACTITUD DOCENTE");
+        }
+
+        if (registros == null || registros.isEmpty()) {
+            return nombresPorCodigo.entrySet().stream()
+                    .map(e -> AreaPuntajeEstudianteDto.builder()
+                            .areaCodigo(e.getKey())
+                            .areaNombre(e.getValue())
+                            .puntajePromedio(BigDecimal.ZERO)
+                            .puntajeMaximo(BigDecimal.valueOf(3.00))
+                            .porcentaje(BigDecimal.ZERO)
+                            .build())
+                    .toList();
+        }
+
+        List<String> regIds = registros.stream().map(EvaluacionEstudianteRegistro::getId).toList();
+        List<EvaluacionEstudianteRespuesta> respuestas = estudianteRespuestaRepository.findByRegistroIdIn(regIds);
+
+        // Fallback defensivo: Si no hay detalle de respuestas (registros históricos o agregados) pero sí porcentaje consolidado
+        if (respuestas.isEmpty()) {
+            double promPct = registros.stream()
+                    .filter(r -> r.getPorcentaje() != null)
+                    .mapToDouble(r -> r.getPorcentaje().doubleValue())
+                    .average()
+                    .orElse(0.0);
+            BigDecimal pctGlobal = BigDecimal.valueOf(promPct).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal promGlobal = pctGlobal.multiply(BigDecimal.valueOf(3.0)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            return nombresPorCodigo.entrySet().stream()
+                    .map(e -> AreaPuntajeEstudianteDto.builder()
+                            .areaCodigo(e.getKey())
+                            .areaNombre(e.getValue())
+                            .puntajePromedio(promGlobal)
+                            .puntajeMaximo(BigDecimal.valueOf(3.00))
+                            .porcentaje(pctGlobal)
+                            .build())
+                    .toList();
+        }
+
+        Map<String, List<Integer>> puntuacionesPorArea = new LinkedHashMap<>();
+        nombresPorCodigo.keySet().forEach(k -> puntuacionesPorArea.put(k, new ArrayList<>()));
+
+        for (EvaluacionEstudianteRespuesta r : respuestas) {
+            if (r.getCriterio() != null && r.getCriterio().getSeccion() != null) {
+                String secCod = r.getCriterio().getSeccion().getCodigo();
+                if (puntuacionesPorArea.containsKey(secCod) && r.getPuntuacion() != null) {
+                    puntuacionesPorArea.get(secCod).add(r.getPuntuacion());
+                }
+            }
+        }
+
+        List<AreaPuntajeEstudianteDto> resultado = new ArrayList<>();
+        for (Map.Entry<String, String> entry : nombresPorCodigo.entrySet()) {
+            String cod = entry.getKey();
+            String nom = entry.getValue();
+            List<Integer> pts = puntuacionesPorArea.getOrDefault(cod, Collections.emptyList());
+
+            BigDecimal prom = BigDecimal.ZERO;
+            BigDecimal pct = BigDecimal.ZERO;
+            if (!pts.isEmpty()) {
+                double avg = pts.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+                prom = BigDecimal.valueOf(avg).setScale(2, RoundingMode.HALF_UP);
+                pct = prom.divide(BigDecimal.valueOf(3), 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP);
+            } else if (registros != null && !registros.isEmpty()) {
+                double promPct = registros.stream()
+                        .filter(r -> r.getPorcentaje() != null)
+                        .mapToDouble(r -> r.getPorcentaje().doubleValue())
+                        .average()
+                        .orElse(0.0);
+                if (promPct > 0) {
+                    pct = BigDecimal.valueOf(promPct).setScale(2, RoundingMode.HALF_UP);
+                    prom = pct.multiply(BigDecimal.valueOf(3.0)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                }
+            }
+
+            resultado.add(AreaPuntajeEstudianteDto.builder()
+                    .areaCodigo(cod)
+                    .areaNombre(nom)
+                    .puntajePromedio(prom)
+                    .puntajeMaximo(BigDecimal.valueOf(3.00))
+                    .porcentaje(pct)
+                    .build());
+        }
+
+        return resultado;
+    }
+
+    /**
+     * Guarda o actualiza las observaciones y retroalimentación del Director de Carrera.
+     */
+    @Transactional
+    public void guardarObservacionesDirector(GuardarObservacionesDirectorRequestDto dto, Authentication authentication) {
+        if (dto.getRegistroId() == null || dto.getRegistroId().isBlank()) {
+            throw new IllegalArgumentException("El ID del registro de evaluación es obligatorio");
+        }
+        EvaluacionDocenteRegistro reg = docenteRegistroRepository.findById(dto.getRegistroId())
+                .orElseThrow(() -> new IllegalArgumentException("Registro no encontrado: " + dto.getRegistroId()));
+
+        reg.setObservaciones(dto.getObservaciones());
+        reg.setRetroalimentacion(dto.getRetroalimentacion());
+        reg.setActualizadoEn(LocalDateTime.now());
+        docenteRegistroRepository.save(reg);
+    }
+
+    /**
+     * Guarda o actualiza una observación de un tercero autorizado (Vicerrector / autoridad) para la materia.
+     */
+    @Transactional
+    public ObservacionTerceroDto guardarObservacionTercero(
+            GuardarObservacionTerceroRequestDto dto, Authentication authentication) {
+        if (authentication == null) {
+            throw new AccessDeniedException("Usuario no autenticado");
+        }
+        UsuarioSistema usuario = usuarioRepository.findByUsuario(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("Usuario no encontrado"));
+
+        boolean esAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRADOR_SISTEMA"));
+        boolean esVicerrector = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_VICERRECTOR"));
+        if (!esAdmin && !esVicerrector && !usuario.isPuedeObservarEvaluacionDocente()) {
+            throw new AccessDeniedException("No tiene permisos para registrar observaciones en esta asignatura");
+        }
+
+        String titulo = usuario.getTituloFirmaEvaluacionDocente();
+        if (titulo == null || titulo.isBlank()) {
+            titulo = switch (usuario.getRolCodigo()) {
+                case "VICERRECTOR" -> "Dirección Académica";
+                case "TALENTO_HUMANO" -> "Jefe de Talento Humano";
+                default -> "Observador Institucional";
+            };
+        }
+
+        String gActual = evaluacionDocenteEstudianteService.resolverGestionActiva(dto.getGestion());
+
+        Optional<EvaluacionDocenteObservacionTercero> optObs = observacionTerceroRepository
+                .findByGestionAndSedeCodigoAndCarreraCodigoAndMateriaCodigoAndDocenteCiAndUsuarioId(
+                        gActual, dto.getSedeCodigo(), dto.getCarreraCodigo(),
+                        dto.getMateriaCodigo(), dto.getDocenteCi(), usuario.getId());
+
+        EvaluacionDocenteObservacionTercero obs;
+        if (optObs.isPresent()) {
+            obs = optObs.get();
+            obs.setObservacion(dto.getObservacion().trim());
+            obs.setTituloFirma(titulo);
+            obs.setActualizadoEn(LocalDateTime.now());
+        } else {
+            obs = EvaluacionDocenteObservacionTercero.builder()
+                    .gestion(gActual)
+                    .sedeCodigo(dto.getSedeCodigo())
+                    .carreraCodigo(dto.getCarreraCodigo())
+                    .materiaCodigo(dto.getMateriaCodigo())
+                    .materiaNombre(dto.getMateriaNombre() != null ? dto.getMateriaNombre() : "")
+                    .grupoCodigo(dto.getGrupoCodigo() != null ? dto.getGrupoCodigo() : "")
+                    .docenteCi(dto.getDocenteCi())
+                    .docenteNombre(dto.getDocenteNombre() != null ? dto.getDocenteNombre() : "")
+                    .usuarioId(usuario.getId())
+                    .usuarioNombre(usuario.getNombreCompleto())
+                    .usuarioRol(usuario.getRolCodigo())
+                    .tituloFirma(titulo)
+                    .observacion(dto.getObservacion().trim())
+                    .build();
+        }
+        EvaluacionDocenteObservacionTercero guardada = observacionTerceroRepository.save(obs);
+        return mapearObservacionTercero(guardada);
+    }
+
+    /**
+     * Lista los firmantes institucionales configurados para el bloque de firmas.
+     */
+    @Transactional(readOnly = true)
+    public List<FirmanteOficialDto> listarFirmantesOficiales() {
+        return usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
+                .filter(u -> u.isActivo() && u.isEsFirmanteEvaluacionDocente())
+                .map(u -> {
+                    String titulo = u.getTituloFirmaEvaluacionDocente();
+                    if (titulo == null || titulo.isBlank()) {
+                        titulo = switch (u.getRolCodigo()) {
+                            case "TALENTO_HUMANO" -> "Jefe de Talento Humano";
+                            case "VICERRECTOR" -> "Dirección Académica";
+                            default -> "Autoridad Institucional";
+                        };
+                    }
+                    boolean esSoloVisual = "TALENTO_HUMANO".equals(u.getRolCodigo());
+                    return FirmanteOficialDto.builder()
+                            .usuarioId(u.getId())
+                            .usuario(u.getUsuario())
+                            .nombreCompleto(u.getNombreCompleto())
+                            .rol(u.getRolCodigo())
+                            .tituloFirma(titulo)
+                            .ordenFirma(u.getOrdenFirmaEvaluacionDocente())
+                            .esFirmante(u.isEsFirmanteEvaluacionDocente())
+                            .puedeObservar(u.isPuedeObservarEvaluacionDocente())
+                            .puedeRatificar(u.isPuedeModificarRatificacionDocente())
+                            .esSoloVisual(esSoloVisual)
+                            .build();
+                })
+                .sorted(Comparator.comparingInt(FirmanteOficialDto::getOrdenFirma)
+                        .thenComparing(FirmanteOficialDto::getNombreCompleto))
+                .toList();
+    }
+
+    /**
+     * Lista todos los usuarios candidatos o configurados como firmantes/observadores para la vista de Administración.
+     */
+    @Transactional(readOnly = true)
+    public List<FirmanteConfiguracionDto> listarFirmantesConfiguracion() {
+        return usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
+                .filter(u -> "VICERRECTOR".equals(u.getRolCodigo())
+                        || "TALENTO_HUMANO".equals(u.getRolCodigo())
+                        || "ADMINISTRADOR_SISTEMA".equals(u.getRolCodigo())
+                        || u.isEsFirmanteEvaluacionDocente()
+                        || u.isPuedeObservarEvaluacionDocente()
+                        || u.isPuedeModificarRatificacionDocente()
+                        || (u.getTituloFirmaEvaluacionDocente() != null && !u.getTituloFirmaEvaluacionDocente().isBlank()))
+                .map(this::mapearFirmanteConfiguracion)
+                .sorted(Comparator.comparing(FirmanteConfiguracionDto::isEsFirmante).reversed()
+                        .thenComparingInt(FirmanteConfiguracionDto::getOrdenFirma)
+                        .thenComparing(FirmanteConfiguracionDto::getNombreCompleto))
+                .toList();
+    }
+
+    /**
+     * Actualiza la configuración de un firmante (permisos de observación, ratificación, título oficial y orden).
+     */
+    @Transactional
+    public FirmanteConfiguracionDto actualizarFirmanteConfiguracion(
+            Long usuarioId, ActualizarFirmanteRequestDto dto, Authentication authentication, String ipOrigen) {
+        UsuarioSistema u = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + usuarioId));
+
+        u.setEsFirmanteEvaluacionDocente(dto.isEsFirmante());
+        u.setPuedeObservarEvaluacionDocente(dto.isPuedeObservar());
+        u.setPuedeModificarRatificacionDocente(dto.isPuedeModificarRatificacion());
+        u.setTituloFirmaEvaluacionDocente(dto.getTituloFirma() != null ? dto.getTituloFirma().trim() : null);
+        u.setOrdenFirmaEvaluacionDocente(dto.getOrdenFirma());
+        u.setActualizadoEn(LocalDateTime.now());
+        UsuarioSistema guardado = usuarioRepository.save(u);
+
+        String actor = authentication != null ? authentication.getName() : "ADMIN";
+        registrarAuditoria(guardado, "FIRMANTE_ACTUALIZADO", actor,
+                "Firma: " + u.isEsFirmanteEvaluacionDocente() + ", Título: " + u.getTituloFirmaEvaluacionDocente() + ", Obs: " + u.isPuedeObservarEvaluacionDocente() + ", Ratif: " + u.isPuedeModificarRatificacionDocente(), ipOrigen);
+
+        return mapearFirmanteConfiguracion(guardado);
+    }
+
+    private ObservacionTerceroDto mapearObservacionTercero(EvaluacionDocenteObservacionTercero obs) {
+        return ObservacionTerceroDto.builder()
+                .id(obs.getId())
+                .usuarioId(obs.getUsuarioId())
+                .usuarioNombre(obs.getUsuarioNombre())
+                .usuarioRol(obs.getUsuarioRol())
+                .tituloFirma(obs.getTituloFirma())
+                .observacion(obs.getObservacion())
+                .fechaRegistro(obs.getCreadoEn())
+                .fechaActualizacion(obs.getActualizadoEn())
+                .build();
+    }
+
+    private FirmanteConfiguracionDto mapearFirmanteConfiguracion(UsuarioSistema u) {
+        String titulo = u.getTituloFirmaEvaluacionDocente();
+        if (titulo == null || titulo.isBlank()) {
+            titulo = switch (u.getRolCodigo()) {
+                case "TALENTO_HUMANO" -> "Jefe de Talento Humano";
+                case "VICERRECTOR" -> "Dirección Académica";
+                default -> "Autoridad Institucional";
+            };
+        }
+        String rolNombre = switch (u.getRolCodigo()) {
+            case "TALENTO_HUMANO" -> "Talento Humano";
+            case "VICERRECTOR" -> "Vicerrector";
+            case "ADMINISTRADOR_SISTEMA" -> "Administrador del Sistema";
+            default -> u.getRolCodigo();
+        };
+        boolean esSoloVisual = "TALENTO_HUMANO".equals(u.getRolCodigo());
+        return FirmanteConfiguracionDto.builder()
+                .usuarioId(u.getId())
+                .usuario(u.getUsuario())
+                .nombreCompleto(u.getNombreCompleto())
+                .correo(u.getCorreo())
+                .rolCodigo(u.getRolCodigo())
+                .rolNombre(rolNombre)
+                .activo(u.isActivo())
+                .esFirmante(u.isEsFirmanteEvaluacionDocente())
+                .puedeObservar(u.isPuedeObservarEvaluacionDocente())
+                .puedeModificarRatificacion(u.isPuedeModificarRatificacionDocente())
+                .tituloFirma(titulo)
+                .ordenFirma(u.getOrdenFirmaEvaluacionDocente())
+                .esSoloVisual(esSoloVisual)
+                .build();
+    }
+
+    private void registrarAuditoria(UsuarioSistema usuario, String accion, String actor, String detalle, String ipOrigen) {
+        AuditoriaUsuario auditoria = new AuditoriaUsuario();
+        auditoria.setUsuarioObjetivoId(usuario.getId());
+        auditoria.setUsuarioObjetivoCi(usuario.getCi());
+        auditoria.setAccion(accion);
+        auditoria.setRealizadoPor(actor == null || actor.isBlank() ? "SISTEMA" : actor);
+        auditoria.setDetalle(detalle);
+        auditoria.setIpOrigen(ipOrigen != null && !ipOrigen.isBlank() ? ipOrigen : "127.0.0.1");
+        auditoria.setFechaEvento(LocalDateTime.now());
+        auditoriaUsuarioRepository.save(auditoria);
     }
 }

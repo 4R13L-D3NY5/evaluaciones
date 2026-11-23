@@ -44,6 +44,7 @@ public class EvaluacionDocenteRegistroDto {
     private BigDecimal puntajeMaximo;
     private BigDecimal porcentaje;
     private String observaciones;
+    private String retroalimentacion;
     private String estado;
     private String creadoPor;
     private LocalDateTime creadoEn;

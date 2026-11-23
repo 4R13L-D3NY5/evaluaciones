@@ -13,7 +13,13 @@ import {
   DocenteRatificacionMateria,
   ModificarRatificacionRequest,
   CumplimientoEvaluacion,
-  PeriodoEvaluacionDocenteEstado
+  PeriodoEvaluacionDocenteEstado,
+  FichaOficialMateriaDocente,
+  GuardarObservacionesDirectorRequest,
+  GuardarObservacionTerceroRequest,
+  ObservacionTercero,
+  FirmanteConfiguracion,
+  ActualizarFirmanteRequest
 } from '../models/evaluacion-docente.models';
 
 @Injectable({
@@ -217,5 +223,45 @@ export class EvaluacionDocenteService {
     if (sedeCodigo && sedeCodigo !== 'TODAS') params = params.set('sedeCodigo', sedeCodigo);
     if (carreraCodigo && carreraCodigo !== 'TODAS') params = params.set('carreraCodigo', carreraCodigo);
     return this._http.get<CumplimientoEvaluacion[]>(`${this._baseUrl}/reportes/cumplimiento`, { params });
+  }
+
+  // --- Ficha Oficial de Evaluación por Asignatura ---
+
+  public obtenerFichaOficial(
+    gestion: string,
+    sedeCodigo: string,
+    carreraCodigo: string,
+    materiaCodigo: string,
+    docenteCi?: string,
+    docenteNombre?: string
+  ): Observable<FichaOficialMateriaDocente> {
+    let params = new HttpParams()
+      .set('gestion', gestion)
+      .set('sedeCodigo', sedeCodigo)
+      .set('carreraCodigo', carreraCodigo)
+      .set('materiaCodigo', materiaCodigo);
+
+    if (docenteCi) params = params.set('docenteCi', docenteCi);
+    if (docenteNombre) params = params.set('docenteNombre', docenteNombre);
+
+    return this._http.get<FichaOficialMateriaDocente>(`${this._baseUrl}/ficha-oficial`, { params });
+  }
+
+  public guardarObservacionesDirector(req: GuardarObservacionesDirectorRequest): Observable<void> {
+    return this._http.put<void>(`${this._baseUrl}/ficha-oficial/director`, req);
+  }
+
+  public guardarObservacionTercero(req: GuardarObservacionTerceroRequest): Observable<ObservacionTercero> {
+    return this._http.post<ObservacionTercero>(`${this._baseUrl}/ficha-oficial/observacion-tercero`, req);
+  }
+
+  // --- Configuración de Firmantes y Autoridades ---
+
+  public listarFirmantes(): Observable<FirmanteConfiguracion[]> {
+    return this._http.get<FirmanteConfiguracion[]>(`${this._baseUrl}/firmantes`);
+  }
+
+  public actualizarFirmante(usuarioId: number, req: ActualizarFirmanteRequest): Observable<FirmanteConfiguracion> {
+    return this._http.put<FirmanteConfiguracion>(`${this._baseUrl}/firmantes/${usuarioId}`, req);
   }
 }

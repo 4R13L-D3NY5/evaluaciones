@@ -212,4 +212,56 @@ public class EvaluacionDocenteController {
             @RequestParam(required = false) String carreraCodigo) {
         return ResponseEntity.ok(evaluacionDocenteReportesService.listarCumplimiento(gestion, sedeCodigo, carreraCodigo));
     }
+
+    @GetMapping("/ficha-oficial")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','RESPONSABLE_EVALUACIONES','DIRECTOR_CARRERA','VICERRECTOR','TALENTO_HUMANO')")
+    @Operation(summary = "Obtener Ficha Oficial Consolidada de la Asignatura para el docente")
+    public ResponseEntity<FichaOficialMateriaDocenteDto> obtenerFichaOficial(
+            @RequestParam String gestion,
+            @RequestParam String sedeCodigo,
+            @RequestParam String carreraCodigo,
+            @RequestParam String materiaCodigo,
+            @RequestParam(required = false) String docenteCi,
+            @RequestParam(required = false) String docenteNombre) {
+        return ResponseEntity.ok(evaluacionDocenteReportesService.obtenerFichaOficial(
+                gestion, sedeCodigo, carreraCodigo, materiaCodigo, docenteCi, docenteNombre));
+    }
+
+    @PutMapping("/ficha-oficial/director")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','DIRECTOR_CARRERA')")
+    @Operation(summary = "Guardar o actualizar observaciones y retroalimentación del Director de Carrera")
+    public ResponseEntity<Void> guardarObservacionesDirector(
+            @Valid @RequestBody GuardarObservacionesDirectorRequestDto dto,
+            Authentication authentication) {
+        evaluacionDocenteReportesService.guardarObservacionesDirector(dto, authentication);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/ficha-oficial/observacion-tercero")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','VICERRECTOR','TALENTO_HUMANO')")
+    @Operation(summary = "Registrar o actualizar observación de un tercero autorizado en la asignatura")
+    public ResponseEntity<ObservacionTerceroDto> guardarObservacionTercero(
+            @Valid @RequestBody GuardarObservacionTerceroRequestDto dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(evaluacionDocenteReportesService.guardarObservacionTercero(dto, authentication));
+    }
+
+    @GetMapping("/firmantes")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','TALENTO_HUMANO','VICERRECTOR')")
+    @Operation(summary = "Listar usuarios firmantes y autoridades para configuración de firmas")
+    public ResponseEntity<List<FirmanteConfiguracionDto>> listarFirmantes() {
+        return ResponseEntity.ok(evaluacionDocenteReportesService.listarFirmantesConfiguracion());
+    }
+
+    @PutMapping("/firmantes/{usuarioId}")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Actualizar configuración de firmante oficial (cargo/título, permisos de observación y ratificación)")
+    public ResponseEntity<FirmanteConfiguracionDto> actualizarFirmante(
+            @PathVariable Long usuarioId,
+            @RequestBody ActualizarFirmanteRequestDto dto,
+            Authentication authentication,
+            jakarta.servlet.http.HttpServletRequest request) {
+        String ipOrigen = com.xpertiflow.evaluaciones.infrastructure.security.ClientIpUtil.obtenerIpCliente(request);
+        return ResponseEntity.ok(evaluacionDocenteReportesService.actualizarFirmanteConfiguracion(usuarioId, dto, authentication, ipOrigen));
+    }
 }

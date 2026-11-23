@@ -71,6 +71,18 @@ public class UsuarioSistema {
     @Column(name = "puede_modificar_ratificacion_docente", nullable = false)
     private boolean puedeModificarRatificacionDocente = false;
 
+    @Column(name = "puede_observar_evaluacion_docente", nullable = false)
+    private boolean puedeObservarEvaluacionDocente = false;
+
+    @Column(name = "titulo_firma_evaluacion_docente", length = 150)
+    private String tituloFirmaEvaluacionDocente;
+
+    @Column(name = "es_firmante_evaluacion_docente", nullable = false)
+    private boolean esFirmanteEvaluacionDocente = false;
+
+    @Column(name = "orden_firma_evaluacion_docente", nullable = false)
+    private int ordenFirmaEvaluacionDocente = 0;
+
     @Column(name = "ultimo_ingreso")
     private LocalDateTime ultimoIngreso;
 

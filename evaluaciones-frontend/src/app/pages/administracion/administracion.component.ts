@@ -13,6 +13,8 @@ import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { SolicitudModificacionService } from '../../core/services/solicitud-modificacion.service';
 import { SolicitudModificacionResponse } from '../../core/models/solicitud-modificacion.models';
 import { AuthService } from '../../core/services/auth.service';
+import { EvaluacionDocenteService } from '../../core/services/evaluacion-docente.service';
+import { FirmanteConfiguracion } from '../../core/models/evaluacion-docente.models';
 
 export interface CampusItem {
   id: number;
@@ -815,6 +817,149 @@ export interface ParcialConfig {
                                   <span>{{ vr.puedeModificarRatificacionDocente ? 'Quitar Ratificar' : 'Dar Ratificar' }}</span>
                                 </button>
                               </div>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+
+              <!-- Configuración de Firmantes y Autoridades (Evaluación Docente) -->
+              <div class="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-id-card text-purple-700 text-base"></i>
+                    <div>
+                      <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Autoridades y Firmantes Oficiales (Evaluación Docente)</h4>
+                      <p class="text-[10px] text-muted-foreground">Define con precisión qué autoridades firman en la Ficha Oficial (activa <strong>¿Firma en Ficha? = SÍ FIRMA</strong> solo en las requeridas, ej. Talento Humano y los Vicerrectores designados) y asigna sus títulos oficiales de firma y facultades de observación/ratificación.</p>
+                    </div>
+                  </div>
+                  <button 
+                    (click)="cargarFirmantesConfiguracion()" 
+                    [disabled]="cargandoFirmantes()"
+                    class="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title="Refrescar lista de firmantes">
+                    <i class="pi pi-refresh text-xs" [class.pi-spin]="cargandoFirmantes()"></i>
+                  </button>
+                </div>
+
+                @if (cargandoFirmantes()) {
+                  <div class="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                    <i class="pi pi-spin pi-spinner text-purple-600"></i>
+                    <span>Cargando autoridades y firmantes configurados...</span>
+                  </div>
+                } @else if (firmantesConfiguracion().length === 0) {
+                  <div class="py-6 text-center text-xs text-muted-foreground">
+                    No se encontraron usuarios con rol Vicerrector o Talento Humano configurados para firmas.
+                  </div>
+                } @else {
+                  <div class="overflow-x-auto border border-border rounded-xl">
+                    <table class="w-full text-left text-xs">
+                      <thead class="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                        <tr>
+                          <th class="py-2.5 px-4">Autoridad / Usuario</th>
+                          <th class="py-2.5 px-3">Rol del Sistema</th>
+                          <th class="py-2.5 px-4">Título Oficial en Ficha (Firma)</th>
+                          <th class="py-2.5 px-3 text-center">¿Firma en Ficha?</th>
+                          <th class="py-2.5 px-3 text-center">Orden</th>
+                          <th class="py-2.5 px-3 text-center">Puede Observar</th>
+                          <th class="py-2.5 px-3 text-center">Puede Ratificar</th>
+                          <th class="py-2.5 px-4 text-right">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-border">
+                        @for (f of firmantesConfiguracion(); track f.usuarioId) {
+                          <tr class="hover:bg-muted/20 transition-colors">
+                            <td class="py-2.5 px-4 font-bold text-foreground">
+                              <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-black text-[10px] flex items-center justify-center">
+                                  {{ inicialesNombre(f.nombreCompleto) }}
+                                </div>
+                                <div>
+                                  <span class="block leading-tight font-black">{{ f.nombreCompleto }}</span>
+                                  <span class="text-[10px] text-muted-foreground font-mono font-normal">{{ f.usuario }}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td class="py-2.5 px-3">
+                              @if (f.esSoloVisual) {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 px-2 py-0.5 text-[10px] font-black">
+                                  <i class="pi pi-eye text-[9px]"></i> Talento Humano (Solo Visual)
+                                </span>
+                              } @else {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700 px-2 py-0.5 text-[10px] font-bold">
+                                  <i class="pi pi-user text-[9px]"></i> {{ f.rolNombre || f.rolCodigo }}
+                                </span>
+                              }
+                            </td>
+                            <td class="py-2.5 px-4">
+                              <input 
+                                type="text" 
+                                [(ngModel)]="f.tituloFirma" 
+                                placeholder="ej. Dirección Académica"
+                                class="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border bg-card focus:outline-hidden focus:ring-1 focus:ring-purple-600 shadow-2xs" />
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                              <button 
+                                type="button"
+                                (click)="toggleEsFirmante(f)"
+                                [class]="f.esFirmante ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:bg-purple-200' : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'"
+                                class="border font-black text-[10px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                                [title]="f.esFirmante ? 'Habilitado: Aparece en la base de firmas de la Ficha Oficial' : 'Inhabilitado: NO aparece en la base de firmas'">
+                                <i [class]="f.esFirmante ? 'pi pi-check text-[9px]' : 'pi pi-times text-[9px]'"></i>
+                                <span>{{ f.esFirmante ? 'SÍ FIRMA' : 'NO' }}</span>
+                              </button>
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                              <input 
+                                type="number" 
+                                [(ngModel)]="f.ordenFirma" 
+                                min="1" 
+                                max="10" 
+                                class="w-14 text-center text-xs font-mono font-bold px-1.5 py-1.5 rounded-lg border border-border bg-card focus:outline-hidden focus:ring-1 focus:ring-purple-600 shadow-2xs" />
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                              <button 
+                                type="button"
+                                (click)="toggleObservarFirmante(f)"
+                                [class]="f.puedeObservar ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200'"
+                                class="border font-bold text-[10px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                                [title]="f.puedeObservar ? 'Habilitado para registrar observaciones por materia' : 'Sin permiso para registrar observaciones'">
+                                <i [class]="f.puedeObservar ? 'pi pi-check text-[9px]' : 'pi pi-ban text-[9px]'"></i>
+                                <span>{{ f.puedeObservar ? 'Habilitado' : 'No' }}</span>
+                              </button>
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                              @if (f.esSoloVisual) {
+                                <span class="text-[10px] font-bold text-muted-foreground italic">N/A (Solo Visual)</span>
+                              } @else {
+                                <button 
+                                  type="button"
+                                  (click)="toggleRatificarFirmante(f)"
+                                  [class]="f.puedeModificarRatificacion ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100' : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200'"
+                                  class="border font-bold text-[10px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                                  [title]="f.puedeModificarRatificacion ? 'Habilitado para cambiar ratificación' : 'Sin permiso para cambiar ratificación'">
+                                  <i [class]="f.puedeModificarRatificacion ? 'pi pi-check text-[9px]' : 'pi pi-ban text-[9px]'"></i>
+                                  <span>{{ f.puedeModificarRatificacion ? 'Habilitado' : 'No' }}</span>
+                                </button>
+                              }
+                            </td>
+                            <td class="py-2.5 px-4 text-right">
+                              <button 
+                                type="button" 
+                                (click)="guardarFirmante(f)" 
+                                [disabled]="guardandoFirmanteId() === f.usuarioId"
+                                class="bg-purple-700 hover:bg-purple-800 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait">
+                                @if (guardandoFirmanteId() === f.usuarioId) {
+                                  <i class="pi pi-spin pi-spinner text-xs"></i>
+                                  <span>Guardando...</span>
+                                } @else {
+                                  <i class="pi pi-save text-xs"></i>
+                                  <span>Guardar</span>
+                                }
+                              </button>
                             </td>
                           </tr>
                         }
@@ -2079,6 +2224,7 @@ export class AdministracionEvaluacionesComponent {
   private readonly _campusCarreras = inject(CampusCarrerasService);
   private readonly _route = inject(ActivatedRoute);
   public readonly authService = inject(AuthService);
+  private readonly _evaluacionDocenteService = inject(EvaluacionDocenteService);
   public readonly Math = Math;
 
   public ratioEstudiantesPorVariante: number = 5;
@@ -2191,6 +2337,11 @@ export class AdministracionEvaluacionesComponent {
   public errorCatalogo = signal<string | null>(null);
   private catalogoVersion = signal(0);
 
+  // Firmantes y Autoridades para Evaluación Docente
+  public firmantesConfiguracion = signal<FirmanteConfiguracion[]>([]);
+  public cargandoFirmantes = signal<boolean>(false);
+  public guardandoFirmanteId = signal<number | null>(null);
+
   constructor() {
     this.listaCampus = [];
     this.listaCarrerasCampus = [];
@@ -2206,6 +2357,7 @@ export class AdministracionEvaluacionesComponent {
       this.cargarCatalogoAdministrativo();
       this.cargarConfiguracionVerificacion();
       this.cargarVicerrectoresEdicion();
+      this.cargarFirmantesConfiguracion();
     }
     this.cargarSolicitudesPendientes();
     this.cargarHistorialSolicitudes();
@@ -2299,6 +2451,56 @@ export class AdministracionEvaluacionesComponent {
         this._mostrarToast('Error al actualizar el permiso de ratificación del vicerrector.');
       }
     });
+  }
+
+  public cargarFirmantesConfiguracion(): void {
+    this.cargandoFirmantes.set(true);
+    this._evaluacionDocenteService.listarFirmantes().subscribe({
+      next: lista => {
+        this.firmantesConfiguracion.set(lista || []);
+        this.cargandoFirmantes.set(false);
+      },
+      error: () => {
+        this.cargandoFirmantes.set(false);
+        this._mostrarToast('No se pudo cargar la configuración de firmantes de evaluación docente.');
+      }
+    });
+  }
+
+  public guardarFirmante(f: FirmanteConfiguracion): void {
+    this.guardandoFirmanteId.set(f.usuarioId);
+    this._evaluacionDocenteService.actualizarFirmante(f.usuarioId, {
+      esFirmante: f.esFirmante,
+      puedeObservar: f.puedeObservar,
+      puedeModificarRatificacion: f.puedeModificarRatificacion,
+      tituloFirma: f.tituloFirma || '',
+      ordenFirma: f.ordenFirma || 1
+    }).subscribe({
+      next: actualizado => {
+        this.guardandoFirmanteId.set(null);
+        this.firmantesConfiguracion.update(list =>
+          list.map(item => item.usuarioId === f.usuarioId ? actualizado : item)
+        );
+        this._mostrarToast(`Configuración de firma guardada para ${f.nombreCompleto}.`);
+      },
+      error: () => {
+        this.guardandoFirmanteId.set(null);
+        this._mostrarToast('Error al actualizar la configuración del firmante.');
+      }
+    });
+  }
+
+  public toggleEsFirmante(f: FirmanteConfiguracion): void {
+    f.esFirmante = !f.esFirmante;
+  }
+
+  public toggleObservarFirmante(f: FirmanteConfiguracion): void {
+    f.puedeObservar = !f.puedeObservar;
+  }
+
+  public toggleRatificarFirmante(f: FirmanteConfiguracion): void {
+    if (f.esSoloVisual) return;
+    f.puedeModificarRatificacion = !f.puedeModificarRatificacion;
   }
 
   public cargarSolicitudesPendientes(): void {
