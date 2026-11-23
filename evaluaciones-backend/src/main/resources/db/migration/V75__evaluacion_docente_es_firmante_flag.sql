@@ -18,8 +18,8 @@ UPDATE sea_usuarios_sistema
 SET es_firmante_evaluacion_docente = FALSE 
 WHERE rol_codigo = 'VICERRECTOR';
 
--- 4. Sembrado de respuestas para registro histórico REG-EST-C0BCD8EA-CEE (Suma 28 puntos)
--- si no cuenta con detalle en sea_evaluacion_estudiante_respuestas
+-- 4. Sembrado defensivo de respuestas para registro histórico si existe en el entorno
+-- y no cuenta con detalle en sea_evaluacion_estudiante_respuestas
 INSERT INTO sea_evaluacion_estudiante_respuestas (registro_id, criterio_id, puntuacion)
 SELECT 'REG-EST-C0BCD8EA-CEE', c.id, 
        CASE 
@@ -29,6 +29,10 @@ SELECT 'REG-EST-C0BCD8EA-CEE', c.id,
 FROM sea_evaluacion_criterios c
 JOIN sea_evaluacion_secciones s ON s.id = c.seccion_id
 WHERE s.instrumento_id = 'inst-estudiante-unitepc-v1'
+  AND EXISTS (
+      SELECT 1 FROM sea_evaluacion_estudiante_registros reg 
+      WHERE reg.id = 'REG-EST-C0BCD8EA-CEE'
+  )
   AND NOT EXISTS (
       SELECT 1 FROM sea_evaluacion_estudiante_respuestas r 
       WHERE r.registro_id = 'REG-EST-C0BCD8EA-CEE'
