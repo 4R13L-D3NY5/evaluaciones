@@ -539,6 +539,26 @@ public class EvaluacionDocenteReportesService {
         List<String> regIds = registros.stream().map(EvaluacionEstudianteRegistro::getId).toList();
         List<EvaluacionEstudianteRespuesta> respuestas = estudianteRespuestaRepository.findByRegistroIdIn(regIds);
 
+        // Fallback defensivo: Si no hay detalle de respuestas (registros históricos o agregados) pero sí porcentaje consolidado
+        if (respuestas.isEmpty()) {
+            double promPct = registros.stream()
+                    .filter(r -> r.getPorcentaje() != null)
+                    .mapToDouble(r -> r.getPorcentaje().doubleValue())
+                    .average()
+                    .orElse(0.0);
+            BigDecimal pctGlobal = BigDecimal.valueOf(promPct).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal promGlobal = pctGlobal.multiply(BigDecimal.valueOf(3.0)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            return nombresPorCodigo.entrySet().stream()
+                    .map(e -> AreaPuntajeEstudianteDto.builder()
+                            .areaCodigo(e.getKey())
+                            .areaNombre(e.getValue())
+                            .puntajePromedio(promGlobal)
+                            .puntajeMaximo(BigDecimal.valueOf(3.00))
+                            .porcentaje(pctGlobal)
+                            .build())
+                    .toList();
+        }
+
         Map<String, List<Integer>> puntuacionesPorArea = new LinkedHashMap<>();
         nombresPorCodigo.keySet().forEach(k -> puntuacionesPorArea.put(k, new ArrayList<>()));
 
@@ -564,6 +584,16 @@ public class EvaluacionDocenteReportesService {
                 prom = BigDecimal.valueOf(avg).setScale(2, RoundingMode.HALF_UP);
                 pct = prom.divide(BigDecimal.valueOf(3), 4, RoundingMode.HALF_UP)
                         .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP);
+            } else if (registros != null && !registros.isEmpty()) {
+                double promPct = registros.stream()
+                        .filter(r -> r.getPorcentaje() != null)
+                        .mapToDouble(r -> r.getPorcentaje().doubleValue())
+                        .average()
+                        .orElse(0.0);
+                if (promPct > 0) {
+                    pct = BigDecimal.valueOf(promPct).setScale(2, RoundingMode.HALF_UP);
+                    prom = pct.multiply(BigDecimal.valueOf(3.0)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                }
             }
 
             resultado.add(AreaPuntajeEstudianteDto.builder()
@@ -664,11 +694,7 @@ public class EvaluacionDocenteReportesService {
     @Transactional(readOnly = true)
     public List<FirmanteOficialDto> listarFirmantesOficiales() {
         return usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
-                .filter(u -> u.isActivo() && ("VICERRECTOR".equals(u.getRolCodigo())
-                        || "TALENTO_HUMANO".equals(u.getRolCodigo())
-                        || u.isPuedeObservarEvaluacionDocente()
-                        || u.isPuedeModificarRatificacionDocente()
-                        || (u.getTituloFirmaEvaluacionDocente() != null && !u.getTituloFirmaEvaluacionDocente().isBlank())))
+                .filter(u -> u.isActivo() && u.isEsFirmanteEvaluacionDocente())
                 .map(u -> {
                     String titulo = u.getTituloFirmaEvaluacionDocente();
                     if (titulo == null || titulo.isBlank()) {
@@ -686,6 +712,7 @@ public class EvaluacionDocenteReportesService {
                             .rol(u.getRolCodigo())
                             .tituloFirma(titulo)
                             .ordenFirma(u.getOrdenFirmaEvaluacionDocente())
+                            .esFirmante(u.isEsFirmanteEvaluacionDocente())
                             .puedeObservar(u.isPuedeObservarEvaluacionDocente())
                             .puedeRatificar(u.isPuedeModificarRatificacionDocente())
                             .esSoloVisual(esSoloVisual)
@@ -705,11 +732,13 @@ public class EvaluacionDocenteReportesService {
                 .filter(u -> "VICERRECTOR".equals(u.getRolCodigo())
                         || "TALENTO_HUMANO".equals(u.getRolCodigo())
                         || "ADMINISTRADOR_SISTEMA".equals(u.getRolCodigo())
+                        || u.isEsFirmanteEvaluacionDocente()
                         || u.isPuedeObservarEvaluacionDocente()
                         || u.isPuedeModificarRatificacionDocente()
                         || (u.getTituloFirmaEvaluacionDocente() != null && !u.getTituloFirmaEvaluacionDocente().isBlank()))
                 .map(this::mapearFirmanteConfiguracion)
-                .sorted(Comparator.comparingInt(FirmanteConfiguracionDto::getOrdenFirma)
+                .sorted(Comparator.comparing(FirmanteConfiguracionDto::isEsFirmante).reversed()
+                        .thenComparingInt(FirmanteConfiguracionDto::getOrdenFirma)
                         .thenComparing(FirmanteConfiguracionDto::getNombreCompleto))
                 .toList();
     }
@@ -723,6 +752,7 @@ public class EvaluacionDocenteReportesService {
         UsuarioSistema u = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + usuarioId));
 
+        u.setEsFirmanteEvaluacionDocente(dto.isEsFirmante());
         u.setPuedeObservarEvaluacionDocente(dto.isPuedeObservar());
         u.setPuedeModificarRatificacionDocente(dto.isPuedeModificarRatificacion());
         u.setTituloFirmaEvaluacionDocente(dto.getTituloFirma() != null ? dto.getTituloFirma().trim() : null);
@@ -732,7 +762,7 @@ public class EvaluacionDocenteReportesService {
 
         String actor = authentication != null ? authentication.getName() : "ADMIN";
         registrarAuditoria(guardado, "FIRMANTE_ACTUALIZADO", actor,
-                "Título: " + u.getTituloFirmaEvaluacionDocente() + ", Obs: " + u.isPuedeObservarEvaluacionDocente() + ", Ratif: " + u.isPuedeModificarRatificacionDocente(), ipOrigen);
+                "Firma: " + u.isEsFirmanteEvaluacionDocente() + ", Título: " + u.getTituloFirmaEvaluacionDocente() + ", Obs: " + u.isPuedeObservarEvaluacionDocente() + ", Ratif: " + u.isPuedeModificarRatificacionDocente(), ipOrigen);
 
         return mapearFirmanteConfiguracion(guardado);
     }
@@ -774,6 +804,7 @@ public class EvaluacionDocenteReportesService {
                 .rolCodigo(u.getRolCodigo())
                 .rolNombre(rolNombre)
                 .activo(u.isActivo())
+                .esFirmante(u.isEsFirmanteEvaluacionDocente())
                 .puedeObservar(u.isPuedeObservarEvaluacionDocente())
                 .puedeModificarRatificacion(u.isPuedeModificarRatificacionDocente())
                 .tituloFirma(titulo)

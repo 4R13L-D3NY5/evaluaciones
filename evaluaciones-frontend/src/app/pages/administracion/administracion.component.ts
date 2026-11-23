@@ -833,7 +833,7 @@ export interface ParcialConfig {
                     <i class="pi pi-id-card text-purple-700 text-base"></i>
                     <div>
                       <h4 class="text-xs font-black uppercase tracking-wider text-foreground">Autoridades y Firmantes Oficiales (Evaluación Docente)</h4>
-                      <p class="text-[10px] text-muted-foreground">Configura los títulos oficiales para la base de firmas de la Ficha Oficial (ej. "Director Académico", "Dirección Institucional", "Jefe de Talento Humano") y asigna facultades de observación y ratificación.</p>
+                      <p class="text-[10px] text-muted-foreground">Define con precisión qué autoridades firman en la Ficha Oficial (activa <strong>¿Firma en Ficha? = SÍ FIRMA</strong> solo en las requeridas, ej. Talento Humano y los Vicerrectores designados) y asigna sus títulos oficiales de firma y facultades de observación/ratificación.</p>
                     </div>
                   </div>
                   <button 
@@ -862,6 +862,7 @@ export interface ParcialConfig {
                           <th class="py-2.5 px-4">Autoridad / Usuario</th>
                           <th class="py-2.5 px-3">Rol del Sistema</th>
                           <th class="py-2.5 px-4">Título Oficial en Ficha (Firma)</th>
+                          <th class="py-2.5 px-3 text-center">¿Firma en Ficha?</th>
                           <th class="py-2.5 px-3 text-center">Orden</th>
                           <th class="py-2.5 px-3 text-center">Puede Observar</th>
                           <th class="py-2.5 px-3 text-center">Puede Ratificar</th>
@@ -899,6 +900,17 @@ export interface ParcialConfig {
                                 [(ngModel)]="f.tituloFirma" 
                                 placeholder="ej. Dirección Académica"
                                 class="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border bg-card focus:outline-hidden focus:ring-1 focus:ring-purple-600 shadow-2xs" />
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                              <button 
+                                type="button"
+                                (click)="toggleEsFirmante(f)"
+                                [class]="f.esFirmante ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:bg-purple-200' : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'"
+                                class="border font-black text-[10px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                                [title]="f.esFirmante ? 'Habilitado: Aparece en la base de firmas de la Ficha Oficial' : 'Inhabilitado: NO aparece en la base de firmas'">
+                                <i [class]="f.esFirmante ? 'pi pi-check text-[9px]' : 'pi pi-times text-[9px]'"></i>
+                                <span>{{ f.esFirmante ? 'SÍ FIRMA' : 'NO' }}</span>
+                              </button>
                             </td>
                             <td class="py-2.5 px-3 text-center">
                               <input 
@@ -2458,6 +2470,7 @@ export class AdministracionEvaluacionesComponent {
   public guardarFirmante(f: FirmanteConfiguracion): void {
     this.guardandoFirmanteId.set(f.usuarioId);
     this._evaluacionDocenteService.actualizarFirmante(f.usuarioId, {
+      esFirmante: f.esFirmante,
       puedeObservar: f.puedeObservar,
       puedeModificarRatificacion: f.puedeModificarRatificacion,
       tituloFirma: f.tituloFirma || '',
@@ -2475,6 +2488,10 @@ export class AdministracionEvaluacionesComponent {
         this._mostrarToast('Error al actualizar la configuración del firmante.');
       }
     });
+  }
+
+  public toggleEsFirmante(f: FirmanteConfiguracion): void {
+    f.esFirmante = !f.esFirmante;
   }
 
   public toggleObservarFirmante(f: FirmanteConfiguracion): void {

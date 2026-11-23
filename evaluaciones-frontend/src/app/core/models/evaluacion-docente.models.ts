@@ -291,6 +291,7 @@ export interface FirmanteOficial {
   rol: string;
   tituloFirma: string;
   ordenFirma: number;
+  esFirmante?: boolean;
   puedeObservar: boolean;
   puedeRatificar: boolean;
   esSoloVisual: boolean;
@@ -373,6 +374,7 @@ export interface FirmanteConfiguracion {
   rolCodigo: string;
   rolNombre: string;
   activo: boolean;
+  esFirmante: boolean;
   puedeObservar: boolean;
   puedeModificarRatificacion: boolean;
   tituloFirma: string;
@@ -381,6 +383,7 @@ export interface FirmanteConfiguracion {
 }
 
 export interface ActualizarFirmanteRequest {
+  esFirmante: boolean;
   puedeObservar: boolean;
   puedeModificarRatificacion: boolean;
   tituloFirma: string;

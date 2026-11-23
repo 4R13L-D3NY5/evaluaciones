@@ -21,5 +21,6 @@ public class FirmanteConfiguracionDto {
     private boolean puedeModificarRatificacion;
     private String tituloFirma;
     private int ordenFirma;
+    private boolean esFirmante;
     private boolean esSoloVisual;
 }

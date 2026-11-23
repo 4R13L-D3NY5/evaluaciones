@@ -14,4 +14,5 @@ public class ActualizarFirmanteRequestDto {
     private boolean puedeModificarRatificacion;
     private String tituloFirma;
     private int ordenFirma;
+    private boolean esFirmante;
 }

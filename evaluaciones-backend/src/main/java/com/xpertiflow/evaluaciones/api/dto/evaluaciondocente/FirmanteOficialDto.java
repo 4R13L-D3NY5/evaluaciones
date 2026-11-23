@@ -16,6 +16,7 @@ public class FirmanteOficialDto {
     private String rol;
     private String tituloFirma;
     private int ordenFirma;
+    private boolean esFirmante;
     private boolean puedeObservar;
     private boolean puedeRatificar;
     private boolean esSoloVisual;

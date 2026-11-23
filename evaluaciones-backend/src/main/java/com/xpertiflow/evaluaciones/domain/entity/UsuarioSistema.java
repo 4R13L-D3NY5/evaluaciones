@@ -77,6 +77,9 @@ public class UsuarioSistema {
     @Column(name = "titulo_firma_evaluacion_docente", length = 150)
     private String tituloFirmaEvaluacionDocente;
 
+    @Column(name = "es_firmante_evaluacion_docente", nullable = false)
+    private boolean esFirmanteEvaluacionDocente = false;
+
     @Column(name = "orden_firma_evaluacion_docente", nullable = false)
     private int ordenFirmaEvaluacionDocente = 0;
 
