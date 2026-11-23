@@ -2272,7 +2272,7 @@ export interface DocenteEvaluacionRow {
                   <div><strong class="text-gray-600">ASIGNATURA:</strong> <span class="font-bold text-gray-900">{{ ficha.materiaNombre }} ({{ ficha.materiaCodigo }}) · Grupo {{ ficha.grupoCodigo }}</span></div>
                   <div><strong class="text-gray-600">DOCENTE EVALUADO:</strong> <span class="font-bold text-gray-900">{{ ficha.docenteNombre }} (C.I. {{ ficha.docenteCi || '—' }})</span></div>
                   <div><strong class="text-gray-600">FECHA DE EVALUACIÓN:</strong> <span class="font-bold text-gray-900">{{ ficha.directorFechaEvaluacion || '—' }} {{ ficha.directorHoraEvaluacion || '' }}</span></div>
-                  <div><strong class="text-gray-600">EVALUADOR / DIRECTOR:</strong> <span class="font-bold text-gray-900">{{ ficha.directorEvaluadorNombre || 'Sin registrar' }} ({{ ficha.directorEvaluadorRol || 'Director de Carrera' }})</span></div>
+                  <div><strong class="text-gray-600">DIRECTOR DE CARRERA:</strong> <span class="font-bold text-gray-900">{{ ficha.directorCarreraNombre || ficha.directorEvaluadorNombre || 'Director de Carrera' }}</span></div>
                 </div>
               </div>
 
@@ -2523,8 +2523,8 @@ export interface DocenteEvaluacionRow {
                   <!-- Firma Director -->
                   <div class="flex flex-col justify-end">
                     <div class="border-t border-gray-400 mx-auto w-36 pt-2"></div>
-                    <strong class="text-[11px] text-gray-900 block">RESPONSABLE EVALUACIÓN</strong>
-                    <span class="text-[10px] text-gray-600 block">{{ ficha.directorEvaluadorNombre || 'Director de Carrera' }}</span>
+                    <strong class="text-[11px] text-gray-900 block">DIRECTOR DE CARRERA</strong>
+                    <span class="text-[10px] text-gray-600 block">{{ ficha.directorCarreraNombre || ficha.directorEvaluadorNombre || 'Director de Carrera' }}</span>
                   </div>
 
                   <!-- Firmas de Autoridades Configuradas (Vicerrectores / Talento Humano) -->
@@ -6196,7 +6196,7 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
     pdf.text(`CARRERA: ${ficha.carreraNombre}`, col1X, metaY + 20);
     pdf.text(`SEDE ACADÉMICA: ${ficha.sedeNombre}`, col2X, metaY + 20);
 
-    pdf.text(`EVALUADOR DIRECTOR: ${ficha.directorEvaluadorNombre || 'Director de Carrera'}`, col1X, metaY + 25);
+    pdf.text(`DIRECTOR DE CARRERA: ${ficha.directorCarreraNombre || ficha.directorEvaluadorNombre || 'Director de Carrera'}`, col1X, metaY + 25);
     pdf.text(`FECHA / HORA: ${ficha.directorFechaEvaluacion || '—'} ${ficha.directorHoraEvaluacion || ''}`, col2X, metaY + 25);
 
     // Resumen Consolidado (100 Pts)
@@ -6446,7 +6446,7 @@ export class EvaluacionDocenteComponent implements OnInit, OnDestroy {
     // Armar lista de firmantes: Docente, Director, y autoridades oficiales
     const firmas: { linea1: string; linea2: string }[] = [
       { linea1: 'FIRMA DEL DOCENTE EVALUADO', linea2: ficha.docenteNombre },
-      { linea1: 'DIRECTOR DE CARRERA / EVALUADOR', linea2: ficha.directorEvaluadorNombre || 'Responsable de Carrera' }
+      { linea1: 'DIRECTOR DE CARRERA', linea2: ficha.directorCarreraNombre || ficha.directorEvaluadorNombre || 'Director de Carrera' }
     ];
 
     if (ficha.firmantesOficiales && ficha.firmantesOficiales.length > 0) {

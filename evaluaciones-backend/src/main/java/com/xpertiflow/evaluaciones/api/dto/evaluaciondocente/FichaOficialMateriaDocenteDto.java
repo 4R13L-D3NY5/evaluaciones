@@ -30,6 +30,7 @@ public class FichaOficialMateriaDocenteDto {
     // Componente 1: Evaluación del Director de Carrera (Máx. 50 Pts)
     private boolean directorEvaluado;
     private String directorRegistroId;
+    private String directorCarreraNombre;
     private String directorEvaluadorNombre;
     private String directorEvaluadorRol;
     private String directorFechaEvaluacion;

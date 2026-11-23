@@ -462,6 +462,7 @@ public class EvaluacionDocenteReportesService {
         String carNom = regDir != null ? regDir.getCarreraNombre() : (consolidadoMateria != null ? consolidadoMateria.getCarreraCodigo() : carreraCodigo);
         String matNom = regDir != null ? regDir.getMateriaNombre() : (consolidadoMateria != null ? consolidadoMateria.getMateriaNombre() : matCod);
         String grpCod = regDir != null ? regDir.getGrupoCodigo() : (consolidadoMateria != null ? consolidadoMateria.getGrupoCodigo() : "");
+        String directorNombre = resolverDirectorCarreraNombre(sedeCodigo, carreraCodigo, regDir);
 
         return FichaOficialMateriaDocenteDto.builder()
                 .gestion(gActual)
@@ -476,8 +477,9 @@ public class EvaluacionDocenteReportesService {
                 .docenteNombre(docNom)
                 .directorEvaluado(dirEvaluado)
                 .directorRegistroId(regDir != null ? regDir.getId() : null)
-                .directorEvaluadorNombre(regDir != null ? regDir.getEvaluadorNombre() : null)
-                .directorEvaluadorRol(regDir != null ? regDir.getEvaluadorRol() : null)
+                .directorCarreraNombre(directorNombre)
+                .directorEvaluadorNombre(regDir != null && regDir.getEvaluadorNombre() != null ? regDir.getEvaluadorNombre() : directorNombre)
+                .directorEvaluadorRol(regDir != null ? regDir.getEvaluadorRol() : "DIRECTOR_CARRERA")
                 .directorFechaEvaluacion(regDir != null && regDir.getFechaEvaluacion() != null ? regDir.getFechaEvaluacion().toString() : null)
                 .directorHoraEvaluacion(regDir != null ? regDir.getHoraEvaluacion() : null)
                 .directorInstrumentoTitulo(regDir != null && regDir.getInstrumento() != null ? regDir.getInstrumento().getTitulo() : "EVALUACIÓN DE LA COMPETENCIA DOCENTE")
@@ -503,6 +505,45 @@ public class EvaluacionDocenteReportesService {
                 .observacionesTerceros(obsDtos)
                 .firmantesOficiales(firmantes)
                 .build();
+    }
+
+    /**
+     * Resuelve el nombre oficial del Director de Carrera para la sede y carrera indicadas.
+     */
+    private String resolverDirectorCarreraNombre(String sedeCodigo, String carreraCodigo, EvaluacionDocenteRegistro regDir) {
+        String sedeCod = sedeCodigo != null ? sedeCodigo.trim() : "";
+        String carCod = carreraCodigo != null ? carreraCodigo.trim() : "";
+
+        List<UsuarioSistema> directores = usuarioRepository.findAllByOrderByNombreCompletoAsc().stream()
+                .filter(u -> u.isActivo() && "DIRECTOR_CARRERA".equals(u.getRolCodigo()))
+                .filter(u -> {
+                    boolean coincideCarrera = u.getCarreras() != null && u.getCarreras().stream()
+                            .anyMatch(c -> c.getCodigo() != null && c.getCodigo().trim().equalsIgnoreCase(carCod));
+                    boolean coincideSede = u.getSedes() == null || u.getSedes().isEmpty() || u.getSedes().stream()
+                            .anyMatch(s -> s.getCodigo() != null && s.getCodigo().trim().equalsIgnoreCase(sedeCod));
+                    boolean coincideAsignacion = u.getAsignaciones() != null && u.getAsignaciones().stream()
+                            .anyMatch(a -> a.getCarreraCodigo().trim().equalsIgnoreCase(carCod)
+                                    && (a.getSedeCodigo().isBlank() || a.getSedeCodigo().trim().equalsIgnoreCase(sedeCod)));
+                    return (coincideCarrera && coincideSede) || coincideAsignacion;
+                })
+                .toList();
+
+        if (!directores.isEmpty()) {
+            return directores.get(0).getNombreCompleto();
+        }
+
+        if (regDir != null && regDir.getEvaluadorRol() != null 
+                && regDir.getEvaluadorRol().toUpperCase().contains("DIRECTOR")
+                && regDir.getEvaluadorNombre() != null && !regDir.getEvaluadorNombre().isBlank()) {
+            return regDir.getEvaluadorNombre();
+        }
+
+        if (regDir != null && regDir.getEvaluadorNombre() != null && !regDir.getEvaluadorNombre().isBlank()
+                && (regDir.getDocenteNombre() == null || !regDir.getEvaluadorNombre().trim().equalsIgnoreCase(regDir.getDocenteNombre().trim()))) {
+            return regDir.getEvaluadorNombre();
+        }
+
+        return "Director de Carrera";
     }
 
     /**

@@ -312,6 +312,7 @@ export interface FichaOficialMateriaDocente {
   // Director (50 Pts)
   directorEvaluado: boolean;
   directorRegistroId?: string;
+  directorCarreraNombre?: string;
   directorEvaluadorNombre?: string;
   directorEvaluadorRol?: string;
   directorFechaEvaluacion?: string;
