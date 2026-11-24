@@ -5595,36 +5595,66 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
   }
 
   private _cargarEstadoMarcas(items: EvaluacionItemUI[]): void {
-    this.estadoMarcas.set({});
-    this.estadoListas.set({});
-    if (items.length > 60) {
-      // En consultas masivas (toda la sede), no saturar el navegador con miles de peticiones simultáneas
-      return;
-    }
-    items.filter(item => this.puedeGestionarCartillas(item)).forEach(item => {
-      this._cartillasOmr.obtenerPreparacion(item.id).subscribe({
-        next: preparacion => {
-          this.estadoMarcas.update(estados => ({
-            ...estados,
-            [item.id]: preparacion.estadoImpresion
-          }));
-          this.estadoListas.update(estados => ({
-            ...estados,
-            [item.id]: preparacion.estadoImpresionLista
-          }));
-        },
-        error: () => {
-          this.estadoMarcas.update(estados => ({
-            ...estados,
-            [item.id]: 'SIN_GENERAR'
-          }));
-          this.estadoListas.update(estados => ({
-            ...estados,
-            [item.id]: 'SIN_GENERAR'
-          }));
+    const marcasIniciales: Record<string, string> = { ...this.estadoMarcas() };
+    const listasIniciales: Record<string, string> = { ...this.estadoListas() };
+
+    // 1. Optimización instantánea: los exámenes que ya pasaron de 'Impreso' (Entregado, Devuelto, etc.)
+    //    ya tienen sus cartillas y listas impresas y confirmadas por definición. Cero llamadas HTTP.
+    items.forEach(item => {
+      if (item.modalidad === 'PRESENCIAL_CARTILLA') {
+        if (['Entregado', 'Devuelto', 'Pendiente de notas', 'Calificado', 'Confirmado'].includes(item.etapa)) {
+          marcasIniciales[item.id] = 'IMPRESO';
+          listasIniciales[item.id] = 'IMPRESO';
         }
-      });
+      }
     });
+    this.estadoMarcas.set(marcasIniciales);
+    this.estadoListas.set(listasIniciales);
+
+    // 2. Filtrar únicamente las evaluaciones activas que realmente requieren consultar el estado:
+    //    - Modalidad PRESENCIAL_CARTILLA
+    //    - En etapa 'Impreso' o 'Generado'
+    //    - Que no hayan sido marcadas ya como IMPRESO en memoria
+    const itemsAConsultar = items.filter(item =>
+      item.modalidad === 'PRESENCIAL_CARTILLA' &&
+      (item.etapa === 'Impreso' || item.etapa === 'Generado') &&
+      marcasIniciales[item.id] !== 'IMPRESO' &&
+      this.puedeGestionarCartillas(item)
+    );
+
+    if (itemsAConsultar.length === 0) return;
+
+    // 3. Consultar en lotes pequeños (chunks de a 6) para respetar los límites de conexiones concurrentes del navegador
+    const chunkSize = 6;
+    for (let i = 0; i < itemsAConsultar.length; i += chunkSize) {
+      const chunk = itemsAConsultar.slice(i, i + chunkSize);
+      window.setTimeout(() => {
+        chunk.forEach(item => {
+          this._cartillasOmr.obtenerPreparacion(item.id).subscribe({
+            next: preparacion => {
+              this.estadoMarcas.update(estados => ({
+                ...estados,
+                [item.id]: preparacion.estadoImpresion
+              }));
+              this.estadoListas.update(estados => ({
+                ...estados,
+                [item.id]: preparacion.estadoImpresionLista
+              }));
+            },
+            error: () => {
+              this.estadoMarcas.update(estados => ({
+                ...estados,
+                [item.id]: 'SIN_GENERAR'
+              }));
+              this.estadoListas.update(estados => ({
+                ...estados,
+                [item.id]: 'SIN_GENERAR'
+              }));
+            }
+          });
+        });
+      }, Math.floor(i / chunkSize) * 120);
+    }
   }
 
   public abrirGestionCartillas(item: EvaluacionItemUI): void {
@@ -6227,6 +6257,23 @@ export class EvaluacionesDiaComponent implements OnInit, OnDestroy {
     }
 
     if (this.pasoBloqueadoPorCartillas(item, pasoKey)) {
+      if (this.estadoMarcas()[item.id] === undefined) {
+        this._cartillasOmr.obtenerPreparacion(item.id).subscribe({
+          next: preparacion => {
+            this.estadoMarcas.update(e => ({ ...e, [item.id]: preparacion.estadoImpresion }));
+            this.estadoListas.update(e => ({ ...e, [item.id]: preparacion.estadoImpresionLista }));
+            if (preparacion.estadoImpresion === 'IMPRESO' && preparacion.estadoImpresionLista === 'IMPRESO') {
+              this.procesarTransicionAEntregado(item);
+            } else {
+              this._mostrarToast('Antes de pasar a Entregado, confirma la impresión de las marcas OMR y de la lista de estudiantes.', 'warning');
+            }
+          },
+          error: () => {
+            this._mostrarToast('Antes de pasar a Entregado, confirma la impresión de las marcas OMR y de la lista de estudiantes.', 'warning');
+          }
+        });
+        return;
+      }
       this._mostrarToast('Antes de pasar a Entregado, confirma la impresión de las marcas OMR y de la lista de estudiantes.', 'warning');
       return;
     }
